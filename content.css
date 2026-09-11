@@ -1,0 +1,2 @@
+/* Panel se vykresluje v shadow DOM; zde jen záruka, že host nezdědí styly stránky. */
+#terms-guard-host { all: initial; position: fixed; z-index: 2147483647; }

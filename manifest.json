@@ -1,0 +1,61 @@
+{
+  "manifest_version": 3,
+  "name": "Hlídač podmínek",
+  "description": "Automaticky čte obchodní podmínky, zásady ochrany dat a licenční ujednání při nákupu, registraci nebo instalaci a upozorní na rizika, ceny a způsob zrušení.",
+  "version": "1.0.0",
+  "default_locale": "cs",
+  "minimum_chrome_version": "116",
+  "permissions": [
+    "storage",
+    "activeTab",
+    "scripting",
+    "contextMenus",
+    "notifications",
+    "alarms"
+  ],
+  "host_permissions": ["<all_urls>"],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "content_scripts": [
+    {
+      "matches": ["http://*/*", "https://*/*"],
+      "js": [
+        "lib/keywords.js",
+        "lib/detector.js",
+        "lib/extract.js",
+        "lib/render.js",
+        "content.js"
+      ],
+      "css": ["content.css"],
+      "run_at": "document_idle",
+      "all_frames": false
+    }
+  ],
+  "action": {
+    "default_popup": "popup/popup.html",
+    "default_title": "Hlídač podmínek",
+    "default_icon": {
+      "16": "icons/icon16.png",
+      "32": "icons/icon32.png",
+      "48": "icons/icon48.png",
+      "128": "icons/icon128.png"
+    }
+  },
+  "options_ui": {
+    "page": "options/options.html",
+    "open_in_tab": true
+  },
+  "icons": {
+    "16": "icons/icon16.png",
+    "32": "icons/icon32.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  },
+  "web_accessible_resources": [
+    {
+      "resources": ["icons/*.png"],
+      "matches": ["http://*/*", "https://*/*"]
+    }
+  ]
+}

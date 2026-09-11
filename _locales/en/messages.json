@@ -1,0 +1,4 @@
+{
+  "extName": { "message": "Terms Guardian" },
+  "extDescription": { "message": "Automatically reads terms of service, privacy policies and licence agreements during checkout, sign-up or installation and warns about risks, prices and how to cancel." }
+}

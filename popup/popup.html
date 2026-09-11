@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+  <meta charset="utf-8">
+  <title>Hlídač podmínek</title>
+  <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+  <header>
+    <span class="logo">🛡️</span>
+    <h1>Hlídač podmínek</h1>
+    <button id="btn-options" class="icon" title="Nastavení">⚙</button>
+  </header>
+
+  <div id="nokey" class="notice hidden">
+    Bez API klíče běží jen rychlá offline analýza. Pro plnohodnotný rozbor
+    <a href="#" id="link-options">zadejte klíč v nastavení</a>.
+  </div>
+
+  <section id="status" class="status"></section>
+
+  <div class="actions">
+    <button id="btn-analyze" class="primary">Analyzovat tuto stránku</button>
+    <button id="btn-links" class="hidden">Analyzovat odkazované podmínky</button>
+    <button id="btn-paste">Vložit text…</button>
+  </div>
+
+  <div id="paste-box" class="hidden">
+    <textarea id="paste-text" rows="8" placeholder="Sem vložte text obchodních podmínek, licenčního ujednání apod."></textarea>
+    <div class="actions"><button id="btn-paste-run" class="primary">Analyzovat vložený text</button><button id="btn-paste-cancel">Zrušit</button></div>
+  </div>
+
+  <section id="result"></section>
+
+  <section id="history-wrap">
+    <h2>Nedávné analýzy</h2>
+    <ul id="history"></ul>
+  </section>
+
+  <script src="../lib/keywords.js"></script>
+  <script src="../lib/render.js"></script>
+  <script src="popup.js"></script>
+</body>
+</html>

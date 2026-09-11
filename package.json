@@ -1,0 +1,13 @@
+{
+  "name": "hlidac-podminek",
+  "version": "1.0.0",
+  "description": "Rozšíření prohlížeče, které čte obchodní podmínky, zásady ochrany dat a licenční ujednání a upozorní na rizika, ceny a způsob zrušení.",
+  "private": true,
+  "scripts": {
+    "test": "node --test test/*.test.js",
+    "icons": "python3 tools/make-icons.py",
+    "e2e": "node tools/e2e.js",
+    "pack": "zip -r -X dist/hlidac-podminek.zip manifest.json background.js content.js content.css lib popup options icons _locales -x '*.DS_Store'"
+  },
+  "license": "MIT"
+}

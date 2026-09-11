@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+  <meta charset="utf-8">
+  <title>Hlídač podmínek – nastavení</title>
+  <style>
+    * { box-sizing: border-box; }
+    body { max-width: 760px; margin: 0 auto; padding: 24px 20px 60px; font: 14px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif; color: #222; }
+    h1 { font-size: 22px; margin: 0 0 4px; } .lead { color: #555; margin: 0 0 20px; }
+    h2 { font-size: 15px; margin: 26px 0 8px; padding-bottom: 4px; border-bottom: 1px solid #e5e5e5; }
+    label.row { display: flex; gap: 10px; align-items: flex-start; margin: 8px 0; }
+    label.row input[type=checkbox] { margin-top: 4px; }
+    label.row small, .help { display: block; color: #666; font-size: 12px; }
+    input[type=text], input[type=password], select, textarea { width: 100%; padding: 7px 9px; font: inherit; border: 1px solid #cfd6dd; border-radius: 6px; }
+    .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+    button { font: inherit; cursor: pointer; border: 1px solid #cfd6dd; background: #f4f6f8; border-radius: 6px; padding: 7px 14px; }
+    button.primary { background: #1a73e8; color: #fff; border-color: #1a73e8; }
+    .bar { display: flex; gap: 8px; align-items: center; margin-top: 18px; }
+    #msg { font-size: 13px; } #msg.ok { color: #2e7d32; } #msg.err { color: #c62828; }
+    .warn { background: #fff8e6; border: 1px solid #f0d58c; border-radius: 8px; padding: 10px 12px; font-size: 13px; }
+    code { background: #f4f6f8; padding: 1px 5px; border-radius: 4px; }
+  </style>
+</head>
+<body>
+  <h1>🛡️ Hlídač podmínek – nastavení</h1>
+  <p class="lead">Rozšíření běží na pozadí a samo se aktivuje, když otevřete obchodní podmínky, pokladnu e-shopu, registraci nebo stránku s instalací aplikace.</p>
+
+  <h2>Analýza modelem Claude (doporučeno)</h2>
+  <div class="warn">Text podmínek se při analýze odešle na Anthropic API (api.anthropic.com). Klíč je uložen pouze ve vašem prohlížeči. Bez klíče funguje jen rychlá offline analýza podle klíčových slov.</div>
+  <div class="grid" style="margin-top:12px">
+    <div>
+      <label>API klíč Anthropic<br><input type="password" id="apiKey" placeholder="sk-ant-…" autocomplete="off"></label>
+      <span class="help">Získáte na <a href="https://console.anthropic.com/" target="_blank" rel="noopener">console.anthropic.com</a>.</span>
+    </div>
+    <div>
+      <label>Model<br>
+        <select id="model">
+          <option value="claude-opus-5">Claude Opus 5 (výchozí, nejpřesnější)</option>
+          <option value="claude-sonnet-5">Claude Sonnet 5 (levnější)</option>
+          <option value="claude-haiku-4-5">Claude Haiku 4.5 (nejlevnější, rychlý)</option>
+        </select>
+      </label>
+      <label style="display:block;margin-top:8px">Důkladnost<br>
+        <select id="effort">
+          <option value="low">nízká (rychle, levně)</option>
+          <option value="medium">střední (výchozí)</option>
+          <option value="high">vysoká</option>
+        </select>
+      </label>
+    </div>
+  </div>
+  <div class="bar"><button id="btn-test">Otestovat klíč</button><span id="testmsg"></span></div>
+
+  <h2>Automatické spouštění</h2>
+  <label class="row"><input type="checkbox" id="autoMode"><span>Aktivovat se sama na pokladně, při registraci a instalaci aplikací<small>Rozšíření najde odkazy na podmínky, stáhne je a zanalyzuje ještě před tím, než kliknete na „Souhlasím“.</small></span></label>
+  <label class="row"><input type="checkbox" id="autoOnDocuments"><span>Analyzovat i přímo otevřené stránky s podmínkami<small>Např. když si otevřete „Obchodní podmínky“ nebo „Zásady ochrany osobních údajů“.</small></span></label>
+  <label class="row"><input type="checkbox" id="showOverlay"><span>Zobrazit panel s výsledkem přímo ve stránce</span></label>
+  <label class="row"><input type="checkbox" id="notify"><span>Systémová notifikace u rizikových podmínek</span></label>
+  <label class="row"><input type="checkbox" id="useLocalFallback"><span>Bez klíče (nebo při chybě API) použít offline analýzu</span></label>
+
+  <h2>Ignorované weby</h2>
+  <textarea id="ignoredHosts" rows="3" placeholder="jeden hostname na řádek, např. example.com"></textarea>
+  <span class="help">Na těchto webech se rozšíření nebude samo spouštět (ruční analýza z popupu funguje dál).</span>
+
+  <div class="bar">
+    <button id="btn-save" class="primary">Uložit</button>
+    <button id="btn-clear">Vymazat mezipaměť výsledků</button>
+    <span id="msg"></span>
+  </div>
+
+  <h2>Jak to funguje</h2>
+  <ul>
+    <li>Na každé stránce běží lehký detektor (bez sítě). Pozná dokument s podmínkami podle nadpisu, URL a hustoty právního textu, a „kontext souhlasu“ podle tlačítek (Objednat, Registrovat, Instalovat), zaškrtávacích políček a odkazů na podmínky.</li>
+    <li>Odkazované dokumenty stáhne na pozadí a pošle k analýze. Výsledky se ukládají do mezipaměti na 7 dní, takže stejné podmínky se neplatí dvakrát.</li>
+    <li>Kdykoli můžete kliknout pravým tlačítkem na označený text nebo odkaz a zvolit „Analyzovat…“.</li>
+    <li>Ikona v liště ukazuje stav: <code>OK</code> standardní, <code>!</code> pozor, <code>!!</code> rizikové.</li>
+  </ul>
+  <script src="options.js"></script>
+</body>
+</html>
