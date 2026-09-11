@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Hlídač podmínek</string>
+    <string name="service_label">Hlídač podmínek – čtení obrazovky</string>
+    <string name="service_description">Služba čte text na obrazovce, aby poznala obchodní podmínky, pokladnu, registraci nebo instalaci aplikace a mohla podmínky automaticky vyhodnotit. Text se odesílá pouze na Anthropic API, pokud zadáte klíč; jinak probíhá analýza jen v telefonu.</string>
+    <string name="share_label">Analyzovat podmínky</string>
+    <string name="result_title">Výsledek analýzy</string>
+    <string name="settings_title">Nastavení</string>
+
+    <string name="main_intro">Aplikace čte obchodní podmínky, zásady ochrany dat a licenční ujednání a upozorní na rizika, ceny a způsob zrušení.</string>
+    <string name="service_on">Služba na pozadí je zapnutá – podmínky se vyhodnocují automaticky.</string>
+    <string name="service_off">Služba na pozadí je vypnutá. Zapněte ji, aby se aplikace sama aktivovala při nákupu, registraci nebo instalaci.</string>
+    <string name="btn_enable_service">Zapnout službu na pozadí</string>
+    <string name="btn_settings">Nastavení</string>
+    <string name="btn_analyze_text">Analyzovat vložený text</string>
+    <string name="btn_analyze_url">Analyzovat odkaz</string>
+    <string name="paste_hint">Vložte text podmínek nebo odkaz (https://…)</string>
+    <string name="history_title">Nedávné analýzy</string>
+    <string name="history_empty">Zatím žádné analýzy. Otevřete obchodní podmínky, nebo použijte Sdílet → Hlídač podmínek.</string>
+    <string name="no_key_notice">Bez API klíče běží jen rychlá offline analýza. Pro plnohodnotný rozbor zadejte klíč v nastavení.</string>
+    <string name="analyzing">Čtu podmínky…</string>
+    <string name="error_short_text">Vložte alespoň 100 znaků textu nebo platný odkaz.</string>
+
+    <string name="settings_api_key">API klíč Anthropic</string>
+    <string name="settings_api_key_hint">sk-ant-…</string>
+    <string name="settings_model">Model</string>
+    <string name="settings_effort">Důkladnost</string>
+    <string name="settings_auto">Aktivovat se sama při nákupu, registraci a instalaci</string>
+    <string name="settings_auto_docs">Analyzovat i přímo otevřené stránky s podmínkami</string>
+    <string name="settings_notify">Notifikace u rizikových podmínek</string>
+    <string name="settings_local">Bez klíče (nebo při chybě API) použít offline analýzu</string>
+    <string name="settings_privacy">Text podmínek se při analýze odešle na api.anthropic.com. Klíč je uložen pouze v telefonu.</string>
+    <string name="settings_test">Otestovat klíč</string>
+    <string name="settings_save">Uložit</string>
+    <string name="settings_saved">Uloženo.</string>
+    <string name="settings_ignored">Ignorované aplikace / weby (jeden na řádek)</string>
+
+    <string name="notif_channel_results">Výsledky analýzy</string>
+    <string name="notif_channel_status">Stav služby</string>
+    <string name="notif_analyzing_title">Hlídač podmínek</string>
+    <string name="notif_open">Zobrazit</string>
+    <string name="notif_consent_title">Souhlas s podmínkami v aplikaci</string>
+    <string name="notif_consent_text">Aplikace %1$s po vás chce souhlas s podmínkami. Klepněte pro analýzu textu na obrazovce, nebo podmínky otevřete a sdílejte do Hlídače.</string>
+    <string name="notif_analyze_screen">Analyzovat obrazovku</string>
+</resources>

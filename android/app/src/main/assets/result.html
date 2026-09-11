@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html lang="cs"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Výsledek</title>
+<script src="lib/keywords.js"></script>
+<script src="lib/render.js"></script>
+<style>
+  * { box-sizing: border-box; }
+  body { margin: 0; padding: 12px; font: 14px/1.45 -apple-system, Roboto, "Segoe UI", Arial, sans-serif; color: #222; background: #fff; }
+  .tg-tabs { position: sticky; top: 0; background: #fff; z-index: 2; }
+  .tg-tab { font-size: 14px; padding: 10px 10px; }
+  .tg-panel, .tg-summary { font-size: 14px; }
+  .tg-table { display: block; overflow-x: auto; }
+  h1 { font-size: 16px; margin: 0 0 8px; color: #555; word-break: break-all; }
+  @media (prefers-color-scheme: dark) { body { background: #121212; color: #eee; } .tg-tabs { background: #121212; } .tg-finding { background: #1e1e1e; } .tg-keypoints { background: #1e1e1e; } .tg-kv b { color: #ddd; } blockquote { background: #1a1a1a; color: #bbb; } .tg-table th { background: #222; } .tg-tab { color: #ccc; } }
+</style>
+<script>
+  window.showResult = function (json, title) {
+    var r = typeof json === 'string' ? JSON.parse(json) : json;
+    document.body.innerHTML = (title ? '<h1>' + TermsRender.esc(title) + '</h1>' : '') + TermsRender.renderResult(r);
+    TermsRender.bindTabs(document.body);
+  };
+  document.addEventListener('DOMContentLoaded', function () {
+    var s = document.createElement('style'); s.textContent = TermsRender.CSS; document.head.appendChild(s);
+    if (window.Android && Android.getResult) showResult(Android.getResult(), Android.getTitle());
+  });
+</script></head><body></body></html>

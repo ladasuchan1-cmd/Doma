@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html><head><meta charset="utf-8"><title>engine</title>
+<script src="lib/keywords.js"></script>
+<script src="lib/detector.js"></script>
+<script src="lib/extract.js"></script>
+<script src="lib/schema.js"></script>
+<script src="lib/local-analyzer.js"></script>
+<script src="lib/claude.js"></script>
+<script>
+// Most mezi Kotlinem a sdílenými JS knihovnami. Každá funkce bere a vrací JSON řetězce.
+window.TG = {
+  ready: function () { return 'ok'; },
+  detect: function (signalsJson) {
+    var s = JSON.parse(signalsJson);
+    var d = TermsDetector.detect(s);
+    return JSON.stringify({ kind: d.kind, reason: d.reason, score: d.score, context: d.context, termsLinks: d.termsLinks, length: d.length, agree: d.agree || null, strong: d.strong || [], titleHit: d.titleHit || null, urlHit: d.urlHit || null });
+  },
+  analyzeLocal: function (text, metaJson) {
+    return JSON.stringify(TermsLocalAnalyzer.analyze(text, JSON.parse(metaJson || '{}')));
+  },
+  fromHtml: function (html) {
+    return JSON.stringify({ title: TermsExtract.titleFromHtml(html), text: TermsExtract.fromHtml(html) });
+  },
+  hash: function (text) { return TermsExtract.hash(text); },
+  buildRequest: function (text, metaJson, settingsJson) {
+    var r = TermsClaude.buildRequest(text, JSON.parse(metaJson || '{}'), JSON.parse(settingsJson || '{}'));
+    return JSON.stringify({ body: r.body, betas: r.betas, truncated: r.truncated });
+  }
+};
+</script></head><body></body></html>

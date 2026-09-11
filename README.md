@@ -10,7 +10,12 @@ Rozšíření pro Chrome / Edge / Brave (Manifest V3), které **za vás čte obc
 
 Rozšíření **běží na pozadí a aktivuje se samo**: lehký detektor na každé stránce pozná dokument s podmínkami (nadpis, URL, hustota právního textu) i „kontext souhlasu“ – pokladnu e-shopu, registraci, obchod s aplikacemi – kde stáhne odkazované podmínky a zanalyzuje je ještě před tím, než kliknete na *Souhlasím*.
 
-## Instalace (ze zdrojáků)
+Existuje ve dvou podobách se společným jádrem:
+
+- **Rozšíření prohlížeče** (Chrome / Edge / Brave) – tento adresář.
+- **Android aplikace** (Kotlin) – složka [`android/`](android/README.md); služba na pozadí čte obrazovku, takže funguje v prohlížeči, Obchodě Play i v aplikacích.
+
+## Instalace rozšíření (ze zdrojáků)
 
 1. Stáhněte / naklonujte tento repozitář.
 2. V Chromu otevřete `chrome://extensions`, zapněte **Režim pro vývojáře**.
@@ -58,7 +63,11 @@ npm test          # jednotkové testy (Node 20+, bez závislostí)
 npm run icons     # přegeneruje ikony (python3, bez závislostí)
 npm run pack      # zabalí rozšíření do dist/hlidac-podminek.zip
 node tools/e2e.js # spustí Chromium s rozšířením nad testovací stránkou (vyžaduje playwright)
+npm run e2e:android   # ověří WebView assety Android aplikace v Chromiu
+npm run typecheck:android   # zkompiluje Kotlin zdrojáky proti android-all.jar (bez Android SDK)
 ```
+
+Android APK se sestavuje v Android Studiu nebo `cd android && ./gradlew assembleDebug` (viz `android/README.md`).
 
 Omezení: PDF dokumenty se zatím nečtou (rozšíření na to upozorní); analýza je automatická a **nenahrazuje právní poradenství**.
 

@@ -1,3 +1,11 @@
 dist/
 node_modules/
 .DS_Store
+android/build/
+android/app/build/
+android/.gradle/
+android/local.properties
+android/.idea/
+tools/android-typecheck/build/
+tools/android-typecheck/.gradle/
+tools/android-typecheck/.kotlin/
