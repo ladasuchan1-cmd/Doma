@@ -40,15 +40,21 @@ jobs:
         working-directory: android
         run: ./gradlew --no-daemon assembleDebug
 
-      - name: Nahrát APK
+      # full = se službou přístupnosti (Play Protect ji mimo Obchod Play blokuje, viz android/README.md),
+      # lite = bez ní (projde Play Protect; analýza ručně přes Sdílet / vložení textu).
+      - name: Nahrát APK (full + lite)
         uses: actions/upload-artifact@v4
         with:
           name: hlidac-podminek-debug-apk
-          path: android/app/build/outputs/apk/debug/app-debug.apk
+          path: |
+            android/app/build/outputs/apk/full/debug/app-full-debug.apk
+            android/app/build/outputs/apk/lite/debug/app-lite-debug.apk
           if-no-files-found: error
 
       - name: Release při tagu
         if: startsWith(github.ref, 'refs/tags/v')
         uses: softprops/action-gh-release@v2
         with:
-          files: android/app/build/outputs/apk/debug/app-debug.apk
+          files: |
+            android/app/build/outputs/apk/full/debug/app-full-debug.apk
+            android/app/build/outputs/apk/lite/debug/app-lite-debug.apk

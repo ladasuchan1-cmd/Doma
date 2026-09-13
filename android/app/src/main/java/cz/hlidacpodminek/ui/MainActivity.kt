@@ -2,6 +2,7 @@ package cz.hlidacpodminek.ui
 
 import android.Manifest
 import android.app.Activity
+import android.content.ComponentName
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Build
@@ -48,14 +49,28 @@ class MainActivity : Activity() {
 
     override fun onResume() {
         super.onResume()
-        val enabled = isServiceEnabled()
         val status = view<TextView>(R.id.service_status)
-        status.text = getString(if (enabled) R.string.service_on else R.string.service_off)
-        status.setBackgroundColor(if (enabled) 0xFFE8F5E9.toInt() else 0xFFFFF8E6.toInt())
-        view<Button>(R.id.btn_enable_service).visibility = if (enabled) View.GONE else View.VISIBLE
+        if (!hasBackgroundService()) {
+            // Varianta Lite: služba přístupnosti v manifestu není (Play Protect by instalaci zablokoval).
+            status.text = getString(R.string.service_unavailable_lite)
+            status.setBackgroundColor(0xFFE3F2FD.toInt())
+            view<Button>(R.id.btn_enable_service).visibility = View.GONE
+        } else {
+            val enabled = isServiceEnabled()
+            status.text = getString(if (enabled) R.string.service_on else R.string.service_off)
+            status.setBackgroundColor(if (enabled) 0xFFE8F5E9.toInt() else 0xFFFFF8E6.toInt())
+            view<Button>(R.id.btn_enable_service).visibility = if (enabled) View.GONE else View.VISIBLE
+        }
         view<TextView>(R.id.no_key_notice).visibility = if (prefs.apiKey.isEmpty()) View.VISIBLE else View.GONE
         renderHistory()
     }
+
+    /** Je služba na pozadí vůbec součástí této varianty aplikace (full ano, lite ne)? */
+    private fun hasBackgroundService(): Boolean = try {
+        @Suppress("DEPRECATION")
+        packageManager.getServiceInfo(ComponentName(this, TermsAccessibilityService::class.java), 0)
+        true
+    } catch (e: PackageManager.NameNotFoundException) { false }
 
     private fun isServiceEnabled(): Boolean {
         val enabled = Settings.Secure.getString(contentResolver, Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES) ?: return false

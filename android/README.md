@@ -22,13 +22,37 @@ Vyžaduje Android Studio (nebo Android SDK + JDK 17) a přístup na Google Maven
 
 ```bash
 cd android
-./gradlew assembleDebug          # APK: app/build/outputs/apk/debug/app-debug.apk
-./gradlew installDebug           # instalace na připojený telefon (USB ladění)
+./gradlew assembleDebug          # APK: app/build/outputs/apk/{full,lite}/debug/app-{full,lite}-debug.apk
+./gradlew installFullDebug       # instalace na připojený telefon (USB ladění); installLiteDebug pro variantu lite
 ```
 
 Nebo v Android Studiu: *File → Open → složka `android`* → Run.
 
 Task `copyJsLibs` před sestavením zkopíruje `../lib/*.js` do assetů – JS knihovny se neduplikují.
+
+## Dvě varianty APK a Google Play Protect
+
+Sestavení vytvoří dva APK:
+
+| Varianta | Soubor | Služba na pozadí | Instalace mimo Obchod Play |
+|---|---|---|---|
+| **full** | `app-full-debug.apk` | ano – čte obrazovku, aktivuje se sama | **Play Protect ji blokuje** („Aplikace byla za účelem ochrany zařízení zablokována“), protože deklaruje službu přístupnosti |
+| **lite** | `app-lite-debug.apk` | ne | projde bez problémů |
+
+Varianta *lite* umí vše ruční: *Sdílet → Hlídač podmínek*, „Analyzovat podmínky“ v menu označeného textu,
+vložení textu nebo odkazu v aplikaci. Obě varianty mohou být v telefonu vedle sebe (lite má balíček
+`cz.hlidacpodminek.lite`).
+
+Chcete-li nainstalovat *full*, Play Protect je třeba na chvíli vypnout:
+
+1. Obchod Play → ikona profilu vpravo nahoře → **Play Protect** → ozubené kolo → vypnout
+   **Kontrolovat aplikace pomocí služby Play Protect**.
+2. Nainstalovat `app-full-debug.apk`.
+3. Kontrolu zase zapnout. Nainstalovaná aplikace zůstane, Play Protect ji dodatečně neodstraní
+   (může ji jen znovu označit jako neověřenou).
+
+Alternativa bez vypínání: instalace přes USB ladění (`adb install app-full-debug.apk`, nebo
+`./gradlew installFullDebug`) – tu Play Protect nekontroluje.
 
 ## První spuštění v telefonu
 

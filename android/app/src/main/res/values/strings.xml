@@ -1,6 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">Hlídač podmínek</string>
+    <string name="app_name_lite">Hlídač podmínek Lite</string>
+    <string name="service_unavailable_lite">Toto je varianta Lite bez služby na pozadí (projde kontrolou Google Play Protect). Podmínky analyzujte ručně: Sdílet → Hlídač podmínek, „Analyzovat podmínky“ v menu označeného textu, nebo vložením textu či odkazu níže.</string>
     <string name="service_label">Hlídač podmínek – čtení obrazovky</string>
     <string name="service_description">Služba čte text na obrazovce, aby poznala obchodní podmínky, pokladnu, registraci nebo instalaci aplikace a mohla podmínky automaticky vyhodnotit. Text se odesílá pouze na Anthropic API, pokud zadáte klíč; jinak probíhá analýza jen v telefonu.</string>
     <string name="share_label">Analyzovat podmínky</string>

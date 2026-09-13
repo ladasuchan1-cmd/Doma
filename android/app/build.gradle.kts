@@ -30,6 +30,24 @@ android {
         }
     }
 
+    // Dvě varianty aplikace:
+    //  full – se službou přístupnosti (automatické čtení obrazovky). Google Play Protect ji při instalaci
+    //         mimo Obchod Play blokuje („Aplikace byla za účelem ochrany zařízení zablokována“), dokud
+    //         uživatel dočasně nevypne kontrolu aplikací v Play Protect nebo neinstaluje přes adb.
+    //  lite – bez služby přístupnosti (src/lite/AndroidManifest.xml ji odebírá), takže projde Play Protect.
+    //         Funguje ručně: Sdílet → Hlídač podmínek, menu označeného textu, vložení textu / odkazu.
+    flavorDimensions += "variant"
+    productFlavors {
+        create("full") {
+            dimension = "variant"
+        }
+        create("lite") {
+            dimension = "variant"
+            applicationIdSuffix = ".lite"
+            versionNameSuffix = "-lite"
+        }
+    }
+
     buildTypes {
         release {
             isMinifyEnabled = false
