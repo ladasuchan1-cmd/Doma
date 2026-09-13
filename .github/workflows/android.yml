@@ -1,0 +1,54 @@
+# Sestaví Android APK na runnerech GitHubu (mají Android SDK) a nabídne ho ke stažení
+# v záložce Actions → běh → Artifacts → hlidac-podminek-debug-apk.
+# Při pushnutí tagu v1.2.3 navíc vytvoří GitHub Release s APK.
+name: Android APK
+
+on:
+  push:
+    branches: ["**"]
+    tags: ["v*"]
+    paths:
+      - "android/**"
+      - "lib/**"
+      - ".github/workflows/android.yml"
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Android SDK
+        uses: android-actions/setup-android@v3
+        with:
+          packages: "platforms;android-34 build-tools;34.0.0 platform-tools"
+
+      - name: Gradle cache
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Jednotkové testy JS jádra
+        run: node --test test/*.test.js
+
+      - name: Sestavit debug APK
+        working-directory: android
+        run: ./gradlew --no-daemon assembleDebug
+
+      - name: Nahrát APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: hlidac-podminek-debug-apk
+          path: android/app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
+
+      - name: Release při tagu
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: android/app/build/outputs/apk/debug/app-debug.apk
