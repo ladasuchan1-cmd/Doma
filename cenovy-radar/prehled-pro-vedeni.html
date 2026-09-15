@@ -1,0 +1,278 @@
+<title>Cenový radar</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Condensed:wght@500;600;700&family=IBM+Plex+Sans:ital,wght@0,400;0,500;0,600;1,400&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+:root{
+  --bg:#F5F7F6; --panel:#FFFFFF; --ink:#18232B; --ink-2:#4A5A63; --ink-3:#7C8B93;
+  --line:#D9E0E0; --accent:#0E6B6B; --accent-ink:#0B5252; --accent-soft:#DCEDEC;
+  --warn:#B8681A; --warn-soft:#F6E7D5; --bad:#A6323A; --bad-soft:#F5DEDF; --good:#2E7D4F; --good-soft:#DDEFE3;
+  --mono:"IBM Plex Mono",ui-monospace,SFMono-Regular,Menlo,monospace;
+  --sans:"IBM Plex Sans",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  --disp:"IBM Plex Sans Condensed","IBM Plex Sans",system-ui,sans-serif;
+  color-scheme:light;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#0F1618; --panel:#161F22; --ink:#E6ECEB; --ink-2:#A9B6B8; --ink-3:#7A8A8D;
+    --line:#2A3639; --accent:#5FC0BB; --accent-ink:#8ED8D3; --accent-soft:#163A3A;
+    --warn:#E0A05A; --warn-soft:#3A2A16; --bad:#E07A80; --bad-soft:#3E2124; --good:#7BC79A; --good-soft:#1B3527;
+    color-scheme:dark;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#0F1618; --panel:#161F22; --ink:#E6ECEB; --ink-2:#A9B6B8; --ink-3:#7A8A8D;
+  --line:#2A3639; --accent:#5FC0BB; --accent-ink:#8ED8D3; --accent-soft:#163A3A;
+  --warn:#E0A05A; --warn-soft:#3A2A16; --bad:#E07A80; --bad-soft:#3E2124; --good:#7BC79A; --good-soft:#1B3527;
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--sans);font-size:16px;line-height:1.55;padding-inline:16px;padding-block:0}
+a{color:var(--accent-ink)}
+.wrap{max-width:1120px;margin:0 auto;display:grid;grid-template-columns:220px minmax(0,1fr);gap:40px;padding-block:32px 80px}
+nav.toc{position:sticky;top:env(safe-area-inset-top,0px);align-self:start;padding-top:8px;font-size:13.5px}
+nav.toc .eyebrow{margin-bottom:10px}
+nav.toc a{display:block;color:var(--ink-2);text-decoration:none;padding:5px 0 5px 12px;border-left:2px solid var(--line)}
+nav.toc a:hover{color:var(--ink);border-color:var(--accent)}
+main{min-width:0;max-width:72ch}
+.eyebrow{font-family:var(--mono);font-size:11.5px;letter-spacing:.09em;text-transform:uppercase;color:var(--ink-3)}
+h1{font-family:var(--disp);font-weight:700;font-size:44px;line-height:1.05;margin:6px 0 10px;text-wrap:balance;letter-spacing:-.01em}
+h2{font-family:var(--disp);font-weight:600;font-size:26px;line-height:1.15;margin:52px 0 12px;text-wrap:balance}
+h3{font-family:var(--disp);font-weight:600;font-size:18px;margin:26px 0 8px}
+p{margin:0 0 14px}
+.lede{font-size:19px;line-height:1.5;color:var(--ink-2);margin:0 0 22px}
+.meta{font-family:var(--mono);font-size:12.5px;color:var(--ink-3);display:flex;flex-wrap:wrap;gap:8px 22px;padding:12px 0 22px;border-bottom:1px solid var(--line);margin-bottom:26px}
+.tldr{background:var(--panel);border:1px solid var(--line);border-top:3px solid var(--accent);padding:18px 22px;margin:0 0 8px}
+.tldr h2{margin:0 0 10px;font-size:20px}
+.tldr ol{margin:0;padding-left:20px}
+.tldr li{margin-bottom:6px}
+ul,ol{padding-left:22px;margin:0 0 14px}
+li{margin-bottom:5px}
+strong{font-weight:600}
+code,.mono{font-family:var(--mono);font-size:.92em}
+code{background:var(--accent-soft);color:var(--accent-ink);padding:1px 5px;border-radius:3px}
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin:18px 0 22px}
+.kpi{background:var(--panel);border:1px solid var(--line);padding:12px 14px}
+.kpi .n{font-family:var(--disp);font-weight:700;font-size:28px;line-height:1;font-variant-numeric:tabular-nums;margin-bottom:6px}
+.kpi .l{font-size:12.5px;color:var(--ink-2);line-height:1.35}
+.kpi.warn .n{color:var(--warn)} .kpi.bad .n{color:var(--bad)} .kpi.acc .n{color:var(--accent)}
+table{border-collapse:collapse;width:100%;font-size:14px;margin:12px 0 18px}
+.tablewrap{overflow-x:auto;margin:0 0 18px}
+th,td{text-align:left;vertical-align:top;padding:8px 10px;border-bottom:1px solid var(--line)}
+th{font-family:var(--mono);font-size:11.5px;letter-spacing:.06em;text-transform:uppercase;color:var(--ink-3);font-weight:500}
+td.num{font-variant-numeric:tabular-nums;text-align:right;white-space:nowrap}
+.pill{display:inline-block;font-family:var(--mono);font-size:11.5px;padding:2px 8px;border-radius:999px;white-space:nowrap}
+.pill.ok{background:var(--good-soft);color:var(--good)} .pill.warn{background:var(--warn-soft);color:var(--warn)} .pill.bad{background:var(--bad-soft);color:var(--bad)} .pill.acc{background:var(--accent-soft);color:var(--accent-ink)}
+.flow{background:var(--panel);border:1px solid var(--line);padding:16px 18px;margin:14px 0 20px;overflow-x:auto}
+.flow pre{margin:0;font-family:var(--mono);font-size:12.5px;line-height:1.45;color:var(--ink-2)}
+.tiers{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:10px;margin:14px 0 20px}
+.tier{border:1px solid var(--line);background:var(--panel);padding:12px 14px}
+.tier .t{font-family:var(--mono);font-size:12px;color:var(--accent-ink);margin-bottom:4px}
+.tier .d{font-size:13.5px;color:var(--ink-2)}
+.phases{display:grid;gap:0;margin:16px 0 20px;border-left:2px solid var(--line)}
+.phase{display:grid;grid-template-columns:120px minmax(0,1fr) 64px;gap:16px;padding:12px 0 12px 18px;position:relative}
+.phase::before{content:"";position:absolute;left:-7px;top:19px;width:12px;height:12px;border-radius:50%;background:var(--bg);border:2px solid var(--accent)}
+.phase.crit::before{background:var(--warn);border-color:var(--warn)}
+.phase .when{font-family:var(--mono);font-size:12.5px;color:var(--ink-3);padding-top:2px}
+.phase .what b{display:block;font-family:var(--disp);font-weight:600;font-size:16px;margin-bottom:2px}
+.phase .what span{font-size:14px;color:var(--ink-2)}
+.phase .h{font-family:var(--mono);font-size:12.5px;color:var(--ink-3);text-align:right;padding-top:2px;white-space:nowrap}
+.cols{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:14px;margin:14px 0 20px}
+.box{border:1px solid var(--line);background:var(--panel);padding:14px 16px}
+.box h3{margin:0 0 8px;font-size:16px}
+.box.good{border-top:3px solid var(--good)} .box.warn{border-top:3px solid var(--warn)} .box.bad{border-top:3px solid var(--bad)}
+.box ul{margin:0;padding-left:18px;font-size:14px}
+.q{counter-reset:q;list-style:none;padding:0}
+.q li{counter-increment:q;display:grid;grid-template-columns:34px minmax(0,1fr);gap:10px;padding:10px 0;border-bottom:1px solid var(--line)}
+.q li::before{content:counter(q);font-family:var(--disp);font-weight:700;font-size:20px;color:var(--accent);line-height:1.1}
+.q li b{display:block;font-weight:600}
+.q li span{color:var(--ink-2);font-size:14.5px}
+.foot{margin-top:56px;padding-top:16px;border-top:1px solid var(--line);font-size:13px;color:var(--ink-3)}
+.foot p{margin:0 0 6px}
+@media (max-width:820px){.wrap{grid-template-columns:1fr;gap:20px}nav.toc{position:static;display:flex;flex-wrap:wrap;gap:4px 14px}nav.toc a{border-left:0;padding:2px 0}nav.toc .eyebrow{width:100%}.phase{grid-template-columns:1fr}.phase .h{text-align:left}h1{font-size:34px}}
+@media (prefers-reduced-motion:reduce){*{scroll-behavior:auto!important}}
+</style>
+
+<div class="wrap">
+<nav class="toc" aria-label="Obsah">
+  <div class="eyebrow">Obsah</div>
+  <a href="#tldr">Shrnutí</a>
+  <a href="#proc">Proč odejít z Disiva</a>
+  <a href="#co">Co postavíme</a>
+  <a href="#sber">Sběr cen</a>
+  <a href="#parovani">Párování</a>
+  <a href="#engine">Cenový engine</a>
+  <a href="#pravo">Právní rámec</a>
+  <a href="#konkurence">Konkurence a zdroje</a>
+  <a href="#faze">Fáze a čas</a>
+  <a href="#rizika">Rizika</a>
+  <a href="#otazky">K rozhodnutí</a>
+</nav>
+
+<main>
+<div class="eyebrow">Koloshop · návrh projektu · verze 0.1</div>
+<h1>Cenový radar</h1>
+<p class="lede">Vlastní monitoring cen konkurence a dynamická cenotvorba místo Disiva. Logika v našich rukou, data na našem serveru, bez limitu „searchů“.</p>
+<div class="meta"><span>15. 9. 2026</span><span>připravil L. Suchan (research s AI asistentem)</span><span>podklad k rozhodnutí pro vedení</span></div>
+
+<section class="tldr" id="tldr">
+  <h2>Shrnutí</h2>
+  <ol>
+    <li><strong>Disivo nám nestačí:</strong> úpravy logiky jdou jen přes support, monitoring je omezený počtem searchů, exporty občas neproběhnou a DE monitoring od října končí.</li>
+    <li><strong>Postavíme vlastní nástroj</strong> ve stejném stacku jako Sales Radar a Feed Hub (FastAPI, Postgres, interní server). Export cen bude ve stejném formátu, jaký admin už umí z Disiva, takže admin se nemění.</li>
+    <li><strong>Sběr cen bude legální a slušný:</strong> jen veřejné stránky, robots.txt, 1 dotaz za 2 s, identifikovaný bot, žádné obcházení ochran. Podrobná policy je k schválení.</li>
+    <li><strong>Párování bude auditovatelné:</strong> cenu smí hýbat jen shoda přes EAN, kód výrobce nebo ruční potvrzení. Podobnost názvu jde vždy do fronty k ověření.</li>
+    <li><strong>Postup po fázích:</strong> říjen náhrada DE monitoringu, listopad CZ zdroje, prosinec až leden cenový engine ve stínu vedle Disiva, únor ostrý provoz. Odhad 107 h práce rozložených do 6 měsíců.</li>
+  </ol>
+</section>
+
+<h2 id="proc">Proč odejít z Disiva</h2>
+<p>Čísla z tarifu a z týdenního reportu Disiva (7. až 13. 9. 2026):</p>
+<div class="kpis">
+  <div class="kpi"><div class="n">1,0 mil.</div><div class="l">searchů měsíčně v tarifu CZ</div></div>
+  <div class="kpi warn"><div class="n">1,55 mil.</div><div class="l">searchů potřebných s Kupkolem, Mojekolem a Bikemaxem vedle Heureky</div></div>
+  <div class="kpi bad"><div class="n">48 000</div><div class="l">aktivních položek na webu, z nich se denně hledá jen 31 000 skladem</div></div>
+  <div class="kpi acc"><div class="n">234 896</div><div class="l">přecenění za týden, která musí umět i náš nástroj</div></div>
+</div>
+<ul>
+  <li><strong>Logika není naše.</strong> Strategie per konkurent, master produkty, limity searchů podle kategorií: vše čeká na vývojáře Disiva („3 až 6 týdnů“).</li>
+  <li><strong>Provozní chyby s dopadem na marketing.</strong> Export se 7. 9. nevygeneroval, 20. 5. běžel přes 2 hodiny a prošvihla se ranní vlna feedů.</li>
+  <li><strong>Párování dělá chyby, které stojí marži.</strong> Shoda „podle názvu“ páruje jinou barvu nebo velikost, případně vyprodanou variantu. U Kupkola muselo jít vše ručně přes tabulku.</li>
+  <li><strong>Upozornění blokují tisíce položek.</strong> Po akci hlásí Disivo 1 741 až 3 193 „významných změn ceny“ k ručnímu odkliknutí.</li>
+  <li><strong>Bez historie a bez automatického exportu sestav.</strong> Support 10. 9.: historická data zpětně asi nejdou vytáhnout.</li>
+  <li><strong>DE monitoring končí v říjnu 2026.</strong> Náhradu musíme mít do měsíce, ať se rozhodneme o CZ jakkoli.</li>
+</ul>
+
+<h2 id="co">Co postavíme</h2>
+<p>Aplikace <span class="mono">ceny.report</span> na interním serveru vedle <span class="mono">sales.report</span> a <span class="mono">feeds.report</span>. Stejná pravidla jako Feed Hub: data u nás, žádné externí AI služby, deterministická logika, hesla jen v <span class="mono">.env</span>.</p>
+<div class="flow"><pre>Pohoda (denní mail: zásoby, pohyby)  ─┐
+Admin webu (export položek, ceny)    ─┼─► INGEST ─► products · our_prices · N · DMOC
+                                       │
+Konkurence (JSON-LD, sitemapy,        │
+soubory SHOPSCOUT)                   ─┴─► COLLECT ─► offers · offer_history ─► MATCH (T1 EAN · T2 MPN · T3 kód · T4 fronta)
+                                                                                     │
+                                          strategie + zarážky + dry-run ◄────────────┘
+                                                     │
+                                          PRICE ENGINE ─► návrh + „proč“ ─► schválení ─► export CSV (formát Disiva) ─► admin
+                                                     └─► alerty · denní mail 7:00 · týdenní KPI · historie</pre></div>
+<div class="cols">
+  <div class="box"><h3>Ingest</h3><ul><li>Denní export Pohody už chodí mailem (zásoby, pohyby, příjemky).</li><li>Export položek z adminu (web kód, aktivní, zásoba).</li><li>N klasifikace převzatá ze Sales Radaru.</li></ul></div>
+  <div class="box"><h3>Collect</h3><ul><li>Adaptér per zdroj, konfigurace v databázi.</li><li>Slušný fetcher už existuje v Sales Radaru (Kupkolo).</li><li>Raw HTML 30 dní, metriky každého běhu.</li></ul></div>
+  <div class="box"><h3>Match</h3><ul><li>Vrstvy s jistotou a důvodem.</li><li>Fronta k ověření pro brand manažery.</li><li>Trvalé ruční páry a zákazy.</li></ul></div>
+  <div class="box"><h3>Price</h3><ul><li>Strategie podle kategorie, značky a N.</li><li>Zarážky: marže, DMOC, krok změny.</li><li>Každá cena má dohledatelné vysvětlení.</li></ul></div>
+</div>
+
+<h2 id="sber">Sběr cen konkurence</h2>
+<p>Vždy volíme nejčistší dostupný způsob. Odhad objemu: 30 000 skladových položek krát zhruba 6 relevantních konkurentů v kategorii dá 60 až 120 tisíc stránek týdně. Při 2 s na dotaz a 10 zdrojích souběžně je to 4 až 7 hodin nočního běhu.</p>
+<ol>
+  <li><strong>Strukturovaná data na stránce</strong> (JSON-LD s EAN, kódem výrobce a cenou). Jedna stránka obvykle nese všechny varianty. Ověřeno u Kupkola a bike-discountu.</li>
+  <li><strong>Sitemapy</strong> pro noční objevení URL jen ve značkách, které vedeme.</li>
+  <li><strong>Hledání podle EAN</strong> tam, kde není sitemap. Dražší, dva dotazy na položku.</li>
+  <li><strong>Soubory</strong> (SHOPSCOUT, pricewatch) stejnou pipelinou.</li>
+  <li><strong>Prohlížeč (Playwright)</strong> jen u webů bez anti-bot ochrany a po jmenovitém schválení vedením. Ochrany typu Datadome nebo Cloudflare neobcházíme, zdroj raději vynecháme.</li>
+</ol>
+
+<h2 id="parovani">Párování produktů</h2>
+<p>Stav oboru: EAN je nejspolehlivější, u komponentů běžně dostupný, u kol a oblečení často chybí. Zboží.cz i komerční nástroje kombinují identifikátor, skóre a ruční validaci. My držíme jednoduché pravidlo: <strong>cenu hýbe jen jistá shoda.</strong></p>
+<div class="tiers">
+  <div class="tier"><div class="t">T1 · EAN/GTIN · 0,98</div><div class="d">Validní kontrolní číslice, UPC převeden na EAN13. Hýbe cenou.</div></div>
+  <div class="tier"><div class="t">T2 · MPN + značka · 0,90</div><div class="d">Kódy dílů Shimano, SRAM, Fox jsou unikátní na variantu. Hýbe cenou.</div></div>
+  <div class="tier"><div class="t">T3 · náš kód v SKU · 0,80</div><div class="d">Po prvním ručním potvrzení značky. Hýbe cenou.</div></div>
+  <div class="tier"><div class="t">T4 · kandidát podle názvu · 0,3–0,7</div><div class="d">Značka, model, rok, velikost, barva, fuzzy shoda. Jen fronta k ověření.</div></div>
+</div>
+<ul>
+  <li>Pojistka výrobce: výrobce z našeho názvu musí být v názvu konkurenta.</li>
+  <li>Filtr podezřelých cen: poměr pod 0,2 nebo nad 5× jde na kontrolu, ne do marže.</li>
+  <li>Vyprodaná varianta se nepáruje na jinou barvu ani velikost (přesně chyba Disiva).</li>
+  <li>Předchozí ročník se sleduje jako „similar“, automaticky nepřeceňuje.</li>
+  <li>Cíl: přesnost automatických párů 97 % a víc. Špatný pár zkazí cenu, chybějící ji jen zpozdí.</li>
+</ul>
+
+<h2 id="engine">Cenový engine</h2>
+<p>Deterministický výpočet nad strategiemi uloženými v databázi a editovatelnými v aplikaci.</p>
+<ol>
+  <li><strong>Vstup položky:</strong> naše cena, nákupní, DMOC, N, zásoba, dodání, prodeje, jisté ceny konkurence s dostupností.</li>
+  <li><strong>Volba strategie</strong> podle kategorie, značky, N nebo konkrétních kódů. Příklad: N1 až N2 chránit, N3 až N4 marže vs. konkurence, N5 až N6 hlídat obrátku, N7 až N8 řízený odprodej.</li>
+  <li><strong>Pravidlo:</strong> nejlevnější konkurent skladem minus 1 %, medián konkurence, DMOC minus 5 %, nákupní krát cílová marže.</li>
+  <li><strong>Zarážky v pevném pořadí:</strong> minimální marže, spodní a horní cena, DMOC strop, maximální krok za den, nezlevňovat pod nejlevnějšího, zaokrouhlení, akce má přednost.</li>
+  <li><strong>Výstup:</strong> návrh plus vysvětlení („N4, Kupkolo skladem 1 290, cíl −1 % = 1 277, marže 22 % OK“). Změny mimo pásmo jdou do fronty s hromadným schválením.</li>
+  <li><strong>Export</strong> ve formátu, který admin zná z Disiva, včetně záznamu kdo, kdy a kolik změn.</li>
+</ol>
+
+<h2 id="pravo">Právní rámec ve zkratce</h2>
+<p>Čtení veřejných cen je v EU i ČR standardní soutěžní praxe (výjimka pro vytěžování dat § 39c autorského zákona, rozsudek SDEU CV-Online). Riziko tvoří až obcházení ochran, kopírování celé databáze nebo porušení podmínek, které jsme aktivně přijali.</p>
+<div class="cols">
+  <div class="box good"><h3>Smíme</h3><ul><li>Číst veřejné produktové stránky bez přihlášení v mezích robots.txt.</li><li>Ukládat cenu, dostupnost, EAN, název, URL, čas.</li><li>Používat sitemapy, Google Shopping, oficiální produkty Heureky.</li><li>Interně z toho odvozovat vlastní ceny.</li></ul></div>
+  <div class="box warn"><h3>S opatrností</h3><ul><li>Větší část katalogu jednoho konkurenta.</li><li>Weby, jejichž podmínky scraping zakazují, ale robots.txt ne. Při výzvě přestat.</li></ul></div>
+  <div class="box bad"><h3>Nesmíme</h3><ul><li>Obcházet captcha, Cloudflare, Datadome, blokace IP; maskovat bota, rotovat proxy.</li><li>Přihlašovat se, zakládat účty, číst B2B ceníky.</li><li>Scrapovat Heureka.cz (výslovný zákaz).</li><li>Stahovat recenze, jména, fotky, texty; data zveřejňovat.</li></ul></div>
+</div>
+<p>Rešerše není právní stanovisko. Návrh interní <strong>scraping policy</strong> je připraven k schválení a doporučujeme jednorázovou revizi advokátem.</p>
+
+<h2 id="konkurence">Konkurence a zdroje</h2>
+<p>Rychlá technická sonda 15. 9. 2026 (z datacentrové IP, z našeho serveru je nutné znovu ověřit). Přehled, co jde sbírat čistě a kde je to zablokované.</p>
+<div class="tablewrap"><table>
+<thead><tr><th>Doména</th><th>Platforma</th><th>Produktové stránky v robots.txt</th><th>EAN / kód v JSON-LD</th><th>Anti-bot</th><th>Veřejný feed</th></tr></thead>
+<tbody>
+<tr><td>kupkolo.cz</td><td>vlastní (WPJ)</td><td><span class="pill ok">povoleny</span> + sitemapa</td><td>gtin13, sku (část pseudo-EAN)</td><td><span class="pill ok">ne</span></td><td>–</td></tr>
+<tr><td>cyklospeciality.cz</td><td>vlastní (WPJ)</td><td><span class="pill ok">povoleny</span></td><td>pravděpodobně jako Kupkolo</td><td><span class="pill ok">ne</span></td><td>–</td></tr>
+<tr><td>bikero.cz</td><td>vlastní</td><td><span class="pill ok">povoleny</span> + sitemapa</td><td>sku, EAN (chybný typ)</td><td><span class="pill ok">ne</span></td><td>–</td></tr>
+<tr><td>kolokram.cz</td><td>vlastní (jako bikero)</td><td><span class="pill ok">povoleny</span></td><td>sku, gtin12</td><td><span class="pill ok">ne</span></td><td>–</td></tr>
+<tr><td>velosport.cz</td><td>Shoptet</td><td><span class="pill ok">povoleny</span></td><td>gtin13, sku</td><td><span class="pill ok">ne</span></td><td><span class="pill acc">heureka + google XML</span></td></tr>
+<tr><td>kola-bbm.cz</td><td>Shoptet</td><td><span class="pill ok">povoleny</span></td><td>sku (gtin13 když je EAN)</td><td><span class="pill ok">ne</span></td><td><span class="pill acc">zbozi + heureka + google XML</span></td></tr>
+<tr><td>bikemax.cz</td><td>Shoptet</td><td><span class="pill ok">povoleny</span></td><td>gtin13, sku</td><td><span class="pill ok">ne</span></td><td><span class="pill acc">heureka + google XML</span></td></tr>
+<tr><td>bikeforce.cz</td><td>Eshop-rychle</td><td><span class="pill ok">povoleny</span>, Crawl-delay 2</td><td>gtin, sku</td><td><span class="pill ok">ne</span></td><td>–</td></tr>
+<tr><td>mtbiker.sk</td><td>vlastní</td><td><span class="pill ok">povoleny</span></td><td>neověřeno</td><td><span class="pill warn">Cloudflare</span></td><td>–</td></tr>
+<tr><td>sportisimo.cz</td><td>vlastní</td><td><span class="pill ok">povoleny</span>, bez filtrů</td><td>neověřeno</td><td><span class="pill warn">Cloudflare</span></td><td>–</td></tr>
+<tr><td>kola-radotin.cz</td><td>vlastní</td><td><span class="pill ok">povoleny</span></td><td>neověřeno</td><td><span class="pill warn">Cloudflare</span></td><td>–</td></tr>
+<tr><td>bike-discount.de</td><td>Shopware 6</td><td><span class="pill warn">detail blokován pro Googlebot</span></td><td>JSON-LD + UPC (ověřeno 7/2026)</td><td><span class="pill warn">Cloudflare</span></td><td>12 sitemap</td></tr>
+<tr><td>bike24.com</td><td>vlastní</td><td>403 i na robots</td><td>–</td><td><span class="pill bad">Akamai</span></td><td>–</td></tr>
+<tr><td>alza.cz</td><td>vlastní</td><td>403 i na robots</td><td>–</td><td><span class="pill bad">Cloudflare + vlastní</span></td><td>–</td></tr>
+<tr><td>decathlon.cz</td><td>vlastní</td><td>–</td><td>–</td><td><span class="pill bad">Cloudflare challenge</span></td><td>–</td></tr>
+</tbody></table></div>
+<ul>
+  <li><strong>Shoptet obchody</strong> dají celý katalog s cenou a EAN jedním stažením veřejného feedu, bez crawlování.</li>
+  <li><strong>Vlastní české platformy</strong> mají sitemapy a JSON-LD, ale EAN bývá nespolehlivý; párovat i přes kód výrobce a název.</li>
+  <li><strong>Velcí hráči za Cloudflare nebo Akamai</strong> jsou z datacentra neprůchodní a obcházet je nebudeme. Legální cesta je placené Heureka Bidding Data API (oficiální „náhrada za crawlování“, vrací nabídky všech obchodů u produktu) nebo Google Shopping.</li>
+  <li>Dalších zhruba 45 domén z našeho seznamu konkurentů ověříme skriptem z našeho serveru ve fázi 0.</li>
+</ul>
+<div class="box bad" style="margin:18px 0 6px"><h3>Nález mimo projekt: veřejný feed s nákupními cenami</h3><p style="margin:0;font-size:14.5px">Feed pro Disivo <span class="mono">/xml-new/CZE/disivo.xml</span> na koloshop.cz je dostupný bez tokenu a obsahuje nákupní ceny, stavy po prodejnách a zdraví zboží. Ověřeno 15. 9. 2026. Nic jsme neměnili; patří Fameless a Františkovi jako první bod fáze 0 (token v URL, basic auth nebo IP allowlist pro Disivo).</p></div>
+
+<h2 id="faze">Fáze a čas</h2>
+<p>Kapacita: Láďa 1 až 2 h denně plus AI asistent na kód; brand manažeři ověřují páry v aplikaci, ne v Excelu.</p>
+<div class="phases">
+  <div class="phase"><div class="when">do konce 9/2026</div><div class="what"><b>0 · Rozhodnutí a příprava</b><span>Zabezpečit feed disivo.xml, schválit policy, potvrdit formát importu cen v adminu s Fameless, priorita konkurentů, ověřit domény z našeho serveru, poptat Heureka Bidding API.</span></div><div class="h">8 h</div></div>
+  <div class="phase crit"><div class="when">10/2026</div><div class="what"><b>1 · Náhrada DE/AT monitoringu</b><span>Skeleton, ingest Pohody, adaptéry bike-discount a další DE zdroje, párování T1/T2, report „kde jsme dražší“. Termín daný koncem Disivo DE.</span></div><div class="h">25 h</div></div>
+  <div class="phase"><div class="when">11/2026</div><div class="what"><b>2 · CZ zdroje a fronta párů</b><span>Kupkolo, Mojekolo, Bikemax, Radotín a další podle kategorií; kandidáti, fronta, trvalé páry.</span></div><div class="h">25 h</div></div>
+  <div class="phase"><div class="when">12/2026 – 1/2027</div><div class="what"><b>3 · Cenový engine ve stínu</b><span>Strategie, zarážky, dry-run, vysvětlení; 4 týdny denní diff našich návrhů proti exportu Disiva.</span></div><div class="h">30 h</div></div>
+  <div class="phase"><div class="when">2/2027</div><div class="what"><b>4 · Ostrý provoz CZ</b><span>Export do admina místo Disiva, marketingové akce, schvalování, alerty, reporty.</span></div><div class="h">15 h</div></div>
+  <div class="phase"><div class="when">3/2027</div><div class="what"><b>5 · Vypnutí Disiva</b><span>Archiv exportů, náhrada impresí, výpověď.</span></div><div class="h">4 h</div></div>
+</div>
+
+<h2 id="rizika">Rizika</h2>
+<div class="tablewrap"><table>
+<thead><tr><th>Riziko</th><th>Dopad</th><th>Opatření</th></tr></thead>
+<tbody>
+<tr><td>Konkurent blokuje serverovou IP</td><td>výpadek zdroje</td><td>zdroj vynechat nebo požádat o feed; nikdy neobcházet</td></tr>
+<tr><td>Menší pokrytí než Heureka</td><td>u long-tailu chybí cena</td><td>fallback „bez konkurence = DMOC/marže“; po fázi 2 rozhodnout o Heurece pro long-tail</td></tr>
+<tr><td>Špatný pár, špatná cena</td><td>ztráta marže nebo obratu</td><td>jen T1 až T3 hýbou cenou, filtr podezřelých, maximální krok, schvalovací pásmo</td></tr>
+<tr><td>Změna šablony webu konkurenta</td><td>tichý pokles dat</td><td>měření výtěžnosti parseru s prahem a alertem</td></tr>
+<tr><td>Kapacita Ládi</td><td>skluz</td><td>fáze 1 má prioritu, ostatní fáze jsou nezávislé</td></tr>
+<tr><td>Ztráta impresí po odchodu z Disiva</td><td>slabší promo logika</td><td>GA4 nebo web analytika (Sales Radar už GA4 čte)</td></tr>
+<tr><td>Admin importuje jinak, než čekáme</td><td>zdržení přepnutí</td><td>ověřit ve fázi 0, zkušební import</td></tr>
+</tbody></table></div>
+
+<h2 id="otazky">K rozhodnutí</h2>
+<ol class="q">
+  <li><b>Scraping policy</b><span>Schvaluje CEO? Zdroje s anti-bot ochranou (bike24) vynecháme, nebo požádáme o feed?</span></li>
+  <li><b>Import cen do admina</b><span>Soubor z URL, nebo ruční nahrání? Kdo z Fameless potvrdí? Jsou v importu i akční ceny a časová okna?</span></li>
+  <li><b>Heureka pro long-tail a velké hráče</b><span>Poptat ceník Heureka Bidding Data API a rozhodnout, zda ho použít pro produkty bez přímé konkurence a pro Alzu, Decathlon, Sportisimo.</span></li>
+  <li><b>Imprese</b><span>Čím nahradit imprese z Disiva: GA4, nebo web analytika?</span></li>
+  <li><b>DE/AT zdroje</b><span>Které německé e-shopy jsou pro nás nejvíc cenotvorné? Bike-discount a mtbiker jsou za Cloudflare, ověřit průchodnost z našeho serveru; kandidáti bike-components, fahrrad.de, Rose, Bikeinn.</span></li>
+  <li><b>Repozitář</b><span>Nový privátní repozitář jako Feed Hub, se sdílenou databází. Souhlas?</span></li>
+</ol>
+
+<div class="foot">
+  <p>Podrobné dokumenty (současný stav, právní rámec, párování, konkurence, návrh, policy) jsou v repozitáři ve složce <span class="mono">cenovy-radar/docs</span>.</p>
+  <p>Vzniklo čistě sběrem informací. V adminu, Disivu, na webu ani v mailech nebylo nic změněno.</p>
+</div>
+</main>
+</div>

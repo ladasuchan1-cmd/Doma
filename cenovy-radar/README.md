@@ -14,4 +14,6 @@ na webu ani v mailech.
 | [05 Návrh projektu](docs/05-navrh-projektu.md) | Architektura, datový model, sběr, párování, cenový engine, fáze, rizika, otevřené otázky |
 | [06 Scraping policy](docs/06-scraping-policy.md) | Interní pravidla sběru dat k schválení vedením |
 
+Jednostránkový přehled pro vedení: [prehled-pro-vedeni.html](prehled-pro-vedeni.html) (tělo HTML stránky; publikováno i jako sdílený artefakt).
+
 Doporučené pořadí čtení pro vedení: 05 → 01 → 06 → 02. Pro implementaci: 03 → 04 → 05.
