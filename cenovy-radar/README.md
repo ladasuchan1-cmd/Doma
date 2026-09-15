@@ -16,4 +16,6 @@ na webu ani v mailech.
 
 Jednostránkový přehled pro vedení: [prehled-pro-vedeni.html](prehled-pro-vedeni.html) (tělo HTML stránky; publikováno i jako sdílený artefakt).
 
+**Implementace:** samostatný repozitář `ladasuchan1-cmd/cenovy-radar` (fáze 1 — skeleton, ingest feedu, adaptéry, párování EAN/MPN, srovnání cen; nasazení na Hetzner viz tamní `NASAZENI.md`).
+
 Doporučené pořadí čtení pro vedení: 05 → 01 → 06 → 02. Pro implementaci: 03 → 04 → 05.
