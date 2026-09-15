@@ -13,9 +13,13 @@ na náš sortiment auditovatelně, (c) navrhuje a exportuje ceny podle *našich*
 **Mimo rozsah v1:** změna admina webu (import cen zůstane ve formátu, který admin
 už umí od Disiva), řízení nákupu (to je Obra 3.0), Heureka bidding.
 
-**Klíčové rozhodnutí:** admin dnes umí importovat Disivo export. Náš export bude mít
-**stejné sloupce** (`text_ITEM_ID`, `float_PRICE_VAT`, …) → na straně Fameless/admina
-se nic nemění, přepnutí je jen změna zdroje souboru. Ověřit s Davidem (Fameless), zda
+**Klíčové rozhodnutí:** admin dnes umí importovat cenový export Disiva. Náš export bude mít
+**stejné sloupce** (`ITEM_ID, NAME, RECOMMENDEDPRICE_VAT, PURCHASEPRICE_VAT, PRICE_VAT,
+RULE_NAME, GROUP_NAME, SUBGROUP_NAME, PRIORPRICE_VAT`) → na straně Fameless/admina se nic
+nemění, přepnutí je jen změna zdroje souboru. Stejně tak **vstup**: produktový feed
+`disivo.xml`, který admin už generuje (ITEM_ID, EAN, PART_NUMBER, PRICE_VAT,
+PURCHASEPRICE_VAT, GOODS_HEALTH, STOCK_LVL_*, ITEMGROUP_ID…), je hotový kontrakt pro náš
+ingest — jen musí být chráněný tokenem (viz nález v 04). Ověřit s Davidem (Fameless), zda
 admin export načítá z URL, nebo se nahrává ručně (viz otevřené otázky).
 
 ## 2. Architektura
@@ -45,7 +49,7 @@ nikdy pád celého běhu); delta log místo snapshotů.
 
 | Modul | Co dělá | Z čeho vychází |
 |---|---|---|
-| **ingest** | denní načtení Pohody (zásoby, pohyby), exportu položek z adminu, DMOC; výpočet N (převzít z r01sales) | `r01sales` mail import, `build_data.py` |
+| **ingest** | produktový feed z adminu (`disivo.xml`, á 2 h) + denní Pohoda (zásoby, pohyby) pro nákupní ceny a N; DMOC | `r01sales` mail import, `build_data.py`, existující feed |
 | **collect** | plánované stahování cen konkurence per zdroj (adaptér + konfigurace v DB), slušný fetcher (robots, rate‑limit, UA s kontaktem, noční okna), raw storage, monitoring zdroje | `konk_scraper.PoliteFetcher`, `de_scraper`, feedhub `ingest.py` |
 | **match** | párování nabídek konkurence na naše kódy ve vrstvách T1–T4, `match_map` s důvodem a jistotou, fronta k ručnímu ověření, trvalé ruční páry, blokace špatných párů | feedhub `sku_map`, r01sales „jistá/nejistá“ shoda, skill kupkolo‑porovnani (podezřelé páry) |
 | **price** | výpočet návrhu ceny per položka podle strategií a zarážek, dry‑run, diff proti aktuální ceně, schvalování, export | Disivo strategie (co replikujeme), r01sales „akční cena a marže“ |
@@ -85,8 +89,13 @@ Pořadí zdrojů podle „technické čistoty“ — vždy volíme nejčistší 
 1. **Strukturovaná data na produktové stránce** (JSON‑LD `Product/Offer` s `gtin13`/`mpn`/`price`) — zjišťovat 1 GET na produkt, jedna stránka obvykle nese všechny varianty. Kupkolo, bike‑discount ověřeno; ostatní viz 04.
 2. **Sitemap crawl** — noční objevení URL produktů (`sitemap.xml`), pak jen produkty ve značkách, které vedeme (průnik značek), s cache `Last‑Modified`/ETag.
 3. **Vyhledávání podle EAN** na webu konkurenta — jen tam, kde není sitemap; dražší (2 dotazy na položku).
-4. **Soubory** (SHOPSCOUT, pricewatch, tabulky od dodavatelů) — ruční upload, stejná pipeline.
-5. **Prohlížeč (Playwright)** — pouze u zdrojů, kde běžný GET neprojde, a **jen po rozhodnutí vedení** (viz 02 — obcházení anti‑bot ochrany nedoporučujeme; alternativa je zdroj vynechat nebo si vyžádat feed).
+4. **Veřejné feedy konkurentů** — Shoptet obchody (velosport, kola‑bbm, bikemax) vystavují
+   Heureka/Google XML s ITEM_ID, PRICE_VAT a EAN: jeden GET na celý katalog, žádný crawl.
+5. **Heureka Bidding Data API** (placené, oficiální „náhrada za crawlování“) — jediná legální
+   cesta k cenám velkých hráčů za Cloudflare (Alza, Decathlon, Sportisimo) a k long‑tailu;
+   rozhodnout podle ceníku (otázka 3).
+6. **Soubory** (SHOPSCOUT, pricewatch, tabulky od dodavatelů) — ruční upload, stejná pipeline.
+7. **Prohlížeč (Playwright)** — pouze u čistě JS webů bez anti‑bot ochrany a **jen po rozhodnutí vedení** (viz 02 a 06 — obcházení Cloudflare/Akamai/Datadome nedoporučujeme; alternativa je zdroj vynechat, Bidding API, nebo si vyžádat feed).
 
 Pravidla fetcheru (kód už existuje v `konk_scraper.PoliteFetcher`, rozšířit):
 - respektovat `robots.txt` včetně `Crawl-delay`; při `Disallow` produktových stránek zdroj nepoužívat;
@@ -139,14 +148,14 @@ hrubý odhad práce Ládi (kód generuje asistent, čas jde na zadání, kontrol
 
 | Fáze | Obsah | Výstup | Odhad |
 |---|---|---|---|
-| **0 — Rozhodnutí a příprava** (do konce 9/2026) | schválit scraping policy (06), potvrdit formát importu cen v adminu s Fameless, priorita konkurentů per kategorie (Sheet), povolit odchozí provoz z 172.18.9.31 na domény konkurentů (František) | podepsaná policy, seznam zdrojů v1, formát exportu | 6 h |
+| **0 — Rozhodnutí a příprava** (do konce 9/2026) | **zabezpečit `disivo.xml`** (Fameless/František), schválit scraping policy (06), potvrdit formát importu cen v adminu, priorita konkurentů per kategorie (Sheet), povolit odchozí provoz z 172.18.9.31, skriptem ověřit robots/JSON‑LD/anti‑bot všech ~60 domén **z naší IP**, poptat ceník Heureka Bidding API | podepsaná policy, seznam zdrojů v1, formát exportu | 8 h |
 | **1 — DE/AT náhrada** (10/2026, termín daný koncem Disivo DE) | skeleton (schéma `pricing`, ingest Pohody a exportu položek), adaptéry bike‑discount + mtbiker.de + 2–3 další z 04, T1/T2 párování, srovnání CZ→EUR, report „kde jsme dražší“ | ceny DE konkurence denně v UI + XLSX, bez cenového enginu | 25 h |
 | **2 — CZ zdroje a fronta párů** (11/2026) | Kupkolo (přenést), Mojekolo, Bikemax, Radotín, další z 04 podle kategorií; T3/T4 kandidáti, UI fronty, trvalé páry, blokace | pokrytí 60–80 % TOP sortimentu přímými konkurenty | 25 h |
 | **3 — Cenový engine ve stínu** (12/2026–1/2027) | strategie, zarážky, dry‑run, vysvětlení; 4 týdny souběh s Disivem CZ — denní diff našich návrhů proti Disivo exportu | rozhodnutí „přepnout / co doladit“ podložené čísly | 30 h |
 | **4 — Ostrý provoz CZ** (2/2027) | export do admina místo Disiva, marketingové akce, schvalování, alerty, denní/týdenní report | Disivo CZ jen paralelně ke kontrole | 15 h |
 | **5 — Vypnutí Disiva** (3/2027) | archiv Disivo exportů, imprese nahradit GA4/webem, výpověď | úspora licence | 4 h |
 
-Celkem cca 105 h práce Ládi, rozložených do 6 měsíců. Fáze 1 je časově kritická
+Celkem cca 107 h práce Ládi, rozložených do 6 měsíců. Fáze 1 je časově kritická
 (DE monitoring končí v říjnu); zbytek lze posouvat podle výsledků souběhu.
 
 ## 8. Rizika a jak s nimi
@@ -166,7 +175,7 @@ Celkem cca 105 h práce Ládi, rozložených do 6 měsíců. Fáze 1 je časově
 
 1. **Scraping policy** (06) — schvaluje CEO? Speciálně: zdroje s anti‑bot ochranou (bike24) vynecháme, nebo požádáme o feed?
 2. **Formát a cesta importu cen do admina** — soubor z URL, nebo ruční nahrání? Kdo (Fameless) potvrdí? Jsou v importu i akční ceny a časová okna?
-3. **Heureka pro long‑tail** — ponechat po přechodu nějakou formu Heureka dat (např. jen pro produkty bez přímé konkurence), nebo odejít úplně?
+3. **Heureka pro long‑tail a velké hráče** — poptat ceník Heureka Bidding Data API (oficiální náhrada crawlování, vrací nabídky všech obchodů u produktu) a rozhodnout, zda ho použít pro produkty bez přímé konkurence a pro Alzu/Decathlon/Sportisimo.
 4. **Imprese** — čím nahradit Disivo imprese (GA4 vs. web)?
 5. **DE/AT** — které zdroje jsou pro nás v DE nejvíc cenotvorné (bike‑discount, bike24, bike‑components, fahrrad.de, mtbiker.de/sk, …)? Viz tabulka v 04.
 6. **Kde poběží prohlížečový worker**, pokud ho vedení povolí (pobočková síť vs. server).

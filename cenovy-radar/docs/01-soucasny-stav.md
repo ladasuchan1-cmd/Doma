@@ -97,7 +97,14 @@ Porovnání scrapu Kupkola s exportem Pohody (EAN primárně, pojistka výrobce 
 - Lenka Hlinková (PM), Jan Tančin (CEO) — schvalování, rozpočet.
 - František (IT) — Pohoda, firewall, DMOC importy; Fameless — admin webu a feedy.
 
-## 5. Shrnutí bolestí, které má nový nástroj vyřešit
+## 5. Nález mimo projekt: veřejný feed s nákupními cenami
+
+Produktový feed pro Disivo `https://www.koloshop.cz/xml-new/CZE/disivo.xml` je dostupný
+**bez tokenu** a nese `PURCHASEPRICE_VAT`, stavy po prodejnách, `GOODS_HEALTH` a `MAX_LIMIT`
+(ověřeno 15. 9. 2026; detail a doporučení v 04). Nic jsme neměnili — patří to Fameless
+a Františkovi jako první bod fáze 0.
+
+## 6. Shrnutí bolestí, které má nový nástroj vyřešit
 
 1. Logika cenotvorby musí být **naše a upravitelná v kódu/konfiguraci**, ne přes support.
 2. Monitoring konkurence nesmí být limitovaný „searchy“, ale technikou (feedy, JSON-LD, slušný scraping).
