@@ -9,3 +9,11 @@ android/.idea/
 tools/android-typecheck/build/
 tools/android-typecheck/.gradle/
 tools/android-typecheck/.kotlin/
+tools/recepty-typecheck/build/
+tools/recepty-typecheck/.gradle/
+tools/recepty-typecheck/.kotlin/
+recepty/build/
+recepty/app/build/
+recepty/.gradle/
+recepty/local.properties
+recepty/.idea/

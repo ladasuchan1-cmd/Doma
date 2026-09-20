@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string-array name="model_labels">
+        <item>Claude Opus 5 (výchozí, nejpřesnější)</item>
+        <item>Claude Sonnet 5 (levnější)</item>
+        <item>Claude Haiku 4.5 (nejlevnější, rychlý)</item>
+    </string-array>
+    <string-array name="model_values">
+        <item>claude-opus-5</item>
+        <item>claude-sonnet-5</item>
+        <item>claude-haiku-4-5</item>
+    </string-array>
+    <string-array name="effort_labels">
+        <item>nízká (rychle, levně)</item>
+        <item>střední (výchozí)</item>
+        <item>vysoká</item>
+    </string-array>
+    <string-array name="effort_values">
+        <item>low</item>
+        <item>medium</item>
+        <item>high</item>
+    </string-array>
+</resources>

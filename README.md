@@ -15,6 +15,9 @@ Existuje ve dvou podobách se společným jádrem:
 - **Rozšíření prohlížeče** (Chrome / Edge / Brave) – tento adresář.
 - **Android aplikace** (Kotlin) – složka [`android/`](android/README.md); služba na pozadí čte obrazovku, takže funguje v prohlížeči, Obchodě Play i v aplikacích.
 
+> V repozitáři je také samostatná Android aplikace **[Recepty z videí](recepty/README.md)** (složka `recepty/`):
+> sdílíte do ní video s jídlem z YouTube / Instagramu / TikToku, ona zapíše ingredience a postup a recept pak najdete podle klíčových slov.
+
 ## Instalace rozšíření (ze zdrojáků)
 
 1. Stáhněte / naklonujte tento repozitář.

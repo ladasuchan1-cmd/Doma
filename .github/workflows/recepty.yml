@@ -1,0 +1,65 @@
+# Sestaví APK aplikace „Recepty z videí“ na runnerech GitHubu (mají Android SDK) a nabídne ho ke stažení
+# v záložce Actions → běh → Artifacts → recepty-debug-apk.
+# Při pushnutí tagu recepty-v1.2.3 navíc vytvoří GitHub Release s APK.
+name: Recepty APK
+
+on:
+  push:
+    branches: ["**"]
+    tags: ["recepty-v*"]
+    paths:
+      - "recepty/**"
+      - "tools/recepty-typecheck/**"
+      - ".github/workflows/recepty.yml"
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Android SDK
+        uses: android-actions/setup-android@v3
+        with:
+          packages: "platforms;android-34 build-tools;34.0.0 platform-tools"
+
+      - name: Gradle cache
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Sestavit debug APK
+        working-directory: recepty
+        run: ./gradlew --no-daemon assembleDebug
+
+      - name: Nahrát APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: recepty-debug-apk
+          path: recepty/app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
+
+      - name: Release při tagu
+        if: startsWith(github.ref, 'refs/tags/recepty-v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: recepty/app/build/outputs/apk/debug/app-debug.apk
+
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+      - uses: gradle/actions/setup-gradle@v4
+      - name: Jednotkové testy logiky (JVM, bez Android SDK)
+        run: |
+          python3 tools/gen-r.py recepty/app/src/main/res tools/recepty-typecheck/build/gen/cz/doma/recepty/R.java cz.doma.recepty
+          gradle -p tools/recepty-typecheck --no-daemon test

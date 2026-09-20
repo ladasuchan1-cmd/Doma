@@ -1,0 +1,64 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Recepty z videí</string>
+    <string name="share_label">Uložit recept</string>
+    <string name="recipe_title">Recept</string>
+    <string name="edit_title">Upravit recept</string>
+    <string name="settings_title">Nastavení</string>
+
+    <string name="search_hint">Hledat: kuře rýže -smetana</string>
+    <string name="btn_add">Přidat odkaz</string>
+    <string name="add_dialog_title">Odkaz na video nebo recept</string>
+    <string name="add_dialog_hint">https://www.instagram.com/reel/…</string>
+    <string name="empty_intro">Zatím tu žádný recept není.\n\nOtevřete video s jídlem na YouTube, v Instagramu nebo TikToku, klepněte na Sdílet a vyberte „Uložit recept“. Aplikace zapíše ingredience a postup a recept pak najdete podle klíčových slov.</string>
+    <string name="empty_search">Nic nenalezeno. Zkuste jiné slovo nebo jeho začátek (např. „kuř“).</string>
+    <string name="no_key_notice">Bez API klíče Anthropic se ingredience hledají jen v popisku videa (offline). Přesnější zápis zapnete v Nastavení.</string>
+    <string name="count_format">%1$d receptů</string>
+
+    <string name="importing">Ukládám recept…</string>
+    <string name="already_saved">Tento recept už máte uložený.</string>
+    <string name="save_anyway">Uložit k ruční úpravě</string>
+    <string name="fetch_failed_edit">Popisek videa se nepodařilo stáhnout. Zkopírujte ho z aplikace a vložte do pole „Popisek videa“, pak klepněte na „Uložit a analyzovat znovu“.</string>
+    <string name="close">Zavřít</string>
+
+    <string name="open_video">Otevřít video</string>
+    <string name="ingredients">Ingredience</string>
+    <string name="steps">Postup</string>
+    <string name="keywords">Klíčová slova</string>
+    <string name="notes">Poznámky</string>
+    <string name="description">Popisek videa</string>
+    <string name="no_ingredients">Ingredience se nepodařilo zjistit – upravte recept ručně nebo doplňte popisek a spusťte analýzu znovu.</string>
+    <string name="review_banner">Zápis je nejistý – zkontrolujte ingredience.</string>
+
+    <string name="menu_edit">Upravit</string>
+    <string name="menu_reanalyze">Analyzovat znovu</string>
+    <string name="menu_share">Sdílet</string>
+    <string name="menu_delete">Smazat</string>
+    <string name="menu_settings">Nastavení</string>
+    <string name="menu_export">Exportovat zálohu</string>
+    <string name="menu_import">Importovat zálohu</string>
+    <string name="delete_confirm">Smazat tento recept?</string>
+    <string name="delete">Smazat</string>
+    <string name="cancel">Zrušit</string>
+
+    <string name="edit_name">Název</string>
+    <string name="edit_ingredients_hint">Jedna ingredience na řádek, např.\n200 g hladká mouka\n2 ks vejce\nsůl</string>
+    <string name="edit_steps_hint">Jeden krok na řádek</string>
+    <string name="edit_keywords_hint">Klíčová slova oddělená čárkou (kuře, rychlá večeře, asijská)</string>
+    <string name="edit_notes_hint">Vlastní poznámky (co změnit, jak chutnalo…)</string>
+    <string name="edit_description_hint">Popisek / caption videa – sem vložte text, když se nestáhl automaticky</string>
+    <string name="btn_save">Uložit</string>
+    <string name="btn_save_reanalyze">Uložit a analyzovat znovu</string>
+    <string name="saved">Uloženo</string>
+
+    <string name="settings_intro">S API klíčem Anthropic zapisuje recept model Claude – pozná jídlo z popisku, titulků i náhledu, rozdělí ingredience na množství a název a doplní klíčová slova. Bez klíče se ingredience hledají jen podle slovníku v popisku videa.</string>
+    <string name="api_key_hint">API klíč Anthropic (sk-ant-…)</string>
+    <string name="model_label">Model</string>
+    <string name="effort_label">Důkladnost</string>
+    <string name="use_transcript">Posílat i automatické titulky videa</string>
+    <string name="use_thumbnail">Posílat i náhledový obrázek</string>
+    <string name="use_local_fallback">Bez klíče / při chybě použít offline hledání</string>
+    <string name="btn_test">Otestovat klíč</string>
+    <string name="settings_saved">Nastavení uloženo.</string>
+    <string name="privacy_note">Klíč zůstává jen v telefonu. Na api.anthropic.com se posílá pouze popisek, titulky a náhled videa, které ukládáte.</string>
+</resources>

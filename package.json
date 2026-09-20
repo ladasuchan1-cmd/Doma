@@ -9,7 +9,9 @@
     "e2e": "node tools/e2e.js",
     "e2e:android": "node tools/e2e-android-assets.js",
     "typecheck:android": "python3 tools/gen-r.py android/app/src/main/res tools/android-typecheck/build/gen/cz/hlidacpodminek/R.java cz.hlidacpodminek && gradle -p tools/android-typecheck compileKotlin",
-    "pack": "zip -r -X dist/hlidac-podminek.zip manifest.json background.js content.js content.css lib popup options icons _locales -x '*.DS_Store'"
+    "pack": "zip -r -X dist/hlidac-podminek.zip manifest.json background.js content.js content.css lib popup options icons _locales -x '*.DS_Store'",
+    "icons:recepty": "python3 tools/make-recepty-icons.py",
+    "test:recepty": "python3 tools/gen-r.py recepty/app/src/main/res tools/recepty-typecheck/build/gen/cz/doma/recepty/R.java cz.doma.recepty && gradle -p tools/recepty-typecheck test"
   },
   "license": "MIT"
 }

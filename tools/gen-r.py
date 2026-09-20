@@ -2,10 +2,10 @@
 """Vygeneruje náhradní třídu R (jen pro typovou kontrolu Kotlinu mimo Android SDK)."""
 import os, re, sys, glob
 res = sys.argv[1]; out = sys.argv[2]; pkg = sys.argv[3]
-kinds = {'layout': set(), 'id': set(), 'string': set(), 'drawable': set(), 'mipmap': set(), 'array': set(), 'style': set(), 'xml': set(), 'color': set()}
+kinds = {'layout': set(), 'id': set(), 'string': set(), 'drawable': set(), 'mipmap': set(), 'array': set(), 'style': set(), 'xml': set(), 'color': set(), 'menu': set()}
 for d in glob.glob(os.path.join(res, '*')):
     name = os.path.basename(d).split('-')[0]
-    if name in ('layout', 'drawable', 'mipmap', 'xml'):
+    if name in ('layout', 'drawable', 'mipmap', 'xml', 'menu'):
         for f in glob.glob(os.path.join(d, '*')):
             kinds[name].add(os.path.splitext(os.path.basename(f))[0])
     for f in glob.glob(os.path.join(d, '*.xml')):
