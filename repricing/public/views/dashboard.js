@@ -4,12 +4,12 @@ import { api, isAbort } from '../lib/api.js';
 import { buildHash } from '../lib/router.js';
 import { icon } from '../lib/icons.js';
 import {
-  card, kpi, emptyState, errorState, skeletonBlocks, skeletonTable, button, jobStatusBadge,
+  card, kpi, emptyState, errorState, skeletonBlocks, skeletonTable, button, jobStatusBadge, badge,
 } from '../lib/ui.js';
 import { stackedBar, barList } from '../lib/charts.js';
 import { simpleTable } from '../lib/table.js';
 import {
-  int, percent, signedPercent, signedMoney, index, relTime, dateTime, POSITION_LABELS, POSITION_ORDER, KIND_LABELS, TRIGGER_LABELS, count, duration,
+  int, percent, signedPercent, signedMoney, compactMoney, money, index, relTime, dateTime, POSITION_LABELS, POSITION_ORDER, KIND_LABELS, TRIGGER_LABELS, count, duration,
 } from '../lib/format.js';
 import { statsList } from '../lib/import-model.js';
 import { runSummaryText } from '../lib/run-stats.js';
@@ -17,12 +17,29 @@ import { runSummaryText } from '../lib/run-stats.js';
 export const title = 'Přehled';
 
 const POS_COLORS = { cheapest: 'var(--pos-cheapest)', middle: 'var(--pos-middle)', most_expensive: 'var(--pos-most)', no_data: 'var(--pos-none)' };
-const ALERT_STYLE = {
-  below_cost: ['danger', 'alert-circle'],
-  import_error: ['danger', 'alert-circle'],
-  undercut: ['warning', 'alert'],
-  stale: ['warning', 'clock'],
+/** Upozornění z API (GET /dashboard → alerts[].type): ikona, text odkazu a výchozí závažnost. */
+export const ALERT_TYPES = {
+  below_cost: { icon: 'alert-circle', link: 'Zobrazit produkty', severity: 'error' },
+  zero_price: { icon: 'alert-circle', link: 'Zobrazit produkty', severity: 'error' },
+  competitor_drop: { icon: 'arrow-down', link: 'Zobrazit produkty', severity: 'warn' },
+  stale_offers: { icon: 'clock', link: 'Zkontrolovat import', severity: 'warn' },
+  not_applied: { icon: 'alert', link: 'Exportované návrhy', severity: 'warn' },
+  no_cost: { icon: 'tag', link: 'Zobrazit produkty', severity: 'warn' },
+  min_below_cost: { icon: 'store', link: 'Zobrazit produkty', severity: 'info' },
+  unmatched: { icon: 'link', link: 'Spárovat nabídky', severity: 'info' },
 };
+const SEVERITY = {
+  error: { variant: 'danger', label: 'Chyba' },
+  warn: { variant: 'warning', label: 'Varování' },
+  warning: { variant: 'warning', label: 'Varování' },
+  info: { variant: 'info', label: 'Info' },
+};
+const SEVERITY_ORDER = { error: 0, warn: 1, warning: 1, info: 2 };
+
+/** Odkaz z API je hash route aplikace („#/produkty?…“) – nic jiného nepustíme. */
+function safeHash(link) {
+  return typeof link === 'string' && link.startsWith('#/') ? link : null;
+}
 
 function onboarding() {
   const steps = [
@@ -64,7 +81,7 @@ function kpis(d) {
     kpi({ label: 'Jsme nejlevnější', icon: 'target', value: int(pos.cheapest), sub: cheapestPct != null ? percent(cheapestPct, 0) + ' produktů s konkurencí' : 'bez dat o trhu', href: buildHash('/produkty', { position: 'cheapest' }) }),
     kpi({ label: 'Čeká na schválení', icon: 'tag', value: int(pr.pending), tone: pr.pending ? 'warning' : null, sub: [h('span', { class: 'chg chg-up' }, '▲ ' + int(pr.up)), h('span', { class: 'chg chg-down' }, '▼ ' + int(pr.down)), pr.avg_change_pct != null ? h('span', null, 'Ø ' + signedPercent(pr.avg_change_pct)) : null], href: '#/navrhy' }),
     kpi({ label: 'Schváleno k exportu', icon: 'download', value: int(pr.approved), sub: 'exportováno za 7 dní: ' + int(pr.exported_7d), href: '#/export' }),
-    kpi({ label: 'Dopad návrhů na marži', icon: 'zap', value: signedMoney(pr.margin_impact_abs, { decimals: 0 }), sub: 'bez DPH, 1 ks od každého produktu', tone: (pr.margin_impact_abs || 0) < 0 ? 'danger' : 'good' })
+    kpi({ label: 'Dopad návrhů na marži', icon: 'zap', value: compactMoney(pr.margin_impact_abs, { signed: true }), title: signedMoney(pr.margin_impact_abs, { decimals: 0 }) + ' bez DPH (součet za 1 ks od každého produktu s návrhem)', sub: 'bez DPH, 1 ks od každého produktu', tone: (pr.margin_impact_abs || 0) < 0 ? 'danger' : 'good' })
   );
 }
 
@@ -80,28 +97,59 @@ function positionCard(d) {
   });
 }
 
+function alertItems(a) {
+  const items = Array.isArray(a.items) ? a.items.slice(0, 3) : [];
+  if (!items.length || a.type === 'unmatched') return null;
+  return h(
+    'ul',
+    { class: 'alert-examples' },
+    items.map((it) => {
+      const name = it.name || it.code || (it.product_id != null ? 'Produkt #' + it.product_id : '');
+      let extra = '';
+      if (a.type === 'competitor_drop') extra = (it.competitor ? it.competitor + ': ' : '') + money(it.prev_price) + ' → ' + money(it.price) + (it.drop_pct != null ? ' (−' + percent(it.drop_pct) + ')' : '');
+      else if (a.type === 'not_applied') extra = 'export ' + money(it.exported_price) + ', v adminu ' + money(it.current_price);
+      return h('li', null, it.product_id != null ? h('a', { href: '#/produkty/' + encodeURIComponent(it.product_id) }, name) : h('span', null, name), extra ? h('span', { class: 'muted' }, ' · ' + extra) : null);
+    })
+  );
+}
+
 function alertsCard(d) {
-  const alerts = Array.isArray(d.alerts) ? d.alerts : [];
+  const alerts = (Array.isArray(d.alerts) ? d.alerts : []).slice().sort((a, b) => (SEVERITY_ORDER[a.severity] ?? 3) - (SEVERITY_ORDER[b.severity] ?? 3));
+  const nErr = alerts.filter((a) => a.severity === 'error').length;
   return card({
     title: 'Upozornění',
     icon: 'alert',
     subtitle: alerts.length ? count(alerts.length, 'položka vyžaduje pozornost', 'položky vyžadují pozornost', 'položek vyžaduje pozornost') : null,
+    actions: nErr ? [badge(count(nErr, 'chyba', 'chyby', 'chyb'), 'danger')] : null,
+    dataset: { card: 'alerts' },
     body: alerts.length
       ? h(
         'ul',
         { class: 'alert-list' },
         alerts.map((a) => {
-          const [variant, ic] = ALERT_STYLE[a.type] || ['info', 'info'];
+          const type = ALERT_TYPES[a.type] || { icon: 'info', link: 'Zobrazit' };
+          const sev = SEVERITY[a.severity] || SEVERITY[type.severity] || SEVERITY.info;
+          const link = safeHash(a.link);
           return h(
             'li',
-            { class: 'alert-' + variant },
-            icon(ic, { size: 16 }),
-            h('div', { style: 'flex:1;min-width:0' }, a.text),
-            a.product_id ? h('a', { href: '#/produkty/' + encodeURIComponent(a.product_id), class: 'small nowrap' }, 'Detail') : null
+            { class: ['alert-item', 'alert-' + sev.variant], dataset: { alert: a.type || '' } },
+            h('span', { class: 'alert-icon', title: sev.label }, icon(type.icon, { size: 16 })),
+            h(
+              'div',
+              { class: 'alert-body' },
+              h('div', { class: 'alert-text' }, a.count != null && a.count > 0 ? h('b', { class: 'alert-count' }, int(a.count)) : null, a.text),
+              alertItems(a),
+              h(
+                'div',
+                { class: 'alert-actions' },
+                link ? h('a', { href: link, class: 'alert-link' }, type.link, ' →') : null,
+                a.product_id != null ? h('a', { href: '#/produkty/' + encodeURIComponent(a.product_id), class: 'alert-link' }, 'Detail produktu →') : null
+              )
+            )
           );
         })
       )
-      : emptyState({ icon: 'check', title: 'Vše v pořádku', text: 'Žádné produkty pod nákupní cenou ani zastaralá data.', compact: true }),
+      : emptyState({ icon: 'check', title: 'Vše v pořádku', text: 'Žádné produkty pod nákupní cenou, zastaralá data ani nespárované nabídky.', compact: true }),
   });
 }
 

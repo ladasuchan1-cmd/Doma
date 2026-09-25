@@ -82,7 +82,7 @@ test('proposalsXlsx: listy Návrhy a Souhrn, české hlavičky, hodnoty', () => 
   assert.equal(a['Pořadí před'], 3);
   assert.equal(a['Pořadí po'], 1);
   assert.equal(a['Stav'], 'Čeká na schválení');
-  assert.equal(a['Příznaky'], 'omezeno limitem změny, velká změna');
+  assert.equal(a['Příznaky'], 'změna omezena limitem, velká změna');
   assert.equal(a['Vytvořeno'], '2026-09-25T10:00:00', 'datum v pražském čase');
 
   assert.equal(b['Kód'], 'PLAST-29');

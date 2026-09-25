@@ -1,12 +1,14 @@
 // Export – feedy pro admin (URL s tokenem), stažení souborů, odeslání webhookem, dokumentace potvrzení (ack), historie.
 import { h, mount } from '../lib/dom.js';
-import { api, apiUrl, itemsOf, isAbort, basePath } from '../lib/api.js';
+import { api, apiUrl, itemsOf, isAbort, basePath, bindDownload } from '../lib/api.js';
 import { icon } from '../lib/icons.js';
 import { DataTable } from '../lib/table.js';
-import { card, kpi, emptyState, callout, codeBlock, copyField, jobStatusBadge, checkbox, select, field, dl, button } from '../lib/ui.js';
+import { card, kpi, emptyState, callout, codeBlock, copyField, jobStatusBadge, checkbox, select, field, dl, button, changeEl } from '../lib/ui.js';
 import { confirmDialog } from '../lib/modal.js';
 import { toast } from '../lib/toast.js';
-import { int, dateTime, relTime, EXPORT_KIND_LABELS, count, truncate, duration } from '../lib/format.js';
+import { int, dateTime, relTime, EXPORT_KIND_LABELS, count, truncate, duration, detailText } from '../lib/format.js';
+import { priceMove } from '../lib/decision.js';
+import { finalPrice, finalChangePct } from '../lib/proposal-model.js';
 
 export const title = 'Export';
 
@@ -52,17 +54,26 @@ export async function show(root, ctx) {
   function updateChangeLinks() {
     for (const a of changeLinks) a.href = apiUrl('/export/changes.' + a.dataset.format, markChanges.v ? { mark: 1 } : null);
   }
-  for (const a of changeLinks) a.addEventListener('click', () => { if (markChanges.v) setTimeout(() => { loadApproved(); loadLog(); }, 1200); });
+  const afterDownload = (r) => {
+    if (r.exportId) {
+      toast('Staženo ' + r.filename + ' – ' + count(r.count ?? 0, 'změna označena', 'změny označeny', 'změn označeno') + ' jako exportované (export #' + r.exportId + ').', { type: 'success' });
+      ctx.notifyChanged('export');
+      loadApproved();
+      loadLog();
+    }
+  };
+  for (const a of changeLinks) bindDownload(a, afterDownload);
   const pohodaScope = select([{ value: 'approved', label: 'Jen schválené změny' }, { value: 'all', label: 'Celý ceník' }], 'approved');
-  const pohodaEnc = select([{ value: '', label: 'UTF-8' }, { value: 'windows-1250', label: 'Windows-1250' }], '');
+  // bez parametru server použije nastavení (export.pohoda.encoding, výchozí windows-1250) – posíláme ho vždy explicitně
+  const pohodaEnc = select([{ value: 'windows-1250', label: 'Windows-1250 (výchozí)' }, { value: 'utf-8', label: 'UTF-8' }], 'windows-1250');
   const pohodaMark = { v: false };
   const pohodaLink = h('a', { class: 'btn btn-sm btn-primary', download: '', dataset: { action: 'pohoda' } }, icon('download', { size: 14 }), h('span', null, 'POHODA XML'));
   function updatePohoda() {
-    pohodaLink.href = apiUrl('/export/pohoda.xml', { scope: pohodaScope.value, encoding: pohodaEnc.value || null, mark: pohodaMark.v ? 1 : null });
+    pohodaLink.href = apiUrl('/export/pohoda.xml', { scope: pohodaScope.value, encoding: pohodaEnc.value, mark: pohodaMark.v ? 1 : null });
   }
   pohodaScope.addEventListener('change', updatePohoda);
   pohodaEnc.addEventListener('change', updatePohoda);
-  pohodaLink.addEventListener('click', () => { if (pohodaMark.v) setTimeout(() => { loadApproved(); loadLog(); }, 1200); });
+  bindDownload(pohodaLink, afterDownload);
   updatePohoda();
   const downloadsCard = card({
     title: 'Stáhnout soubory',
@@ -81,8 +92,8 @@ export async function show(root, ctx) {
         checkbox('Označit jako exportované', false, (v) => { pohodaMark.v = v; updatePohoda(); }),
         h('div', null, pohodaLink)
       ),
-      h('div', { class: 'download' }, h('h3', null, 'Ceník'), h('p', null, 'Všechny aktivní produkty s cenou k exportu (schválený návrh, jinak aktuální cena).'), h('div', { class: 'btn-group' }, ['xlsx', 'csv', 'json', 'xml'].map((f) => h('a', { class: 'btn btn-sm', href: apiUrl('/export/pricelist.' + f), download: '' }, icon('download', { size: 14 }), h('span', null, f.toUpperCase()))))),
-      h('div', { class: 'download' }, h('h3', null, 'Návrhy cen (XLSX)'), h('p', null, 'Přehled čekajících návrhů pro poradu nebo schválení mimo aplikaci.'), h('div', null, h('a', { class: 'btn btn-sm', href: apiUrl('/export/proposals.xlsx', { status: 'pending' }), download: '' }, icon('download', { size: 14 }), h('span', null, 'Návrhy XLSX'))))
+      h('div', { class: 'download' }, h('h3', null, 'Ceník'), h('p', null, 'Všechny aktivní produkty s cenou k exportu (schválený návrh, jinak aktuální cena).'), h('div', { class: 'btn-group' }, ['xlsx', 'csv', 'json', 'xml'].map((f) => bindDownload(h('a', { class: 'btn btn-sm', href: apiUrl('/export/pricelist.' + f), download: '' }, icon('download', { size: 14 }), h('span', null, f.toUpperCase())))))),
+      h('div', { class: 'download' }, h('h3', null, 'Návrhy cen (XLSX)'), h('p', null, 'Přehled čekajících návrhů pro poradu nebo schválení mimo aplikaci.'), h('div', null, bindDownload(h('a', { class: 'btn btn-sm', href: apiUrl('/export/proposals.xlsx', { status: 'pending' }), download: '' }, icon('download', { size: 14 }), h('span', null, 'Návrhy XLSX')))))
     ),
   });
 
@@ -122,7 +133,7 @@ export async function show(root, ctx) {
       { key: 'target', label: 'Cíl', hideSm: true, render: (e) => h('span', { class: 'small mono', title: e.target || '' }, truncate(e.target || '–', 48)) },
       { key: 'count', label: 'Položek', format: 'int', sortable: true },
       { key: 'status', label: 'Stav', render: (e) => jobStatusBadge(e.status) },
-      { key: 'detail', label: 'Detail', hideSm: true, render: (e) => h('span', { class: 'small muted', title: e.detail || '' }, truncate(e.detail || '', 60)) },
+      { key: 'detail', label: 'Detail', hideSm: true, render: (e) => h('span', { class: 'small muted', title: typeof e.detail === 'object' && e.detail ? JSON.stringify(e.detail, null, 1) : e.detail || '' }, truncate(detailText(e.detail), 80)) },
     ],
     clientSort: true,
     sort: { key: 'created_at', dir: 'desc' },
@@ -145,13 +156,31 @@ export async function show(root, ctx) {
   );
 
   async function loadApproved() {
+    let rows = [];
     try {
-      const r = await api.get('/proposals', { status: 'approved', limit: 1 }, { signal: ctx.signal, silent: true });
+      const r = await api.get('/proposals', { status: 'approved', limit: 6, sort: 'decided_at', dir: 'desc' }, { signal: ctx.signal, silent: true });
       approved = r?.total ?? 0;
+      rows = itemsOf(r);
     } catch (e) {
       if (isAbort(e)) return;
       approved = null;
     }
+    const list = rows.length
+      ? h(
+        'ul',
+        { class: 'export-preview', 'aria-label': 'Schválené změny k exportu' },
+        rows.map((r) => {
+          const p = r.product || { code: r.code, name: r.name };
+          return h(
+            'li',
+            { dataset: { proposalId: r.id } },
+            h('div', { class: 'export-preview-name' }, h('a', { href: '#/produkty/' + encodeURIComponent(r.product_id), title: p.name || '' }, p.name || p.code || '#' + r.product_id), h('span', { class: 'mono muted small' }, p.code || '')),
+            h('div', { class: 'export-preview-price' }, priceMove(r.old_price, finalPrice(r)), changeEl(finalChangePct(r)))
+          );
+        }),
+        approved > rows.length ? h('li', { class: 'muted small' }, '… a další ' + count(approved - rows.length, 'změna', 'změny', 'změn')) : null
+      )
+      : null;
     mount(
       approvedHost,
       card({
@@ -162,6 +191,7 @@ export async function show(root, ctx) {
           'div',
           { class: 'stack-sm' },
           kpi({ label: 'Schválené změny cen', value: approved == null ? '–' : int(approved), sub: approved ? 'připraveno pro admin / POHODU' : 'nic nečeká', tone: approved ? 'info' : null }),
+          list,
           h('div', { class: 'row' }, h('a', { class: 'btn btn-sm', href: '#/navrhy?status=approved' }, 'Zobrazit schválené'), h('a', { class: 'btn btn-sm btn-ghost', href: '#/navrhy' }, 'Schválit další'))
         ),
       })
@@ -199,6 +229,11 @@ export async function show(root, ctx) {
       settings = null;
     }
     const wh = settings?.export?.webhook || {};
+    const enc = String(settings?.export?.pohoda?.encoding || '').toLowerCase();
+    if (enc === 'utf-8' || enc === 'windows-1250') {
+      pohodaEnc.value = enc;
+      updatePohoda();
+    }
     const pushBtn = button('Odeslat schválené změny', { icon: 'send', variant: 'primary', disabled: !wh.url, dataset: { action: 'push' } });
     pushBtn.addEventListener('click', () => push(pushBtn));
     mount(
@@ -212,7 +247,7 @@ export async function show(root, ctx) {
           'div',
           { class: 'stack-sm' },
           wh.url
-            ? dl([['URL', h('span', { class: 'mono small' }, wh.url)], ['Formát', String(wh.format || 'json').toUpperCase()], ['Automaticky po přecenění', settings?.schedule?.auto_push_after_run ? 'ano' : 'ne']])
+            ? dl([['URL', h('span', { class: 'mono small' }, wh.url)], ['Formát', String(wh.format || 'json').toUpperCase()], ['Automaticky po přecenění', settings?.schedule?.auto_push_after_run || wh.auto_push ? 'ano' : 'ne']])
             : callout(h('span', null, 'Webhook zatím není nastaven. ', h('a', { href: '#/nastaveni' }, 'Nastavit URL →')), 'warning'),
           h('div', { class: 'row' }, pushBtn, h('a', { class: 'btn btn-sm btn-ghost', href: '#/nastaveni' }, 'Nastavení')),
           h('div', { dataset: { role: 'push-result' } })

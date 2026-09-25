@@ -113,6 +113,37 @@ test('run_after_import: po úspěšném importu nabídek ze zdroje proběhne př
   db.close();
 });
 
+test('run_after_import: import ze zdroje dokončený až po začátku tiku nespustí v dalším tiku přecenění znovu (regrese)', async () => {
+  // Skutečný runSource zapíše do imports finished_at = skutečný čas, tj. PO začátku tiku. Dřív dostal běh čas tiku
+  // (starší než import) a příští tik přeceňoval kvůli témuž importu znovu – nadbytečný běh by označil čerstvě
+  // schválené návrhy jako superseded.
+  const db = setup({ schedule: { run_after_import: true } });
+  let due = true;
+  const { deps, calls } = fakeDeps(db, {
+    dueSources: () => (due ? [{ id: 1, name: 'Heureka', kind: 'offers' }] : []),
+    runSource: async () => {
+      due = false;
+      const fin = new Date(NOW.getTime() + 2500).toISOString();
+      db.prepare("INSERT INTO imports(kind, origin, source_id, started_at, finished_at, status) VALUES ('offers', 'schedule', NULL, ?, ?, 'ok')").run(NOW.toISOString(), fin);
+      return { import_id: 1, stats: { matched: 1 } };
+    },
+  });
+  const s = sched(db, deps);
+  const first = await s.tick({ now: NOW });
+  assert.strictEqual(first.run.reason, 'import');
+  assert.strictEqual(calls.runPricing.length, 1);
+  // běh má čas nejdřív konce importu, který zpracoval
+  assert.strictEqual(new Date(calls.runPricing[0].now).toISOString(), new Date(NOW.getTime() + 2500).toISOString());
+  const second = await s.tick({ now: new Date(NOW.getTime() + 60000) });
+  assert.strictEqual(second.run, null, 'stejný import nesmí spustit druhé přecenění');
+  assert.strictEqual(calls.runPricing.length, 1);
+  // ani po restartu plánovače (paměť pokusů prázdná – rozhoduje runs.started_at)
+  const again = await sched(db, deps).tick({ now: new Date(NOW.getTime() + 120000) });
+  assert.strictEqual(again.run, null);
+  assert.strictEqual(calls.runPricing.length, 1);
+  db.close();
+});
+
 test('run_after_import: import katalogu nebo neúspěšný import nabídek přecenění nespustí', async () => {
   for (const [src, res] of [
     [{ id: 1, kind: 'products' }, { import_id: 1 }],

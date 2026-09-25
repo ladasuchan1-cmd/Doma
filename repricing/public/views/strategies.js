@@ -6,7 +6,7 @@ import { icon } from '../lib/icons.js';
 import { card, emptyState, errorState, skeletonTable, switchEl, badge, callout, colorDot, button } from '../lib/ui.js';
 import { confirmDialog } from '../lib/modal.js';
 import { toast } from '../lib/toast.js';
-import { describeTargetShort, describeLimitsShort, mergeConfig } from '../lib/strategy-model.js';
+import { describeTargetShort, describeLimitsShort, describeConditionsShort, describeScheduleShort, scheduleState, mergeConfig } from '../lib/strategy-model.js';
 import { count, relTime } from '../lib/format.js';
 
 export const title = 'Strategie';
@@ -32,6 +32,11 @@ export async function show(root, ctx) {
   const coverageHost = h('div');
   let strategies = [];
   let segments = [];
+  let fieldsMap = new Map();
+  cachedGet('/fields', null, 60000).then((r) => {
+    fieldsMap = new Map((r?.fields || []).map((f) => [f.key, f]));
+    if (strategies.length && !ctx.signal.aborted) renderList();
+  }).catch(() => {});
 
   mount(
     root,
@@ -110,6 +115,37 @@ export async function show(root, ctx) {
     loadList();
   }
 
+  function strategyMeta(s, cfg, seg) {
+    const cond = describeConditionsShort(cfg.conditions, fieldsMap);
+    const sch = describeScheduleShort(cfg.schedule);
+    const limits = describeLimitsShort(cfg);
+    return h(
+      'div',
+      { class: 'strategy-meta' },
+      seg
+        ? h('a', { href: '#/segmenty/' + encodeURIComponent(seg.id), class: 'meta-item' }, colorDot(seg.color), h('span', null, seg.name), seg.count != null ? h('span', { class: 'muted' }, '(' + count(seg.count, 'produkt', 'produkty', 'produktů') + ')') : null)
+        : s.segment_id != null
+          ? h('span', { class: 'meta-item chg chg-down' }, 'Segment #' + s.segment_id + ' nenalezen')
+          : h('span', { class: 'meta-item' }, icon('box', { size: 13 }), 'Všechny produkty'),
+      h('span', { class: 'meta-item', title: 'Cíl ceny' }, icon('target', { size: 13 }), describeTargetShort(cfg)),
+      cond ? h('span', { class: 'meta-item', dataset: { meta: 'conditions' }, title: 'Doplňující podmínky' }, icon('filter', { size: 13 }), 'Podmínky: ' + cond) : null,
+      sch ? h('span', { class: 'meta-item', dataset: { meta: 'schedule' }, title: 'Časové okno' }, icon('clock', { size: 13 }), 'Platnost: ' + sch) : null,
+      limits ? h('span', { class: 'meta-item', title: 'Limity' }, icon('lock', { size: 13 }), limits) : null
+    );
+  }
+
+  function schBadge(sch) {
+    const state = scheduleState(sch);
+    if (state === 'expired') return badge('Platnost skončila', 'warning');
+    if (state === 'future') return badge('Zatím neplatí', 'info');
+    return null;
+  }
+
+  function configErrors(s) {
+    const errs = Array.isArray(s.config_errors) ? s.config_errors : [];
+    return errs.length ? badge('Chybná konfigurace', 'danger', errs.join('; ')) : null;
+  }
+
   let dragId = null;
   function renderList() {
     if (!strategies.length) {
@@ -166,20 +202,9 @@ export async function show(root, ctx) {
         h(
           'div',
           { class: 'strategy-main' },
-          h('div', { class: 'row', style: 'gap:8px' }, h('a', { class: 'strategy-name', href: '#/strategie/' + encodeURIComponent(s.id) }, s.name), s.enabled ? null : badge('Vypnuto', 'neutral'), cfg.approval.auto ? badge('Auto-schválení ≤ ' + (cfg.approval.auto_max_change_pct ?? '∞') + ' %', 'success') : null),
-          s.description ? h('div', { class: 'muted small ellipsis' }, s.description) : null,
-          h(
-            'div',
-            { class: 'strategy-meta' },
-            seg
-              ? h('a', { href: '#/segmenty/' + encodeURIComponent(seg.id), class: 'row', style: 'gap:6px' }, colorDot(seg.color), seg.name, seg.count != null ? h('span', { class: 'muted' }, '(' + count(seg.count, 'produkt', 'produkty', 'produktů') + ')') : null)
-              : s.segment_id != null
-                ? h('span', { class: 'chg chg-down' }, 'Segment #' + s.segment_id + ' nenalezen')
-                : h('span', { class: 'row', style: 'gap:6px' }, icon('box', { size: 13 }), 'Všechny produkty'),
-            h('span', { class: 'sep' }, '|'),
-            h('span', null, icon('target', { size: 13 }), ' ', describeTargetShort(cfg)),
-            describeLimitsShort(cfg) ? [h('span', { class: 'sep' }, '|'), h('span', null, describeLimitsShort(cfg))] : null
-          )
+          h('div', { class: 'row', style: 'gap:8px' }, h('a', { class: 'strategy-name', href: '#/strategie/' + encodeURIComponent(s.id) }, s.name), s.enabled ? null : badge('Vypnuto', 'neutral'), cfg.approval.auto ? badge('Auto-schválení ≤ ' + (cfg.approval.auto_max_change_pct ?? '∞') + ' %', 'success') : null, schBadge(cfg.schedule), configErrors(s)),
+          s.description ? h('div', { class: 'muted small ellipsis', title: s.description }, s.description) : null,
+          strategyMeta(s, cfg, seg)
         ),
         h(
           'div',
@@ -209,6 +234,20 @@ export async function show(root, ctx) {
     }
   }
 
+  function presetMeta(p) {
+    const cfg = mergeConfig(p.config);
+    const cond = describeConditionsShort(cfg.conditions, fieldsMap);
+    const sch = describeScheduleShort(cfg.schedule);
+    return h(
+      'ul',
+      { class: 'preset-meta' },
+      h('li', null, icon('layers', { size: 13 }), h('span', null, p.segment ? 'Segment „' + p.segment.name + '“' : 'Všechny produkty')),
+      h('li', null, icon('target', { size: 13 }), h('span', null, describeTargetShort(cfg))),
+      cond ? h('li', null, icon('filter', { size: 13 }), h('span', null, 'Podmínky: ' + cond)) : null,
+      sch ? h('li', null, icon('clock', { size: 13 }), h('span', null, 'Platnost: ' + sch)) : null
+    );
+  }
+
   async function loadPresets() {
     try {
       const r = await api.get('/strategies/presets', null, { signal: ctx.signal, silent: true });
@@ -225,7 +264,7 @@ export async function show(root, ctx) {
                 { class: 'preset', dataset: { preset: p.key } },
                 h('h3', null, p.name),
                 h('p', null, p.description || ''),
-                h('div', { class: 'row small muted' }, icon('layers', { size: 13 }), p.segment ? 'Segment „' + p.segment.name + '“' : 'Všechny produkty', h('span', null, '·'), describeTargetShort(p.config)),
+                presetMeta(p),
                 h('div', { class: 'row' }, h('button', {
                   type: 'button', class: 'btn btn-sm',
                   onClick: async (e) => {

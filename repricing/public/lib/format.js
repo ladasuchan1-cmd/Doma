@@ -61,6 +61,29 @@ export function money(v, opts = {}) {
   return number(n, d) + (cur ? NBSP + cur : '');
 }
 
+/**
+ * Kompaktní částka pro dlaždice: od milionu „−1,47 mil. Kč“, od miliardy „2,3 mld. Kč“, jinak jako money() bez haléřů.
+ * Plnou hodnotu dejte do title (money()).
+ * @param {*} v
+ * @param {{signed?: boolean, currency?: string}} [opts] signed = vždy se znaménkem (+/−)
+ */
+export function compactMoney(v, opts = {}) {
+  const n = toNum(v);
+  if (n == null) return DASH;
+  const cur = opts.currency ?? 'Kč';
+  const abs = Math.abs(n);
+  const sign = n < 0 && round(abs, 0) > 0 ? MINUS : opts.signed && round(abs, 0) > 0 ? '+' : '';
+  const unit = (x, word) => {
+    const d = x < 10 ? 2 : x < 100 ? 1 : 0;
+    let t = number(x, d);
+    if (t.includes(',')) t = t.replace(/0+$/, '').replace(/,$/, '');
+    return sign + t + NBSP + word + (cur ? NBSP + cur : '');
+  };
+  if (abs >= 1e9) return unit(abs / 1e9, 'mld.');
+  if (abs >= 1e6) return unit(abs / 1e6, 'mil.');
+  return sign + number(abs, 0) + (cur ? NBSP + cur : '');
+}
+
 /** Procenta: „12,5 %“. */
 export function percent(v, decimals = 1) {
   const n = toNum(v);
@@ -296,32 +319,51 @@ export function flagLabel(f) {
   return FLAG_LABELS[f] || String(f);
 }
 
-/** Důvody přeskočení / nezměnění ceny. */
+/**
+ * Důvody přeskočení / nezměnění ceny (decision.reason, stats.skipped, stats.no_change_reasons)
+ * a kódy vyzkoušených strategií (tried[].code). Úplnost vůči enginu hlídá test/ui-labels.test.js.
+ */
 export const REASON_LABELS = {
   locked: 'Zamčený produkt',
   zero_stock: 'Nulový sklad',
   no_msrp: 'Chybí MOC',
   no_cost: 'Chybí nákupní cena',
   no_market: 'Bez konkurence',
+  no_competitor: 'Chybí nabídka konkurenta',
   no_price: 'Chybí aktuální cena',
   below_threshold: 'Změna pod prahem',
+  no_price_point: 'Žádný vhodný cenový bod',
   no_strategy: 'Bez strategie',
   same_price: 'Cena beze změny',
-  // rozšíření enginu (důvody při simulaci / vyhodnocení strategie)
-  fallthrough: 'Předáno další strategii',
+  keep: 'Cena je v mezích',
+  clearance_wait: 'Doprodej čeká na další krok',
+  fallthrough: 'Propadlo na další strategii',
+  invalid_config: 'Chybná konfigurace strategie',
+  invalid_target: 'Neplatná cílová cena',
+  invalid_vat: 'Neplatná sazba DPH',
+  // vyhodnocení použitelnosti strategie (tried[].code, simulace)
   not_applicable: 'Strategie se neuplatní',
   conditions: 'Nesplňuje podmínky strategie',
   schedule: 'Mimo časové okno',
   segment: 'Mimo segment',
   disabled: 'Strategie vypnuta',
-  invalid_config: 'Chybná konfigurace',
-  invalid_target: 'Neplatná cílová cena',
-  invalid_vat: 'Neplatná sazba DPH',
+  change: 'Změna ceny',
+  no_change: 'Beze změny',
+  skip: 'Přeskočeno',
+  none: 'Beze změny',
+  unknown: 'Neznámý důvod',
 };
 
 export function reasonLabel(r) {
   return REASON_LABELS[r] || (r ? String(r) : DASH);
 }
+
+/** Výsledek vyzkoušení strategie pro produkt (explain.tried[].result). */
+export const TRIED_RESULT_LABELS = {
+  not_applicable: 'Neuplatní se',
+  fallthrough: 'Propadlo dál',
+  decided: 'Rozhodla',
+};
 
 /** Proč nabídka nebyla započtena do trhu (SPEC §6.2). */
 export const EXCLUDED_LABELS = {
@@ -333,6 +375,7 @@ export const EXCLUDED_LABELS = {
   stale: 'Zastaralá cena',
   outlier: 'Podezřele nízká cena',
   keyword: 'Vyloučeno klíčovým slovem',
+  invalid_price: 'Neplatná cena',
 };
 
 export function excludedLabel(r) {
@@ -431,6 +474,8 @@ export const STEP_LABELS = {
   vat: 'DPH',
   warning: 'Upozornění',
   locked: 'Zámek',
+  lock: 'Zámek',
+  fallthrough: 'Propadnutí',
   stock: 'Sklad',
   market: 'Trh',
   target: 'Cíl',
@@ -449,4 +494,58 @@ export const STEP_LABELS = {
 
 export function stepLabel(s) {
   return STEP_LABELS[s] || (s ? String(s) : '');
+}
+
+// ------------------------------------------------------------------ detail auditu / exportu
+
+const DETAIL_KEYS = {
+  proposal_ids: 'návrhy', count: 'počet', format: 'formát', scope: 'rozsah', kind: 'druh', target: 'cíl', name: 'název',
+  status: 'stav', error: 'chyba', price_updates: 'aktualizace cen', update_current_price: 'přepsat aktuální cenu', ip: 'IP',
+  changes: 'změny', import_id: 'import', source_id: 'zdroj', product_id: 'produkt', stats: 'statistika', skipped: 'přeskočeno',
+  duration_ms: 'trvání (ms)', unknown_codes: 'neznámé kódy', marked: 'označeno', url: 'URL', key: 'klíč', ids: 'ID',
+};
+const DETAIL_VALUES = { approved: 'schválené', all: 'vše', true: 'ano', false: 'ne' };
+
+function detailValue(v) {
+  if (v == null) return '–';
+  if (typeof v === 'boolean') return v ? 'ano' : 'ne';
+  if (typeof v === 'string') {
+    // hodnoty uložené jako JSON text (např. tags „["klíčový"]“)
+    if (/^[[{]/.test(v)) {
+      try {
+        return detailValue(JSON.parse(v));
+      } catch {
+        /* obyčejný text */
+      }
+    }
+    return DETAIL_VALUES[v] || v;
+  }
+  if (Array.isArray(v)) return v.length > 6 ? count(v.length, 'položka', 'položky', 'položek') : v.map(detailValue).join(', ') || '–';
+  if (typeof v === 'object') return JSON.stringify(v);
+  return String(v);
+}
+
+/**
+ * Detail záznamu auditu / exportu (API vrací objekt) jako krátký český text: „formát: json · rozsah: schválené · návrhy: 55 položek“.
+ * @param {*} d řetězec nebo objekt
+ * @returns {string}
+ */
+export function detailText(d) {
+  if (d == null || d === '') return '';
+  if (typeof d !== 'object') return String(d);
+  if (Array.isArray(d)) return detailValue(d);
+  const parts = [];
+  for (const [k, v] of Object.entries(d)) {
+    if (v == null || v === '' || (Array.isArray(v) && !v.length)) continue;
+    const label = DETAIL_KEYS[k] || k;
+    if (k === 'changes' && v && typeof v === 'object' && !Array.isArray(v)) {
+      for (const [ck, cv] of Object.entries(v)) {
+        if (cv && typeof cv === 'object' && ('from' in cv || 'to' in cv)) parts.push(ck + ': ' + detailValue(cv.from) + ' → ' + detailValue(cv.to));
+        else parts.push(ck + ': ' + detailValue(cv));
+      }
+      continue;
+    }
+    parts.push(label + ': ' + detailValue(v));
+  }
+  return parts.join(' · ');
 }

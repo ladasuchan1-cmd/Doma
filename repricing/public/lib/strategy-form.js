@@ -7,20 +7,18 @@ import { chipsInput } from './chips.js';
 import { parseInputNumber, money } from './format.js';
 import {
   mergeConfig, getPath, setPath, HELP, TARGET_MODES, TARGET_MODE_MAP, FALLBACK_MODES, ZERO_STOCK_MODES, ROUNDING_MODES,
-  ROUNDING_DIRECTIONS, roundingExamples, stepFor, WEEKDAYS,
+  ROUNDING_DIRECTIONS, roundingExamples, stepFor, WEEKDAYS, BASE_MISSING_TEXT, usesFallback,
 } from './strategy-model.js';
 import { filterBuilder } from './filter-builder.js';
 
 /**
  * @param {{config?: object, competitors?: {name: string, label?: string, tags?: string[]}[], onChange?: (config: object) => void,
- *          extensions?: boolean, fields?: object[], facets?: object}} o
- *   extensions = server podporuje rozšíření enginu (časové okno, podmínky, doprodej, klíčová slova, záložní „next“);
- *   fields/facets = pro editor doplňujících podmínek.
+ *          fields?: object[], facets?: object}} o
+ *   fields/facets = pro editor doplňujících podmínek (bez nich se podmínky upravují jako JSON).
  * @returns {{el: HTMLElement, getConfig: () => object, sections: Record<string, HTMLElement>}}
  */
 export function strategyForm(o) {
-  const ext = Boolean(o.extensions);
-  const cfg = mergeConfig(o.config || {}, { extensions: ext });
+  const cfg = mergeConfig(o.config || {});
   const competitors = o.competitors || [];
   const compNames = competitors.map((c) => ({ value: c.name, label: c.label ? c.label + ' (' + c.name + ')' : c.name }));
   const tagSet = new Set(['klíčový', 'marketplace']);
@@ -91,7 +89,7 @@ export function strategyForm(o) {
   // ------------------------------------------------ Cíl ceny
   const modeHelp = h('p', { class: 'mode-help' });
   const example = h('p', { class: 'mode-example' });
-  const modeSel = select(TARGET_MODES.filter((m) => ext || !m.ext || m.value === cfg.target.mode).map((m) => ({ value: m.value, label: m.label })), cfg.target.mode, {
+  const modeSel = select(TARGET_MODES.map((m) => ({ value: m.value, label: m.label })), cfg.target.mode, {
     onChange: (e) => {
       cfg.target.mode = e.target.value;
       emit();
@@ -116,9 +114,9 @@ export function strategyForm(o) {
   const tCompetitor = field({ label: 'Konkurent', control: compSel, help: HELP['target.competitor'] });
   const tMarkup = num('target.markup_pct', 'Přirážka', { suffix: '%', placeholder: 'např. 40' });
   const tFixed = num('target.fixed_price', 'Pevná cena', { suffix: 'Kč', placeholder: 'např. 9 990' });
-  const tStep = ext ? num('target.step_pct', 'Sleva v kroku', { nullable: false, suffix: '%', placeholder: '5' }) : h('div', { hidden: true });
-  const tEvery = ext ? num('target.every_days', 'Každých', { nullable: false, suffix: 'dní', placeholder: '14' }) : h('div', { hidden: true });
-  const tMaxSales = ext ? num('target.max_sales_30', 'Max. prodejů za 30 dní', { nullable: false, suffix: 'ks', placeholder: '0' }) : h('div', { hidden: true });
+  const tStep = num('target.step_pct', 'Sleva v kroku', { nullable: false, suffix: '%', placeholder: '5' });
+  const tEvery = num('target.every_days', 'Každých', { nullable: false, suffix: 'dní', placeholder: '14' });
+  const tMaxSales = num('target.max_sales_30', 'Max. prodejů za 30 dní', { nullable: false, suffix: 'ks', placeholder: '0' });
   const presetsRow = h(
     'div',
     { class: 'quick-offsets' },
@@ -136,6 +134,18 @@ export function strategyForm(o) {
       }, l)
     )
   );
+  const fbMarkup = num('fallback.markup_pct', 'Přirážka (náhradní režim)', { suffix: '%', placeholder: 'z cíle ceny' });
+  const fbOffset = num('fallback.offset_pct', 'Posun od MOC', { nullable: false, suffix: '%', placeholder: '0', emptyValue: 0 });
+  const fbWhen = h('p', { class: 'field-help fb-when' });
+  const fbHelp = h('p', { class: 'field-help fb-mode-help' });
+  const fallbackBlock = h(
+    'div',
+    { class: 'fallback-block', dataset: { block: 'fallback' } },
+    h('h3', { class: 'form-subtitle' }, 'Když chybí základ ceny'),
+    fbWhen,
+    h('div', { class: 'form-grid form-grid-2' }, choice('fallback.mode', 'Náhradní režim', FALLBACK_MODES, { help: '' }), fbMarkup, fbOffset),
+    fbHelp
+  );
   const targetSection = card({
     title: 'Cíl ceny',
     icon: 'target',
@@ -148,17 +158,16 @@ export function strategyForm(o) {
       h('div', { class: 'form-grid' }, tOffsetPct, tOffsetAbs, tRank, tCompetitor, tMarkup, tFixed, tStep, tEvery, tMaxSales),
       presetsRow,
       example,
+      fallbackBlock,
     ],
   });
 
   // ------------------------------------------------ Konkurence
-  const fbMarkup = num('fallback.markup_pct', 'Přirážka (náhradní režim)', { suffix: '%', placeholder: 'např. 30' });
-  const fbOffset = num('fallback.offset_pct', 'Posun od MOC', { nullable: false, suffix: '%', placeholder: '0', emptyValue: 0 });
   const marketNote = h('div', { class: 'callout callout-info section-note' }, icon('info', { size: 16 }), h('div', null, 'Zvolený režim cíle konkurenci nepoužívá – tato nastavení se uplatní jen při změně režimu.'));
   const compSection = card({
     title: 'Konkurence',
     icon: 'store',
-    subtitle: 'Které nabídky se započítají do trhu a co dělat, když trh chybí.',
+    subtitle: 'Které nabídky konkurence se započítají do trhu.',
     class: 'form-section',
     dataset: { section: 'competitors' },
     body: [
@@ -170,7 +179,7 @@ export function strategyForm(o) {
         chips('competitors.exclude', 'Ignorovat konkurenty', compNames, { placeholder: 'nikdo' }),
         chips('competitors.include_tags', 'Jen se štítky', tagList, { placeholder: 'bez omezení' }),
         chips('competitors.exclude_tags', 'Vyloučit štítky', tagList, { placeholder: 'žádné' }),
-        ext ? chips('competitors.exclude_keywords', 'Vyloučit nabídky se slovy', ['bazar', 'použité', 'rozbaleno', 'repasované', 'vystavené'].map((x) => ({ value: x, label: x })), { placeholder: 'např. bazar' }) : null
+        chips('competitors.exclude_keywords', 'Vyloučit nabídky se slovy', ['bazar', 'použité', 'rozbaleno', 'repasované', 'vystavené', 'demo'].map((x) => ({ value: x, label: x })), { placeholder: 'např. bazar' })
       ),
       h('div', { class: 'form-grid form-grid-2' }, toggle('competitors.in_stock_only', 'Jen nabídky skladem'), toggle('competitors.include_shipping', 'Počítat s dopravou')),
       h(
@@ -180,9 +189,6 @@ export function strategyForm(o) {
         num('competitors.max_age_days', 'Max. stáří ceny', { int: true, min: 1, suffix: 'dní', placeholder: 'z nastavení' }),
         num('competitors.outlier_pct', 'Vyřadit podezřele nízké', { suffix: '%', placeholder: 'vypnuto' })
       ),
-      h('h3', { class: 'form-subtitle' }, 'Když konkurence chybí'),
-      h('div', { class: 'form-grid' }, choice('fallback.mode', 'Náhradní režim', FALLBACK_MODES.filter((f) => ext || !f.ext || f.value === cfg.fallback.mode)), fbMarkup, fbOffset),
-      h('p', { class: 'field-help fb-mode-help' }),
     ],
   });
 
@@ -339,7 +345,7 @@ export function strategyForm(o) {
 
   // ------------------------------------------------ Platnost a podmínky (rozšíření enginu)
   let scheduleSection = null;
-  if (ext) {
+  {
     const toLocal = (iso) => {
       if (!iso) return '';
       const d = new Date(iso);
@@ -448,15 +454,16 @@ export function strategyForm(o) {
     show(tCompetitor, cfg.target.mode === 'competitor');
     show(tMarkup, cfg.target.mode === 'cost_plus');
     show(tFixed, cfg.target.mode === 'fixed');
-    show(tStep, ext && cfg.target.mode === 'clearance');
-    show(tEvery, ext && cfg.target.mode === 'clearance');
-    show(tMaxSales, ext && cfg.target.mode === 'clearance');
+    show(tStep, cfg.target.mode === 'clearance');
+    show(tEvery, cfg.target.mode === 'clearance');
+    show(tMaxSales, cfg.target.mode === 'clearance');
     show(marketNote, !m.market);
     compSection.classList.toggle('is-dimmed', !m.market);
+    show(fallbackBlock, usesFallback(cfg.target.mode));
+    fbWhen.textContent = BASE_MISSING_TEXT[cfg.target.mode] ? 'Uplatní se, když ' + BASE_MISSING_TEXT[cfg.target.mode] + '.' : '';
     show(fbMarkup, cfg.fallback.mode === 'cost_plus');
     show(fbOffset, cfg.fallback.mode === 'msrp');
-    const fbHelp = compSection.querySelector('.fb-mode-help');
-    if (fbHelp) fbHelp.textContent = (FALLBACK_MODES.find((f) => f.value === cfg.fallback.mode) || {}).help || '';
+    fbHelp.textContent = (FALLBACK_MODES.find((f) => f.value === cfg.fallback.mode) || {}).help || '';
     show(bandsWrap, cfg.rounding.mode === 'ending');
     show(dirCtl.closest('.field') || dirCtl, cfg.rounding.mode !== 'none');
     show(autoMax, Boolean(cfg.approval.auto));
@@ -484,13 +491,13 @@ export function strategyForm(o) {
 
   const sections = {
     target: targetSection,
+    schedule: scheduleSection,
     competitors: compSection,
     limits: limitsSection,
     rounding: roundingSection,
     stock: stockSection,
     approval: approvalSection,
   };
-  if (scheduleSection) sections.schedule = scheduleSection;
   const el = h('div', { class: 'strategy-form' }, Object.values(sections));
   return { el, sections, getConfig: () => JSON.parse(JSON.stringify(cfg)) };
 }

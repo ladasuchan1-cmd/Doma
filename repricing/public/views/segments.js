@@ -8,6 +8,7 @@ import { emptyState, colorDot, button, callout } from '../lib/ui.js';
 import { confirmDialog } from '../lib/modal.js';
 import { toast } from '../lib/toast.js';
 import { describeFilter, countConditions } from '../lib/filter-model.js';
+import { describeConditionsShort } from '../lib/strategy-model.js';
 import { int, truncate } from '../lib/format.js';
 
 export const title = 'Segmenty';
@@ -28,7 +29,16 @@ export async function show(root, ctx) {
         key: 'filter', label: 'Podmínky', hideSm: true,
         render: (s) => {
           const text = describeFilter(s.filter, fieldsMap);
-          return h('span', { class: 'small', title: text }, truncate(text, 110), ' ', h('span', { class: 'muted' }, '(' + int(countConditions(s.filter)) + ')'));
+          const short = describeConditionsShort(s.filter, fieldsMap) || text;
+          return h(
+            'span',
+            { class: 'small seg-cond', title: text },
+            s.error ? h('span', { class: 'badge badge-danger', title: s.error }, 'Chybný filtr') : null,
+            s.error ? ' ' : null,
+            truncate(short, 110),
+            ' ',
+            h('span', { class: 'muted' }, '(' + int(countConditions(s.filter)) + ')')
+          );
         },
       },
       { key: 'count', label: 'Produktů', sortable: true, align: 'right', value: (s) => s.count, render: (s) => (s.count == null ? h('span', { class: 'muted' }, '–') : h('a', { href: buildHash('/produkty', { segment: s.id }), class: 'num strong', title: 'Zobrazit produkty segmentu' }, int(s.count))) },

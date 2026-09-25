@@ -159,17 +159,32 @@ test('import: náhled CSV a zkušební/ostrý import', async () => {
   assert.strictEqual(log[0].id, js.body.import_id);
 });
 
-test('volba extensions vrací rozšíření konfigurace enginu', async () => {
-  const ext = await createMockServer({ port: 0, autologin: true, extensions: true });
-  try {
-    const s = await (await fetch(ext.url + '/api/v1/strategies/1')).json();
-    assert.deepStrictEqual(s.config.schedule, { valid_from: null, valid_to: null, weekdays: [], hours: null });
-    assert.deepStrictEqual(s.config.competitors.exclude_keywords, []);
-    const plain = (await json('/strategies/1')).body;
-    assert.ok(!('schedule' in plain.config), 'bez volby jen SPEC §6.5');
-  } finally {
-    await ext.close();
+test('tvary odpovědí jako skutečné API: konfigurace strategií, booleany, final_price, upozornění, tried', async () => {
+  const s = (await json('/strategies/1')).body;
+  assert.deepStrictEqual(s.config.schedule, { valid_from: null, valid_to: null, weekdays: [], hours: null });
+  assert.deepStrictEqual(s.config.competitors.exclude_keywords, []);
+  assert.strictEqual(typeof s.enabled, 'boolean');
+  const list = (await json('/strategies')).body.items;
+  assert.ok(list.some((x) => x.config.conditions && Object.keys(x.config.conditions).length), 'strategie s podmínkami');
+  assert.ok(list.some((x) => x.config.schedule.weekdays.length), 'strategie s časovým oknem');
+  const comps = (await json('/competitors')).body.items;
+  assert.ok(comps.every((c) => typeof c.enabled === 'boolean'));
+  const props = (await json('/proposals?limit=5')).body.items;
+  for (const pr of props) {
+    assert.strictEqual(pr.final_price, pr.manual_price ?? pr.new_price);
+    assert.ok('final_change_pct' in pr && 'final_margin_pct' in pr && 'vat_rate' in pr.product);
   }
+  const d = (await json('/dashboard')).body;
+  const types = new Set(['below_cost', 'no_cost', 'zero_price', 'competitor_drop', 'stale_offers', 'not_applied', 'min_below_cost', 'unmatched']);
+  assert.ok(d.alerts.length > 0);
+  for (const a of d.alerts) {
+    assert.ok(types.has(a.type), 'typ upozornění ' + a.type);
+    assert.ok(['error', 'warn', 'info'].includes(a.severity));
+    assert.ok(a.count > 0 && a.text && (!a.link || a.link.startsWith('#/')));
+  }
+  const detail = (await json('/products/1')).body;
+  assert.ok(Array.isArray(detail.explain.tried) && detail.explain.tried.length > 0);
+  assert.strictEqual(typeof detail.product.lock_active, 'boolean');
 });
 
 test('export, feed s tokenem, tokeny, nastavení, audit', async () => {

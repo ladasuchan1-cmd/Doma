@@ -12,17 +12,8 @@ const STATUS_LABELS = {
   superseded: 'Nahrazeno novějším',
 };
 
-const FLAG_LABELS = {
-  change_limited: 'omezeno limitem změny',
-  ceiling: 'strop ceny',
-  floor: 'spodní hranice',
-  limits_conflict: 'konflikt limitů',
-  floor_over_change_limit: 'spodní hranice nad limitem změny',
-  below_cost: 'pod nákupní cenou',
-  big_change: 'velká změna',
-  no_cost: 'chybí nákupní cena',
-  fallback: 'záložní režim',
-};
+// Popisky příznaků přebíráme z enginu (jediný zdroj pravdy), aby nové příznaky nikdy neskončily jako kódy.
+const FLAG_LABELS = Object.freeze({ ...require('../engine/pricing').FLAG_LABELS });
 
 /** Pole návrhu – z API přijde produkt buď vnořený (`product: {code, …}`), nebo zploštělý. */
 function pick(p, key) {

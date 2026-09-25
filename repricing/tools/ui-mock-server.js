@@ -5,7 +5,8 @@
 // endpointy /api/v1 z SPEC §8 realistickými daty cykloobchodu (deterministicky generovanými). Stav je v paměti
 // a mění se (schvalování, strategie, segmenty, import…), takže lze proklikat celé UI bez backendu.
 //
-// Použití:  node tools/ui-mock-server.js [--port=8090] [--host=127.0.0.1] [--latency=120] [--password=demo] [--autologin] [--extensions] [--verbose]
+// Použití:  node tools/ui-mock-server.js [--port=8090] [--host=127.0.0.1] [--latency=120] [--password=demo] [--autologin] [--verbose]
+// Tvary odpovědí odpovídají skutečnému API (src/server/api/*): final_price u návrhů, typy upozornění, booleany atd.
 // Heslo pro přihlášení: demo (nebo --password). Nulové závislosti, jen node:*.
 // Programově: const { createMockServer } = require('./tools/ui-mock-server.js');
 //             const m = await createMockServer({ port: 0 }); … await m.close();
@@ -31,19 +32,20 @@ const DEFAULT_SETTINGS = {
   export: {
     update_current_price: true,
     xml: { root: 'prices', item: 'item', fields: ['code', 'ean', 'name', 'price', 'old_price', 'vat_rate', 'currency', 'changed_at'] },
-    pohoda: { ico: '', application: 'Cenotvorba', filter_by: 'code', price_level: '' },
+    pohoda: { ico: '', application: 'Cenotvorba', filter_by: 'code', price_level: '', encoding: 'windows-1250' },
     webhook: { url: '', format: 'json', headers: {}, auto_push: false, timeout_ms: 20000 },
-    feed_scope: 'all',
   },
   schedule: { run_interval_minutes: 0, run_after_import: false, auto_push_after_run: false },
   retention_days: 180,
 };
 
-// Kopie výchozí konfigurace strategie (SPEC §6.5).
+// Kopie výchozí konfigurace strategie enginu (src/engine/presets.js DEFAULT_CONFIG – shodu hlídá test ui-strategy-sync).
 const DEFAULT_CONFIG = {
-  target: { mode: 'undercut_min', offset_abs: 0, offset_pct: 0, rank: 1, competitor: null, markup_pct: null, fixed_price: null },
-  competitors: { include: [], exclude: [], include_tags: [], exclude_tags: [], in_stock_only: true, include_shipping: false, max_age_days: null, outlier_pct: null, min_competitors: 1 },
-  fallback: { mode: 'keep', markup_pct: null, offset_pct: 0 },
+  conditions: {},
+  schedule: { valid_from: null, valid_to: null, weekdays: [], hours: null },
+  target: { mode: 'undercut_min', offset_abs: 0, offset_pct: 0, rank: 1, competitor: null, markup_pct: null, fixed_price: null, step_pct: 5, every_days: 14, max_sales_30: 0 },
+  competitors: { include: [], exclude: [], include_tags: [], exclude_tags: [], in_stock_only: true, include_shipping: false, max_age_days: null, outlier_pct: null, min_competitors: 1, exclude_keywords: [] },
+  fallback: { mode: 'next', markup_pct: null, offset_pct: 0 },
   limits: {
     min_margin_pct: 10, min_profit_abs: null, max_margin_pct: null, max_above_msrp_pct: 0, max_below_msrp_pct: null,
     max_decrease_pct: 10, max_increase_pct: 15, allow_increase: true, allow_decrease: true, min_change_pct: 0.5, min_change_abs: 5,
@@ -54,14 +56,6 @@ const DEFAULT_CONFIG = {
   approval: { auto: false, auto_max_change_pct: 5 },
 };
 
-// Volitelná rozšíření konfigurace, která implementuje engine nad rámec SPEC §6.5 (src/engine/presets.js).
-// Mock je vrací jen s volbou --extensions / { extensions: true } – výchozí chování odpovídá SPEC.
-const EXTENSION_DEFAULTS = {
-  conditions: {},
-  schedule: { valid_from: null, valid_to: null, weekdays: [], hours: null },
-  target: { step_pct: 5, every_days: 14, max_sales_30: 0 },
-  competitors: { exclude_keywords: [] },
-};
 
 // ------------------------------------------------------------------ pomocníci
 
@@ -206,7 +200,6 @@ function createState(opts = {}) {
   const pick = (arr) => arr[Math.floor(rnd() * arr.length)];
   const between = (a, b) => a + rnd() * (b - a);
   const st = {
-    extensions: Boolean(opts.extensions),
     now: () => (opts.now ? new Date(opts.now).getTime() : Date.now()),
     t0: now,
     password: opts.password || 'demo',
@@ -389,9 +382,11 @@ function createState(opts = {}) {
   };
   strat('Ležáky – doprodej', 'Podlézt nejnižší cenu o 1 %, marže stačí 3 %.', sLezaky, 10, 1, { target: { mode: 'undercut_min', offset_pct: -1 }, limits: { min_margin_pct: 3, max_decrease_pct: 15 } });
   strat('Klíčové značky – pozice 2', 'Držet se těsně pod druhým nejlevnějším, nikdy nad MOC.', sKey, 20, 1, { target: { mode: 'rank', rank: 2, offset_abs: -1 }, limits: { min_margin_pct: 18, max_above_msrp_pct: 0 }, competitors: { include_tags: ['klíčový'], min_competitors: 1 } });
-  strat('Bez konkurence → MOC', 'Kde není konkurence, prodávat za doporučenou cenu.', sNoMarket, 30, 1, { target: { mode: 'msrp' }, limits: { min_margin_pct: 10 } });
+  strat('Víkendová akce', 'O víkendu 10 % pod MOC na elektrokola skladem.', null, 5, 0, { schedule: { weekdays: [6, 7] }, conditions: { all: [{ field: 'category', op: '=', value: 'Elektrokola' }, { field: 'stock', op: '>', value: 0 }] }, target: { mode: 'msrp', offset_pct: -10 }, limits: { min_margin_pct: 8, max_decrease_pct: 15 } });
+  strat('Návrat marže – jsme výrazně nejlevnější', 'Když jsme o víc než 5 % pod nejlevnějším konkurentem, zdražit na 1 % pod něj.', null, 25, 1, { conditions: { all: [{ field: 'position', op: '=', value: 'cheapest' }, { field: 'gap_min_pct', op: '<=', value: -5 }] }, target: { mode: 'undercut_min', offset_pct: -1 }, limits: { min_margin_pct: 10 } });
+  strat('Bez konkurence → MOC', 'Kde není konkurence, prodávat za doporučenou cenu.', sNoMarket, 30, 1, { target: { mode: 'msrp' }, limits: { min_margin_pct: 10 }, fallback: { mode: 'keep' } });
   strat('Komponenty – medián trhu', 'Díly nastavit na medián trhu.', sParts, 40, 0, { target: { mode: 'market_median' }, limits: { min_margin_pct: 15 }, rounding: { mode: 'ending', direction: 'nearest', bands: [{ up_to: 1000, ending: 9 }, { up_to: null, ending: 90 }] } });
-  strat('Výchozí – medián trhu −2 %', 'Všechny ostatní produkty.', null, 100, 1, { target: { mode: 'market_median', offset_pct: -2 }, limits: { min_margin_pct: 12 }, approval: { auto: true, auto_max_change_pct: 3 }, competitors: { exclude_tags: ['marketplace'] } });
+  strat('Výchozí – medián trhu −2 %', 'Všechny ostatní produkty.', null, 100, 1, { target: { mode: 'market_median', offset_pct: -2 }, limits: { min_margin_pct: 12 }, approval: { auto: true, auto_max_change_pct: 3 }, competitors: { exclude_tags: ['marketplace'] }, fallback: { mode: 'keep' } });
 
   // zdroje
   st.sources.push(
@@ -545,6 +540,12 @@ function productView(st, p, ctx) {
     gap_min_pct: m.min ? round(((price - m.min) / m.min) * 100, 2) : null,
     msrp_diff_pct: p.msrp ? round(((price - p.msrp) / p.msrp) * 100, 2) : null,
     offers_instock: offers.filter((o) => o.in_stock === 1 && o.enabled).length,
+    offers_count: offers.filter((o) => o.enabled).length,
+    below_cost: price != null && p.purchase_price != null ? netPrice < p.purchase_price : false,
+    min_below_cost: m.min != null && p.purchase_price != null ? net(m.min, vat) < p.purchase_price : false,
+    has_stock: (p.stock ?? 0) > 0,
+    lock_active: lockActive(p, st.now()),
+    days_since_change: p.price_changed_at ? Math.floor((st.now() - Date.parse(p.price_changed_at)) / DAY) : null,
   };
   delete v.code_key;
   delete v.ean_key;
@@ -686,7 +687,7 @@ function decide(st, product, offers, strategy, ctx) {
     return { ...d, action: 'skip', reason };
   };
   explain.push({ step: 'strategy', text: 'Strategie „' + (strategy.name || 'simulace') + '“' + (strategy.segment_id ? ' (segment #' + strategy.segment_id + ')' : ' (všechny produkty)') });
-  if (product.locked) return skip('locked', 'Produkt je zamčený – cena se nemění.');
+  if (lockActive(product, st.now())) return skip('locked', 'Produkt je zamčený – cena se nemění.');
   let forced = null;
   if ((product.stock ?? 0) <= 0) {
     if (cfg.stock.zero_stock === 'skip') return skip('zero_stock', 'Nulový sklad – strategie produkty bez skladu nepřeceňuje.');
@@ -725,8 +726,12 @@ function decide(st, product, offers, strategy, ctx) {
       }
     }
     if (insufficient) {
-      flags.push('fallback');
       const fb = cfg.fallback;
+      if (fb.mode === 'next') {
+        explain.push({ step: 'fallback', text: 'Chybí základ ceny (' + (t.mode === 'competitor' ? 'konkurent produkt nemá' : 'málo konkurentů') + ') → další strategie' });
+        return { ...d, action: 'skip', reason: 'fallthrough', base_missing: t.mode === 'competitor' ? 'no_competitor' : 'no_market' };
+      }
+      flags.push('fallback');
       if (fb.mode === 'msrp') {
         if (!product.msrp) return skip('no_msrp', 'Náhradní režim MOC, ale produkt nemá MOC.');
         target = product.msrp * (1 + (fb.offset_pct || 0) / 100);
@@ -747,7 +752,10 @@ function decide(st, product, offers, strategy, ctx) {
       const offTxt = t.mode === 'match_min' ? 'dorovnat' : [t.offset_pct ? pct(t.offset_pct) : null, t.offset_abs ? money(t.offset_abs) : null].filter(Boolean).join(' ') || 'bez posunu';
       explain.push({ step: 'target', text: 'Cíl: ' + offTxt + ' vůči ' + money(ref) + ' → ' + money(target) });
     } else if (t.mode === 'msrp') {
-      if (!product.msrp) return skip('no_msrp', 'Produkt nemá doporučenou cenu (MOC).');
+      if (!product.msrp) {
+        if (cfg.fallback.mode === 'next') return { ...d, action: 'skip', reason: 'fallthrough', base_missing: 'no_msrp', explain: [...explain, { step: 'fallback', text: 'Chybí základ ceny: produkt nemá MOC → další strategie' }] };
+        return skip('no_msrp', 'Produkt nemá doporučenou cenu (MOC).');
+      }
       d.reference_price = product.msrp;
       target = product.msrp * (1 + (t.offset_pct || 0) / 100) + (t.offset_abs || 0);
       explain.push({ step: 'target', text: 'Cíl: MOC ' + money(product.msrp) + (t.offset_pct ? ' ' + pct(t.offset_pct) : '') + ' → ' + money(target) });
@@ -762,6 +770,15 @@ function decide(st, product, offers, strategy, ctx) {
     } else if (t.mode === 'fixed') {
       target = t.fixed_price;
       explain.push({ step: 'target', text: 'Cíl: pevná cena ' + money(target) });
+    } else if (t.mode === 'clearance') {
+      if (cur == null) return skip('no_price', 'Chybí aktuální cena.');
+      const since = product.price_changed_at ? (st.now() - Date.parse(product.price_changed_at)) / DAY : Infinity;
+      if (since < (t.every_days ?? 14) || (product.sales_30 ?? 0) > (t.max_sales_30 ?? 0)) {
+        explain.push({ step: 'target', text: 'Doprodej: další krok až za ' + Math.ceil((t.every_days ?? 14) - since) + ' dní nebo se produkt prodává' });
+        return { ...d, action: 'no_change', reason: 'clearance_wait' };
+      }
+      target = cur * (1 - (t.step_pct ?? 5) / 100);
+      explain.push({ step: 'target', text: 'Doprodej: −' + pct(t.step_pct) + ' z ' + money(cur) + ' → ' + money(target) });
     }
   }
   if (target == null) return skip('no_market', 'Nelze určit cílovou cenu.');
@@ -840,22 +857,81 @@ function decide(st, product, offers, strategy, ctx) {
   return { ...d, action: 'change', reason: null };
 }
 
-function strategyFor(st, view, segIds) {
-  const list = st.strategies.filter((s) => s.enabled).sort((a, b) => a.priority - b.priority || a.id - b.id);
-  return list.find((s) => s.segment_id == null || segIds.includes(s.segment_id)) || null;
+/** Efektivní zámek (locked a nevypršelé locked_until). */
+function lockActive(p, now) {
+  if (!p || !Number(p.locked)) return false;
+  if (!p.locked_until) return true;
+  const t = Date.parse(p.locked_until);
+  return Number.isNaN(t) ? true : t > now;
 }
 
+/** Časové okno strategie (zjednodušeně: místní čas serveru). */
+function scheduleActive(sch, now) {
+  if (!sch) return true;
+  if (sch.valid_from && now < Date.parse(sch.valid_from)) return false;
+  if (sch.valid_to && now >= Date.parse(sch.valid_to)) return false;
+  const d = new Date(now);
+  const wd = ((d.getDay() + 6) % 7) + 1;
+  if (Array.isArray(sch.weekdays) && sch.weekdays.length && !sch.weekdays.includes(wd)) return false;
+  if (Array.isArray(sch.hours) && sch.hours.length === 2) {
+    const h = d.getHours() + d.getMinutes() / 60;
+    const [a, b] = sch.hours;
+    if (a < b ? !(h >= a && h < b) : !(h >= a || h < b)) return false;
+  }
+  return true;
+}
+
+/** Vyzkouší strategie v pořadí (segment, podmínky, okno, propadnutí) – jako evaluateProduct enginu. */
 function evaluate(st, ctx, p, compiled) {
   const view = productView(st, p, ctx);
   const segIds = segmentIdsFor(st, view, compiled);
-  const strategy = strategyFor(st, view, segIds);
   const offers = productOffers(st, p.id).map((o) => engineOffer(st, o));
-  const decision = strategy ? decide(st, p, offers, strategy, ctx) : null;
-  return { view, segIds, strategy, decision };
+  const tried = [];
+  let lastFall = null;
+  const list = [...st.strategies].sort((a, b) => a.priority - b.priority || a.id - b.id);
+  for (const s of list) {
+    const base = { strategy_id: s.id, name: s.name };
+    if (!s.enabled) {
+      tried.push({ ...base, result: 'not_applicable', code: 'disabled', why: 'strategie je vypnutá' });
+      continue;
+    }
+    if (s.segment_id != null && !segIds.includes(s.segment_id)) {
+      const seg = st.segments.find((x) => x.id === s.segment_id);
+      tried.push({ ...base, result: 'not_applicable', code: 'segment', why: 'produkt nepatří do segmentu „' + (seg ? seg.name : '#' + s.segment_id) + '“' });
+      continue;
+    }
+    const cfg = deepMerge(DEFAULT_CONFIG, s.config || {});
+    if (cfg.conditions && Object.keys(cfg.conditions).length) {
+      let ok = false;
+      try {
+        ok = compileFilter(cfg.conditions)(view);
+      } catch {
+        ok = false;
+      }
+      if (!ok) {
+        tried.push({ ...base, result: 'not_applicable', code: 'conditions', why: 'produkt nesplňuje podmínky strategie' });
+        continue;
+      }
+    }
+    if (!scheduleActive(cfg.schedule, ctx.now)) {
+      tried.push({ ...base, result: 'not_applicable', code: 'schedule', why: 'mimo časové okno strategie' });
+      continue;
+    }
+    const decision = decide(st, p, offers, s, ctx);
+    if (decision.action === 'skip' && decision.reason === 'fallthrough') {
+      tried.push({ ...base, result: 'fallthrough', code: decision.base_missing || 'fallthrough', why: 'chybí základ ceny' });
+      lastFall = decision;
+      continue;
+    }
+    tried.push({ ...base, result: 'decided', code: decision.action, why: 'strategie rozhodla' });
+    if (lastFall) decision.explain = [{ step: 'fallthrough', text: 'Strategie „' + (st.strategies.find((x) => x.id === lastFall.strategy_id)?.name || '') + '“ nepoužita: chybí základ ceny' }, ...decision.explain];
+    return { view, segIds, strategy: s, decision, tried, fellThrough: Boolean(lastFall) };
+  }
+  return { view, segIds, strategy: null, decision: null, tried, fellThrough: Boolean(lastFall) };
 }
 
 function emptyStats() {
-  return { products: 0, evaluated: 0, changes: 0, up: 0, down: 0, no_change: 0, skipped: {}, no_strategy: 0, auto_approved: 0, pending: 0, by_strategy: {}, margin_impact_abs: 0 };
+  return { products: 0, evaluated: 0, changes: 0, up: 0, down: 0, no_change: 0, no_change_reasons: {}, skipped: {}, no_strategy: 0, fallthrough: 0, auto_approved: 0, pending: 0, by_strategy: {}, flags: {}, margin_impact_abs: 0 };
 }
 
 function addStats(stats, d, strategy, p, vat) {
@@ -867,8 +943,11 @@ function addStats(stats, d, strategy, p, vat) {
   const bs = stats.by_strategy[strategy.id] || (stats.by_strategy[strategy.id] = { name: strategy.name, products: 0, changes: 0, up: 0, down: 0 });
   bs.products += 1;
   if (d.action === 'skip') stats.skipped[d.reason] = (stats.skipped[d.reason] || 0) + 1;
-  else if (d.action === 'no_change') stats.no_change += 1;
-  else {
+  else if (d.action === 'no_change') {
+    stats.no_change += 1;
+    stats.no_change_reasons[d.reason || 'none'] = (stats.no_change_reasons[d.reason || 'none'] || 0) + 1;
+  } else {
+    for (const f of d.flags || []) stats.flags[f] = (stats.flags[f] || 0) + 1;
     stats.changes += 1;
     bs.changes += 1;
     if (d.change_abs > 0) {
@@ -893,7 +972,8 @@ function doRun(st, { trigger = 'manual', productIds, at, statusMix } = {}) {
   let n = 0;
   for (const p of targets) {
     stats.products += 1;
-    const { strategy, decision } = evaluate(st, ctx, p, compiled);
+    const { strategy, decision, fellThrough } = evaluate(st, ctx, p, compiled);
+    if (fellThrough) stats.fallthrough += 1;
     addStats(stats, decision, strategy, p, p.vat_rate ?? 21);
     // nahradit starší čekající/schválené návrhy produktu
     for (const old of st.proposals) if (old.product_id === p.id && (old.status === 'pending' || old.status === 'approved')) old.status = 'superseded';
@@ -944,13 +1024,22 @@ function proposalRow(st, pr) {
   const p = st.products.find((x) => x.id === pr.product_id) || {};
   const s = st.strategies.find((x) => x.id === pr.strategy_id);
   const seg = st.segments.find((x) => x.id === pr.segment_id);
+  const vat = p.vat_rate ?? 21;
+  const fin = pr.manual_price ?? pr.new_price;
+  const offs = st.offers.filter((o) => o.product_id === pr.product_id && o.price === pr.market_min);
+  const cheapest = offs.length ? st.competitors.find((c) => c.id === offs[0].competitor_id) : null;
   return {
     ...pr,
     flags: [...(pr.flags || [])],
     explain: [...(pr.explain || [])],
-    product: { code: p.code, name: p.name, manufacturer: p.manufacturer, category: p.category, stock: p.stock, purchase_price: p.purchase_price },
+    product: { id: p.id, code: p.code, name: p.name, ean: p.ean, manufacturer: p.manufacturer, category: p.category, stock: p.stock, purchase_price: p.purchase_price, price: p.price, vat_rate: p.vat_rate ?? null, active: p.active },
     strategy_name: s ? s.name : null,
     segment_name: seg ? seg.name : null,
+    // jako skutečné API: cena, která se exportuje (ruční cena má přednost)
+    final_price: fin,
+    final_change_pct: pr.old_price ? round(((fin - pr.old_price) / pr.old_price) * 100, 2) : null,
+    final_margin_pct: pr.manual_price != null ? marginPct(fin, p.purchase_price, vat) : pr.margin_after,
+    cheapest_competitor: cheapest ? cheapest.name : null,
   };
 }
 
@@ -1495,8 +1584,8 @@ function dashboard(st) {
       const p = st.products.find((x) => x.id === o.product_id);
       return p && o.price < p.price;
     }).length;
-    return { name: c.name, offers: offs.length, cheaper_than_us_pct: offs.length ? round((cheaper / offs.length) * 100, 1) : null };
-  }).sort((a, b) => b.offers - a.offers).slice(0, 10);
+    return { id: c.id, name: c.name, label: c.label ?? null, enabled: Boolean(c.enabled), offers: offs.length, cheaper_than_us_pct: offs.length ? round((cheaper / offs.length) * 100, 1) : null };
+  }).filter((c) => c.enabled && c.offers > 0).sort((a, b) => b.offers - a.offers).slice(0, 10); // jako API: vypnutí a bez nabídek se nezobrazují
   const manus = new Map();
   for (const v of views) {
     const m = manus.get(v.manufacturer) || { manufacturer: v.manufacturer, products: 0, idx: [], cheapest: 0, withMarket: 0, margins: [] };
@@ -1511,27 +1600,45 @@ function dashboard(st) {
     manufacturer: m.manufacturer, products: m.products, avg_index: m.idx.length ? round(mean(m.idx), 1) : null,
     cheapest_pct: m.withMarket ? round((m.cheapest / m.withMarket) * 100, 1) : null, avg_margin_pct: m.margins.length ? round(mean(m.margins), 1) : null,
   }));
+  // upozornění ve tvaru skutečného API (src/server/api/dashboard.js)
   const alerts = [];
-  for (const v of views) {
-    if (v.margin_pct != null && v.margin_pct < 0) alerts.push({ type: 'below_cost', text: `${v.code} ${v.name}: prodáváme pod nákupní cenou (marže ${String(v.margin_pct).replace('.', ',')} %)`, product_id: v.id });
+  const cz = (n, one, few, many) => n + ' ' + (n === 1 ? one : n >= 2 && n <= 4 ? few : many);
+  const plink = (filter) => '#/produkty?filter=' + encodeURIComponent(JSON.stringify(filter));
+  const add = (a) => {
+    if (a.count > 0) alerts.push(a);
+  };
+  const belowCost = views.filter((v) => v.below_cost);
+  add({ type: 'below_cost', severity: 'error', count: belowCost.length, text: cz(belowCost.length, 'aktivní produkt prodáváme', 'aktivní produkty prodáváme', 'aktivních produktů prodáváme') + ' pod nákupní cenou.', link: plink({ field: 'below_cost', op: 'is_true' }), ...(belowCost.length === 1 ? { product_id: belowCost[0].id } : {}) });
+  const zero = views.filter((v) => !(v.price > 0));
+  add({ type: 'zero_price', severity: 'error', count: zero.length, text: cz(zero.length, 'aktivní produkt nemá', 'aktivní produkty nemají', 'aktivních produktů nemá') + ' prodejní cenu (prázdná nebo 0).', link: plink({ any: [{ field: 'price', op: 'empty' }, { field: 'price', op: '<=', value: 0 }] }) });
+  const drops = st.offers.filter((o) => o.prev_price && o.price < o.prev_price * 0.9 && o.changed_at && st.now() - new Date(o.changed_at).getTime() < DAY);
+  const dropItems = drops.slice(0, 5).map((o) => {
+    const p = st.products.find((x) => x.id === o.product_id) || {};
+    const c = st.competitors.find((x) => x.id === o.competitor_id) || {};
+    return { product_id: p.id, code: p.code, name: p.name, competitor: c.name, price: o.price, prev_price: o.prev_price, changed_at: o.changed_at, drop_pct: round(((o.prev_price - o.price) / o.prev_price) * 100, 1) };
+  });
+  add({ type: 'competitor_drop', severity: 'warn', count: drops.length, text: cz(drops.length, 'nabídka konkurence zlevnila', 'nabídky konkurence zlevnily', 'nabídek konkurence zlevnilo') + ' za posledních 24 h o více než 10 %' + (dropItems[0] ? ' (např. ' + dropItems[0].competitor + ': ' + dropItems[0].name + ' −' + String(dropItems[0].drop_pct).replace('.', ',') + ' %)' : '') + '.', link: '#/produkty?sort=gap_min_pct&dir=desc', items: dropItems, ...(drops.length === 1 ? { product_id: dropItems[0].product_id } : {}) });
+  const lastObs = Math.max(0, ...st.offers.map((o) => Date.parse(o.observed_at)));
+  const maxAge = st.settings.offer_max_age_days;
+  if (lastObs && st.now() - lastObs > maxAge * DAY) {
+    const days = Math.floor((st.now() - lastObs) / DAY);
+    add({ type: 'stale_offers', severity: 'warn', count: st.offers.length, days_since_import: days, text: `Ceny konkurence nepřišly ${days} dní (limit ${maxAge} dní) – zastaralé nabídky se v cenotvorbě ignorují. Zkontrolujte zdroje dat.`, link: '#/import' });
   }
-  const undercut = st.offers.filter((o) => o.prev_price && o.price < o.prev_price * 0.9 && o.changed_at && st.now() - new Date(o.changed_at).getTime() < DAY * 1.5).slice(0, 3);
-  for (const o of undercut) {
-    const p = st.products.find((x) => x.id === o.product_id);
-    const c = st.competitors.find((x) => x.id === o.competitor_id);
-    alerts.push({ type: 'undercut', text: `${c.name} zlevnil ${p.name} o ${Math.round((1 - o.price / o.prev_price) * 100)} % na ${money(o.price)}`, product_id: p.id });
-  }
-  if (alerts.length < 3) {
-    const v = views.find((x) => x.position === 'most_expensive' && x.gap_min_pct > 8);
-    if (v) alerts.push({ type: 'undercut', text: `${v.cheapest_competitor} je u ${v.name} o ${String(round(v.gap_min_pct, 1)).replace('.', ',')} % levnější než my`, product_id: v.id });
-  }
-  const stale = st.offers.filter((o) => (st.now() - new Date(o.observed_at).getTime()) / DAY > st.settings.offer_max_age_days).length;
-  if (stale) alerts.push({ type: 'stale', text: `${stale} nabídek konkurence je starších než ${st.settings.offer_max_age_days} dní – zkontrolujte zdroj dat.` });
-  const errSrc = st.sources.find((s) => s.last_status === 'error');
-  if (errSrc) alerts.push({ type: 'import_error', text: `Zdroj „${errSrc.name}“ skončil chybou: ${errSrc.last_message}` });
+  const notApplied = st.proposals.filter((pr) => pr.status === 'exported' && pr.exported_at && st.now() - Date.parse(pr.exported_at) > DAY).filter((pr) => {
+    const p = st.products.find((x) => x.id === pr.product_id);
+    return p && Math.abs(p.price - (pr.manual_price ?? pr.new_price)) >= 0.005 && !st.proposals.some((x) => x.product_id === pr.product_id && x.id > pr.id && x.status === 'exported');
+  });
+  add({ type: 'not_applied', severity: 'warn', count: notApplied.length, text: cz(notApplied.length, 'exportovaná cena nebyla', 'exportované ceny nebyly', 'exportovaných cen nebylo') + ' v adminu použito – poslední import katalogu stále ukazuje jinou cenu.', link: '#/navrhy?status=exported', items: notApplied.slice(0, 5).map((pr) => { const p = st.products.find((x) => x.id === pr.product_id); return { proposal_id: pr.id, product_id: p.id, code: p.code, name: p.name, exported_price: pr.manual_price ?? pr.new_price, current_price: p.price, exported_at: pr.exported_at }; }) });
+  const noCost = views.filter((v) => !(v.purchase_price > 0));
+  add({ type: 'no_cost', severity: 'warn', count: noCost.length, text: cz(noCost.length, 'aktivní produkt nemá', 'aktivní produkty nemají', 'aktivních produktů nemá') + ' nákupní cenu – marži nelze hlídat.', link: plink({ any: [{ field: 'purchase_price', op: 'empty' }, { field: 'purchase_price', op: '<=', value: 0 }] }), ...(noCost.length === 1 ? { product_id: noCost[0].id } : {}) });
+  const minBelow = views.filter((v) => v.min_below_cost);
+  add({ type: 'min_below_cost', severity: 'info', count: minBelow.length, text: 'U ' + minBelow.length + ' ' + (minBelow.length === 1 ? 'produktu' : 'produktů') + ' prodává konkurence pod naší nákupní cenou – argument pro jednání s dodavatelem.', link: plink({ field: 'min_below_cost', op: 'is_true' }), ...(minBelow.length === 1 ? { product_id: minBelow[0].id } : {}) });
+  add({ type: 'unmatched', severity: 'info', count: st.unmatched.length, text: cz(st.unmatched.length, 'nabídka konkurence není spárovaná', 'nabídky konkurence nejsou spárované', 'nabídek konkurence není spárovaných') + ' s katalogem.', link: '#/konkurence?tab=unmatched' });
+  const SEV = { error: 0, warn: 1, info: 2 };
+  alerts.sort((a, b) => SEV[a.severity] - SEV[b.severity]);
   const lastRun = st.runs[st.runs.length - 1] || null;
   return {
-    products: { active: views.length, with_market: withMarket.length, without_market: views.length - withMarket.length, locked: views.filter((v) => v.locked).length },
+    products: { active: views.length, with_market: withMarket.length, without_market: views.length - withMarket.length, locked: views.filter((v) => v.lock_active).length },
     position: pos,
     price_index: {
       vs_min: withMarket.length ? round(mean(withMarket.map((v) => v.price_index)), 1) : null,
@@ -1550,7 +1657,8 @@ function dashboard(st) {
     last_imports: st.imports.slice(-5).reverse(),
     competitors: byComp,
     by_manufacturer: byManufacturer,
-    alerts: alerts.slice(0, 8),
+    alerts,
+    generated_at: iso(st.now()),
   };
 }
 
@@ -1578,7 +1686,9 @@ function productsList(st, q) {
   if (q.segment) list = list.filter((x) => x.segments.includes(Number(q.segment)));
   const propOf = (id) => {
     const pr = [...st.proposals].reverse().find((p) => p.product_id === id && (p.status === 'pending' || p.status === 'approved'));
-    return pr ? { id: pr.id, status: pr.status, new_price: pr.manual_price ?? pr.new_price, change_pct: pr.change_pct } : null;
+    if (!pr) return null;
+    const fin = pr.manual_price ?? pr.new_price;
+    return { id: pr.id, status: pr.status, new_price: pr.new_price, change_pct: pr.change_pct, manual_price: pr.manual_price, final_price: fin, final_change_pct: pr.old_price ? round(((fin - pr.old_price) / pr.old_price) * 100, 2) : null };
   };
   let items = list.map((x) => ({ ...x.v, proposal: propOf(x.v.id), segments: x.segments }));
   if (q.has_proposal === '1') items = items.filter((x) => x.proposal);
@@ -1597,7 +1707,8 @@ function productDetail(st, id) {
   const exReason = new Map(m.excluded.map((x) => [x.offer.competitor_id, x.reason]));
   const offers = productOffers(st, p.id).map((o) => {
     const c = st.competitors.find((x) => x.id === o.competitor_id) || {};
-    return { ...o, competitor: c.name, label: c.label, competitor_enabled: c.enabled, tags: c.tags, excluded: exReason.get(o.competitor_id) || null };
+    const ex = exReason.get(o.competitor_id) || null;
+    return { ...o, competitor: c.name, label: c.label, competitor_enabled: Boolean(c.enabled), tags: c.tags, excluded: ex, used: !ex, age_days: round((st.now() - Date.parse(o.observed_at)) / DAY, 1) };
   }).sort((a, b) => a.price - b.price);
   return {
     product: ev.view,
@@ -1606,8 +1717,9 @@ function productDetail(st, id) {
     explain: {
       view: ev.view,
       segments: ev.segIds.map((sid) => ({ id: sid, name: st.segments.find((s) => s.id === sid)?.name })),
-      strategy: ev.strategy ? clone(ev.strategy) : null,
+      strategy: ev.strategy ? { id: ev.strategy.id, name: ev.strategy.name, description: ev.strategy.description, segment_id: ev.strategy.segment_id, priority: ev.strategy.priority } : null,
       decision: ev.decision,
+      tried: ev.tried,
     },
     proposals: st.proposals.filter((x) => x.product_id === p.id).slice(-20).reverse().map((x) => proposalRow(st, x)),
   };
@@ -1632,7 +1744,9 @@ function validateStrategyBody(b) {
   const cfg = deepMerge(DEFAULT_CONFIG, b.config || {});
   if (cfg.limits.min_margin_pct != null && cfg.limits.min_margin_pct >= 100) errors.push('Minimální marže musí být menší než 100 %.');
   if (cfg.target.mode === 'competitor' && !cfg.target.competitor) errors.push('Režim „konkurent“ vyžaduje název konkurenta.');
-  if (!['undercut_min', 'match_min', 'rank', 'market_avg', 'market_median', 'competitor', 'msrp', 'cost_plus', 'keep', 'fixed'].includes(cfg.target.mode)) errors.push('Neznámý režim cíle.');
+  if (!['undercut_min', 'match_min', 'rank', 'market_avg', 'market_median', 'competitor', 'msrp', 'cost_plus', 'keep', 'fixed', 'clearance'].includes(cfg.target.mode)) errors.push('Neznámý režim cíle.');
+  if (!['next', 'keep', 'msrp', 'cost_plus'].includes(cfg.fallback.mode)) errors.push('fallback.mode: neznámá hodnota „' + cfg.fallback.mode + '“');
+  if (cfg.fallback.mode === 'cost_plus' && cfg.fallback.markup_pct == null && cfg.target.markup_pct == null) errors.push('fallback.markup_pct: záložní režim „cost_plus“ vyžaduje přirážku v %');
   if (errors.length) throw new HttpError(400, 'Neplatná strategie', errors);
   return cfg;
 }
@@ -1641,6 +1755,9 @@ const PRESETS = [
   { key: 'lezaky', name: 'Ležáky N7/N8 – doprodej', description: 'Produkty skladem déle než 7 měsíců podlézt o 1 % pod nejnižší cenu, marže stačí 3 %, snížení max. 15 % za běh.', segment: { name: 'Ležáky N7/N8', filter: { all: [{ field: 'attrs.N', op: 'in', value: ['N7', 'N8'] }] } }, config: deepMerge(DEFAULT_CONFIG, { target: { mode: 'undercut_min', offset_pct: -1 }, limits: { min_margin_pct: 3, max_decrease_pct: 15 } }) },
   { key: 'klicove-znacky', name: 'Klíčové značky – držet pozici 2', description: 'Být druhý nejlevnější, minimální marže 18 %, nikdy nad MOC.', segment: { name: 'Klíčové značky', filter: { all: [{ field: 'manufacturer', op: 'in', value: ['Trek', 'Specialized'] }] } }, config: deepMerge(DEFAULT_CONFIG, { target: { mode: 'rank', rank: 2 }, limits: { min_margin_pct: 18, max_above_msrp_pct: 0 } }) },
   { key: 'bez-konkurence', name: 'Bez konkurence → MOC', description: 'Kde produkt nikdo jiný nenabízí, nastavit doporučenou cenu výrobce.', segment: { name: 'Bez konkurence', filter: { all: [{ field: 'market_count', op: '=', value: 0 }] } }, config: deepMerge(DEFAULT_CONFIG, { target: { mode: 'msrp' } }) },
+  { key: 'navrat-marze', name: 'Návrat marže – jsme výrazně nejlevnější', description: 'Když jsme o víc než 5 % pod nejlevnějším konkurentem, zdražit na 1 % pod nejnižší cenu trhu.', segment: null, config: deepMerge(DEFAULT_CONFIG, { conditions: { all: [{ field: 'position', op: '=', value: 'cheapest' }, { field: 'gap_min_pct', op: '<=', value: -5 }] }, target: { mode: 'undercut_min', offset_pct: -1 } }) },
+  { key: 'doprodej', name: 'Doprodej bez prodejů – postupné slevy', description: 'Každých 14 dní −5 %, dokud se nezačne prodávat; min. marže 0 %, nejvýše 40 % pod MOC.', segment: { name: 'Skladem bez prodejů 90 dní', filter: { all: [{ field: 'stock', op: '>', value: 0 }, { field: 'sales_90', op: '<=', value: 0 }] } }, config: deepMerge(DEFAULT_CONFIG, { target: { mode: 'clearance', step_pct: 5, every_days: 14, max_sales_30: 0 }, limits: { min_margin_pct: 0, max_below_msrp_pct: 40 } }) },
+  { key: 'vikend', name: 'Víkendová akce', description: 'O víkendu (so–ne) vybrané zboží 10 % pod MOC.', segment: { name: 'Víkendová akce – vybrané zboží', filter: { field: 'attrs.akce', op: 'is_true' } }, config: deepMerge(DEFAULT_CONFIG, { schedule: { weekdays: [6, 7] }, target: { mode: 'msrp', offset_pct: -10 }, limits: { min_margin_pct: 8, max_decrease_pct: 15 } }) },
   { key: 'vychozi', name: 'Výchozí – medián trhu −2 %', description: 'Všechny produkty 2 % pod mediánem trhu, minimální marže 12 %, změny do 3 % schválit automaticky.', segment: null, config: deepMerge(DEFAULT_CONFIG, { target: { mode: 'market_median', offset_pct: -2 }, limits: { min_margin_pct: 12 }, approval: { auto: true, auto_max_change_pct: 3 } }) },
 ];
 
@@ -1708,7 +1825,7 @@ function buildRoutes(st) {
         idx.push((o.price / p.price) * 100);
         if (o.price < p.price) cheaper += 1;
       }
-      return { id: c.id, name: c.name, label: c.label, enabled: c.enabled, tags: [...c.tags], note: c.note, offers: offs.length, products_cheaper_than_us: cheaper, avg_index: idx.length ? round(mean(idx), 1) : null, last_seen_at: offs.length ? offs.map((o) => o.observed_at).sort().pop() : null };
+      return { id: c.id, name: c.name, label: c.label, enabled: Boolean(c.enabled), tags: [...c.tags], note: c.note, offers: offs.length, products_cheaper_than_us: cheaper, cheaper_than_us_pct: offs.length ? round((cheaper / offs.length) * 100, 1) : null, avg_index: idx.length ? round(mean(idx), 1) : null, last_seen_at: offs.length ? offs.map((o) => o.observed_at).sort().pop() : null };
     }),
   }));
   add('PATCH', '/competitors/:id', (ctx) => {
@@ -1723,7 +1840,7 @@ function buildRoutes(st) {
     }
     if (b.note !== undefined) c.note = b.note || null;
     audit(ctx, 'competitor.update', 'competitor', c.id, b);
-    const out = { ...c };
+    const out = { ...c, enabled: Boolean(c.enabled) };
     delete out._share;
     delete out._bias;
     return out;
@@ -1778,9 +1895,9 @@ function buildRoutes(st) {
     return { ok: true };
   }, 'admin');
 
-  // strategie (s rozšířeními enginu jen při --extensions)
-  const extCfg = (cfg) => (st.extensions ? deepMerge(deepMerge(DEFAULT_CONFIG, EXTENSION_DEFAULTS), cfg) : clone(cfg));
-  const stratOut = (s) => ({ ...clone(s), config: extCfg(s.config) });
+  // strategie – konfigurace vždy normalizovaná na všechny volby enginu, enabled jako boolean (jako skutečné API)
+  const extCfg = (cfg) => deepMerge(DEFAULT_CONFIG, cfg || {});
+  const stratOut = (s) => ({ ...clone(s), enabled: Boolean(s.enabled), segment_name: st.segments.find((g) => g.id === s.segment_id)?.name ?? null, config: extCfg(s.config), config_errors: [] });
   add('GET', '/strategies', (ctx) => paginate([...st.strategies].sort((a, b) => a.priority - b.priority || a.id - b.id).map(stratOut), { ...ctx.query, limit: ctx.query.limit || 500 }, 500));
   add('GET', '/strategies/presets', () => ({ items: PRESETS.map((p) => ({ ...clone(p), config: extCfg(p.config) })) }));
   add('POST', '/strategies/presets/:key', (ctx) => {
@@ -1883,8 +2000,12 @@ function buildRoutes(st) {
     const list = filterProposals(st, q);
     const sort = q.sort || 'abs_change_pct';
     const dir = q.dir || (q.sort ? 'asc' : 'desc');
+    // jako API: řazení změny podle exportované ceny (ruční cena má přednost)
+    const finPct = (pr) => (pr.manual_price != null && pr.old_price ? ((pr.manual_price - pr.old_price) / pr.old_price) * 100 : pr.change_pct);
     const getter = (pr, k) => {
-      if (k === 'abs_change_pct') return pr.change_pct == null ? null : Math.abs(pr.change_pct);
+      if (k === 'abs_change_pct') return finPct(pr) == null ? null : Math.abs(finPct(pr));
+      if (k === 'change_pct') return finPct(pr);
+      if (k === 'final_price') return pr.manual_price ?? pr.new_price;
       if (k === 'code' || k === 'name' || k === 'manufacturer') return st.products.find((x) => x.id === pr.product_id)?.[k];
       return pr[k];
     };
@@ -1991,23 +2112,24 @@ function buildRoutes(st) {
     out.options = out.options || {};
     return out;
   };
-  add('GET', '/sources', (ctx) => paginate(st.sources.map(clone), { ...ctx.query, limit: 500 }, 500));
+  const srcOut = (x) => ({ ...clone(x), enabled: Boolean(x.enabled) });
+  add('GET', '/sources', (ctx) => paginate(st.sources.map(srcOut), { ...ctx.query, limit: 500 }, 500));
   add('POST', '/sources', (ctx) => {
     const s = { id: st.nextId('sources'), ...sourceBody(ctx.body || {}), last_run_at: null, last_status: null, last_message: null, created_at: iso(st.now()), updated_at: iso(st.now()) };
     st.sources.push(s);
     audit(ctx, 'source.create', 'source', s.id);
-    return clone(s);
+    return srcOut(s);
   }, 'admin');
   add('GET', '/sources/:id', (ctx) => {
     const s = st.sources.find((x) => x.id === toNumId(ctx.params.id));
     if (!s) throw new HttpError(404, 'Zdroj nenalezen.');
-    return clone(s);
+    return srcOut(s);
   });
   add('PUT', '/sources/:id', (ctx) => {
     const s = st.sources.find((x) => x.id === toNumId(ctx.params.id));
     if (!s) throw new HttpError(404, 'Zdroj nenalezen.');
     Object.assign(s, sourceBody(ctx.body || {}, s), { updated_at: iso(st.now()) });
-    return clone(s);
+    return srcOut(s);
   }, 'admin');
   add('DELETE', '/sources/:id', (ctx) => {
     const i = st.sources.findIndex((x) => x.id === toNumId(ctx.params.id));
@@ -2224,13 +2346,13 @@ function serveStatic(publicDir, urlPath, res) {
 
 /**
  * Spustí mock server.
- * @param {{port?: number, host?: string, latency?: number, password?: string, autologin?: boolean, publicDir?: string, now?: string|Date, log?: Function, extensions?: boolean}} [opts]
- *   extensions = vracet konfiguraci strategií včetně rozšíření enginu (schedule, conditions, clearance, exclude_keywords)
+ * @param {{port?: number, host?: string, latency?: number, password?: string, autologin?: boolean, publicDir?: string, now?: string|Date, log?: Function}} [opts]
+ *   Konfigurace strategií vždy obsahuje všechny volby enginu (podmínky, časové okno, doprodej, klíčová slova, fallback „next“).
  * @returns {Promise<{server: http.Server, url: string, port: number, state: object, close: () => Promise<void>}>}
  */
 function createMockServer(opts = {}) {
   const publicDir = path.resolve(opts.publicDir || path.join(__dirname, '..', 'public'));
-  const st = createState({ password: opts.password, now: opts.now, extensions: opts.extensions });
+  const st = createState({ password: opts.password, now: opts.now });
   const routes = buildRoutes(st);
   const latency = Number(opts.latency) || 0;
   const log = opts.log || (() => {});
@@ -2362,7 +2484,6 @@ if (require.main === module) {
     latency: Number(args.latency || process.env.MOCK_LATENCY || 0),
     password: args.password || process.env.MOCK_PASSWORD || 'demo',
     autologin: Boolean(args.autologin),
-    extensions: Boolean(args.extensions),
     log: args.verbose ? (m, p, s) => console.log(s, m, p) : undefined,
   }).then((m) => {
     console.log(`Cenotvorba – mock server UI běží na ${m.url}  (heslo: ${m.state.password})`);

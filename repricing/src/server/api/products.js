@@ -15,6 +15,7 @@
 
 const { tx, nowIso, getSettings, parseJson } = require('../../db');
 const { round } = require('../../util/num');
+const { ensurePriceBaseline } = require('../../util/price-history');
 const { loadProducts, loadOffers, explainProduct } = require('../../engine/run');
 const { productView, parseDateTime } = require('../../engine/metrics');
 const { buildMarket, prepareFilter, EXCLUDE_REASONS } = require('../../engine/market');
@@ -201,7 +202,11 @@ function patchProduct(ctx) {
       tx(db, () => {
         const cols = Object.keys(next);
         db.prepare(`UPDATE products SET ${cols.map((c) => `${c} = ?`).join(', ')}, updated_at = ? WHERE id = ?`).run(...cols.map((c) => next[c]), now, id);
-        if (priceChanged) db.prepare("INSERT INTO price_history (product_id, price, source, ref_id, at) VALUES (?, ?, 'manual', NULL, ?)").run(id, next.price, now);
+        if (priceChanged) {
+          // dosavadní cena do historie, pokud tam ještě není (Omnibus lowest_30d – viz util/price-history.js)
+          ensurePriceBaseline(db, cur);
+          db.prepare("INSERT INTO price_history (product_id, price, source, ref_id, at) VALUES (?, ?, 'manual', NULL, ?)").run(id, next.price, now);
+        }
       });
     if (priceChanged) {
       // změna ceny mění i statistiky konkurentů → celá přestavba cache

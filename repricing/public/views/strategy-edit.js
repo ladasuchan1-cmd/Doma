@@ -4,7 +4,7 @@ import { api, cachedGet, itemsOf, isAbort, invalidate } from '../lib/api.js';
 import { icon } from '../lib/icons.js';
 import { card, field, switchEl, emptyState, errorState, skeletonBlocks, badge, callout, numberInput, segmented, changeEl } from '../lib/ui.js';
 import { strategyForm } from '../lib/strategy-form.js';
-import { describeStrategy, validateConfig, mergeConfig, hasExtensions } from '../lib/strategy-model.js';
+import { describeStrategy, validateConfig, mergeConfig } from '../lib/strategy-model.js';
 import { runStatsView } from '../lib/run-stats.js';
 import { histogram } from '../lib/charts.js';
 import { DataTable } from '../lib/table.js';
@@ -49,28 +49,15 @@ export async function show(root, ctx) {
     return;
   }
 
-  // Rozšíření enginu (časové okno, podmínky, doprodej…) nabídnout, jen když je server podporuje.
-  let extensions = strategy ? hasExtensions(strategy.config) : false;
-  if (!strategy) {
-    try {
-      const pr = await cachedGet('/strategies/presets', null, 300000);
-      extensions = itemsOf(pr).some((p) => hasExtensions(p.config));
-    } catch {
-      extensions = false;
-    }
-  }
-  let fields = [];
-  let facets = null;
-  if (extensions) {
-    const [fr, fc] = await Promise.allSettled([cachedGet('/fields'), cachedGet('/products/facets')]);
-    fields = fr.status === 'fulfilled' ? fr.value?.fields || [] : [];
-    facets = fc.status === 'fulfilled' ? fc.value : null;
-  }
+  // Pole a hodnoty pro editor doplňujících podmínek (bez nich se podmínky upravují jako JSON).
+  const [fr, fc] = await Promise.allSettled([cachedGet('/fields', null, 60000), cachedGet('/products/facets', null, 60000)]);
+  const fields = fr.status === 'fulfilled' ? fr.value?.fields || [] : [];
+  const facets = fc.status === 'fulfilled' ? fc.value : null;
   if (ctx.signal.aborted) return;
   const fieldsMap = new Map(fields.map((f) => [f.key, f]));
   const model = strategy
-    ? { name: strategy.name || '', description: strategy.description || '', segment_id: strategy.segment_id ?? null, priority: strategy.priority ?? null, enabled: Boolean(strategy.enabled), config: mergeConfig(strategy.config, { extensions }) }
-    : { name: '', description: '', segment_id: ctx.query.segment ? Number(ctx.query.segment) : null, priority: null, enabled: true, config: mergeConfig({}, { extensions }) };
+    ? { name: strategy.name || '', description: strategy.description || '', segment_id: strategy.segment_id ?? null, priority: strategy.priority ?? null, enabled: Boolean(strategy.enabled), config: mergeConfig(strategy.config) }
+    : { name: '', description: '', segment_id: ctx.query.segment ? Number(ctx.query.segment) : null, priority: null, enabled: true, config: mergeConfig({}) };
   if (!isNew) ctx.setTitle(model.name || 'Strategie', h('span', null, h('a', { href: '#/strategie' }, 'Strategie'), ' / ' + (model.name || '#' + ctx.params.id)));
   let dirty = false;
 
@@ -119,7 +106,7 @@ export async function show(root, ctx) {
   });
 
   // ------------------------------------------------ konfigurace
-  const form = strategyForm({ config: model.config, competitors, extensions, fields, facets, onChange: (cfg) => { model.config = cfg; changed(); } });
+  const form = strategyForm({ config: model.config, competitors, fields, facets, onChange: (cfg) => { model.config = cfg; changed(); } });
 
   // ------------------------------------------------ shrnutí + akce
   const summaryText = h('p', { class: 'summary-text', 'aria-live': 'polite' });
@@ -133,7 +120,13 @@ export async function show(root, ctx) {
     icon: 'info',
     class: 'summary-card',
     actions: [dirtyBadge],
-    body: [summaryText, validationEl, h('div', { class: 'sticky-actions' }, saveBtn, simBtn, delBtn), h('p', { class: 'field-help' }, 'Simulace spočítá dopad na aktuálních datech bez uložení a bez vzniku návrhů.')],
+    body: [
+      // uložená konfigurace, kterou server nepřijal (strategie se pak v přecenění přeskakuje – invalid_config)
+      Array.isArray(strategy?.config_errors) && strategy.config_errors.length
+        ? callout(h('div', null, h('b', null, 'Uložená konfigurace je neplatná – přecenění strategii přeskakuje:'), h('ul', { class: 'validation-list' }, strategy.config_errors.map((e) => h('li', null, e)))), 'danger')
+        : null,
+      summaryText, validationEl, h('div', { class: 'sticky-actions' }, saveBtn, simBtn, delBtn), h('p', { class: 'field-help' }, 'Simulace spočítá dopad na aktuálních datech bez uložení a bez vzniku návrhů.'),
+    ],
     dataset: { card: 'summary' },
   });
 

@@ -9,6 +9,7 @@
 
 const { tx, nowIso, json, getSettings, audit } = require('../db');
 const { codeKey } = require('../util/keys');
+const { ensurePriceBaseline } = require('../util/price-history');
 const { exportRows, idList, LATEST_APPROVED_SQL } = require('./rows');
 const feeds = require('./feeds');
 const { buildPohodaXml, pragueDate } = require('./pohoda');
@@ -93,6 +94,8 @@ function markExported(db, proposalIds, opts = {}) {
       if (price == null || !(price > 0)) continue;
       const cur = current.has(p.product_id) ? current.get(p.product_id) : p.current_price;
       if (cur != null && Math.abs(cur - price) < 0.005) continue;
+      // dosavadní cenu zapsat do historie, pokud tam ještě není (jinak by lowest_30d po zdražení ukazovala novou cenu)
+      ensurePriceBaseline(db, { id: p.product_id });
       setPrice.run(price, now, now, p.product_id);
       addHistory.run(p.product_id, price, exportId, now);
       current.set(p.product_id, price);

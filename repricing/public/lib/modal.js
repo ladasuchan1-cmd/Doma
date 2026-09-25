@@ -1,6 +1,7 @@
 // Modální dialogy nad nativním <dialog> (focus trap a Esc zajišťuje prohlížeč).
 import { h, uid } from './dom.js';
 import { icon } from './icons.js';
+import { rehomeToasts } from './toast.js';
 
 /**
  * Otevře modální dialog.
@@ -39,6 +40,7 @@ export function openModal(o) {
     } catch {
       /* už zavřeno */
     }
+    rehomeToasts(dlg);
     dlg.remove();
     if (previous && typeof previous.focus === 'function' && previous.isConnected) previous.focus();
     if (o.onClose) o.onClose(reason);

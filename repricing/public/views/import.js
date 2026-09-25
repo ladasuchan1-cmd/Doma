@@ -299,9 +299,10 @@ export async function show(root, ctx) {
   function previewTables() {
     const p = wz.preview || {};
     const headers = (Array.isArray(p.headers) ? p.headers : []).slice(0, 14);
-    const sample = (Array.isArray(p.sample) ? p.sample : []).slice(0, 5).map((r, i) => ({ ...r, __i: i }));
+    const sample = (Array.isArray(p.sample) ? p.sample : []).slice(0, 10).map((r, i) => ({ ...r, __i: i }));
     const canon = (Array.isArray(p.canonical) ? p.canonical : []).map((r, i) => ({ ...(r || {}), __i: i, __bad: r == null }));
     const canonKeys = [...new Set(canon.flatMap((r) => Object.keys(r).filter((k) => !k.startsWith('__'))))];
+    const canonLabel = (k) => (CANONICAL[wz.kind] || []).find((f) => f.key === k)?.label?.replace(/\s*\(.*\)$/, '') || (k === 'in_stock' ? 'Skladem' : k === 'delivery_days' ? 'Dodání (dny)' : k === 'attrs' ? 'Atributy' : k);
     const errs = Array.isArray(p.errors) ? p.errors : [];
     return h(
       'div',
@@ -321,7 +322,7 @@ export async function show(root, ctx) {
         dataset: { card: 'canonical' },
         body: [
           canon.length
-            ? simpleTable(canonKeys.map((k) => ({ key: k, label: k, render: (r) => (r.__bad ? h('span', { class: 'muted' }, '–') : h('span', { class: 'small nowrap' }, truncate(typeof r[k] === 'object' ? JSON.stringify(r[k]) : String(r[k] ?? ''), 32))) })), canon, { rowKey: '__i', rowClass: (r) => (r.__bad ? 'is-muted' : null) })
+            ? simpleTable(canonKeys.map((k) => ({ key: k, label: canonLabel(k), title: k, render: (r) => (r.__bad ? h('span', { class: 'muted' }, '–') : h('span', { class: 'small nowrap' }, truncate(typeof r[k] === 'object' ? JSON.stringify(r[k]) : String(r[k] ?? ''), 32))) })), canon, { rowKey: '__i', rowClass: (r) => (r.__bad ? 'is-muted' : null) })
             : emptyState({ title: 'Zatím nic', text: 'Namapujte povinná pole.', compact: true }),
           errs.length ? h('div', { style: 'padding:10px 16px' }, errorsList(errs)) : null,
         ],
@@ -560,7 +561,10 @@ export async function show(root, ctx) {
     columns: [
       { key: 'name', label: 'Zdroj', sortable: true, render: (s) => h('div', { class: 'cell-2' }, h('span', { class: 'strong' }, s.name), h('span', { class: 'cell-sub' }, KIND_LABELS[s.kind] || s.kind, ' · ID ', h('span', { class: 'mono' }, String(s.id)))) },
       { key: 'url', label: 'URL', hideSm: true, render: (s) => (s.url ? h('span', { class: 'mono small', title: s.url }, truncate(s.url, 48)) : h('span', { class: 'muted small' }, 'bez URL – API / soubor')) },
-      { key: 'interval_minutes', label: 'Interval', sortable: true, render: (s) => h('span', { class: 'small' }, s.url ? intervalLabel(s.interval_minutes) : '–') },
+      {
+        key: 'interval_minutes', label: 'Interval', sortable: true,
+        render: (s) => h('div', { class: 'cell-2' }, h('span', { class: 'small' }, s.url ? intervalLabel(s.interval_minutes) : '–'), s.url && s.enabled && s.next_run_at ? h('span', { class: 'cell-sub', title: dateTime(s.next_run_at) }, 'další ' + relTime(s.next_run_at)) : null),
+      },
       {
         key: 'last_run_at', label: 'Poslední běh', sortable: true, value: (s) => (s.last_run_at ? Date.parse(s.last_run_at) : null),
         render: (s) => (s.last_run_at ? h('div', { class: 'cell-2' }, h('span', { class: 'row', style: 'gap:6px' }, jobStatusBadge(s.last_status), h('span', { class: 'small', title: dateTime(s.last_run_at) }, relTime(s.last_run_at))), s.last_message ? h('span', { class: 'cell-sub ellipsis', style: 'max-width:260px', title: s.last_message }, s.last_message) : null) : h('span', { class: 'muted' }, 'zatím neběžel')),

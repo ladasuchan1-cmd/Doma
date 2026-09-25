@@ -300,13 +300,22 @@ export async function loadInto(container, loader, render, opts = {}) {
 }
 
 /** KPI dlaždice. */
+const KPI_UNIT = /^(.*\d)([\u00a0 ](?:(?:tis\.|mil\.|mld\.)[\u00a0 ])?(?:Kč|%|ks))$/;
+
+/** Hodnota dlaždice: číslo velké, jednotka („Kč“, „mil. Kč“, „%“, „ks“) menší – dlouhé částky se tak vejdou. */
+export function kpiValue(v) {
+  if (typeof v !== 'string') return v;
+  const m = KPI_UNIT.exec(v);
+  return m ? [m[1], h('span', { class: 'kpi-unit' }, m[2])] : v;
+}
+
 export function kpi(o) {
   const tag = o.href ? 'a' : 'div';
   return h(
     tag,
     { class: ['kpi', o.tone ? 'kpi-' + o.tone : null, o.href ? 'kpi-link' : null], href: o.href },
     h('div', { class: 'kpi-label' }, o.icon ? icon(o.icon, { size: 14 }) : null, o.label),
-    h('div', { class: 'kpi-value' }, o.value),
+    h('div', { class: 'kpi-value', title: o.title || (typeof o.value === 'string' ? o.value : null) }, kpiValue(o.value)),
     o.sub ? h('div', { class: 'kpi-sub' }, o.sub) : null,
     o.extra || null
   );

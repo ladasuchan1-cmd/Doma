@@ -1,7 +1,7 @@
 // Zobrazení statistik přecenění / simulace (tvar stats z runPricing / simulate, SPEC §6.8).
 import { h } from './dom.js';
 import { kpi, badge } from './ui.js';
-import { int, signedMoney, reasonLabel, count } from './format.js';
+import { int, signedMoney, compactMoney, reasonLabel, flagLabel, count } from './format.js';
 import { barList } from './charts.js';
 import { DataTable } from './table.js';
 
@@ -28,19 +28,21 @@ export function runStatsView(stats, o = {}) {
     o.simulate ? null : kpi({ label: 'Čeká na schválení', value: int(s.pending) }),
     kpi({ label: 'Autom. schváleno', value: int(s.auto_approved) }),
     s.no_strategy ? kpi({ label: 'Bez strategie', value: int(s.no_strategy), tone: 'warning' }) : null,
-    kpi({ label: 'Dopad na marži', value: signedMoney(s.margin_impact_abs, { decimals: 0 }), sub: 'bez DPH, 1 ks od každého', tone: (s.margin_impact_abs || 0) < 0 ? 'danger' : 'good' })
+    kpi({ label: 'Dopad na marži', value: compactMoney(s.margin_impact_abs, { signed: true }), title: signedMoney(s.margin_impact_abs, { decimals: 0 }) + ' (bez DPH, součet za 1 ks od každého produktu)', sub: 'bez DPH, 1 ks od každého', tone: (s.margin_impact_abs || 0) < 0 ? 'danger' : 'good' })
   );
   const parts = [tiles];
-  if (skipped) {
-    parts.push(
-      h(
-        'div',
-        { class: 'row', style: 'margin-top:10px' },
-        h('span', { class: 'muted small' }, 'Přeskočeno:'),
-        Object.entries(s.skipped).filter(([, v]) => v).map(([k, v]) => badge(reasonLabel(k) + ': ' + int(v), 'neutral'))
-      )
-    );
-  }
+  const reasonRow = (label, obj, labelFn, variant = 'neutral') => {
+    const entries = obj && typeof obj === 'object' ? Object.entries(obj).filter(([, v]) => Number(v) > 0).sort((a, b) => b[1] - a[1]) : [];
+    if (!entries.length) return null;
+    return h('div', { class: 'row reason-row' }, h('span', { class: 'muted small' }, label), entries.map(([k, v]) => badge(labelFn(k) + ': ' + int(v), variant, k)));
+  };
+  const rows = [
+    reasonRow('Přeskočeno:', s.skipped, reasonLabel, 'warning'),
+    reasonRow('Beze změny:', s.no_change_reasons, reasonLabel),
+    reasonRow('Příznaky změn:', s.flags, flagLabel, 'info'),
+    Number(s.fallthrough) > 0 ? h('div', { class: 'row reason-row' }, h('span', { class: 'muted small' }, 'Propadnutí:'), h('span', { class: 'small' }, count(s.fallthrough, 'produkt', 'produkty', 'produktů') + ' přešlo na další strategii (chyběl základ ceny)')) : null,
+  ].filter(Boolean);
+  if (rows.length) parts.push(h('div', { class: 'stack-sm', style: 'margin-top:10px' }, rows));
   const bs = s.by_strategy && typeof s.by_strategy === 'object' ? Object.entries(s.by_strategy) : [];
   if (bs.length > 1 || (bs.length === 1 && !o.simulate)) {
     const t = new DataTable({

@@ -168,7 +168,8 @@ function writeExampleFiles(dir, data) {
   fs.writeFileSync(path.join(dir, 'katalog.csv'), '﻿' + lines.join('\r\n') + '\r\n');
 
   // 2) Konkurence jako plochý JSON (1 řádek = produkt × konkurent)
-  fs.writeFileSync(path.join(dir, 'konkurence.json'), JSON.stringify({ items: someOffers.map((o) => ({ ean: o.ean, competitor: o.competitor, price: o.price, shipping: o.shipping, in_stock: !!o.in_stock, url: o.url, observed_at: o.observed_at })) }, null, 2) + '\n');
+  // bez observed_at → čas zjištění = okamžik importu (pevné datum by po týdnu vypadalo jako zastaralá data)
+  fs.writeFileSync(path.join(dir, 'konkurence.json'), JSON.stringify({ items: someOffers.map((o) => ({ ean: o.ean, competitor: o.competitor, price: o.price, shipping: o.shipping, in_stock: !!o.in_stock, url: o.url })) }, null, 2) + '\n');
 
   // 3) Konkurence jako vnořený JSON (produkt → nabídky)
   const nested = some.map((p) => ({
@@ -198,6 +199,11 @@ function seedDatabase(db, data, { now = new Date(), withStrategies = true } = {}
   const { importProducts, importOffers } = require('../src/import');
   const productStats = importProducts(db, data.products, { now });
   const offerStats = importOffers(db, data.offers, { now });
+  // záznam do logu importů, aby přehled a historie importů ukázaly, odkud data jsou
+  const ts = new Date(now).toISOString();
+  const logImport = db.prepare("INSERT INTO imports(kind, format, origin, started_at, finished_at, status, stats) VALUES (?, 'json', 'api', ?, ?, 'ok', ?)");
+  logImport.run('products', ts, ts, JSON.stringify(productStats));
+  logImport.run('offers', ts, ts, JSON.stringify(offerStats));
   let strategies = 0;
   if (withStrategies && db.prepare('SELECT COUNT(*) AS c FROM strategies').get().c === 0) {
     const { STRATEGY_PRESETS } = require('../src/engine/presets');

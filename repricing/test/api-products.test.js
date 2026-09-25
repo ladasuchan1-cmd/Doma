@@ -214,12 +214,14 @@ test('API produkty', async (t) => {
     assert.equal(r.status, 200);
     assert.equal(r.json.price, 249);
     assert.ok(r.json.price_changed_at);
-    const h = app.db.prepare('SELECT * FROM price_history WHERE product_id = ?').all(P.P6);
-    assert.equal(h.length, 1);
-    assert.equal(h[0].source, 'manual');
-    assert.equal(h[0].price, 249);
+    const h = app.db.prepare('SELECT * FROM price_history WHERE product_id = ? ORDER BY id').all(P.P6);
+    // dosavadní cena (výchozí záznam pro Omnibus lowest_30d) + ruční změna
+    assert.equal(h.length, 2);
+    assert.equal(h[0].source, 'import');
+    assert.equal(h[1].source, 'manual');
+    assert.equal(h[1].price, 249);
     const d = await s.get(`/api/v1/products/${P.P6}`);
-    assert.equal(d.json.history.our.length, 1);
+    assert.equal(d.json.history.our.length, 2);
     assert.equal(d.json.product.price, 249);
     const list = await s.get('/api/v1/products?q=P6');
     assert.equal(list.json.items[0].price, 249);

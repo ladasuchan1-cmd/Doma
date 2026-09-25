@@ -9,57 +9,65 @@ const { pathToFileURL } = require('node:url');
 const load = () => import(pathToFileURL(path.join(__dirname, '..', 'public', 'lib', 'strategy-model.js')).href);
 const norm = (s) => String(s).replace(/[  ]/g, ' ').replace(/−/g, '-');
 
-test('DEFAULT_CONFIG odpovídá SPEC §6.5', async () => {
+test('DEFAULT_CONFIG odpovídá SPEC §6.5 a enginu (podrobné srovnání v ui-strategy-sync)', async () => {
   const m = await load();
   const d = m.DEFAULT_CONFIG;
   assert.strictEqual(d.target.mode, 'undercut_min');
-  assert.deepStrictEqual(d.competitors, { include: [], exclude: [], include_tags: [], exclude_tags: [], in_stock_only: true, include_shipping: false, max_age_days: null, outlier_pct: null, min_competitors: 1 });
-  assert.deepStrictEqual(d.fallback, { mode: 'keep', markup_pct: null, offset_pct: 0 });
+  assert.deepStrictEqual(d.competitors, { include: [], exclude: [], include_tags: [], exclude_tags: [], in_stock_only: true, include_shipping: false, max_age_days: null, outlier_pct: null, min_competitors: 1, exclude_keywords: [] });
+  assert.deepStrictEqual(d.fallback, { mode: 'next', markup_pct: null, offset_pct: 0 });
+  assert.deepStrictEqual(d.conditions, {});
+  assert.deepStrictEqual(d.schedule, { valid_from: null, valid_to: null, weekdays: [], hours: null });
+  assert.strictEqual(d.target.step_pct, 5);
   assert.strictEqual(d.limits.min_margin_pct, 10);
   assert.strictEqual(d.limits.max_above_msrp_pct, 0);
   assert.strictEqual(d.limits.min_change_abs, 5);
   assert.deepStrictEqual(d.rounding.bands, [{ up_to: 1000, ending: 9 }, { up_to: 10000, ending: 90 }, { up_to: null, ending: 990 }]);
   assert.deepStrictEqual(d.approval, { auto: false, auto_max_change_pct: 5 });
-  // všechny režimy cíle mají popisek a nápovědu
-  const modes = ['undercut_min', 'match_min', 'rank', 'market_avg', 'market_median', 'competitor', 'msrp', 'cost_plus', 'keep', 'fixed'];
-  assert.deepStrictEqual(m.TARGET_MODES.filter((x) => !x.ext).map((x) => x.value).sort(), modes.sort(), 'režimy SPEC §6.5 (bez rozšíření enginu)');
+  const modes = ['undercut_min', 'match_min', 'rank', 'market_avg', 'market_median', 'competitor', 'msrp', 'cost_plus', 'keep', 'fixed', 'clearance'];
+  assert.deepStrictEqual(m.TARGET_MODES.map((x) => x.value).sort(), modes.sort());
   for (const x of m.TARGET_MODES) assert.ok(x.label && x.help.length > 30, x.value);
+  assert.deepStrictEqual(m.FALLBACK_MODES.map((x) => x.value), ['next', 'keep', 'msrp', 'cost_plus']);
 });
 
-test('výchozí hodnoty a režimy sedí s enginem (src/engine/presets.js, pokud existuje)', { skip: !fs.existsSync(path.join(__dirname, '..', 'src', 'engine', 'presets.js')) }, async () => {
+test('podmínky, časové okno a doprodej: mergeConfig, validace a popis', async () => {
   const m = await load();
-  let engine;
-  try {
-    engine = require('../src/engine/presets.js');
-  } catch {
-    return; // engine je rozpracovaný – porovnání přeskočit
-  }
-  if (!engine.DEFAULT_CONFIG) return;
-  const ui = JSON.parse(JSON.stringify(m.mergeConfig({}, { extensions: m.hasExtensions(engine.DEFAULT_CONFIG) })));
-  const en = JSON.parse(JSON.stringify(engine.DEFAULT_CONFIG));
-  // Známá odchylka: SPEC §6.5 má fallback.mode „keep“, engine „next“. UI pro nové strategie drží SPEC.
-  assert.ok(m.FALLBACK_MODES.some((f) => f.value === en.fallback.mode), 'UI zná záložní režim enginu ' + en.fallback.mode);
-  en.fallback.mode = ui.fallback.mode;
-  assert.deepStrictEqual(ui, en);
-  if (Array.isArray(engine.TARGET_MODES)) for (const mode of engine.TARGET_MODES) assert.ok(m.TARGET_MODE_MAP[mode], 'UI nezná režim ' + mode);
-  if (Array.isArray(engine.FALLBACK_MODES)) for (const mode of engine.FALLBACK_MODES) assert.ok(m.FALLBACK_MODES.some((f) => f.value === mode), 'UI nezná záložní režim ' + mode);
-});
-
-test('rozšíření: hasExtensions, mergeConfig a popis', async () => {
-  const m = await load();
-  assert.ok(!m.hasExtensions(m.DEFAULT_CONFIG));
-  assert.ok(m.hasExtensions({ schedule: {} }));
-  assert.ok(!('schedule' in m.mergeConfig({})));
-  const c = m.mergeConfig({}, { extensions: true });
+  const c = m.mergeConfig({});
   assert.deepStrictEqual(c.schedule.weekdays, []);
+  assert.deepStrictEqual(c.conditions, {});
   assert.strictEqual(c.target.step_pct, 5);
+  assert.deepStrictEqual(m.mergeConfig({ conditions: null, schedule: null }).schedule.weekdays, [], 'null = bez omezení');
   const s = norm(m.describeStrategy({ schedule: { weekdays: [6, 7], hours: [18, 24] }, conditions: { field: 'stock', op: '>', value: 0 }, target: { mode: 'clearance', step_pct: 5, every_days: 14, max_sales_30: 0 }, fallback: { mode: 'next' } }, { fieldsMap: new Map([['stock', { label: 'Sklad' }]]) }));
   assert.match(s, /každých 14 dní zlevní o 5 %/);
   assert.match(s, /Navíc jen pro produkty, kde Sklad je větší než 0\./);
   assert.match(s, /Platí jen so, ne, od 18 do 24 h/);
+  assert.match(s, /Když chybí základ ceny \(chybí aktuální cena\), produkt propadne na další strategii v pořadí\./);
   assert.ok(m.validateConfig({ schedule: { valid_from: '2026-10-02T00:00:00Z', valid_to: '2026-10-01T00:00:00Z' } }).errors.length);
   assert.ok(m.validateConfig({ schedule: { hours: [5, 5] } }).errors.length);
   assert.ok(m.validateConfig({ target: { mode: 'clearance', step_pct: 0 } }).errors.length);
+  assert.ok(m.validateConfig({ conditions: { field: 'x', op: 'nesmysl', value: 1 } }).errors.length);
+  assert.deepStrictEqual(m.validateConfig({ conditions: { all: [{ field: 'position', op: '=', value: 'cheapest' }] } }).errors, []);
+});
+
+test('krátké souhrny do seznamu strategií: podmínky a platnost', async () => {
+  const m = await load();
+  const cond = { all: [{ field: 'position', op: '=', value: 'cheapest' }, { field: 'gap_min_pct', op: '<=', value: -5 }] };
+  assert.strictEqual(norm(m.describeConditionsShort(cond)), 'pozice = nejlevnější a rozdíl ≤ -5 %');
+  assert.strictEqual(m.describeConditionsShort({}), '');
+  assert.strictEqual(norm(m.describeConditionsShort({ field: 'attrs.N', op: 'in', value: ['N7', 'N8'] })), 'N = N7 / N8');
+  assert.strictEqual(norm(m.describeConditionsShort({ any: [{ field: 'stock', op: '>', value: 0 }, { field: 'has_stock', op: 'is_false' }] })), 'sklad > 0 ks nebo ne skladem');
+  assert.strictEqual(norm(m.describeConditionsShort({ field: 'attrs.sezona', op: '<', value: 2026 }, new Map([['attrs.sezona', { label: 'sezona' }]]))), 'sezona < 2026');
+  assert.strictEqual(m.describeScheduleShort({ weekdays: [6, 7] }), 'so–ne');
+  assert.strictEqual(m.describeScheduleShort({ weekdays: [1, 2, 3, 4, 5] }), 'po–pá');
+  assert.strictEqual(m.describeScheduleShort({ weekdays: [1, 3, 5] }), 'po, st, pá');
+  assert.strictEqual(norm(m.describeScheduleShort({ weekdays: [6, 7], hours: [18, 24] })), 'so–ne, 18–24 h');
+  assert.strictEqual(m.describeScheduleShort({ weekdays: [], hours: null, valid_from: null, valid_to: null }), '');
+  assert.strictEqual(m.describeScheduleShort({ weekdays: [1, 2, 3, 4, 5, 6, 7] }), '', 'všechny dny = bez omezení');
+  assert.match(norm(m.describeScheduleShort({ valid_to: '2026-10-31T12:00:00Z' })), /^do 31\. 10\. 2026/);
+  const now = Date.parse('2026-09-25T12:00:00Z');
+  assert.strictEqual(m.scheduleState({ weekdays: [] }, now), 'none');
+  assert.strictEqual(m.scheduleState({ valid_to: '2026-09-01T00:00:00Z' }, now), 'expired');
+  assert.strictEqual(m.scheduleState({ valid_from: '2026-10-01T00:00:00Z' }, now), 'future');
+  assert.strictEqual(m.scheduleState({ weekdays: [6, 7] }, now), 'window');
 });
 
 test('nápověda existuje pro každou volbu konfigurace', async () => {
@@ -73,9 +81,8 @@ test('nápověda existuje pro každou volbu konfigurace', async () => {
     }
   };
   walk(m.DEFAULT_CONFIG, '');
-  // target.mode má nápovědu u každého režimu (TARGET_MODES), ostatní volby v HELP (i rozšíření enginu)
-  walk(m.EXTENSION_DEFAULTS, '');
-  for (const p of leafPaths) if (p !== 'target.mode' && !p.startsWith('schedule.valid') && p !== 'schedule.weekdays' && p !== 'schedule.hours' && p !== 'conditions') assert.ok(m.HELP[p], 'chybí nápověda: ' + p);
+  // target.mode má nápovědu u každého režimu (TARGET_MODES), ostatní volby v HELP
+  for (const p of leafPaths) if (p !== 'target.mode' && p !== 'rounding.bands') assert.ok(m.HELP[p] || p === 'conditions', 'chybí nápověda: ' + p);
   for (const p of ['schedule.valid_from', 'schedule.valid_to', 'schedule.weekdays', 'schedule.hours', 'conditions']) assert.ok(m.HELP[p], 'chybí nápověda: ' + p);
 });
 
@@ -140,7 +147,9 @@ test('describeStrategy – lidsky čitelné shrnutí', async () => {
   assert.match(auto, /Změny do ±3 % schválí automaticky/);
   assert.match(auto, /Produkty bez skladu nepřeceňuje\./);
   assert.match(norm(m.describeStrategy({ target: { mode: 'cost_plus', markup_pct: 40 } })), /nákup \+ 40 %/);
-  assert.doesNotMatch(norm(m.describeStrategy({ target: { mode: 'msrp' } })), /Když konkurence nestačí/, 'nemarketové režimy bez náhradního režimu');
+  assert.doesNotMatch(norm(m.describeStrategy({ target: { mode: 'msrp' } })), /Počítá jen nabídky/, 'nemarketové režimy bez filtru trhu');
+  assert.match(norm(m.describeStrategy({ target: { mode: 'msrp' }, fallback: { mode: 'keep' } })), /Když chybí základ ceny \(chybí MOC\), cenu ponechá/);
+  assert.doesNotMatch(norm(m.describeStrategy({ target: { mode: 'fixed', fixed_price: 999 } })), /základ ceny/, 'pevná cena nemá náhradní režim');
   assert.match(norm(m.describeStrategy({ target: { mode: 'rank', rank: 2, offset_abs: -1 } })), /o 1 Kč pod cenou konkurenta na 2\. místě/);
   assert.match(norm(m.describeStrategy({ target: { mode: 'undercut_min', offset_pct: -1, offset_abs: 10 } })), /posun -1 % \+10 Kč od nejnižší ceny konkurence/);
 });

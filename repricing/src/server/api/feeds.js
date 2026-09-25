@@ -7,7 +7,7 @@
 //   jiný název → 404
 //
 // Feed se vrací inline (bez Content-Disposition) – je určen ke stahování programem.
-// Pozn.: nastavení export.feed_scope se zde nepoužívá – rozsah určuje název feedu (changes / prices).
+// Rozsah určuje název feedu: changes = schválené změny, prices = kompletní ceník.
 
 const { HttpError } = require('../http');
 const { sendChanges, markRequested } = require('./exports');

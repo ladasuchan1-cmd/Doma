@@ -8,7 +8,7 @@
 
 const { parseJson } = require('../../db');
 const { runPricing } = require('../../engine/run');
-const { HttpError, intParam, paging } = require('../http');
+const { HttpError, intParam, paging, toHttpError } = require('../http');
 const V = require('./_views');
 
 function runItem(row) {
@@ -50,6 +50,10 @@ module.exports = {
           res = runPricing(ctx.db, { trigger, productIds });
         } catch (e) {
           V.invalidate(ctx.db, 'proposals');
+          // Známé chyby zachovat (zamčená databáze jiným procesem → 503 + Retry-After, chyby vstupu → 4xx);
+          // dřív se vše měnilo na 500, takže klient nepoznal, že stačí požadavek zopakovat.
+          const h = toHttpError(e);
+          if (h.status !== 500) throw h;
           throw new HttpError(500, `Přecenění selhalo: ${e.message}`);
         }
         ctx.audit({ action: 'run.start', entity: 'run', entity_id: res.run_id, detail: { trigger, products: res.stats.products, changes: res.stats.changes, product_ids: productIds ? productIds.slice(0, 100) : undefined } });

@@ -215,3 +215,40 @@ test('API návrhy cen', async (t) => {
     assert.ok(after.json.items.every((x) => x.proposal.status === 'pending'));
   });
 });
+
+test('regrese: POST /runs při databázi zamčené jiným procesem → 503 + Retry-After (ne 500)', async () => {
+  const fs = require('node:fs');
+  const os = require('node:os');
+  const path = require('node:path');
+  const { DatabaseSync } = require('node:sqlite');
+  const { startServer, example } = require('./api-import-helpers');
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'ct-runs-lock-'));
+  const dbFile = path.join(dir, 'db.sqlite');
+  const s = await startServer({ dbFile });
+  try {
+    assert.equal((await s.call('POST', '/api/v1/import/products', { body: example('katalog.csv'), type: 'text/csv' })).status, 200);
+    // zkrácené čekání serveru na zámek (výchozí busy_timeout 5 s by blokoval test)
+    s.db.exec('PRAGMA busy_timeout = 50');
+    const other = new DatabaseSync(dbFile);
+    other.exec('BEGIN IMMEDIATE');
+    other.prepare("INSERT INTO audit(at, action) VALUES (?, 'lock')").run(new Date().toISOString());
+    let r;
+    try {
+      r = await s.call('POST', '/api/v1/runs', { json: {} });
+    } finally {
+      other.exec('COMMIT');
+      other.close();
+    }
+    assert.equal(r.status, 503, r.text);
+    assert.equal(r.headers['retry-after'], '5');
+    assert.match(r.data.error.message, /zaneprázdněná/);
+    // po uvolnění zámku přecenění projde a nezůstal žádný rozpracovaný běh
+    const ok = await s.call('POST', '/api/v1/runs', { json: {} });
+    assert.equal(ok.status, 200, ok.text);
+    const runs = await s.call('GET', '/api/v1/runs');
+    assert.equal(runs.data.total, 1);
+  } finally {
+    await s.stop();
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});

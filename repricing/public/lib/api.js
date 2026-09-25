@@ -118,6 +118,91 @@ export const api = {
     request('POST', path, { ...opts, query, raw: file, contentType: guessContentType(file.name, file.type) }),
 };
 
+// ------------------------------------------------------------------ stahování souborů
+
+/** Název souboru z Content-Disposition (filename*=UTF-8''… má přednost). */
+export function filenameFromDisposition(cd, fallback = 'soubor') {
+  if (!cd) return fallback;
+  const star = /filename\*\s*=\s*(?:UTF-8'')?([^;]+)/i.exec(cd);
+  if (star) {
+    try {
+      return decodeURIComponent(star[1].trim().replace(/^"|"$/g, ''));
+    } catch {
+      /* níže */
+    }
+  }
+  const plain = /filename\s*=\s*"?([^";]+)"?/i.exec(cd);
+  return plain ? plain[1].trim() : fallback;
+}
+
+/**
+ * Stáhne soubor z API přes fetch: chyba (např. 409 „není co exportovat“) se ukáže jako toast místo
+ * uložení JSON chyby do souboru; úspěch uloží soubor pod jménem ze serveru.
+ * @param {string} href URL (apiUrl(…))
+ * @returns {Promise<{filename: string, size: number, exportId: string|null, count: number|null}|null>}
+ */
+export async function downloadHref(href) {
+  let res;
+  try {
+    res = await fetch(href, { credentials: 'same-origin', headers: { 'X-Requested-With': 'cenotvorba' } });
+  } catch {
+    toast('Server je nedostupný – soubor se nepodařilo stáhnout.', { type: 'error' });
+    return null;
+  }
+  if (res.status === 401) {
+    if (unauthorizedHandler) unauthorizedHandler(new ApiError(401, 'Přihlášení vypršelo – přihlaste se znovu.'));
+    return null;
+  }
+  if (!res.ok) {
+    let msg = 'Soubor se nepodařilo stáhnout (HTTP ' + res.status + ').';
+    try {
+      const j = await res.json();
+      if (j?.error?.message) msg = j.error.message;
+    } catch {
+      /* ne-JSON */
+    }
+    toast(msg, { type: res.status === 409 ? 'warning' : 'error' });
+    return null;
+  }
+  const blob = await res.blob();
+  const fallback = decodeURIComponent(String(new URL(href, location.href).pathname.split('/').pop() || 'soubor'));
+  const filename = filenameFromDisposition(res.headers.get('content-disposition'), fallback);
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  a.style.display = 'none';
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 2000);
+  const cnt = res.headers.get('x-export-count');
+  return { filename, size: blob.size, exportId: res.headers.get('x-export-id'), count: cnt != null ? Number(cnt) : null };
+}
+
+/**
+ * Odkaz ke stažení (a[href]) stáhne přes downloadHref – s hlášením chyb; Ctrl/⌘/Shift+klik zůstává nativní.
+ * @param {HTMLAnchorElement} a
+ * @param {(r: object) => void} [onDone]
+ */
+export function bindDownload(a, onDone) {
+  a.addEventListener('click', async (e) => {
+    if (e.button !== 0 || e.ctrlKey || e.metaKey || e.shiftKey || e.altKey) return;
+    e.preventDefault();
+    if (a.classList.contains('is-busy')) return;
+    a.classList.add('is-busy');
+    a.setAttribute('aria-busy', 'true');
+    try {
+      const r = await downloadHref(a.href);
+      if (r && onDone) onDone(r);
+    } finally {
+      a.classList.remove('is-busy');
+      a.removeAttribute('aria-busy');
+    }
+  });
+  return a;
+}
+
 // ------------------------------------------------------------------ jednoduchá cache číselníků
 
 const cache = new Map();

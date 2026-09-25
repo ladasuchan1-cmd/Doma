@@ -97,7 +97,6 @@ const SCHEMA = {
       auto_push: isBool,
       timeout_ms: num({ min: 1000, max: 300000, integer: true }),
     },
-    feed_scope: oneOf('all', 'approved'),
   },
   schedule: {
     run_interval_minutes: num({ min: 0, max: 10080, integer: true }),

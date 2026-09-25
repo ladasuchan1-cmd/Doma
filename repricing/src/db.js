@@ -276,7 +276,6 @@ const DEFAULT_SETTINGS = {
     xml: { root: 'prices', item: 'item', fields: ['code', 'ean', 'name', 'price', 'old_price', 'vat_rate', 'currency', 'changed_at'] },
     pohoda: { ico: '', application: 'Cenotvorba', filter_by: 'code', price_level: '', encoding: 'windows-1250' },
     webhook: { url: '', format: 'json', headers: {}, auto_push: false, timeout_ms: 20000 },
-    feed_scope: 'all',
   },
   schedule: {
     // 0 = vypnuto. Automatické přecenění každých N minut.

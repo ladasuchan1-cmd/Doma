@@ -7,7 +7,8 @@
 //    výslovně obsahuje – applyMapping je z návrhu mapování nikdy nevytvoří
 //  - attrs: nové klíče přepisují, ostatní zůstávají; null = atribut smazat
 //  - změna ceny (stará i nová známá) → price_history (source 'import') + price_changed_at. Nový produkt ani první
-//    doplnění ceny se za změnu nepovažují (strategie „doprodej“ bere „nikdy neměněno“ jako splatné).
+//    doplnění ceny se za změnu nepovažují (strategie „doprodej“ bere „nikdy neměněno“ jako splatné). Při první
+//    zaznamenané změně se do historie nejdřív doplní dosavadní cena (util/price-history.js – Omnibus lowest_30d).
 //  - nastavení purchase_includes_vat → nákupní cena se převede na cenu bez DPH (DPH záznamu / produktu / výchozí)
 //  - price_is_net (mapping.price_net) → price, msrp, min_price, max_price se převedou na ceny s DPH
 
@@ -15,6 +16,7 @@ const { tx, nowIso, getSettings, parseJson } = require('../db');
 const { codeKey, eanKey, mpnKey } = require('../util/keys');
 const { parseNumber, round } = require('../util/num');
 const { normalizeCode, normalizeText, parseBool, parseVat, parseDate, errorCollector } = require('./mapping');
+const { ensurePriceBaseline } = require('../util/price-history');
 
 const TEXT_FIELDS = ['name', 'manufacturer', 'category', 'supplier', 'owner'];
 const NUMBER_FIELDS = ['purchase_price', 'price', 'msrp', 'stock', 'sales_30', 'sales_90', 'min_price', 'max_price'];
@@ -190,6 +192,8 @@ function importProducts(db, records, opts = {}) {
         if (!changed) for (const c of COMPARE) if (!same(cur[c], next[c])) { changed = true; break; }
         if (changed) {
           if (cur.price != null && next.price != null && !same(cur.price, next.price)) {
+            // první změna ceny: nejdřív dosavadní cenu (Omnibus lowest_30d ji jinak ztratí) – viz util/price-history.js
+            ensurePriceBaseline(db, cur);
             history.run(next.id, next.price, refId, now);
             next.price_changed_at = now;
           }

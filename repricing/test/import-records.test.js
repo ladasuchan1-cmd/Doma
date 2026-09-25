@@ -301,3 +301,17 @@ test('předané objekty (records), hlavičky = sjednocení v pořadí prvního v
   assert.equal(extractRecords(Buffer.from('a;b\n1;2')).records.length, 1);
   assert.equal(extractRecords('[{"a":1}]').records.length, 1);
 });
+
+test('regrese: patologicky zanořený JSON → ImportError 400 (ne přetečení zásobníku / HTTP 500)', () => {
+  const { extractRecords } = require('../src/import/records');
+  for (const text of ['['.repeat(100000) + ']'.repeat(100000), '{"a":'.repeat(20000) + '1' + '}'.repeat(20000), '{"items":[' + '{"a":'.repeat(5000) + '1' + '}'.repeat(5000) + ']}']) {
+    assert.throws(
+      () => extractRecords({ text }, {}),
+      (e) => e.name === 'ImportError' && e.status === 400 && /zanořený/.test(e.message)
+    );
+  }
+  // běžné zanoření (desítky úrovní) projde
+  const ok = extractRecords({ text: JSON.stringify({ items: [{ a: { b: { c: { d: { e: 1 } } } }, price: 10 }] }) }, {});
+  assert.equal(ok.records.length, 1);
+  assert.equal(ok.records[0]['a.b.c.d.e'], 1);
+});

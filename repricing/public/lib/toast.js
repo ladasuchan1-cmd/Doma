@@ -16,6 +16,23 @@ function ensure() {
   return container;
 }
 
+/**
+ * Před odstraněním dialogu přesune jeho oznámení na stránku (jinak by zmizela s dialogem –
+ * typicky „Uloženo“ vyvolané těsně před zavřením modálního okna).
+ * @param {HTMLElement} dialog
+ */
+export function rehomeToasts(dialog) {
+  if (typeof document === 'undefined' || !dialog) return;
+  const c = [...dialog.children].find((x) => x.classList && x.classList.contains('toasts'));
+  if (!c) return;
+  const kids = [...c.children].filter((k) => !k.classList.contains('is-leaving'));
+  c.remove();
+  if (container === c) container = null;
+  if (!kids.length) return;
+  const target = ensure();
+  for (const k of kids) target.appendChild(k);
+}
+
 const ICON = { success: 'check', error: 'alert-circle', warning: 'alert', info: 'info' };
 
 /**
@@ -58,8 +75,14 @@ export function toast(message, opts = {}) {
   while (host.children.length > 4) host.firstChild.remove();
   if (timeout > 0) {
     timer = setTimeout(close, timeout);
-    el.addEventListener('mouseenter', () => timer && clearTimeout(timer));
-    el.addEventListener('mouseleave', () => { timer = setTimeout(close, 2000); });
+    // pozastavit jen při najetí myší – na dotykových zařízeních by emulovaný mouseenter bez mouseleave
+    // nechal oznámení viset navždy
+    el.addEventListener('pointerenter', (e) => {
+      if (e.pointerType === 'mouse' && timer) clearTimeout(timer);
+    });
+    el.addEventListener('pointerleave', (e) => {
+      if (e.pointerType === 'mouse') timer = setTimeout(close, 2000);
+    });
   }
   return { close };
 }

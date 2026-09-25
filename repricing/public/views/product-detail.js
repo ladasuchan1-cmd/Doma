@@ -9,13 +9,15 @@ import {
   segmented, statusBadge, changeEl, callout, flagBadges,
 } from '../lib/ui.js';
 import { simpleTable } from '../lib/table.js';
-import { lineChart, sparkline, SERIES_COLORS } from '../lib/charts.js';
+import { lineChart, sparkline, seriesWithCurrent, SERIES_COLORS } from '../lib/charts.js';
 import { decisionView } from '../lib/decision.js';
 import { confirmDialog } from '../lib/modal.js';
 import { toast } from '../lib/toast.js';
 import {
-  money, percent, int, index, number, availability, age, ageDays, relTime, dateTime, date, excludedLabel, signedPercent, parseInputNumber,
+  money, percent, int, index, number, availability, age, ageDays, relTime, dateTime, date, excludedLabel, signedPercent, parseInputNumber, toNum,
+  reasonLabel, TRIED_RESULT_LABELS,
 } from '../lib/format.js';
+import { finalPrice, finalChangePct, isManual } from '../lib/proposal-model.js';
 
 export const title = 'Detail produktu';
 
@@ -31,6 +33,17 @@ function competitorColor(id) {
   return SERIES_COLORS[(Number.isFinite(n) ? n - 1 : 0) % SERIES_COLORS.length];
 }
 
+const DAY = 86400000;
+
+/** ISO → hodnota pro <input type="datetime-local"> v místním čase. */
+function toLocalInput(iso) {
+  if (!iso) return '';
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return '';
+  const pad = (n) => String(n).padStart(2, '0');
+  return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate()) + 'T' + pad(d.getHours()) + ':' + pad(d.getMinutes());
+}
+
 /** Body řady od `from` (poslední bod před `from` se posune na `from`). */
 function clip(points, from) {
   if (from == null) return points;
@@ -38,6 +51,30 @@ function clip(points, from) {
   const after = points.filter((p) => p.t >= from);
   if (before.length) after.unshift({ t: from, v: before[before.length - 1].v });
   return after;
+}
+
+const TRIED_VARIANT = { decided: 'success', fallthrough: 'warning', not_applicable: 'neutral' };
+
+/** Které strategie se na produkt zkoušely a proč se (ne)použily – explain.tried z API. */
+function triedList(tried) {
+  const list = Array.isArray(tried) ? tried : [];
+  if (!list.length) return null;
+  return h(
+    'details',
+    { class: 'tried', open: list.some((t) => t.result === 'fallthrough') || null },
+    h('summary', null, 'Pořadí strategií pro tento produkt (' + int(list.length) + ')'),
+    h(
+      'ol',
+      { class: 'tried-list' },
+      list.map((t) => h(
+        'li',
+        { class: 'tried-' + (t.result || 'x') },
+        badge(TRIED_RESULT_LABELS[t.result] || t.result || '–', TRIED_VARIANT[t.result] || 'neutral', t.code ? reasonLabel(t.code) : null),
+        t.strategy_id != null ? h('a', { href: '#/strategie/' + encodeURIComponent(t.strategy_id) }, t.name || '#' + t.strategy_id) : h('span', null, t.name || '–'),
+        t.why ? h('span', { class: 'muted small' }, '– ' + t.why) : null
+      ))
+    )
+  );
 }
 
 export async function show(root, ctx) {
@@ -64,6 +101,7 @@ export async function show(root, ctx) {
 
   function render(d) {
     const p = d.product || {};
+    const lockActive = p.lock_active != null ? Boolean(p.lock_active) : Boolean(Number(p.locked));
     const offers = Array.isArray(d.offers) ? d.offers : [];
     const hist = d.history || {};
     const ex = d.explain || {};
@@ -107,7 +145,8 @@ export async function show(root, ctx) {
             'div',
             { class: 'row', style: 'margin-top:8px' },
             positionBadge(p.position),
-            p.locked ? badge('Zamčeno – nepřeceňuje se', 'warning') : null,
+            lockActive ? badge(p.locked_until ? 'Zamčeno do ' + dateTime(p.locked_until) : 'Zamčeno – nepřeceňuje se', 'warning') : null,
+            !lockActive && Number(p.locked) && p.locked_until ? badge('Zámek vypršel ' + relTime(p.locked_until), 'neutral') : null,
             p.active === 0 || p.active === false ? badge('Neaktivní', 'neutral') : null,
             segs.map((s) => h('a', { href: '#/segmenty/' + encodeURIComponent(s.id), class: 'tag-chip' }, icon('layers', { size: 12 }), ' ', s.name || '#' + s.id))
           )
@@ -116,7 +155,9 @@ export async function show(root, ctx) {
     );
 
     // ----------------------------------------------------- KPI
-    const ourPoints = (Array.isArray(hist.our) ? hist.our : []).map((r) => ({ t: Date.parse(r.at), v: Number(r.price) })).filter((x) => Number.isFinite(x.t) && Number.isFinite(x.v)).sort((a, b) => a.t - b.t);
+    const ourHistory = (Array.isArray(hist.our) ? hist.our : []).map((r) => ({ t: Date.parse(r.at), v: Number(r.price) })).filter((x) => Number.isFinite(x.t) && Number.isFinite(x.v)).sort((a, b) => a.t - b.t);
+    // Naše cena v grafu = historie změn + aktuální cena (i když historie je prázdná).
+    const ourPoints = seriesWithCurrent(ourHistory, toNum(p.price), p.price_changed_at || p.created_at);
     const kpis = h(
       'div',
       { class: 'kpi-grid compact' },
@@ -195,15 +236,26 @@ export async function show(root, ctx) {
     }
     function drawChart() {
       const now = Date.now();
-      const from = range === 'all' ? null : now - Number(range) * 86400000;
+      const rangeFrom = range === 'all' ? null : now - Number(range) * DAY;
       const series = [];
       for (const c of [...byComp.values()].sort((a, b) => String(a.name).localeCompare(String(b.name), 'cs'))) {
-        const pts = clip(c.points.sort((a, b) => a.t - b.t), from);
-        if (pts.length) series.push({ id: 'c' + c.id, name: c.name, color: competitorColor(c.id), points: pts });
+        const pts = clip(c.points.sort((a, b) => a.t - b.t), rangeFrom);
+        if (pts.length) series.push({ id: 'c' + c.id, name: c.name, color: competitorColor(c.id), points: pts, markers: true });
       }
-      const ours = clip(ourPoints, from);
-      if (ours.length) series.push({ id: 'us', name: 'Naše cena', color: 'var(--series-us)', points: ours, us: true });
-      mount(chartHost, lineChart({ series, height: 280, from: from ?? undefined, to: now, ariaLabel: 'Vývoj naší ceny a cen konkurence', emptyText: 'Pro zvolené období nejsou žádná data' }));
+      const ours = clip(ourPoints, rangeFrom);
+      if (ours.length) series.push({ id: 'us', name: 'Naše cena', color: 'var(--series-us)', points: ours, us: true, markers: true });
+      // Osa X podle dat: když data pokrývají kratší dobu než zvolené období, graf se na ně přiblíží (min. 7 dní).
+      const allT = series.flatMap((x) => x.points.map((pt) => pt.t));
+      let from = rangeFrom;
+      if (allT.length) {
+        const dataFrom = Math.min(...allT);
+        from = rangeFrom == null ? dataFrom : Math.max(rangeFrom, dataFrom);
+        from = Math.min(from - DAY / 2, now - 7 * DAY);
+        if (rangeFrom != null) from = Math.max(from, rangeFrom);
+      }
+      // Bez historie změn je naše cena jen jeden bod – přidáme vodorovnou čáru aktuální ceny pro srovnání s konkurencí.
+      const refLines = !ourHistory.length && toNum(p.price) != null ? [{ v: toNum(p.price), label: 'naše aktuální cena', color: 'var(--series-us)' }] : [];
+      mount(chartHost, lineChart({ series, refLines, height: 280, from: from ?? undefined, to: now, ariaLabel: 'Vývoj naší ceny a cen konkurence', emptyText: 'Pro zvolené období nejsou žádná data' }));
     }
     const rangeCtl = segmented(RANGES, range, (v) => {
       range = v;
@@ -217,9 +269,12 @@ export async function show(root, ctx) {
       title: 'Rozhodnutí strategie',
       icon: 'sliders',
       subtitle: strategy ? h('span', null, 'Platí strategie ', h('a', { href: '#/strategie/' + encodeURIComponent(strategy.id) }, strategy.name || '#' + strategy.id), ' – co by přecenění teď udělalo a proč.') : null,
-      body: strategy
-        ? decisionView(ex.decision, { showMarket: true })
-        : callout(h('span', null, 'Na produkt se nevztahuje žádná zapnutá strategie, přecenění ho přeskočí. ', h('a', { href: '#/strategie' }, 'Nastavit strategie →')), 'warning'),
+      body: [
+        strategy
+          ? decisionView(ex.decision, { showMarket: true })
+          : callout(h('span', null, 'Na produkt se nevztahuje žádná zapnutá strategie, přecenění ho přeskočí. ', h('a', { href: '#/strategie' }, 'Nastavit strategie →')), 'warning'),
+        triedList(ex.tried),
+      ],
       dataset: { card: 'decision' },
     });
 
@@ -232,8 +287,8 @@ export async function show(root, ctx) {
         [
           { key: 'created_at', label: 'Datum', sortable: true, render: (r) => h('span', { title: dateTime(r.created_at) }, date(r.created_at)) },
           { key: 'old_price', label: 'Původní', format: 'money' },
-          { key: 'new_price', label: 'Návrh', align: 'right', render: (r) => h('span', { class: 'num strong' }, money(r.manual_price ?? r.new_price)) },
-          { key: 'change_pct', label: 'Změna', align: 'right', render: (r) => changeEl(r.change_pct) },
+          { key: 'new_price', label: 'Návrh', align: 'right', render: (r) => h('span', { class: 'num strong', title: isManual(r) ? 'Ruční cena (navrženo ' + money(r.new_price) + ')' : null }, money(finalPrice(r)), isManual(r) ? h('span', { class: 'muted' }, ' ✎') : null) },
+          { key: 'change_pct', label: 'Změna', align: 'right', render: (r) => changeEl(finalChangePct(r)) },
           { key: 'flags', label: 'Příznaky', hideSm: true, render: (r) => flagBadges(r.flags) },
           { key: 'status', label: 'Stav', render: (r) => statusBadge(r.status) },
         ],
@@ -243,7 +298,10 @@ export async function show(root, ctx) {
     });
 
     // ----------------------------------------------------- nastavení produktu
-    const lockSw = switchEl({ checked: Boolean(p.locked), label: 'Zamknout cenu (nepřeceňovat)' });
+    const untilIn = h('input', { type: 'datetime-local', class: 'input', value: toLocalInput(lockActive ? p.locked_until : null), 'aria-label': 'Zamčeno do', dataset: { field: 'locked_until' } });
+    const untilField = field({ label: 'Zamčeno do', control: untilIn, help: 'Prázdné = natrvalo. Po tomto okamžiku se produkt znovu přeceňuje.' });
+    untilField.hidden = !lockActive;
+    const lockSw = switchEl({ checked: lockActive, label: 'Zamknout cenu (nepřeceňovat)', onChange: (v) => { untilField.hidden = !v; } });
     const minIn = numberInput(p.min_price, { placeholder: 'bez limitu' });
     const maxIn = numberInput(p.max_price, { placeholder: 'bez limitu' });
     const noteIn = h('textarea', { class: 'input', rows: 3, placeholder: 'Např. dohoda s dodavatelem, akce…' });
@@ -268,7 +326,14 @@ export async function show(root, ctx) {
           saveBtn.disabled = true;
           try {
             const sw = lockSw.querySelector('[role=switch]') || lockSw;
-            await api.patch('/products/' + encodeURIComponent(p.id), { locked: sw.getAttribute('aria-checked') === 'true', min_price: min, max_price: max, note: noteIn.value.trim() || null });
+            const locked = sw.getAttribute('aria-checked') === 'true';
+            const until = locked && untilIn.value ? new Date(untilIn.value) : null;
+            if (until && (Number.isNaN(until.getTime()) || until.getTime() <= Date.now())) {
+              toast('„Zamčeno do“ musí být v budoucnosti.', { type: 'error' });
+              saveBtn.disabled = false;
+              return;
+            }
+            await api.patch('/products/' + encodeURIComponent(p.id), { locked, locked_until: until ? until.toISOString() : null, min_price: min, max_price: max, note: noteIn.value.trim() || null });
             toast('Nastavení produktu uloženo', { type: 'success' });
             ctx.notifyChanged('product');
             load();
@@ -280,7 +345,8 @@ export async function show(root, ctx) {
         },
       },
       lockSw,
-      h('p', { class: 'field-help' }, 'Zamčený produkt žádná strategie nepřecení – cena zůstane, dokud zámek nezrušíte.'),
+      h('p', { class: 'field-help' }, 'Zamčený produkt žádná strategie nepřecení – cena zůstane, dokud zámek nezrušíte nebo nevyprší.'),
+      untilField,
       h('div', { class: 'form-grid form-grid-2' }, field({ label: 'Minimální cena', control: withSuffix(minIn, 'Kč'), input: minIn, help: 'Cena nikdy neklesne níž (pokud to strategie respektuje).' }), field({ label: 'Maximální cena', control: withSuffix(maxIn, 'Kč'), input: maxIn })),
       field({ label: 'Poznámka', control: noteIn }),
       h('div', { class: 'form-actions' }, saveBtn)

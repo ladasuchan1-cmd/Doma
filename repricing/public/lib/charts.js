@@ -56,6 +56,22 @@ export function stepPoints(points, end) {
   return out;
 }
 
+/**
+ * Body řady pro graf: historie změn a aktuální hodnota (naše cena). Bez historie je aktuální cena jediný bod
+ * (v čase poslední změny / založení produktu, nejpozději teď), aby byla v grafu vždy vidět.
+ */
+export function seriesWithCurrent(history, price, since, now = Date.now()) {
+  const pts = history.slice();
+  if (price != null && Number.isFinite(price)) {
+    const last = pts[pts.length - 1];
+    if (!last) {
+      const t = Date.parse(since);
+      pts.push({ t: Number.isFinite(t) && t <= now ? t : now, v: price });
+    } else if (Math.abs(last.v - price) >= 0.005) pts.push({ t: now, v: price });
+  }
+  return pts;
+}
+
 // ------------------------------------------------------------------ seznam vodorovných pruhů
 
 /**
@@ -166,7 +182,10 @@ export function sparkline(values, o = {}) {
 
 /**
  * Čárový (schodovitý) graf vývoje cen s tooltipem, legendou (přepínání řad) a responzivní šířkou.
- * @param {{series: {id: string, name: string, color: string, points: {t: number, v: number}[], width?: number, dash?: string, us?: boolean}[],
+ * Jednotlivá pozorování lze zvýraznit body (series.markers) – řada s jediným pozorováním je pak vidět jako bod.
+ * refLines = vodorovné čárkované čáry (např. naše aktuální cena, když chybí historie).
+ * @param {{series: {id: string, name: string, color: string, points: {t: number, v: number}[], width?: number, dash?: string, us?: boolean, markers?: boolean}[],
+ *          refLines?: {v: number, label?: string, color?: string}[],
  *          height?: number, from?: number, to?: number, yFormat?: Function, ariaLabel?: string}} o
  */
 export function lineChart(o) {
@@ -212,7 +231,9 @@ export function lineChart(o) {
     const allT = series.flatMap((s) => s.points.map((p) => p.t));
     const from = o.from ?? Math.min(...allT);
     const to = o.to ?? Math.max(...allT, Date.now());
+    const refs = (Array.isArray(o.refLines) ? o.refLines : []).filter((r) => Number.isFinite(r?.v));
     const vals = vis.flatMap((s) => s.points.map((p) => p.v));
+    if (vals.length) for (const r of refs) vals.push(r.v);
     if (!vals.length) {
       mount(plot, h('div', { class: 'chart-empty' }, 'Žádná zobrazená řada'));
       return;
@@ -239,6 +260,11 @@ export function lineChart(o) {
       nodes.push(svg('text', { x: X(t), y: height - 8, class: 'axis-label', 'text-anchor': 'middle' }, shortDate(t)));
     }
     nodes.push(svg('line', { x1: m.l, x2: width - m.r, y1: height - m.b, y2: height - m.b, class: 'baseline' }));
+    for (const r of refs) {
+      const y = Y(r.v).toFixed(1);
+      nodes.push(svg('line', { x1: m.l, x2: width - m.r, y1: y, y2: y, class: 'ref-line', style: { stroke: r.color || 'var(--muted)' }, 'stroke-dasharray': '5 4' }));
+      if (r.label) nodes.push(svg('text', { x: m.l + 6, y: Number(y) - 5, class: 'axis-label ref-label' }, r.label + ' ' + yFormat(r.v)));
+    }
     // řady – naše cena vykreslená jako poslední (nahoře)
     const ordered = [...vis].sort((a, b) => (a.us ? 1 : 0) - (b.us ? 1 : 0));
     for (const s of ordered) {
@@ -258,7 +284,12 @@ export function lineChart(o) {
         })
       );
       const lp = s.points[s.points.length - 1];
-      nodes.push(svg('circle', { cx: X(to).toFixed(1), cy: Y(lp.v).toFixed(1), r: s.us ? 4.5 : 3.5, class: 'end-dot', style: { fill: s.color } }));
+      // body pozorování (jen u řídkých řad, ať graf nezahltí)
+      const obs = s.points.filter((p) => p.t >= from && p.t <= to);
+      if (s.markers && obs.length <= 60) {
+        for (const p of obs) nodes.push(svg('circle', { cx: X(p.t).toFixed(1), cy: Y(p.v).toFixed(1), r: s.us ? 4 : 3.25, class: 'obs-dot', style: { stroke: s.color } }));
+      }
+      if (!(s.markers && Math.abs(X(lp.t) - X(to)) < 2)) nodes.push(svg('circle', { cx: X(to).toFixed(1), cy: Y(lp.v).toFixed(1), r: s.us ? 4.5 : 3.5, class: 'end-dot', style: { fill: s.color } }));
     }
     const cursor = svg('line', { x1: 0, x2: 0, y1: m.t, y2: height - m.b, class: 'cursor', visibility: 'hidden' });
     const hoverDots = svg('g', { class: 'hover-dots' });

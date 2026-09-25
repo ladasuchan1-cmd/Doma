@@ -389,7 +389,7 @@ const STRATEGY_PRESETS = [
   {
     key: 'aged_stock_n7_n8',
     name: 'Ležáky N7/N8 – doprodej',
-    description: 'Ležáky (stáří zásoby N7/N8) podstřelí nejnižší cenu trhu o 1 %. Marže smí klesnout až na 3 %, jednorázový pokles nejvýše 15 %.',
+    description: 'Ležáky (stáří zásoby N7/N8) podstřelí nejnižší cenu trhu o 1 %. Marže smí klesnout až na 3 %, jednorázový pokles nejvýše 15 %, cena se nezvyšuje.',
     enabled: true,
     priority: 20,
     segment: {
@@ -399,7 +399,8 @@ const STRATEGY_PRESETS = [
     },
     config: P({
       target: { mode: 'undercut_min', offset_pct: -1 },
-      limits: { min_margin_pct: 3, max_decrease_pct: 15 },
+      // doprodej ležáků cenu nezvedá, ani když jsme hluboko pod trhem
+      limits: { min_margin_pct: 3, max_decrease_pct: 15, allow_increase: false },
       fallback: { mode: 'next' },
     }),
   },

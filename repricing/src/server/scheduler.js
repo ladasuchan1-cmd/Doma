@@ -92,10 +92,10 @@ function lastOfferImportMs(db) {
  * Odešle schválené změny webhookem a při úspěchu je označí jako exportované.
  * @returns {Promise<{ok: boolean, count: number, status?: number|null, export_id?: number|null, marked?: number, skipped?: string, error?: string}>}
  */
-async function autoPush({ db, deps, webhook, template, now, log = defaultLog }) {
+async function autoPush({ db, deps, webhook, template, currency, now, log = defaultLog }) {
   const rows = (await deps.exportRows(db, { scope: 'approved' })) || [];
   if (!rows.length) return { ok: true, count: 0, skipped: 'no_changes' };
-  const res = await deps.pushWebhook(rows, { ...webhook, template });
+  const res = await deps.pushWebhook(rows, { ...webhook, template, ...(currency ? { currency } : {}) });
   if (res && res.ok) {
     const ids = [...new Set(rows.map((r) => r.proposal_id).filter((id) => id != null))];
     const marked = ids.length ? await deps.markExported(db, ids, { kind: 'webhook', target: webhook.url, actor: 'scheduler', now }) : null;
@@ -187,15 +187,18 @@ function startScheduler({ db, config = {}, log = defaultLog, deps, intervalMs = 
 
     // 2) přecenění
     let reason = null;
+    // Čas běhu přecenění. Import ze zdroje v kroku 1 skončí až PO začátku tiku (finished_at = skutečný čas), takže
+    // běh zapsaný s časem tiku by byl „starší“ než import, který ho spustil – další tik by pak kvůli témuž importu
+    // přeceňoval znovu (a nadbytečný běh by označil čerstvě schválené návrhy jako superseded). Běh po importu proto
+    // dostane čas nejdřív konec posledního importu nabídek, který zpracovává.
+    let runAt = now;
     try {
       const lastRun = lastRunStartedMs(db);
       const since = Math.max(lastRun ?? 0, lastAttemptMs);
       if (sched.run_after_import) {
-        if (offersImported) reason = 'import';
-        else {
-          const lastImport = lastOfferImportMs(db);
-          if (lastImport != null && lastImport > since) reason = 'import';
-        }
+        const lastImport = lastOfferImportMs(db);
+        if (offersImported || (lastImport != null && lastImport > since)) reason = 'import';
+        if (reason && lastImport != null && lastImport > nowMs) runAt = new Date(lastImport);
       }
       const interval = Number(sched.run_interval_minutes) || 0;
       if (!reason && interval > 0 && (!since || nowMs - since >= interval * 60 * 1000)) reason = 'interval';
@@ -205,9 +208,9 @@ function startScheduler({ db, config = {}, log = defaultLog, deps, intervalMs = 
     }
 
     if (reason && !stopped) {
-      lastAttemptMs = nowMs;
+      lastAttemptMs = runAt.getTime();
       try {
-        const result = await d.runPricing(db, { trigger: 'schedule', now });
+        const result = await d.runPricing(db, { trigger: 'schedule', now: runAt });
         if (result && (result.ok === false || result.error)) {
           throw new Error(typeof result.error === 'string' ? result.error : 'Přecenění skončilo chybou');
         }
@@ -231,7 +234,7 @@ function startScheduler({ db, config = {}, log = defaultLog, deps, intervalMs = 
       const enabled = !!(sched.auto_push_after_run || webhook.auto_push);
       if (enabled && webhook.url) {
         try {
-          summary.push = await autoPush({ db, deps: d, webhook, template: settings.export && settings.export.xml, now, log });
+          summary.push = await autoPush({ db, deps: d, webhook, template: settings.export && settings.export.xml, currency: settings.currency, now: runAt, log });
           clearError('push');
         } catch (e) {
           summary.push = { ok: false, error: e.message };

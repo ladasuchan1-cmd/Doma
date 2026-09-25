@@ -1,15 +1,16 @@
 // Návrhy cen – filtry, tabulka staré → nové ceny, hromadné schválení/zamítnutí, schválení vše dle filtru,
 // ruční úprava ceny v řádku, rozbalitelné vysvětlení, stažení XLSX.
 import { h, mount, debounce } from '../lib/dom.js';
-import { api, apiUrl, cachedGet, itemsOf, isAbort } from '../lib/api.js';
+import { api, apiUrl, cachedGet, itemsOf, isAbort, bindDownload } from '../lib/api.js';
 import { icon } from '../lib/icons.js';
 import { DataTable } from '../lib/table.js';
 import { emptyState, flagBadges, statusBadge, changeEl, segmented, searchInput, badge, callout, dl } from '../lib/ui.js';
 import { explainList, priceMove } from '../lib/decision.js';
+import { finalPrice, finalChangePct, finalMargin } from '../lib/proposal-model.js';
 import { confirmDialog } from '../lib/modal.js';
 import { toast } from '../lib/toast.js';
 import {
-  money, percent, int, count, FLAG_LABELS, parseInputNumber, round, relTime, dateTime, toNum,
+  money, signedMoney, percent, int, count, FLAG_LABELS, parseInputNumber, round, relTime, dateTime, toNum,
 } from '../lib/format.js';
 
 export const title = 'Návrhy cen';
@@ -22,19 +23,6 @@ const STATUSES = [
   { value: 'superseded', label: 'Nahrazeno' },
   { value: 'all', label: 'Vše' },
 ];
-
-/** Marže při ruční ceně – DPH se odvodí z marže navržené ceny (API ji v řádku neposílá). */
-function manualMargin(r, price) {
-  const purchase = toNum(r.product?.purchase_price ?? r.purchase_price);
-  const m = toNum(r.margin_after);
-  const np = toNum(r.new_price);
-  if (purchase == null || m == null || np == null || m >= 100) return null;
-  const netNew = purchase / (1 - m / 100);
-  const vatFactor = np / netNew;
-  if (!(vatFactor > 0.9 && vatFactor < 1.5)) return null;
-  const net = price / vatFactor;
-  return round(((net - purchase) / net) * 100, 2);
-}
 
 function prod(r) {
   return r.product || { code: r.code, name: r.name, manufacturer: r.manufacturer };
@@ -84,7 +72,7 @@ export async function show(root, ctx) {
     return { ...filterParams(), sort: st.sort || null, dir: st.dir || null, page: st.page, limit: st.limit };
   }
 
-  const xlsxLink = h('a', { class: 'btn btn-ghost', download: '', dataset: { action: 'xlsx' } }, icon('download', { size: 16 }), h('span', { class: 'lbl' }, 'XLSX'));
+  const xlsxLink = bindDownload(h('a', { class: 'btn btn-ghost', download: '', dataset: { action: 'xlsx' } }, icon('download', { size: 16 }), h('span', { class: 'lbl' }, 'XLSX')));
   const approveAllBtn = h('button', { type: 'button', class: 'btn btn-success', dataset: { action: 'approve-all' }, onClick: () => decideAll('approve') }, icon('check', { size: 16 }), h('span', { class: 'lbl' }, 'Schválit vše dle filtru'));
   const rejectAllBtn = h('button', { type: 'button', class: 'btn btn-ghost', dataset: { action: 'reject-all' }, onClick: () => decideAll('reject') }, icon('x', { size: 16 }), h('span', { class: 'lbl' }, 'Zamítnout vše'));
   ctx.setActions(xlsxLink, rejectAllBtn, approveAllBtn);
@@ -99,12 +87,18 @@ export async function show(root, ctx) {
   }
 
   // --------------------------------------------------------------- akce
+  function decidedToast(kind, n, skippedLocked) {
+    const msg = (kind === 'approve' ? 'Schváleno: ' : 'Zamítnuto: ') + count(n, 'návrh', 'návrhy', 'návrhů');
+    const skip = Number(skippedLocked) || 0;
+    if (skip) toast(msg + ' · ' + count(skip, 'návrh přeskočen', 'návrhy přeskočeny', 'návrhů přeskočeno') + ' (zamčený produkt)', { type: n ? 'warning' : 'error' });
+    else toast(msg, { type: n ? 'success' : 'info' });
+  }
   async function decide(kind, ids) {
     if (!ids.length) return;
     try {
       const res = await api.post('/proposals/' + kind, { ids });
       const n = res?.updated ?? ids.length;
-      toast((kind === 'approve' ? 'Schváleno: ' : 'Zamítnuto: ') + count(n, 'návrh', 'návrhy', 'návrhů'), { type: 'success' });
+      decidedToast(kind, n, res?.skipped_locked);
       table.clearSelection();
       ctx.notifyChanged('proposals');
     } catch {
@@ -128,11 +122,12 @@ export async function show(root, ctx) {
     });
     if (!ok) return;
     const filter = filterParams();
-    delete filter.status;
+    // Hromadně jen čekající návrhy (API by při zamítnutí bez stavu zamítlo i schválené).
+    filter.status = 'pending';
     for (const k of Object.keys(filter)) if (filter[k] == null) delete filter[k];
     try {
       const res = await api.post('/proposals/' + kind, { all: true, filter });
-      toast((kind === 'approve' ? 'Schváleno: ' : 'Zamítnuto: ') + count(res?.updated ?? 0, 'návrh', 'návrhy', 'návrhů'), { type: 'success' });
+      decidedToast(kind, res?.updated ?? 0, res?.skipped_locked);
       ctx.notifyChanged('proposals');
     } catch {
       /* toast */
@@ -159,7 +154,7 @@ export async function show(root, ctx) {
 
   // --------------------------------------------------------------- tabulka
   function priceCell(r) {
-    const eff = r.manual_price ?? r.new_price;
+    const eff = finalPrice(r);
     const editable = r.status === 'pending' || r.status === 'approved';
     if (editing === r.id) {
       const inp = h('input', { type: 'text', inputmode: 'decimal', class: 'input input-num', value: String(eff ?? '').replace('.', ','), 'aria-label': 'Ruční cena pro ' + (prod(r).code || '') });
@@ -195,7 +190,7 @@ export async function show(root, ctx) {
       );
     }
     const content = [h('span', null, money(eff))];
-    if (r.manual_price != null) content.push(badge('ručně', 'info', 'Navrženo ' + money(r.new_price)));
+    if (r.manual_price != null) content.push(badge('ručně', 'info', 'Ruční cena – exportuje se místo navržené ' + money(r.new_price)));
     if (!editable) return h('span', { class: 'num strong' }, content);
     return h(
       'button',
@@ -225,7 +220,7 @@ export async function show(root, ctx) {
     },
     { key: 'strategy_name', label: 'Strategie', hideSm: true, hideLg: true, render: (r) => h('div', { class: 'cell-2' }, h('span', { class: 'ellipsis', style: 'max-width:190px' }, r.strategy_name || '–'), r.segment_name ? h('span', { class: 'cell-sub ellipsis', style: 'max-width:190px' }, r.segment_name) : null) },
     { key: 'old_price', label: 'Stará cena', format: 'money', sortable: true },
-    { key: 'new_price', label: 'Nová cena', align: 'right', sortKey: 'new_price', render: priceCell },
+    { key: 'new_price', label: 'Nová cena', title: 'Cena k exportu (ruční cena má přednost před navrženou)', align: 'right', sortKey: 'final_price', render: priceCell },
     {
       key: 'change_pct',
       label: 'Změna',
@@ -233,8 +228,10 @@ export async function show(root, ctx) {
       sortable: true,
       defaultDesc: true,
       render: (r) => {
-        if (r.manual_price != null && r.old_price) return h('div', { class: 'cell-2', style: 'align-items:flex-end' }, changeEl(((r.manual_price - r.old_price) / r.old_price) * 100), h('span', { class: 'cell-sub num' }, money(r.manual_price - r.old_price)));
-        return h('div', { class: 'cell-2', style: 'align-items:flex-end' }, changeEl(r.change_pct), r.change_abs != null ? h('span', { class: 'cell-sub num' }, money(r.change_abs)) : null);
+        const fp = finalPrice(r);
+        const old = toNum(r.old_price);
+        const abs = fp != null && old != null ? round(fp - old, 2) : toNum(r.change_abs);
+        return h('div', { class: 'cell-2', style: 'align-items:flex-end' }, changeEl(finalChangePct(r)), abs != null ? h('span', { class: 'cell-sub num' }, signedMoney(abs)) : null);
       },
     },
     {
@@ -244,7 +241,7 @@ export async function show(root, ctx) {
       align: 'right',
       sortable: true,
       render: (r) => {
-        const after = r.manual_price != null ? manualMargin(r, r.manual_price) : r.margin_after;
+        const after = finalMargin(r);
         return h('div', { class: 'cell-2', style: 'align-items:flex-end' }, h('span', { class: after != null && after < 0 ? 'chg chg-down' : 'num strong' }, percent(after)), h('span', { class: 'cell-sub num' }, 'z ' + percent(r.margin_before)));
       },
     },
@@ -295,12 +292,15 @@ export async function show(root, ctx) {
           null,
           h('div', { class: 'form-subtitle' }, 'Detail'),
           dl([
-            ['Cena', priceMove(r.old_price, r.manual_price ?? r.new_price)],
+            ['Cena k exportu', priceMove(r.old_price, finalPrice(r))],
+            r.manual_price != null ? ['Navržená cena', money(r.new_price) + ' (nahrazena ruční cenou)'] : null,
             ['Cílová cena', money(r.target_price)],
             ['Reference', money(r.reference_price)],
             ['Nákup bez DPH', money(prod(r).purchase_price ?? r.purchase_price)],
             ['Sklad', int(prod(r).stock)],
+            ['Nejlevnější konkurent', r.cheapest_competitor ? r.cheapest_competitor + ' · ' + money(r.market_min) : money(r.market_min)],
             ['Vytvořeno', dateTime(r.created_at)],
+            r.exported_at ? ['Exportováno', dateTime(r.exported_at) + (r.export_id ? ' (export #' + r.export_id + ')' : '')] : null,
           ]),
           h('div', { class: 'row', style: 'margin-top:10px' }, h('a', { class: 'btn btn-sm', href: '#/produkty/' + encodeURIComponent(r.product_id) }, 'Detail produktu'))
         )

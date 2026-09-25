@@ -11,7 +11,7 @@ import {
 import { chipsInput } from '../lib/chips.js';
 import { openModal, confirmDialog } from '../lib/modal.js';
 import { toast } from '../lib/toast.js';
-import { dateTime, relTime, SCOPE_LABELS, parseInputNumber } from '../lib/format.js';
+import { dateTime, relTime, SCOPE_LABELS, parseInputNumber, detailText } from '../lib/format.js';
 
 export const title = 'Nastavení';
 
@@ -75,6 +75,23 @@ export async function show(root, ctx) {
   function boolField(path, label, help) {
     const sw = switchEl({ checked: Boolean(get(draft, path)), label, onChange: (v) => { set(draft, path, v); markDirty(); } });
     return h('div', { class: 'field field-switch' }, sw, help ? h('div', { class: 'field-help' }, help) : null);
+  }
+  /**
+   * Automatické odeslání po plánovaném přecenění: server odesílá, když je zapnuté schedule.auto_push_after_run
+   * NEBO export.webhook.auto_push – jeden přepínač proto nastavuje oba příznaky (jinak by nešlo vypnout).
+   */
+  function autoPushField() {
+    const on = Boolean(get(draft, 'schedule.auto_push_after_run') || get(draft, 'export.webhook.auto_push'));
+    const sw = switchEl({
+      checked: on,
+      label: 'Po plánovaném přecenění odeslat schválené změny webhookem',
+      onChange: (v) => {
+        set(draft, 'schedule.auto_push_after_run', v);
+        set(draft, 'export.webhook.auto_push', v);
+        markDirty();
+      },
+    });
+    return h('div', { class: 'field field-switch' }, sw, h('div', { class: 'field-help' }, 'Vyžaduje nastavenou URL webhooku (sekce Export). Ruční odeslání je na stránce Export.'));
   }
   function textField(path, label, opts = {}) {
     const inp = h('input', { class: ['input', opts.mono ? 'input-mono' : null], type: opts.type || 'text', value: get(draft, path) ?? '', placeholder: opts.placeholder || '' });
@@ -188,7 +205,7 @@ export async function show(root, ctx) {
           body: [
             h('div', { class: 'form-grid form-grid-2' },
               boolField('export.update_current_price', 'Po exportu přepsat aktuální cenu produktu', 'Exportovaná cena se zapíše jako aktuální a do historie – další přecenění pak počítá s ní.'),
-              selField('export.feed_scope', 'Obsah feedu ceníku', [{ value: 'all', label: 'Celý ceník (všechny aktivní produkty)' }, { value: 'approved', label: 'Jen schválené změny' }])
+              h('div', { class: 'field' }, h('div', { class: 'field-label' }, 'Obsah feedů'), h('p', { class: 'field-help', style: 'margin:0' }, 'Feed ', h('code', null, 'changes'), ' obsahuje jen schválené a dosud neexportované změny, feed ', h('code', null, 'prices'), ' celý ceník. Adresy najdete na stránce ', h('a', { href: '#/export' }, 'Export'), '.'))
             ),
             h('h3', { class: 'form-subtitle' }, 'XML feed'),
             h('div', { class: 'form-grid' }, rootIn, itemIn),
@@ -199,7 +216,8 @@ export async function show(root, ctx) {
               textField('export.pohoda.ico', 'IČO účetní jednotky', { placeholder: '12345678', help: 'Musí odpovídat IČO v POHODĚ, jinak import odmítne.' }),
               textField('export.pohoda.application', 'Aplikace', { help: 'Uvádí se v hlavičce datového balíku.' }),
               selField('export.pohoda.filter_by', 'Párovat zásoby podle', [{ value: 'code', label: 'Kódu (doporučeno)' }, { value: 'ean', label: 'EAN' }]),
-              textField('export.pohoda.price_level', 'Cenová hladina', { placeholder: 'prázdné = prodejní cena', help: 'Zkratka cenové hladiny v POHODĚ, pokud se nemá měnit základní prodejní cena.' })
+              textField('export.pohoda.price_level', 'Cenová hladina', { placeholder: 'prázdné = prodejní cena', help: 'Zkratka cenové hladiny v POHODĚ, pokud se nemá měnit základní prodejní cena.' }),
+              selField('export.pohoda.encoding', 'Kódování XML', [{ value: 'windows-1250', label: 'Windows-1250 (doporučeno)' }, { value: 'utf-8', label: 'UTF-8' }], 'Výchozí kódování souboru pro import do POHODY.')
             ),
             h('h3', { class: 'form-subtitle' }, 'Webhook do adminu'),
             h('div', { class: 'form-grid form-grid-2' },
@@ -207,8 +225,7 @@ export async function show(root, ctx) {
               selField('export.webhook.format', 'Formát těla', [{ value: 'json', label: 'JSON' }, { value: 'xml', label: 'XML (šablona výše)' }])
             ),
             h('div', { class: 'form-grid form-grid-2', style: 'margin-top:14px' },
-              numField('export.webhook.timeout_ms', 'Časový limit', { suffix: 'ms', int: true, min: 1000 }),
-              boolField('export.webhook.auto_push', 'Povolit automatické odesílání', 'Odesílání po naplánovaném přecenění řídí volba v sekci Plánování.')
+              numField('export.webhook.timeout_ms', 'Časový limit', { suffix: 'ms', int: true, min: 1000 })
             ),
             h('div', { style: 'margin-top:14px' }, headersEditor()),
           ],
@@ -221,7 +238,7 @@ export async function show(root, ctx) {
             selField('schedule.run_interval_minutes', 'Automatické přecenění', RUN_INTERVALS, 'Pravidelné přecenění všech produktů. Návrhy čekají na schválení (kromě automaticky schvalovaných).'),
             h('div', null,
               boolField('schedule.run_after_import', 'Přecenit po importu cen konkurence', 'Po každém úspěšném importu nabídek (API, URL zdroj) se spustí přecenění.'),
-              boolField('schedule.auto_push_after_run', 'Po přecenění odeslat schválené změny webhookem', 'Vyžaduje nastavenou URL webhooku.'))
+              autoPushField())
           ),
         })
       );
@@ -429,7 +446,7 @@ export async function show(root, ctx) {
         { key: 'actor', label: 'Kdo', sortable: true, render: (a) => h('span', { class: 'small' }, a.actor || '–') },
         { key: 'action', label: 'Akce', sortable: true, render: (a) => h('span', { class: 'mono small' }, a.action) },
         { key: 'entity', label: 'Objekt', hideSm: true, render: (a) => h('span', { class: 'small' }, (a.entity || '') + (a.entity_id != null ? ' #' + a.entity_id : '')) },
-        { key: 'detail', label: 'Detail', hideSm: true, render: (a) => h('span', { class: 'small muted mono ellipsis', style: 'max-width:360px;display:inline-block', title: a.detail || '' }, a.detail || '') },
+        { key: 'detail', label: 'Detail', hideSm: true, render: (a) => h('span', { class: 'small muted ellipsis', style: 'max-width:360px;display:inline-block', title: typeof a.detail === 'object' && a.detail ? JSON.stringify(a.detail, null, 1) : a.detail || '' }, detailText(a.detail)) },
       ],
       clientSort: true,
       sort: { key: 'at', dir: 'desc' },

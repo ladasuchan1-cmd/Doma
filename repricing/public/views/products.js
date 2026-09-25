@@ -8,6 +8,7 @@ import { card, emptyState, positionBadge, changeEl, searchInput, checkbox } from
 import { filterBuilder } from '../lib/filter-builder.js';
 import { describeFilter, countConditions, isEmptyFilter } from '../lib/filter-model.js';
 import { money, percent, int, index, count, statusLabel, POSITION_LABELS, POSITION_ORDER } from '../lib/format.js';
+import { finalPrice, finalChangePct, isManual } from '../lib/proposal-model.js';
 
 export const title = 'Produkty';
 
@@ -26,6 +27,11 @@ function parseFilter(s) {
   } catch {
     return null;
   }
+}
+
+/** Efektivní zámek (API: lock_active; starší odpovědi jen locked 0/1). */
+function lockOn(r) {
+  return r.lock_active != null ? Boolean(r.lock_active) : Boolean(Number(r.locked));
 }
 
 export async function show(root, ctx) {
@@ -52,9 +58,11 @@ export async function show(root, ctx) {
   let facets = null;
   let segments = [];
   let fields = [];
-  const [facetsRes, segRes] = await Promise.allSettled([cachedGet('/products/facets'), cachedGet('/segments')]);
+  // pole načíst hned (i bez otevřeného pokročilého filtru) – popisky v souhrnu filtru z URL (např. z upozornění na přehledu)
+  const [facetsRes, segRes, fieldsRes] = await Promise.allSettled([cachedGet('/products/facets'), cachedGet('/segments'), cachedGet('/fields')]);
   if (facetsRes.status === 'fulfilled') facets = facetsRes.value;
   if (segRes.status === 'fulfilled') segments = itemsOf(segRes.value);
+  if (fieldsRes.status === 'fulfilled') fields = fieldsRes.value?.fields || [];
   if (ctx.signal.aborted) return;
 
   function queryParams() {
@@ -101,7 +109,7 @@ export async function show(root, ctx) {
       render: (r) => h(
         'div',
         { class: 'cell-2' },
-        h('a', { href: '#/produkty/' + encodeURIComponent(r.id), class: 'cell-name', style: 'max-width:250px', title: r.name }, r.locked ? icon('lock', { size: 12, title: 'Zamčeno' }) : null, r.locked ? ' ' : null, r.name || r.code),
+        h('a', { href: '#/produkty/' + encodeURIComponent(r.id), class: 'cell-name', style: 'max-width:250px', title: r.name }, lockOn(r) ? icon('lock', { size: 12, title: 'Zamčeno – nepřeceňuje se' }) : null, lockOn(r) ? ' ' : null, r.name || r.code),
         h('span', { class: 'cell-sub ellipsis', style: 'max-width:250px' }, h('span', { class: 'show-sm mono' }, r.code + ' · '), [r.manufacturer, r.category].filter(Boolean).join(' · ') + (r.active === 0 || r.active === false ? ' · neaktivní' : ''))
       ),
     },
@@ -128,7 +136,9 @@ export async function show(root, ctx) {
         const p = r.proposal;
         if (!p) return h('span', { class: 'muted' }, '–');
         const approved = p.status === 'approved';
-        return h('div', { class: 'cell-2', style: 'align-items:flex-end', title: statusLabel(p.status) }, h('span', { class: 'num strong nowrap' }, approved ? h('span', { class: 'chg-up', 'aria-label': 'schváleno' }, icon('check', { size: 12 }), ' ') : null, money(p.new_price, { decimals: 0 })), changeEl(p.change_pct));
+        const manual = isManual(p);
+        const tip = statusLabel(p.status) + (manual ? ' · ruční cena (navrženo ' + money(p.new_price) + ')' : '');
+        return h('div', { class: 'cell-2', style: 'align-items:flex-end', title: tip }, h('span', { class: 'num strong nowrap' }, approved ? h('span', { class: 'chg-up', 'aria-label': 'schváleno' }, icon('check', { size: 12 }), ' ') : null, money(finalPrice(p)), manual ? h('span', { class: 'muted', 'aria-label': 'ruční cena' }, ' ✎') : null), changeEl(finalChangePct(p)));
       },
     },
   ];

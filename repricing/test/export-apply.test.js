@@ -28,8 +28,15 @@ test('markExported: jen schválené návrhy → exported, cena produktu, histori
 
   assert.deepEqual({ ...product(db, s.a) }, { price: 18990, price_changed_at: h.NOW, updated_at: h.NOW });
   assert.equal(product(db, s.b).price, 899, 'ruční cena má přednost');
-  assert.deepEqual(history(db, s.a), [{ price: 18990, source: 'export', ref_id: res.export_id, at: h.NOW }]);
-  assert.deepEqual(history(db, s.b), [{ price: 899, source: 'export', ref_id: res.export_id, at: h.NOW }]);
+  // před první zaznamenanou změnou se doplní dosavadní cena platná od price_changed_at / založení (Omnibus lowest_30d)
+  assert.deepEqual(history(db, s.a), [
+    { price: 19990, source: 'import', ref_id: null, at: h.daysAgo(40) },
+    { price: 18990, source: 'export', ref_id: res.export_id, at: h.NOW },
+  ]);
+  assert.deepEqual(history(db, s.b), [
+    { price: 949, source: 'import', ref_id: null, at: h.T0 },
+    { price: 899, source: 'export', ref_id: res.export_id, at: h.NOW },
+  ]);
 
   const log = exportsLog(db);
   assert.equal(log.length, 1);
@@ -254,4 +261,31 @@ test('pushChanges: úspěch označí export, chyba se zapíše do logu a nic neo
   assert.equal(exportsLog(db)[1].target, 'https://admin.example/hook');
   const empty = await pushChanges(db, { now: h.NOW, push: async () => assert.fail('nemá se volat') });
   assert.deepEqual([empty.ok, empty.count, empty.skipped], [true, 0, 'no_changes']);
+});
+
+test('regrese: lowest_30d po exportu zdražení zahrnuje dosavadní cenu (Omnibus), i když první cena v historii nebyla', () => {
+  // Import katalogu první cenu produktu do price_history nezapisuje. Dřív po exportu zdražení 1 000 → 1 200 zůstal
+  // v historii jen záznam 1 200 a feed hlásil „nejnižší cena za 30 dní“ = 1 200, přestože se včera prodávalo za 1 000.
+  const db = h.freshDb();
+  const run = h.addRun(db);
+  const p = h.addProduct(db, { code: 'OMNI-1', price: 1000, vat_rate: 21 });
+  const pr1 = h.addProposal(db, { run_id: run, product_id: p, old_price: 1000, new_price: 1200 });
+  markExported(db, [pr1], { kind: 'ack', now: h.NOW });
+  const row = (now) => exportRows(db, { scope: 'all', now }).find((r) => r.code === 'OMNI-1');
+  assert.equal(row(h.daysAgo(-1)).price, 1200);
+  assert.equal(row(h.daysAgo(-1)).lowest_30d, 1000);
+  // po 30 dnech od změny už platí jen nová cena
+  assert.equal(row(h.daysAgo(-40)).lowest_30d, 1200);
+  // další změna výchozí záznam znovu nepřidá
+  const pr2 = h.addProposal(db, { run_id: run, product_id: p, old_price: 1200, new_price: 1100 });
+  markExported(db, [pr2], { kind: 'ack', now: h.daysAgo(-2) });
+  assert.deepEqual(
+    history(db, p).map((x) => [x.price, x.source]),
+    [
+      [1000, 'import'],
+      [1200, 'export'],
+      [1100, 'export'],
+    ]
+  );
+  assert.equal(row(h.daysAgo(-3)).lowest_30d, 1000);
 });

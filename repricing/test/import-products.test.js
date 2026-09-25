@@ -59,10 +59,14 @@ test('importProducts: změna ceny → price_history(import) + price_changed_at; 
   assert.equal(a.price, 900);
   assert.equal(a.price_changed_at, T2);
   const h = db.prepare('SELECT product_id, price, source, ref_id, at FROM price_history').all().map((r) => ({ ...r }));
-  assert.deepEqual(h, [{ product_id: a.id, price: 900, source: 'import', ref_id: 77, at: T2 }]);
+  // první změna: nejdřív dosavadní cena platná od založení (jinak by ji lowest_30d ztratila), pak nová
+  assert.deepEqual(h, [
+    { product_id: a.id, price: 1000, source: 'import', ref_id: null, at: T1 },
+    { product_id: a.id, price: 900, source: 'import', ref_id: 77, at: T2 },
+  ]);
   // stejná cena znovu → žádná historie
   importProducts(db, [{ code: 'A', price: 900.0000000001 }], { now: '2026-09-26T00:00:00Z' });
-  assert.equal(db.prepare('SELECT COUNT(*) AS c FROM price_history').get().c, 1);
+  assert.equal(db.prepare('SELECT COUNT(*) AS c FROM price_history').get().c, 2);
   // null = smazat (prázdná buňka ve zdroji)
   importProducts(db, [{ code: 'A', manufacturer: null, msrp: null }], { now: T2 });
   const a2 = product(db, 'A');
@@ -226,7 +230,8 @@ test('runImport: Google Merchant feed a POHODA listStock jako katalog', () => {
   const s = product(db, 'SRA-001');
   assert.equal(s.price, 909);
   assert.equal(s.price_changed_at, T2);
-  assert.equal(db.prepare('SELECT COUNT(*) AS c FROM price_history WHERE source = ?').get('import').c, 1);
+  // výchozí cena 9 990 (od založení) + změna na 909
+  assert.equal(db.prepare('SELECT COUNT(*) AS c FROM price_history WHERE source = ?').get('import').c, 2);
 });
 
 test('runImport: varianty produktů (Shoptet-like XML) → produkt na variantu, bez duplicit v attrs', () => {
@@ -242,4 +247,14 @@ test('runImport: varianty produktů (Shoptet-like XML) → produkt na variantu, 
   assert.deepEqual(m.attrs, { 'PARAMETERS.PARAMETER.Velikost': 'M' });
   assert.equal(product(db, 'ZVON').price, 199);
   assert.equal(product(db, 'TRAIL'), null, 'rodič s variantami sám produktem není');
+});
+
+test('regrese: změna ceny importem zachová dosavadní cenu pro lowest_30d (Omnibus)', () => {
+  const { exportRows } = require('../src/export/rows');
+  const db = openDb();
+  importProducts(db, [{ code: 'OMNI-2', price: 1000 }], { now: T1 });
+  importProducts(db, [{ code: 'OMNI-2', price: 1200 }], { now: T2 });
+  const row = exportRows(db, { scope: 'all', now: T2 }).find((r) => r.code === 'OMNI-2');
+  assert.equal(row.price, 1200);
+  assert.equal(row.lowest_30d, 1000, 'cena 1 000 platila ještě před 5 dny');
 });

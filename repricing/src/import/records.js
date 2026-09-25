@@ -18,6 +18,10 @@ const { ImportError, keyForms } = require('./mapping');
 const MAX_UNZIPPED = 600 * 1024 * 1024;
 const HEADER_SAMPLE = 1000;
 const OFFERS_SCAN = 200;
+// Nejvyšší povolené zanoření záznamu při zploštění. Rekurze v flattenInto by na patologicky zanořeném JSONu
+// (např. 5 000× „[“) přetekla zásobník (RangeError → HTTP 500); XML parser má vlastní limit 1 000 úrovní.
+// Skutečná data mají jednotky až desítky úrovní.
+const MAX_FLATTEN_DEPTH = 200;
 
 const FORMAT_LABELS = { json: 'JSON', xml: 'XML', csv: 'CSV', xlsx: 'XLSX' };
 
@@ -78,7 +82,10 @@ function put(out, key, value) {
   } else setOwn(out, key, value);
 }
 
-function flattenInto(out, value, path) {
+function flattenInto(out, value, path, depth = 0) {
+  if (depth > MAX_FLATTEN_DEPTH) {
+    throw new ImportError(`Záznam je příliš hluboko zanořený (více než ${MAX_FLATTEN_DEPTH} úrovní) – zkontrolujte strukturu souboru.`, { code: 'IMPORT_TOO_DEEP' });
+  }
   if (isPrimitive(value)) {
     setOwn(out, path || 'value', primitiveValue(value));
     return;
@@ -101,7 +108,7 @@ function flattenInto(out, value, path) {
       return;
     }
     if (value.length === 1) {
-      flattenInto(out, value[0], path);
+      flattenInto(out, value[0], path, depth + 1);
       return;
     }
     // páry název–hodnota
@@ -115,7 +122,7 @@ function flattenInto(out, value, path) {
     // pole objektů → každý podklíč jako hodnoty spojené „|“ (zarovnané podle pořadí prvků)
     const subs = value.map((x) => {
       const o = {};
-      flattenInto(o, x, '');
+      flattenInto(o, x, '', depth + 1);
       return o;
     });
     const keys = [];
@@ -149,7 +156,7 @@ function flattenInto(out, value, path) {
       setOwn(out, path || '#text', primitiveValue(v));
       continue;
     }
-    flattenInto(out, v, path ? `${path}.${k}` : k);
+    flattenInto(out, v, path ? `${path}.${k}` : k, depth + 1);
   }
   if (!any && path) setOwn(out, path, '');
 }

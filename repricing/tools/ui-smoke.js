@@ -6,7 +6,10 @@
 // porušení CSP, nezachycené výjimky, chyby API 5xx a vodorovné přetečení stránky na mobilu.
 //
 // Použití:
-//   node tools/ui-smoke.js [--out=DIR] [--url=http://localhost:8080] [--password=demo] [--only=desktop|mobile|extensions] [--no-dark] [--headed]
+//   node tools/ui-smoke.js [--out=DIR] [--url=http://localhost:8080] [--password=demo] [--only=desktop|mobile] [--no-dark] [--headed]
+// Nezávislé na datech: ID a hledané texty bere z API (první produkt, strategie s posunem, segment), takže projde
+// s mockem i se skutečným serverem s demo daty (tools/demo-data.js). Smoke data mění (schválí návrhy, vytvoří segment,
+// zdroj a token, naimportuje examples/konkurence.csv, spustí přecenění) – proti produkční databázi ho nepouštějte.
 // Playwright: require('playwright'), jinak PLAYWRIGHT_PATH, jinak /opt/node22/lib/node_modules/playwright.
 // Návratový kód 1 = nalezeny chyby.
 
@@ -38,17 +41,17 @@ const VIEWPORTS = [
   { name: 'mobile', width: 390, height: 844, isMobile: true, hasTouch: true },
 ].filter((v) => !args.only || v.name === args.only);
 
-const ROUTES = [
-  '/prehled', '/produkty', '/produkty/1', '/navrhy', '/strategie', '/strategie/1', '/strategie/nova', '/segmenty', '/segmenty/1', '/segmenty/novy',
-  '/konkurence', '/konkurence?tab=unmatched', '/import', '/import?tab=sources', '/import?tab=log', '/import?tab=api', '/export', '/nastaveni', '/nastaveni?tab=tokeny', '/nastaveni?tab=audit', '/neexistuje',
-];
+// Trasy se doplní o skutečná ID z dat (první produkt, strategie a segment) – smoke funguje s mockem i s demo daty.
+function routesFor(ids) {
+  return [
+    '/prehled', '/produkty', '/produkty/' + ids.product, '/navrhy', '/strategie', '/strategie/' + ids.strategy, '/strategie/nova', '/segmenty',
+    ids.segment ? '/segmenty/' + ids.segment : null, '/segmenty/novy',
+    '/konkurence', '/konkurence?tab=unmatched', '/import', '/import?tab=sources', '/import?tab=log', '/import?tab=api', '/export', '/nastaveni', '/nastaveni?tab=tokeny', '/nastaveni?tab=audit', '/neexistuje',
+  ].filter(Boolean);
+}
 
-const CSV = [
-  'EAN;Obchod;Cena s DPH;Doprava;Skladem;URL',
-  '8599999000011;VeloMarket.cz;20 490 Kč;0;ano;https://velomarket.example/p/1',
-  'NEEXISTUJE-1;KoloExpres.cz;1 290,-;99;ne;https://koloexpres.example/p/2',
-  ';CykloSvět.cz;abc;;;',
-].join('\n');
+const EXAMPLE_CSV = path.join(__dirname, '..', 'examples', 'konkurence.csv');
+const RUN_ID = Date.now().toString(36);
 
 const problems = [];
 function problem(vp, where, msg) {
@@ -56,7 +59,41 @@ function problem(vp, where, msg) {
 }
 
 function slug(route) {
-  return route.replace(/^\//, '').replace(/[?=&/]+/g, '-').replace(/-+$/, '') || 'root';
+  // ID v cestě nahradíme slovem, aby se názvy snímků neměnily s daty (produkty/1 i produkty/654 → produkty-detail)
+  return route.replace(/^\//, '').replace(/\/\d+(?=$|\?)/, '/detail').replace(/[?=&/]+/g, '-').replace(/-+$/, '') || 'root';
+}
+
+/** Volání API ze stránky (session cookie + CSRF hlavička jako UI). */
+async function apiCall(page, method, url, body) {
+  return page.evaluate(async ([m, u, b]) => {
+    const r = await fetch('api/v1' + u, { method: m, credentials: 'same-origin', headers: { 'X-Requested-With': 'cenotvorba', ...(b != null ? { 'Content-Type': 'application/json' } : {}) }, body: b != null ? JSON.stringify(b) : undefined });
+    let json = null;
+    try {
+      json = await r.json();
+    } catch {
+      /* ne-JSON */
+    }
+    return { status: r.status, body: json };
+  }, [method, url, body ?? null]);
+}
+
+const itemsOf = (b) => (Array.isArray(b) ? b : b && Array.isArray(b.items) ? b.items : []);
+
+/** Skutečná ID z dat: produkt s nejvíce konkurenty, strategie s posunem cíle, první segment. */
+async function discoverIds(page) {
+  const prods = itemsOf((await apiCall(page, 'GET', '/products?limit=5&sort=market_count&dir=desc')).body);
+  const strats = itemsOf((await apiCall(page, 'GET', '/strategies')).body);
+  const segs = itemsOf((await apiCall(page, 'GET', '/segments')).body);
+  const OFFSET_MODES = ['undercut_min', 'rank', 'market_avg', 'market_median', 'competitor', 'msrp'];
+  const strategy = strats.find((x) => x.enabled && OFFSET_MODES.includes(x.config?.target?.mode)) || strats[0];
+  const product = prods[0];
+  return {
+    product: product ? product.id : 1,
+    productName: product ? product.name : '',
+    strategy: strategy ? strategy.id : 1,
+    segment: segs[0] ? segs[0].id : null,
+    manufacturer: product ? product.manufacturer : null,
+  };
 }
 
 async function waitReady(page, prevSeq, timeout = 15000) {
@@ -98,7 +135,10 @@ async function shot(page, name, full = true) {
     await page.screenshot({ path: file });
     return file;
   }
-  // celá stránka, ale nejvýš 2400 px (dlouhé seznamy na mobilu by byly nečitelné)
+  // celá stránka, ale nejvýš 2400 px (dlouhé seznamy na mobilu by byly nečitelné); od začátku stránky,
+  // jinak by lepivá hlavička a postranní panel byly na snímku uprostřed
+  await page.evaluate(() => window.scrollTo(0, 0));
+  await page.waitForTimeout(50);
   const size = await page.evaluate(() => ({ w: document.documentElement.clientWidth, h: document.documentElement.scrollHeight }));
   await page.screenshot({ path: file, fullPage: true, clip: { x: 0, y: 0, width: size.w, height: Math.min(size.h, 2400) } });
   return file;
@@ -125,19 +165,32 @@ async function expectVisible(page, selector, vp, where, timeout = 5000) {
   }
 }
 
-async function interactions(page, base, vp) {
+async function interactions(page, base, vp, ids) {
   const W = (name) => 'interakce ' + name;
-  // --- produkty: hledání, filtr výrobce, detail
+  const okStatus = (r) => r.status() >= 200 && r.status() < 300;
+  let r;
+
+  // --- produkty: hledání podle názvu prvního produktu, filtr výrobce, detail
   step('produkty');
   await go(page, base, '/produkty');
-  await act(page, (x) => x.url().includes('/api/v1/products?') && x.url().includes('q=trek'), () => page.fill('#products-search', 'trek'));
-  await page.waitForTimeout(200);
-  const firstName = await page.locator('.dt tbody tr:first-child td:nth-child(2)').innerText().catch(() => '');
-  if (!/trek/i.test(firstName)) problem(vp, W('produkty'), 'hledání „trek“ nevrátilo Trek (první řádek: ' + firstName + ')');
+  const firstName = (await page.locator('.dt tbody tr.is-clickable .cell-name').first().innerText().catch(() => '')).trim() || ids.productName;
+  const needle = firstName.split(/\s+/).slice(0, 3).join(' ');
+  if (!needle) problem(vp, W('produkty'), 'tabulka produktů je prázdná');
+  else {
+    await act(page, (x) => x.url().includes('/api/v1/products?') && decodeURIComponent(x.url().replace(/\+/g, ' ')).includes('q=' + needle), () => page.fill('#products-search', needle));
+    await page.waitForTimeout(250);
+    const rows = await page.locator('.dt tbody tr.is-clickable .cell-name').allInnerTexts();
+    if (!rows.length || !rows.some((t) => t.includes(needle))) problem(vp, W('produkty'), `hledání „${needle}“ nevrátilo produkt (řádky: ${rows.slice(0, 3).join(' | ')})`);
+  }
   if (vp === 'desktop') {
-    await act(page, (x) => x.url().includes('/api/v1/products?') && x.url().includes('manufacturer=Trek'), () => page.selectOption('select[aria-label="Výrobce"]', 'Trek'));
-    await page.waitForTimeout(150);
-    await shot(page, vp + '-produkty-filtr');
+    // hledání zrušit, jinak by se s filtrem výrobce nemuselo nic najít
+    await act(page, (x) => x.url().includes('/api/v1/products?') && !x.url().includes('q='), () => page.fill('#products-search', ''));
+    const manu = await page.locator('select[aria-label="Výrobce"] option').nth(1).getAttribute('value').catch(() => null);
+    if (manu) {
+      await act(page, (x) => x.url().includes('/api/v1/products?') && x.url().includes('manufacturer='), () => page.selectOption('select[aria-label="Výrobce"]', manu));
+      await page.waitForTimeout(150);
+      await shot(page, vp + '-produkty-filtr');
+    } else problem(vp, W('produkty'), 'filtr výrobce nemá žádné hodnoty (facety)');
     // pokročilý filtr
     await page.click('[data-action="advanced-filter"]');
     await expectVisible(page, '.fb', vp, W('pokročilý filtr'));
@@ -148,19 +201,27 @@ async function interactions(page, base, vp) {
   await waitReady(page, prev);
   await expectVisible(page, '.product-title', vp, W('detail produktu'));
   await expectVisible(page, '[data-card="history"] svg', vp, W('graf historie'));
+  // naše cena musí být v grafu vždy (i bez historie změn)
+  const usInLegend = await page.locator('[data-card="history"] .legend-item', { hasText: 'Naše cena' }).count();
+  if (!usInLegend) problem(vp, W('graf historie'), 'v grafu chybí naše cena');
   if (vp === 'desktop') {
-    // úprava min. ceny
+    // úprava min. ceny (a vrácení zpět, ať smoke nemění data)
     const minInput = page.locator('[data-card="product-settings"] input.input-num').first();
+    const before = await minInput.inputValue();
     await minInput.fill('1000');
-    const pr = await act(page, (x) => x.request().method() === 'PATCH' && x.url().includes('/api/v1/products/'), () => page.click('[data-action="save-product"]'));
-    if (pr.status() !== 200) problem(vp, W('uložení produktu'), 'PATCH vrátil ' + pr.status());
-    await page.waitForTimeout(300);
+    r = await act(page, (x) => x.request().method() === 'PATCH' && x.url().includes('/api/v1/products/'), () => page.click('[data-action="save-product"]'));
+    if (r.status() !== 200) problem(vp, W('uložení produktu'), 'PATCH vrátil ' + r.status());
+    await page.waitForTimeout(700);
+    await page.locator('[data-card="product-settings"] input.input-num').first().fill(before);
+    r = await act(page, (x) => x.request().method() === 'PATCH' && x.url().includes('/api/v1/products/'), () => page.click('[data-action="save-product"]'));
+    if (r.status() !== 200) problem(vp, W('vrácení min. ceny'), 'PATCH vrátil ' + r.status());
+    await page.waitForTimeout(400);
     // hover na graf (tooltip)
     const plot = page.locator('[data-card="history"] .overlay').first();
     await plot.scrollIntoViewIfNeeded();
     const box = await plot.boundingBox();
     if (box) {
-      await plot.hover({ position: { x: box.width * 0.7, y: box.height / 2 } });
+      await plot.hover({ position: { x: box.width * 0.9, y: box.height / 2 } });
       await page.waitForTimeout(150);
       await expectVisible(page, '.chart-tip:not([hidden])', vp, W('tooltip grafu'), 2000);
       await shot(page, vp + '-produkt-graf-tooltip', false);
@@ -170,11 +231,15 @@ async function interactions(page, base, vp) {
   // --- návrhy: schválit řádek, hromadný výběr, schválit vše (Esc), rozbalení, ruční cena
   step('návrhy');
   await go(page, base, '/navrhy');
-  let r = await act(page, (x) => x.url().includes('/api/v1/proposals/approve') && x.request().method() === 'POST', () => page.locator('[data-action="approve-row"]').first().click());
-  if (r.status() !== 200) problem(vp, W('schválení návrhu'), 'POST approve ' + r.status());
-  await expectVisible(page, '.toast-success', vp, W('toast po schválení'));
-  await page.waitForTimeout(400);
-  if (vp === 'desktop') {
+  const pendingRows = await page.locator('[data-action="approve-row"]').count();
+  if (!pendingRows) problem(vp, W('návrhy'), 'žádné čekající návrhy (spusťte přecenění na demo datech)');
+  else {
+    r = await act(page, (x) => x.url().includes('/api/v1/proposals/approve') && x.request().method() === 'POST', () => page.locator('[data-action="approve-row"]').first().click());
+    if (r.status() !== 200) problem(vp, W('schválení návrhu'), 'POST approve ' + r.status());
+    await expectVisible(page, '.toast-success, .toast-warning', vp, W('toast po schválení'));
+    await page.waitForTimeout(400);
+  }
+  if (vp === 'desktop' && pendingRows > 3) {
     const boxes = page.locator('.dt tbody td.col-check input[type=checkbox]');
     await boxes.nth(0).check();
     await boxes.nth(1).check();
@@ -196,50 +261,78 @@ async function interactions(page, base, vp) {
     // rozbalení vysvětlení
     await page.locator('.expander').first().click();
     await expectVisible(page, '.dt-expand .steps-explain', vp, W('rozbalení vysvětlení'));
-    // ruční cena
-    await page.locator('.price-edit').first().click();
+    // ruční cena: o 10 Kč nad navrženou – v tabulce se pak musí ukázat právě ta (cena k exportu)
+    const priceBtn = page.locator('.price-edit').first();
+    const shown = (await priceBtn.innerText()).replace(/[^\d,]/g, '').replace(',', '.');
+    const manual = Math.round(Number(shown) || 1000) + 10;
+    await priceBtn.click();
     const inp = page.locator('.inline-edit input');
-    await inp.fill('12 345');
+    await inp.fill(String(manual));
     r = await act(page, (x) => x.request().method() === 'PATCH' && x.url().includes('/api/v1/proposals/'), () => inp.press('Enter'));
-    if (r.request().postDataJSON().manual_price !== 12345) problem(vp, W('ruční cena'), 'špatně odeslaná cena ' + r.request().postData());
-    await page.waitForTimeout(250);
+    if (r.request().postDataJSON().manual_price !== manual) problem(vp, W('ruční cena'), 'špatně odeslaná cena ' + r.request().postData());
+    if (r.status() !== 200) problem(vp, W('ruční cena'), 'PATCH ' + r.status());
+    await page.waitForTimeout(300);
+    const after = (await page.locator('.price-edit').first().innerText()).replace(/\D/g, '');
+    if (after !== String(manual)) problem(vp, W('ruční cena'), `v tabulce je ${after}, čekáno ${manual} (cena k exportu)`);
     await shot(page, vp + '-navrhy-po-akcich');
   }
 
   // --- strategie: úprava + simulace + uložení, přeřazení
   step('strategie');
-  await go(page, base, '/strategie/1');
+  await go(page, base, '/strategie/' + ids.strategy);
   const off = page.locator('input[data-path="target.offset_pct"]');
-  await off.fill('-2');
-  await page.waitForTimeout(100);
-  const summary = await page.locator('.summary-text').innerText();
-  if (!/2\s?%/.test(summary.replace(/ /g, ' '))) problem(vp, W('shrnutí strategie'), 'shrnutí nereaguje na změnu: ' + summary.slice(0, 120));
+  if (await off.isVisible()) {
+    await off.fill('-2');
+    await page.waitForTimeout(100);
+    const summary = await page.locator('.summary-text').innerText();
+    if (!/2\s?%/.test(summary.replace(/ /g, ' '))) problem(vp, W('shrnutí strategie'), 'shrnutí nereaguje na změnu: ' + summary.slice(0, 120));
+  } else problem(vp, W('strategie'), 'strategie #' + ids.strategy + ' nemá pole posunu');
+  // náhradní režim: výchozí „next“ je v nabídce vždy
+  const fbOpts = await page.locator('select[data-path="fallback.mode"] option').evaluateAll((o) => o.map((x) => x.value));
+  for (const v of ['next', 'keep', 'msrp', 'cost_plus']) if (!fbOpts.includes(v)) problem(vp, W('strategie'), 'náhradní režim bez volby ' + v);
+  await expectVisible(page, '[data-section="schedule"]', vp, W('sekce Platnost a podmínky'));
   step('strategie – simulace');
-  r = await act(page, (x) => x.url().includes('/api/v1/simulate'), () => page.click('[data-action="simulate"]'));
+  r = await act(page, (x) => x.url().includes('/api/v1/simulate'), () => page.click('[data-action="simulate"]'), 30000);
   if (r.status() !== 200) problem(vp, W('simulace'), 'POST simulate ' + r.status());
-  await expectVisible(page, '[data-card="simulation"] .kpi', vp, W('výsledek simulace'));
+  await expectVisible(page, '[data-card="simulation"] .kpi', vp, W('výsledek simulace'), 15000);
   await page.waitForTimeout(300);
-  await shot(page, vp + '-strategie-simulace');
+  // karta simulace je pod dlouhým formulářem – snímek jen jí (celostránkový by ji s limitem 2400 px uřízl)
+  await page.locator('[data-card="simulation"]').screenshot({ path: path.join(OUT, vp + '-strategie-simulace.png') });
   step('strategie – uložení');
-  r = await act(page, (x) => x.url().includes('/api/v1/strategies/1') && x.request().method() === 'PUT', () => page.click('[data-action="save-strategy"]'));
-  if (r.status() !== 200) problem(vp, W('uložení strategie'), 'PUT ' + r.status());
+  r = await act(page, (x) => x.url().includes('/api/v1/strategies/' + ids.strategy) && x.request().method() === 'PUT', () => page.click('[data-action="save-strategy"]'));
+  if (r.status() !== 200) problem(vp, W('uložení strategie'), 'PUT ' + r.status() + ' ' + (await r.text().catch(() => '')).slice(0, 200));
   if (vp === 'desktop') {
     await go(page, base, '/strategie');
+    if (!(await page.locator('.strategy-meta [data-meta="conditions"], .strategy-meta [data-meta="schedule"]').count())) problem(vp, W('seznam strategií'), 'chybí souhrn podmínek / platnosti');
     r = await act(page, (x) => x.url().includes('/api/v1/strategies/reorder'), () => page.locator('[data-move="down"]').first().click());
     if (r.status() !== 200) problem(vp, W('přeřazení'), 'reorder ' + r.status());
     await page.waitForTimeout(300);
+    // vrátit pořadí zpět
+    r = await act(page, (x) => x.url().includes('/api/v1/strategies/reorder'), () => page.locator('[data-move="up"]:not([disabled])').first().click());
+    await page.waitForTimeout(300);
+    // nová strategie: výchozí hodnoty = engine (fallback „next“)
+    await go(page, base, '/strategie/nova');
+    const fb = await page.locator('select[data-path="fallback.mode"]').inputValue();
+    if (fb !== 'next') problem(vp, W('nová strategie'), 'výchozí náhradní režim je „' + fb + '“, engine má „next“');
+    await page.selectOption('select[data-path="target.mode"]', 'clearance');
+    await expectVisible(page, 'input[data-path="target.step_pct"]', vp, W('pole doprodeje'));
+    await page.locator('[data-section="schedule"] .segmented button').nth(5).click();
+    await page.locator('[data-section="schedule"] .segmented button').nth(6).click();
+    const sum = (await page.locator('.summary-text').innerText()).replace(/ /g, ' ');
+    if (!/zlevní o 5/.test(sum) || !/jen so, ne/.test(sum)) problem(vp, W('shrnutí nové strategie'), sum.slice(0, 200));
+    await shot(page, vp + '-strategie-nova-doprodej');
   }
 
   // --- segment s vnořenou skupinou
   step('segment');
   await go(page, base, '/segmenty/novy');
-  await page.fill('input[data-field="name"]', 'Test – Trek levné');
+  await page.fill('input[data-field="name"]', 'Smoke ' + vp + ' ' + RUN_ID);
   await page.click('.fb-group.depth-0 > .fb-group-head [data-action="add-cond"]');
   let cond = page.locator('.fb-cond').last();
   await cond.locator('.fb-field').selectOption('manufacturer');
   await cond.locator('.fb-op').selectOption('in');
   const chipsInputEl = cond.locator('.chips-input');
-  await chipsInputEl.fill('Trek');
+  await chipsInputEl.fill(ids.manufacturer || 'Trek');
   await chipsInputEl.press('Enter');
   await page.click('.fb-group.depth-0 > .fb-group-head [data-action="add-group"]');
   cond = page.locator('.fb-group.depth-1 .fb-cond').last();
@@ -256,51 +349,75 @@ async function interactions(page, base, vp) {
   if (!/Výrobce/.test(sumText) || !/nebo/.test(sumText)) problem(vp, W('popis filtru'), sumText);
   await shot(page, vp + '-segment-vnoreny');
   r = await act(page, (x) => x.url().endsWith('/api/v1/segments') && x.request().method() === 'POST', () => page.click('[data-action="save-segment"]'));
+  if (!okStatus(r)) problem(vp, W('uložení segmentu'), 'POST ' + r.status());
   const saved = r.request().postDataJSON();
   if (!saved.filter?.all || !saved.filter.all.some((x) => x.any)) problem(vp, W('uložení segmentu'), 'filtr bez vnořené skupiny: ' + JSON.stringify(saved.filter));
   await page.waitForTimeout(400);
 
-  // --- import CSV
+  // --- import: examples/konkurence.csv průvodcem s navrženým mapováním
   step('import');
   await go(page, base, '/import');
-  r = await act(page, (x) => x.url().includes('/api/v1/import/preview'), () => page.setInputFiles('#import-file', { name: 'ceny-konkurence.csv', mimeType: 'text/csv', buffer: Buffer.from(CSV, 'utf8') }));
+  r = await act(page, (x) => x.url().includes('/api/v1/import/preview'), () => page.setInputFiles('#import-file', { name: 'konkurence.csv', mimeType: 'text/csv', buffer: fs.readFileSync(EXAMPLE_CSV) }));
   if (r.status() !== 200) problem(vp, W('náhled importu'), 'preview ' + r.status());
   if (r.request().headers()['content-type'] !== 'text/csv') problem(vp, W('náhled importu'), 'Content-Type ' + r.request().headers()['content-type']);
   await expectVisible(page, '[data-card="mapping"]', vp, W('mapování'));
-  const mappedEan = await page.locator('select[data-canonical="ean"]').inputValue();
-  if (mappedEan !== 'EAN') problem(vp, W('návrh mapování'), 'EAN namapován na „' + mappedEan + '“');
-  await page.selectOption('select[data-canonical="shipping"]', 'Doprava');
-  await page.waitForTimeout(800);
+  const expected = { ean: 'ean', competitor: 'konkurent', price: 'cena', shipping: 'doprava', availability: 'skladem', url: 'url' };
+  for (const [canon, col] of Object.entries(expected)) {
+    const v = await page.locator(`select[data-canonical="${canon}"]`).inputValue().catch(() => '');
+    if (v !== col) problem(vp, W('návrh mapování'), `${canon} namapováno na „${v}“, čekáno „${col}“`);
+  }
+  await page.waitForTimeout(500);
   await shot(page, vp + '-import-mapovani');
   r = await act(page, (x) => x.url().includes('/api/v1/import/offers') && x.url().includes('dry_run=1'), () => page.click('[data-action="dry-run"]'));
   if (r.status() !== 200) problem(vp, W('zkušební import'), r.status());
   await page.waitForTimeout(300);
-  r = await act(page, (x) => x.url().includes('/api/v1/import/offers') && !x.url().includes('dry_run'), () => page.click('[data-action="import"]'));
-  if (r.status() !== 200) problem(vp, W('import'), r.status());
+  r = await act(page, (x) => x.url().includes('/api/v1/import/offers') && !x.url().includes('dry_run'), () => page.click('[data-action="import"]'), 30000);
+  if (r.status() !== 200) problem(vp, W('import'), r.status() + ' ' + (await r.text().catch(() => '')).slice(0, 200));
+  else {
+    const res = await r.json().catch(() => ({}));
+    const st = res.stats || {};
+    if (!(st.received > 100)) problem(vp, W('import'), 'přijato jen ' + st.received + ' řádků');
+    if (args.url && !(st.matched > 0)) problem(vp, W('import'), 'nic se nespárovalo (demo data by měla): ' + JSON.stringify(st).slice(0, 200));
+  }
   await expectVisible(page, '[data-card="import-result"]', vp, W('výsledek importu'));
   await shot(page, vp + '-import-vysledek');
   if (vp === 'desktop') {
     await page.click('[data-action="open-save-source"]');
     await expectVisible(page, 'dialog[open]', vp, W('uložit zdroj'));
     r = await act(page, (x) => x.url().endsWith('/api/v1/sources') && x.request().method() === 'POST', () => page.click('[data-action="save-source"]'));
-    if (r.status() !== 200) problem(vp, W('uložit zdroj'), r.status());
+    if (!okStatus(r)) problem(vp, W('uložit zdroj'), r.status());
     await page.waitForTimeout(300);
+    await go(page, base, '/import?tab=log');
+    const logText = await page.locator('main').innerText();
+    if (!/Ceny konkurence/.test(logText)) problem(vp, W('historie importů'), 'import se neobjevil v historii');
   }
 
-  // --- konkurence: vypnutí konkurenta, ruční spárování nabídky
+  // --- konkurence: vypnutí/zapnutí konkurenta, ruční spárování nabídky
   step('konkurence');
   if (vp === 'desktop') {
     await go(page, base, '/konkurence');
+    const sw = page.locator('.dt tbody [role=switch]').first();
+    const wasOn = (await sw.getAttribute('aria-checked')) === 'true';
+    r = await act(page, (x) => x.request().method() === 'PATCH' && x.url().includes('/api/v1/competitors/'), () => sw.click());
+    if (r.request().postDataJSON().enabled !== !wasOn) problem(vp, W('konkurent'), 'PATCH enabled ' + r.request().postData());
+    await page.waitForTimeout(300);
     r = await act(page, (x) => x.request().method() === 'PATCH' && x.url().includes('/api/v1/competitors/'), () => page.locator('.dt tbody [role=switch]').first().click());
-    if (r.request().postDataJSON().enabled === undefined) problem(vp, W('konkurent'), 'PATCH bez enabled');
+    if (r.request().postDataJSON().enabled !== wasOn) problem(vp, W('konkurent'), 'zpětné zapnutí ' + r.request().postData());
+    // nespárovaná nabídka: když žádná není (demo data), vytvoříme ji importem přes API
+    const um = await apiCall(page, 'GET', '/unmatched?limit=1');
+    if (!itemsOf(um.body).length) {
+      const imp = await apiCall(page, 'POST', '/import/offers', { items: [{ competitor: 'SmokeShop.cz', ean: '8590000000017', name: firstName + ' (smoke)', price: 1234 }] });
+      if (imp.status !== 200) problem(vp, W('nespárované'), 'nepodařilo se vytvořit nespárovanou nabídku: ' + imp.status);
+    }
     await go(page, base, '/konkurence?tab=unmatched');
     await page.locator('[data-action="match"]').first().click();
     await expectVisible(page, 'dialog[open] input[type=search]', vp, W('dialog párování'));
-    await act(page, (x) => x.url().includes('/api/v1/products?') && x.url().includes('q=trek'), () => page.locator('dialog[open] input[type=search]').fill('trek'));
+    await act(page, (x) => x.url().includes('/api/v1/products?') && x.url().includes('q='), () => page.locator('dialog[open] input[type=search]').fill(needle));
     await expectVisible(page, 'dialog[open] .match-item', vp, W('výsledky hledání produktu'));
     await page.locator('dialog[open] .match-item').first().click();
     r = await act(page, (x) => x.url().includes('/match') && x.request().method() === 'POST', () => page.click('dialog[open] [data-action="confirm-match"]'));
     if (!r.request().postDataJSON().product_id) problem(vp, W('spárování'), 'chybí product_id');
+    if (!okStatus(r)) problem(vp, W('spárování'), 'POST match ' + r.status());
     await page.waitForTimeout(300);
     await shot(page, vp + '-konkurence-sparovano', false);
   }
@@ -309,8 +426,9 @@ async function interactions(page, base, vp) {
   step('tokeny');
   if (vp === 'desktop') {
     await go(page, base, '/nastaveni?tab=tokeny');
-    await page.fill('input[placeholder^="Např. Admin"]', 'Smoke test');
-    await act(page, (x) => x.url().endsWith('/api/v1/tokens') && x.request().method() === 'POST', () => page.click('[data-action="create-token"]'));
+    await page.fill('input[placeholder^="Např. Admin"]', 'Smoke test ' + RUN_ID);
+    r = await act(page, (x) => x.url().endsWith('/api/v1/tokens') && x.request().method() === 'POST', () => page.click('[data-action="create-token"]'));
+    if (!okStatus(r)) problem(vp, W('nový token'), 'POST ' + r.status());
     await expectVisible(page, '[data-role="new-token"]', vp, W('nový token'));
     const tok = await page.locator('[data-role="new-token"] input').first().inputValue();
     if (!/^ct_[A-Za-z0-9]{32}$/.test(tok)) problem(vp, W('nový token'), 'neplatný token ' + tok);
@@ -318,12 +436,12 @@ async function interactions(page, base, vp) {
     await page.locator('dialog[open] .modal-foot .btn-primary').click();
   }
 
-  // --- globální přecenění
+  // --- přecenění → schválit jeden návrh → export ho ukazuje
   step('přecenění');
   await go(page, base, '/prehled');
   await page.click('[data-action="run-pricing"]');
   await expectVisible(page, 'dialog[open] [data-confirm]', vp, W('potvrzení přecenění'));
-  r = await act(page, (x) => x.url().endsWith('/api/v1/runs') && x.request().method() === 'POST', () => page.click('dialog[open] [data-confirm]'));
+  r = await act(page, (x) => x.url().endsWith('/api/v1/runs') && x.request().method() === 'POST', () => page.click('dialog[open] [data-confirm]'), 60000);
   if (r.status() !== 200) problem(vp, W('přecenění'), r.status());
   await expectVisible(page, 'dialog[open] .run-stats', vp, W('výsledek přecenění'));
   await page.waitForTimeout(250);
@@ -331,6 +449,44 @@ async function interactions(page, base, vp) {
   await page.keyboard.press('Escape');
   await page.waitForTimeout(200);
   if (await page.locator('dialog[open]').count()) problem(vp, W('Esc'), 'Esc nezavřel dialog výsledku');
+
+  step('schválení → export');
+  await go(page, base, '/navrhy');
+  const row = page.locator('.dt tbody tr[data-key]').filter({ has: page.locator('[data-action="approve-row"]') }).first();
+  const propId = await row.getAttribute('data-key').catch(() => null);
+  if (!propId) problem(vp, W('schválení → export'), 'po přecenění není žádný čekající návrh');
+  else {
+    const priceText = (await row.locator('.price-edit').innerText().catch(() => '')).replace(/\D/g, '');
+    r = await act(page, (x) => x.url().includes('/api/v1/proposals/approve'), () => row.locator('[data-action="approve-row"]').click());
+    if (r.status() !== 200) problem(vp, W('schválení → export'), 'approve ' + r.status());
+    await page.waitForTimeout(300);
+    await go(page, base, '/export');
+    const item = page.locator(`[data-card="approved"] [data-proposal-id="${propId}"]`);
+    if (!(await item.count())) problem(vp, W('schválení → export'), 'export nezobrazuje schválený návrh #' + propId);
+    else {
+      const t = (await item.innerText()).replace(/\s/g, '');
+      if (priceText && !t.includes(priceText)) problem(vp, W('schválení → export'), `export ukazuje jinou cenu (${t}) než návrhy (${priceText})`);
+    }
+    const feed = await apiCall(page, 'GET', '/export/changes.json');
+    if (feed.status !== 200 || !itemsOf(feed.body).some((x) => String(x.proposal_id) === String(propId))) problem(vp, W('schválení → export'), 'changes.json neobsahuje návrh #' + propId);
+    await shot(page, vp + '-export-schvaleno');
+    if (vp === 'desktop') {
+      // stažení souboru přes UI (fetch → blob) – bez označení jako exportované
+      const [dl] = await Promise.all([page.waitForEvent('download', { timeout: 15000 }), page.click('a[data-format="json"]')]);
+      if (!/\.json$/.test(dl.suggestedFilename())) problem(vp, W('stažení změn'), 'neočekávaný název souboru ' + dl.suggestedFilename());
+    }
+  }
+
+  // --- upozornění na přehledu mají odkaz
+  if (vp === 'desktop') {
+    step('upozornění');
+    await go(page, base, '/prehled');
+    const alerts = await page.locator('[data-card="alerts"] .alert-item').count();
+    const links = await page.locator('[data-card="alerts"] .alert-item .alert-link').count();
+    if (alerts && links < alerts) problem(vp, W('upozornění'), `jen ${links} z ${alerts} upozornění má odkaz`);
+    const bad = await page.locator('[data-card="alerts"] .alert-item:not(.alert-danger):not(.alert-warning):not(.alert-info)').count();
+    if (bad) problem(vp, W('upozornění'), bad + ' upozornění bez stylu závažnosti');
+  }
 
   // --- mobilní menu
   step('mobilní menu');
@@ -359,6 +515,8 @@ async function runViewport(browser, base, vp, colorScheme = 'light') {
   page.on('pageerror', (e) => problem(label, 'výjimka', e.message));
   page.on('response', (r) => {
     if (r.status() >= 500) problem(label, 'API', r.status() + ' ' + r.url());
+    // 4xx z API = UI poslalo požadavek, který server odmítl (neznámé pole, špatný parametr…); 401 u přihlášení je v pořádku
+    else if (r.status() >= 400 && r.status() !== 401 && r.url().includes('/api/v1/')) problem(label, 'API', r.status() + ' ' + r.request().method() + ' ' + r.url());
   });
   page.on('requestfailed', (req) => {
     const f = req.failure()?.errorText || '';
@@ -381,7 +539,10 @@ async function runViewport(browser, base, vp, colorScheme = 'light') {
   await waitReady(page, prev);
   if (!(await page.locator('.sidebar').count())) problem(label, 'přihlášení', 'po přihlášení se nezobrazila aplikace');
 
-  const routes = colorScheme === 'dark' ? ['/prehled', '/produkty/1', '/navrhy', '/strategie/1', '/segmenty/1', '/import'] : ROUTES;
+  const ids = await discoverIds(page);
+  const routes = colorScheme === 'dark'
+    ? ['/prehled', '/produkty/' + ids.product, '/navrhy', '/strategie', '/strategie/' + ids.strategy, ids.segment ? '/segmenty/' + ids.segment : '/segmenty', '/import', '/export']
+    : routesFor(ids);
   for (const route of routes) {
     try {
       await go(page, base, route);
@@ -392,42 +553,22 @@ async function runViewport(browser, base, vp, colorScheme = 'light') {
     if (vp.isMobile) await checkOverflow(page, label, route, vp.width);
     const err = await page.locator('.empty-error').count();
     if (err && route !== '/neexistuje') problem(label, route, 'zobrazen chybový stav');
+    // hodnoty dlaždic se nesmí oříznout výpustkou (např. „−1 467 7…“)
+    const cut = await page.evaluate(() => [...document.querySelectorAll('.kpi-value')].filter((e) => e.scrollWidth > e.clientWidth + 1).map((e) => e.textContent));
+    if (cut.length) problem(label, route, 'oříznutá hodnota KPI: ' + cut.join(' | '));
+    // žádné surové objekty v textu stránky
+    const raw = await page.evaluate(() => /\[object Object\]|\bundefined\b|\bNaN\b/.test(document.querySelector('main')?.innerText || ''));
+    if (raw) problem(label, route, 'v textu stránky je [object Object] / undefined / NaN');
     await shot(page, label + '-' + slug(route));
   }
   if (colorScheme === 'light') {
     try {
-      await interactions(page, base, vp.name);
+      await interactions(page, base, vp.name, ids);
     } catch (e) {
       problem(label, 'interakce „' + currentStep + '“', e.message.split('\n')[0]);
       await shot(page, label + '-CHYBA-interakce').catch(() => {});
     }
   }
-  await context.close();
-}
-
-async function runExtensions(browser, base) {
-  const label = 'rozšíření';
-  const context = await browser.newContext({ viewport: { width: 1366, height: 850 }, locale: 'cs-CZ' });
-  const page = await context.newPage();
-  page.on('console', (m) => {
-    if (/status of 401/.test(m.text())) return;
-    if (m.type() === 'error') problem(label, 'konzole', m.text());
-  });
-  page.on('pageerror', (e) => problem(label, 'výjimka', e.message));
-  await page.goto(base + '/#/strategie/nova');
-  await page.waitForSelector('[data-view="login"]');
-  const prev = await currentSeq(page);
-  await page.fill('#login-password', PASSWORD);
-  await page.click('.login-card button[type=submit]');
-  await waitReady(page, prev);
-  await expectVisible(page, '[data-section="schedule"] .fb', label, 'sekce Platnost a podmínky s editorem podmínek');
-  await page.selectOption('select[data-path="target.mode"]', 'clearance');
-  await expectVisible(page, 'input[data-path="target.step_pct"]', label, 'pole doprodeje');
-  await page.locator('[data-section="schedule"] .segmented button').nth(5).click();
-  const sum = await page.locator('.summary-text').innerText();
-  if (!/zlevní o 5/.test(sum.replace(/\u00a0/g, ' ')) || !/jen so/.test(sum)) problem(label, 'shrnutí', sum.slice(0, 200));
-  await shot(page, 'desktop-rozsireni-strategie');
-  await page.locator('[data-section="schedule"]').screenshot({ path: path.join(OUT, 'desktop-rozsireni-platnost.png') });
   await context.close();
 }
 
@@ -452,17 +593,6 @@ async function main() {
       if (!args['no-dark'] && vp.name === 'desktop') {
         console.log('▶ ' + vp.name + ' tmavý režim');
         await runViewport(browser, base, vp, 'dark');
-      }
-    }
-    // Rozšíření enginu (časové okno, podmínky, doprodej) – druhý mock server s --extensions
-    if (!args.url && (!args.only || args.only === 'extensions')) {
-      console.log('▶ desktop – rozšíření strategií');
-      const { createMockServer } = require('./ui-mock-server.js');
-      const ext = await createMockServer({ port: 0, password: PASSWORD, extensions: true });
-      try {
-        await runExtensions(browser, ext.url);
-      } finally {
-        await ext.close();
       }
     }
   } finally {
