@@ -1,0 +1,42 @@
+{
+  "generated": "2026-09-25T06:00:00Z",
+  "products": [
+    {
+      "code": "SRA-001",
+      "ean": "8597315660484",
+      "offers": [
+        {
+          "shop": "VeloMarket.cz",
+          "price": "12 490 Kč",
+          "stock": "skladem"
+        },
+        {
+          "shop": "KoloPointer.cz",
+          "price": "12 990 Kč",
+          "stock": "na dotaz"
+        },
+        {
+          "shop": "VeloMarket.cz",
+          "price": "12 390 Kč",
+          "stock": "skladem"
+        }
+      ]
+    },
+    {
+      "code": "MAX-028",
+      "ean": 8595234463384,
+      "offers": [
+        {
+          "shop": "CykloDům.cz",
+          "price": 799,
+          "stock": 3
+        }
+      ]
+    },
+    {
+      "code": "NOVY-1",
+      "ean": "8591111111116",
+      "offers": []
+    }
+  ]
+}

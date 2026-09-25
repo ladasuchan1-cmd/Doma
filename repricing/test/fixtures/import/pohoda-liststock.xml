@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="Windows-1250"?>
+<rsp:responsePack version="2.0" id="001" state="ok" xmlns:rsp="http://www.stormware.cz/schema/version_2/response.xsd" xmlns:lStk="http://www.stormware.cz/schema/version_2/list_stock.xsd" xmlns:stk="http://www.stormware.cz/schema/version_2/stock.xsd" xmlns:typ="http://www.stormware.cz/schema/version_2/type.xsd">
+  <rsp:responsePackItem version="2.0" id="li1" state="ok">
+    <lStk:listStock version="2.0">
+      <lStk:stock version="2.0">
+        <stk:stockHeader>
+          <stk:id>1</stk:id>
+          <stk:EAN>8597315660484</stk:EAN>
+          <stk:code>SRA-001</stk:code>
+          <stk:name>SRAM XTR kliky</stk:name>
+          <stk:sellingRateVAT>high</stk:sellingRateVAT>
+          <stk:purchasingPrice>505.5</stk:purchasingPrice>
+          <stk:sellingPrice>909</stk:sellingPrice>
+          <stk:count>7</stk:count>
+          <stk:producer>SRAM</stk:producer>
+        </stk:stockHeader>
+      </lStk:stock>
+      <lStk:stock version="2.0">
+        <stk:stockHeader>
+          <stk:id>2</stk:id>
+          <stk:EAN>8595234463384</stk:EAN>
+          <stk:code>MAX-028</stk:code>
+          <stk:name>Maxxis Nobby Nic</stk:name>
+          <stk:sellingRateVAT>low</stk:sellingRateVAT>
+          <stk:purchasingPrice>488</stk:purchasingPrice>
+          <stk:sellingPrice>819</stk:sellingPrice>
+          <stk:count>-1</stk:count>
+          <stk:producer>Maxxis</stk:producer>
+        </stk:stockHeader>
+      </lStk:stock>
+    </lStk:listStock>
+  </rsp:responsePackItem>
+</rsp:responsePack>

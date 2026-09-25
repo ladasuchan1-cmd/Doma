@@ -390,13 +390,22 @@ Op       := "=" "!=" ">" ">=" "<" "<=" "in" "not_in" "contains" "not_contains" "
 6. Apply in this order: clamp by change limits (vs current price; flag `change_limited`) → `min(ceiling)` (flag `ceiling`)
    → `max(floor)` (flag `floor`). **Floor always wins.** floor > ceiling → flag `limits_conflict`.
    If the floor pushes the price beyond the change limit → flag `floor_over_change_limit`.
-7. Round (`rounding.direction`); if rounded < floor → take `up` candidate (repeat until ≥ floor); if rounded > ceiling and the
-   `down` candidate ≥ floor → take it.
+7. Round (`rounding.direction`). Candidates: the point in the configured direction, the point on the other side, and points
+   derived from the floor / ceiling / change limits (the band is picked from the rounded value, so the nearest valid point may lie
+   in the neighbouring band). The rounded price must respect floor, ceiling and change limit and must not flip the direction of the
+   change (a decrease never becomes an increase); if no candidate satisfies that and the current price is within limits →
+   `no_change` reason `no_price_point`. If the price after limits equals the current price, it is not re-rounded.
+   If the current price violates the limits and **no rounding point lies within [floor, ceiling]** (floor ≤ ceiling) → the
+   **unrounded** whole-CZK price inside [floor, ceiling] closest to the target is used + flag `rounding_skipped` (limits beat
+   the price ending – Disivo behaviour). Only when floor > ceiling does the floor win (`limits_conflict`).
 8. If current price exists and |new − cur| < max(min_change_abs, cur × min_change_pct/100) and the current price
    is within [floor, ceiling] → `no_change` (reason `below_threshold`). new == cur → `no_change`.
 9. Output metrics: `margin_before/after` (marginPct), `rank_after`, `change_abs`, `change_pct` (2 dp),
    flags `below_cost` (net new < purchase), `big_change` (|change_pct| > approval.auto_max_change_pct).
-10. `auto_approve = approval.auto && !flags.some(f => ['limits_conflict','floor_over_change_limit','below_cost','big_change'].includes(f))`
+    Extra flag `ceiling_over_change_limit` when the ceiling forces a decrease beyond the change limit / `allow_decrease=false`.
+    Skip reasons also include `invalid_vat` (VAT < 0 or ≥ 100) and `invalid_config`; no_change reasons include `keep`,
+    `same_price`, `below_threshold`, `no_price_point`, `clearance_wait`.
+10. `auto_approve = approval.auto && !flags.some(f => ['limits_conflict','floor_over_change_limit','ceiling_over_change_limit','below_cost','big_change'].includes(f))`
     and **not** (`no_cost` flag and the price goes down) – never auto-lower a price when the margin cannot be checked.
 
 Decision shape:

@@ -1,0 +1,67 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<office:document xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0"
+ xmlns:table="urn:oasis:names:tc:opendocument:xmlns:table:1.0"
+ xmlns:text="urn:oasis:names:tc:opendocument:xmlns:text:1.0"
+ xmlns:style="urn:oasis:names:tc:opendocument:xmlns:style:1.0"
+ xmlns:fo="urn:oasis:names:tc:opendocument:xmlns:xsl-fo-compatible:1.0"
+ xmlns:number="urn:oasis:names:tc:opendocument:xmlns:datastyle:1.0"
+ xmlns:of="urn:oasis:names:tc:opendocument:xmlns:of:1.2"
+ office:version="1.3" office:mimetype="application/vnd.oasis.opendocument.spreadsheet">
+ <office:automatic-styles>
+  <style:style style:name="T1" style:family="text"><style:text-properties fo:font-weight="bold"/></style:style>
+  <style:style style:name="ta1" style:family="table"><style:table-properties table:display="true"/></style:style>
+  <style:style style:name="ta2" style:family="table"><style:table-properties table:display="false"/></style:style>
+  <number:date-style style:name="N1"><number:day/><number:text>.</number:text><number:month/><number:text>.</number:text><number:year number:style="long"/></number:date-style>
+  <number:number-style style:name="N2"><number:number number:decimal-places="2" number:min-decimal-places="2" number:min-integer-digits="1" number:grouping="true"/><number:text> Kč</number:text></number:number-style>
+  <style:style style:name="ce1" style:family="table-cell" style:data-style-name="N1"/>
+  <style:style style:name="ce2" style:family="table-cell" style:data-style-name="N2"/>
+ </office:automatic-styles>
+ <office:body>
+  <office:spreadsheet>
+   <table:table table:name="Pomocný" table:style-name="ta2">
+    <table:table-row><table:table-cell office:value-type="string"><text:p>skrytý list</text:p></table:table-cell></table:table-row>
+   </table:table>
+   <table:table table:name="Ceník" table:style-name="ta1">
+    <table:table-row><table:table-cell office:value-type="string"><text:p>Ceník konkurence – export 2026</text:p></table:table-cell></table:table-row>
+    <table:table-row><table:table-cell/></table:table-row>
+    <table:table-row>
+     <table:table-cell office:value-type="string"><text:p>Kód</text:p></table:table-cell>
+     <table:table-cell office:value-type="string"><text:p>Název</text:p></table:table-cell>
+     <table:table-cell/>
+     <table:table-cell office:value-type="string"><text:p>Cena</text:p></table:table-cell>
+     <table:table-cell office:value-type="string"><text:p>Cena</text:p></table:table-cell>
+     <table:table-cell office:value-type="string"><text:p>Skladem</text:p></table:table-cell>
+     <table:table-cell office:value-type="string"><text:p>Datum</text:p></table:table-cell>
+     <table:table-cell office:value-type="string"><text:p>Chyba</text:p></table:table-cell>
+    </table:table-row>
+    <table:table-row>
+     <table:table-cell office:value-type="string"><text:p>KOLO-001</text:p></table:table-cell>
+     <table:table-cell office:value-type="string"><text:p>Kolo <text:span text:style-name="T1">Žluťoučký</text:span> kůň</text:p></table:table-cell>
+     <table:table-cell/>
+     <table:table-cell office:value-type="float" office:value="12990.5" table:style-name="ce2"><text:p>12 990,50 Kč</text:p></table:table-cell>
+     <table:table-cell table:formula="of:=[.D4]*2" office:value-type="float" office:value="25981"><text:p>25981</text:p></table:table-cell>
+     <table:table-cell office:value-type="boolean" office:boolean-value="true"><text:p>PRAVDA</text:p></table:table-cell>
+     <table:table-cell office:value-type="date" office:date-value="2026-09-25" table:style-name="ce1"><text:p>25.09.2026</text:p></table:table-cell>
+     <table:table-cell table:formula="of:=1/0" office:value-type="string" office:string-value="#DIV/0!"><text:p>#DIV/0!</text:p></table:table-cell>
+    </table:table-row>
+    <table:table-row>
+     <table:table-cell office:value-type="string"><text:p>KOLO-002</text:p></table:table-cell>
+     <table:table-cell table:formula="of:=CONCATENATE(&quot;Silniční &quot;;&quot;kolo&quot;)" office:value-type="string" office:string-value="Silniční kolo"><text:p>Silniční kolo</text:p></table:table-cell>
+     <table:table-cell/>
+     <table:table-cell office:value-type="float" office:value="0.1" table:style-name="ce2"><text:p>0,10 Kč</text:p></table:table-cell>
+     <table:table-cell table:formula="of:=[.D5]+0.2" office:value-type="float" office:value="0.3"><text:p>0,3</text:p></table:table-cell>
+     <table:table-cell office:value-type="boolean" office:boolean-value="false"><text:p>NEPRAVDA</text:p></table:table-cell>
+     <table:table-cell/>
+     <table:table-cell/>
+     <table:table-cell office:value-type="string"><text:p>navíc</text:p></table:table-cell>
+    </table:table-row>
+    <table:table-row><table:table-cell table:number-columns-repeated="8"/></table:table-row>
+    <table:table-row>
+     <table:table-cell office:value-type="string"><text:p>KOLO-003</text:p></table:table-cell>
+     <table:table-cell table:number-columns-repeated="2"/>
+     <table:table-cell office:value-type="float" office:value="100"><text:p>100</text:p></table:table-cell>
+    </table:table-row>
+   </table:table>
+  </office:spreadsheet>
+ </office:body>
+</office:document>

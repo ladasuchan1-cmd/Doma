@@ -406,3 +406,27 @@ export function parseInputNumber(s) {
   const n = Number(t);
   return Number.isFinite(n) ? n : NaN;
 }
+
+/** Kroky vysvětlení rozhodnutí (explain[].step). */
+export const STEP_LABELS = {
+  strategy: 'Strategie',
+  locked: 'Zámek',
+  stock: 'Sklad',
+  market: 'Trh',
+  target: 'Cíl',
+  reference: 'Reference',
+  fallback: 'Náhradní režim',
+  bounds: 'Hranice',
+  limits: 'Limity',
+  floor: 'Spodní hranice',
+  ceiling: 'Horní hranice',
+  change_limit: 'Limit změny',
+  rounding: 'Zaokrouhlení',
+  threshold: 'Práh změny',
+  approval: 'Schválení',
+  result: 'Výsledek',
+};
+
+export function stepLabel(s) {
+  return STEP_LABELS[s] || (s ? String(s) : '');
+}

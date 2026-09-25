@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="utf-8"?>
+<SHOP>
+  <SHOPITEM>
+    <ITEM_ID>SRA-001</ITEM_ID>
+    <PRODUCTNAME>SRAM XTR kliky</PRODUCTNAME>
+    <EAN>8597315660484</EAN>
+    <PARAM><PARAM_NAME>Barva</PARAM_NAME><VAL>černá</VAL></PARAM>
+    <PARAM><PARAM_NAME>Délka</PARAM_NAME><VAL>175 mm</VAL></PARAM>
+    <OFFERS>
+      <OFFER shop="VeloMarket.cz">
+        <PRICE_VAT currency="CZK">12 490</PRICE_VAT>
+        <DELIVERY_DATE>0</DELIVERY_DATE>
+        <URL><![CDATA[https://velomarket.cz/p/xtr?a=1&b=2]]></URL>
+      </OFFER>
+      <OFFER shop="KoloPointer.cz">
+        <PRICE_VAT currency="CZK">12 790</PRICE_VAT>
+        <DELIVERY_DATE>3</DELIVERY_DATE>
+      </OFFER>
+    </OFFERS>
+  </SHOPITEM>
+  <SHOPITEM>
+    <ITEM_ID>MAX-028</ITEM_ID>
+    <PRODUCTNAME>Maxxis Nobby Nic</PRODUCTNAME>
+    <EAN>8595234463384</EAN>
+    <OFFERS>
+      <OFFER shop="www.VeloMarket.cz">
+        <PRICE_VAT currency="CZK">799</PRICE_VAT>
+        <DELIVERY_DATE>0</DELIVERY_DATE>
+      </OFFER>
+    </OFFERS>
+  </SHOPITEM>
+  <SHOPITEM>
+    <ITEM_ID>NEEXISTUJE-1</ITEM_ID>
+    <PRODUCTNAME>Cizí produkt</PRODUCTNAME>
+    <OFFERS>
+      <OFFER shop="SpeedKola.cz">
+        <PRICE_VAT currency="CZK">5 000</PRICE_VAT>
+        <DELIVERY_DATE>2026-10-05</DELIVERY_DATE>
+      </OFFER>
+    </OFFERS>
+  </SHOPITEM>
+  <SHOPITEM>
+    <ITEM_ID>BEZ-NABIDEK</ITEM_ID>
+    <PRODUCTNAME>Produkt bez nabídek</PRODUCTNAME>
+    <OFFERS/>
+  </SHOPITEM>
+</SHOP>
