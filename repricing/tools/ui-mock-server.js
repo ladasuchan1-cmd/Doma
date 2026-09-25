@@ -5,7 +5,7 @@
 // endpointy /api/v1 z SPEC §8 realistickými daty cykloobchodu (deterministicky generovanými). Stav je v paměti
 // a mění se (schvalování, strategie, segmenty, import…), takže lze proklikat celé UI bez backendu.
 //
-// Použití:  node tools/ui-mock-server.js [--port=8090] [--host=127.0.0.1] [--latency=120] [--password=demo] [--autologin]
+// Použití:  node tools/ui-mock-server.js [--port=8090] [--host=127.0.0.1] [--latency=120] [--password=demo] [--autologin] [--extensions] [--verbose]
 // Heslo pro přihlášení: demo (nebo --password). Nulové závislosti, jen node:*.
 // Programově: const { createMockServer } = require('./tools/ui-mock-server.js');
 //             const m = await createMockServer({ port: 0 }); … await m.close();
@@ -52,6 +52,15 @@ const DEFAULT_CONFIG = {
   rounding: { mode: 'ending', direction: 'down', bands: [{ up_to: 1000, ending: 9 }, { up_to: 10000, ending: 90 }, { up_to: null, ending: 990 }] },
   stock: { zero_stock: 'reprice' },
   approval: { auto: false, auto_max_change_pct: 5 },
+};
+
+// Volitelná rozšíření konfigurace, která implementuje engine nad rámec SPEC §6.5 (src/engine/presets.js).
+// Mock je vrací jen s volbou --extensions / { extensions: true } – výchozí chování odpovídá SPEC.
+const EXTENSION_DEFAULTS = {
+  conditions: {},
+  schedule: { valid_from: null, valid_to: null, weekdays: [], hours: null },
+  target: { step_pct: 5, every_days: 14, max_sales_30: 0 },
+  competitors: { exclude_keywords: [] },
 };
 
 // ------------------------------------------------------------------ pomocníci
@@ -197,6 +206,7 @@ function createState(opts = {}) {
   const pick = (arr) => arr[Math.floor(rnd() * arr.length)];
   const between = (a, b) => a + rnd() * (b - a);
   const st = {
+    extensions: Boolean(opts.extensions),
     now: () => (opts.now ? new Date(opts.now).getTime() : Date.now()),
     t0: now,
     password: opts.password || 'demo',
@@ -1713,7 +1723,9 @@ function buildRoutes(st) {
     }
     if (b.note !== undefined) c.note = b.note || null;
     audit(ctx, 'competitor.update', 'competitor', c.id, b);
-    const { _share, _bias, ...out } = c;
+    const out = { ...c };
+    delete out._share;
+    delete out._bias;
     return out;
   }, 'admin');
 
@@ -1766,10 +1778,11 @@ function buildRoutes(st) {
     return { ok: true };
   }, 'admin');
 
-  // strategie
-  const stratOut = (s) => clone(s);
+  // strategie (s rozšířeními enginu jen při --extensions)
+  const extCfg = (cfg) => (st.extensions ? deepMerge(deepMerge(DEFAULT_CONFIG, EXTENSION_DEFAULTS), cfg) : clone(cfg));
+  const stratOut = (s) => ({ ...clone(s), config: extCfg(s.config) });
   add('GET', '/strategies', (ctx) => paginate([...st.strategies].sort((a, b) => a.priority - b.priority || a.id - b.id).map(stratOut), { ...ctx.query, limit: ctx.query.limit || 500 }, 500));
-  add('GET', '/strategies/presets', () => ({ items: clone(PRESETS) }));
+  add('GET', '/strategies/presets', () => ({ items: PRESETS.map((p) => ({ ...clone(p), config: extCfg(p.config) })) }));
   add('POST', '/strategies/presets/:key', (ctx) => {
     const pr = PRESETS.find((x) => x.key === ctx.params.key);
     if (!pr) throw new HttpError(404, 'Předvolba nenalezena.');
@@ -2211,12 +2224,13 @@ function serveStatic(publicDir, urlPath, res) {
 
 /**
  * Spustí mock server.
- * @param {{port?: number, host?: string, latency?: number, password?: string, autologin?: boolean, publicDir?: string, now?: string|Date, log?: Function}} [opts]
+ * @param {{port?: number, host?: string, latency?: number, password?: string, autologin?: boolean, publicDir?: string, now?: string|Date, log?: Function, extensions?: boolean}} [opts]
+ *   extensions = vracet konfiguraci strategií včetně rozšíření enginu (schedule, conditions, clearance, exclude_keywords)
  * @returns {Promise<{server: http.Server, url: string, port: number, state: object, close: () => Promise<void>}>}
  */
 function createMockServer(opts = {}) {
   const publicDir = path.resolve(opts.publicDir || path.join(__dirname, '..', 'public'));
-  const st = createState({ password: opts.password, now: opts.now });
+  const st = createState({ password: opts.password, now: opts.now, extensions: opts.extensions });
   const routes = buildRoutes(st);
   const latency = Number(opts.latency) || 0;
   const log = opts.log || (() => {});
@@ -2348,6 +2362,7 @@ if (require.main === module) {
     latency: Number(args.latency || process.env.MOCK_LATENCY || 0),
     password: args.password || process.env.MOCK_PASSWORD || 'demo',
     autologin: Boolean(args.autologin),
+    extensions: Boolean(args.extensions),
     log: args.verbose ? (m, p, s) => console.log(s, m, p) : undefined,
   }).then((m) => {
     console.log(`Cenotvorba – mock server UI běží na ${m.url}  (heslo: ${m.state.password})`);

@@ -7,15 +7,20 @@ import { chipsInput } from './chips.js';
 import { parseInputNumber, money } from './format.js';
 import {
   mergeConfig, getPath, setPath, HELP, TARGET_MODES, TARGET_MODE_MAP, FALLBACK_MODES, ZERO_STOCK_MODES, ROUNDING_MODES,
-  ROUNDING_DIRECTIONS, roundingExamples, stepFor,
+  ROUNDING_DIRECTIONS, roundingExamples, stepFor, WEEKDAYS,
 } from './strategy-model.js';
+import { filterBuilder } from './filter-builder.js';
 
 /**
- * @param {{config?: object, competitors?: {name: string, label?: string, tags?: string[]}[], onChange?: (config: object) => void}} o
+ * @param {{config?: object, competitors?: {name: string, label?: string, tags?: string[]}[], onChange?: (config: object) => void,
+ *          extensions?: boolean, fields?: object[], facets?: object}} o
+ *   extensions = server podporuje rozšíření enginu (časové okno, podmínky, doprodej, klíčová slova, záložní „next“);
+ *   fields/facets = pro editor doplňujících podmínek.
  * @returns {{el: HTMLElement, getConfig: () => object, sections: Record<string, HTMLElement>}}
  */
 export function strategyForm(o) {
-  const cfg = mergeConfig(o.config || {});
+  const ext = Boolean(o.extensions);
+  const cfg = mergeConfig(o.config || {}, { extensions: ext });
   const competitors = o.competitors || [];
   const compNames = competitors.map((c) => ({ value: c.name, label: c.label ? c.label + ' (' + c.name + ')' : c.name }));
   const tagSet = new Set(['klíčový', 'marketplace']);
@@ -86,7 +91,7 @@ export function strategyForm(o) {
   // ------------------------------------------------ Cíl ceny
   const modeHelp = h('p', { class: 'mode-help' });
   const example = h('p', { class: 'mode-example' });
-  const modeSel = select(TARGET_MODES.map((m) => ({ value: m.value, label: m.label })), cfg.target.mode, {
+  const modeSel = select(TARGET_MODES.filter((m) => ext || !m.ext || m.value === cfg.target.mode).map((m) => ({ value: m.value, label: m.label })), cfg.target.mode, {
     onChange: (e) => {
       cfg.target.mode = e.target.value;
       emit();
@@ -111,6 +116,9 @@ export function strategyForm(o) {
   const tCompetitor = field({ label: 'Konkurent', control: compSel, help: HELP['target.competitor'] });
   const tMarkup = num('target.markup_pct', 'Přirážka', { suffix: '%', placeholder: 'např. 40' });
   const tFixed = num('target.fixed_price', 'Pevná cena', { suffix: 'Kč', placeholder: 'např. 9 990' });
+  const tStep = ext ? num('target.step_pct', 'Sleva v kroku', { nullable: false, suffix: '%', placeholder: '5' }) : h('div', { hidden: true });
+  const tEvery = ext ? num('target.every_days', 'Každých', { nullable: false, suffix: 'dní', placeholder: '14' }) : h('div', { hidden: true });
+  const tMaxSales = ext ? num('target.max_sales_30', 'Max. prodejů za 30 dní', { nullable: false, suffix: 'ks', placeholder: '0' }) : h('div', { hidden: true });
   const presetsRow = h(
     'div',
     { class: 'quick-offsets' },
@@ -137,7 +145,7 @@ export function strategyForm(o) {
     body: [
       field({ label: 'Režim', control: modeSel }),
       modeHelp,
-      h('div', { class: 'form-grid' }, tOffsetPct, tOffsetAbs, tRank, tCompetitor, tMarkup, tFixed),
+      h('div', { class: 'form-grid' }, tOffsetPct, tOffsetAbs, tRank, tCompetitor, tMarkup, tFixed, tStep, tEvery, tMaxSales),
       presetsRow,
       example,
     ],
@@ -161,7 +169,8 @@ export function strategyForm(o) {
         chips('competitors.include', 'Jen tito konkurenti', compNames, { placeholder: 'všichni zapnutí' }),
         chips('competitors.exclude', 'Ignorovat konkurenty', compNames, { placeholder: 'nikdo' }),
         chips('competitors.include_tags', 'Jen se štítky', tagList, { placeholder: 'bez omezení' }),
-        chips('competitors.exclude_tags', 'Vyloučit štítky', tagList, { placeholder: 'žádné' })
+        chips('competitors.exclude_tags', 'Vyloučit štítky', tagList, { placeholder: 'žádné' }),
+        ext ? chips('competitors.exclude_keywords', 'Vyloučit nabídky se slovy', ['bazar', 'použité', 'rozbaleno', 'repasované', 'vystavené'].map((x) => ({ value: x, label: x })), { placeholder: 'např. bazar' }) : null
       ),
       h('div', { class: 'form-grid form-grid-2' }, toggle('competitors.in_stock_only', 'Jen nabídky skladem'), toggle('competitors.include_shipping', 'Počítat s dopravou')),
       h(
@@ -172,7 +181,7 @@ export function strategyForm(o) {
         num('competitors.outlier_pct', 'Vyřadit podezřele nízké', { suffix: '%', placeholder: 'vypnuto' })
       ),
       h('h3', { class: 'form-subtitle' }, 'Když konkurence chybí'),
-      h('div', { class: 'form-grid' }, choice('fallback.mode', 'Náhradní režim', FALLBACK_MODES), fbMarkup, fbOffset),
+      h('div', { class: 'form-grid' }, choice('fallback.mode', 'Náhradní režim', FALLBACK_MODES.filter((f) => ext || !f.ext || f.value === cfg.fallback.mode)), fbMarkup, fbOffset),
       h('p', { class: 'field-help fb-mode-help' }),
     ],
   });
@@ -328,6 +337,93 @@ export function strategyForm(o) {
     body: [choice('stock.zero_stock', 'Produkty s nulovým skladem', ZERO_STOCK_MODES)],
   });
 
+  // ------------------------------------------------ Platnost a podmínky (rozšíření enginu)
+  let scheduleSection = null;
+  if (ext) {
+    const toLocal = (iso) => {
+      if (!iso) return '';
+      const d = new Date(iso);
+      if (Number.isNaN(d.getTime())) return '';
+      const pad = (n) => String(n).padStart(2, '0');
+      return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate()) + 'T' + pad(d.getHours()) + ':' + pad(d.getMinutes());
+    };
+    const dateField = (path, label) => {
+      const inp = h('input', { type: 'datetime-local', class: 'input', value: toLocal(getPath(cfg, path)) });
+      inp.dataset.path = path;
+      inp.addEventListener('change', () => {
+        const d = inp.value ? new Date(inp.value) : null;
+        setPath(cfg, path, d && !Number.isNaN(d.getTime()) ? d.toISOString() : null);
+        emit();
+      });
+      return field({ label, control: inp, help: HELP[path] });
+    };
+    const days = new Set(Array.isArray(cfg.schedule.weekdays) ? cfg.schedule.weekdays : []);
+    const dayBtns = h(
+      'div',
+      { class: 'segmented', role: 'group', 'aria-label': 'Dny v týdnu' },
+      WEEKDAYS.map((d) => {
+        const b = h('button', { type: 'button', 'aria-pressed': days.has(d.value) ? 'true' : 'false', title: d.label }, d.short);
+        b.addEventListener('click', () => {
+          if (days.has(d.value)) days.delete(d.value);
+          else days.add(d.value);
+          b.setAttribute('aria-pressed', days.has(d.value) ? 'true' : 'false');
+          cfg.schedule.weekdays = [...days].sort((a, x) => a - x);
+          emit();
+        });
+        return b;
+      })
+    );
+    const hours = Array.isArray(cfg.schedule.hours) ? cfg.schedule.hours : [null, null];
+    const hFrom = numberInput(hours[0], { placeholder: '0', size: 4, ariaLabel: 'Od hodiny' });
+    const hTo = numberInput(hours[1], { placeholder: '24', size: 4, ariaLabel: 'Do hodiny' });
+    const updHours = () => {
+      const a = parseInputNumber(hFrom.value);
+      const b = parseInputNumber(hTo.value);
+      const bad = Number.isNaN(a) || Number.isNaN(b) || (a == null) !== (b == null);
+      hFrom.classList.toggle('is-invalid', bad);
+      hTo.classList.toggle('is-invalid', bad);
+      if (bad) return;
+      cfg.schedule.hours = a == null ? null : [a, b];
+      emit();
+    };
+    hFrom.addEventListener('input', updHours);
+    hTo.addEventListener('input', updHours);
+    const condHost = h('div');
+    if (Array.isArray(o.fields) && o.fields.length) {
+      const fb = filterBuilder({ value: cfg.conditions || {}, fields: o.fields, facets: o.facets, emptyText: 'Bez doplňujících podmínek – strategie platí na celý segment.', onChange: (f) => { cfg.conditions = f; emit(); } });
+      condHost.appendChild(fb.el);
+    } else {
+      const ta = h('textarea', { class: 'input json-edit', rows: 4, spellcheck: 'false', 'aria-label': 'Doplňující podmínky (JSON)' });
+      ta.value = JSON.stringify(cfg.conditions || {}, null, 2);
+      ta.addEventListener('change', () => {
+        try {
+          cfg.conditions = JSON.parse(ta.value || '{}');
+          ta.classList.remove('is-invalid');
+          emit();
+        } catch {
+          ta.classList.add('is-invalid');
+        }
+      });
+      condHost.appendChild(ta);
+    }
+    scheduleSection = card({
+      title: 'Platnost a podmínky',
+      icon: 'clock',
+      subtitle: 'Časové okno (akce, víkendy, večery) a podmínky navíc k segmentu. Mimo ně produkt převezme další strategie.',
+      class: 'form-section',
+      dataset: { section: 'schedule' },
+      body: [
+        h('div', { class: 'form-grid form-grid-2' }, dateField('schedule.valid_from', 'Platí od'), dateField('schedule.valid_to', 'Platí do')),
+        h('div', { class: 'form-grid form-grid-2', style: 'margin-top:14px' },
+          field({ label: 'Dny v týdnu', control: dayBtns, input: dayBtns.firstChild, help: HELP['schedule.weekdays'] }),
+          field({ label: 'Hodiny (od – do)', control: h('div', { class: 'row', style: 'flex-wrap:nowrap' }, hFrom, h('span', { class: 'muted' }, '–'), hTo, h('span', { class: 'muted' }, 'h')), input: hFrom, help: HELP['schedule.hours'] })),
+        h('h3', { class: 'form-subtitle' }, 'Doplňující podmínky'),
+        h('p', { class: 'field-help', style: 'margin-bottom:8px' }, HELP.conditions),
+        condHost,
+      ],
+    });
+  }
+
   // ------------------------------------------------ Schvalování
   const autoMax = num('approval.auto_max_change_pct', 'Automaticky schválit změny do', { suffix: '%', placeholder: 'např. 5' });
   const approvalSection = card({
@@ -352,6 +448,9 @@ export function strategyForm(o) {
     show(tCompetitor, cfg.target.mode === 'competitor');
     show(tMarkup, cfg.target.mode === 'cost_plus');
     show(tFixed, cfg.target.mode === 'fixed');
+    show(tStep, ext && cfg.target.mode === 'clearance');
+    show(tEvery, ext && cfg.target.mode === 'clearance');
+    show(tMaxSales, ext && cfg.target.mode === 'clearance');
     show(marketNote, !m.market);
     compSection.classList.toggle('is-dimmed', !m.market);
     show(fbMarkup, cfg.fallback.mode === 'cost_plus');
@@ -391,6 +490,7 @@ export function strategyForm(o) {
     stock: stockSection,
     approval: approvalSection,
   };
+  if (scheduleSection) sections.schedule = scheduleSection;
   const el = h('div', { class: 'strategy-form' }, Object.values(sections));
   return { el, sections, getConfig: () => JSON.parse(JSON.stringify(cfg)) };
 }

@@ -260,6 +260,8 @@ export const FLAG_LABELS = {
   no_cost: 'Chybí nákupní cena',
   below_cost: 'Pod nákupní cenou',
   big_change: 'Velká změna',
+  ceiling_over_change_limit: 'Strop nad limit změny',
+  rounding_skipped: 'Bez zaokrouhlení',
 };
 
 export const FLAG_HELP = {
@@ -272,6 +274,8 @@ export const FLAG_HELP = {
   no_cost: 'Produkt nemá nákupní cenu – maržové limity nelze uplatnit.',
   below_cost: 'Nová cena bez DPH je nižší než nákupní cena.',
   big_change: 'Změna je větší než limit pro automatické schválení.',
+  ceiling_over_change_limit: 'Horní hranice vynutila větší snížení, než dovoluje limit změny.',
+  rounding_skipped: 'Zaokrouhlení by porušilo hranice – cena zůstala nezaokrouhlená.',
 };
 
 export const FLAG_SEVERITY = {
@@ -284,6 +288,8 @@ export const FLAG_SEVERITY = {
   no_cost: 'warning',
   below_cost: 'danger',
   big_change: 'warning',
+  ceiling_over_change_limit: 'warning',
+  rounding_skipped: 'info',
 };
 
 export function flagLabel(f) {
@@ -301,6 +307,16 @@ export const REASON_LABELS = {
   below_threshold: 'Změna pod prahem',
   no_strategy: 'Bez strategie',
   same_price: 'Cena beze změny',
+  // rozšíření enginu (důvody při simulaci / vyhodnocení strategie)
+  fallthrough: 'Předáno další strategii',
+  not_applicable: 'Strategie se neuplatní',
+  conditions: 'Nesplňuje podmínky strategie',
+  schedule: 'Mimo časové okno',
+  segment: 'Mimo segment',
+  disabled: 'Strategie vypnuta',
+  invalid_config: 'Chybná konfigurace',
+  invalid_target: 'Neplatná cílová cena',
+  invalid_vat: 'Neplatná sazba DPH',
 };
 
 export function reasonLabel(r) {
@@ -316,6 +332,7 @@ export const EXCLUDED_LABELS = {
   out_of_stock: 'Není skladem',
   stale: 'Zastaralá cena',
   outlier: 'Podezřele nízká cena',
+  keyword: 'Vyloučeno klíčovým slovem',
 };
 
 export function excludedLabel(r) {
@@ -410,6 +427,9 @@ export function parseInputNumber(s) {
 /** Kroky vysvětlení rozhodnutí (explain[].step). */
 export const STEP_LABELS = {
   strategy: 'Strategie',
+  config: 'Konfigurace',
+  vat: 'DPH',
+  warning: 'Upozornění',
   locked: 'Zámek',
   stock: 'Sklad',
   market: 'Trh',

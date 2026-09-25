@@ -4,7 +4,7 @@ import { api, cachedGet, itemsOf, isAbort, invalidate } from '../lib/api.js';
 import { icon } from '../lib/icons.js';
 import { card, field, switchEl, emptyState, errorState, skeletonBlocks, badge, callout, numberInput, segmented, changeEl } from '../lib/ui.js';
 import { strategyForm } from '../lib/strategy-form.js';
-import { describeStrategy, validateConfig, mergeConfig } from '../lib/strategy-model.js';
+import { describeStrategy, validateConfig, mergeConfig, hasExtensions } from '../lib/strategy-model.js';
 import { runStatsView } from '../lib/run-stats.js';
 import { histogram } from '../lib/charts.js';
 import { DataTable } from '../lib/table.js';
@@ -49,9 +49,28 @@ export async function show(root, ctx) {
     return;
   }
 
+  // Rozšíření enginu (časové okno, podmínky, doprodej…) nabídnout, jen když je server podporuje.
+  let extensions = strategy ? hasExtensions(strategy.config) : false;
+  if (!strategy) {
+    try {
+      const pr = await cachedGet('/strategies/presets', null, 300000);
+      extensions = itemsOf(pr).some((p) => hasExtensions(p.config));
+    } catch {
+      extensions = false;
+    }
+  }
+  let fields = [];
+  let facets = null;
+  if (extensions) {
+    const [fr, fc] = await Promise.allSettled([cachedGet('/fields'), cachedGet('/products/facets')]);
+    fields = fr.status === 'fulfilled' ? fr.value?.fields || [] : [];
+    facets = fc.status === 'fulfilled' ? fc.value : null;
+  }
+  if (ctx.signal.aborted) return;
+  const fieldsMap = new Map(fields.map((f) => [f.key, f]));
   const model = strategy
-    ? { name: strategy.name || '', description: strategy.description || '', segment_id: strategy.segment_id ?? null, priority: strategy.priority ?? null, enabled: Boolean(strategy.enabled), config: mergeConfig(strategy.config) }
-    : { name: '', description: '', segment_id: ctx.query.segment ? Number(ctx.query.segment) : null, priority: null, enabled: true, config: mergeConfig({}) };
+    ? { name: strategy.name || '', description: strategy.description || '', segment_id: strategy.segment_id ?? null, priority: strategy.priority ?? null, enabled: Boolean(strategy.enabled), config: mergeConfig(strategy.config, { extensions }) }
+    : { name: '', description: '', segment_id: ctx.query.segment ? Number(ctx.query.segment) : null, priority: null, enabled: true, config: mergeConfig({}, { extensions }) };
   if (!isNew) ctx.setTitle(model.name || 'Strategie', h('span', null, h('a', { href: '#/strategie' }, 'Strategie'), ' / ' + (model.name || '#' + ctx.params.id)));
   let dirty = false;
 
@@ -100,7 +119,7 @@ export async function show(root, ctx) {
   });
 
   // ------------------------------------------------ konfigurace
-  const form = strategyForm({ config: model.config, competitors, onChange: (cfg) => { model.config = cfg; changed(); } });
+  const form = strategyForm({ config: model.config, competitors, extensions, fields, facets, onChange: (cfg) => { model.config = cfg; changed(); } });
 
   // ------------------------------------------------ shrnutí + akce
   const summaryText = h('p', { class: 'summary-text', 'aria-live': 'polite' });
@@ -131,7 +150,7 @@ export async function show(root, ctx) {
 
   function refresh() {
     dirtyBadge.hidden = !dirty;
-    summaryText.textContent = describeStrategy(model.config, { segmentName: model.segment_id != null ? segNameOf(model.segment_id) || '#' + model.segment_id : null });
+    summaryText.textContent = describeStrategy(model.config, { segmentName: model.segment_id != null ? segNameOf(model.segment_id) || '#' + model.segment_id : null, fieldsMap });
     const v = validateConfig(model.config);
     const errors = [...v.errors];
     if (!model.name.trim()) errors.unshift('Zadejte název strategie.');
@@ -223,13 +242,15 @@ export async function show(root, ctx) {
     simBtn.disabled = false;
     simBtn.classList.remove('is-busy');
     const decisions = Array.isArray(res?.decisions) ? res.decisions : [];
-    const products = await resolveProducts([...new Set(decisions.map((d) => d.product_id).filter((x) => x != null))]);
-    renderSimulation(res?.stats || {}, decisions, products);
+    // API může rozhodnutí obohatit o product {code,name} nebo ploché code/name; jinak názvy dohledáme
+    const missing = decisions.filter((d) => !d.product && !d.code).map((d) => d.product_id).filter((x) => x != null);
+    const products = await resolveProducts([...new Set(missing)]);
+    renderSimulation(res?.stats || {}, decisions, products, Array.isArray(res?.errors) ? res.errors : []);
   }
 
-  function renderSimulation(stats, decisions, products) {
+  function renderSimulation(stats, decisions, products, simErrors = []) {
     let filter = 'change';
-    const rows = decisions.map((d, i) => ({ ...d, _key: i, _p: d.product || products.get(String(d.product_id)) || null }));
+    const rows = decisions.map((d, i) => ({ ...d, _key: i, _p: d.product || (d.code ? { code: d.code, name: d.name, manufacturer: d.manufacturer } : products.get(String(d.product_id))) || null }));
     const table = new DataTable({
       columns: [
         {
@@ -263,6 +284,7 @@ export async function show(root, ctx) {
         body: h(
           'div',
           { class: 'stack' },
+          simErrors.length ? callout(h('ul', { class: 'validation-list' }, simErrors.map((e) => h('li', null, typeof e === 'string' ? e : e.message || JSON.stringify(e)))), 'danger') : null,
           runStatsView(stats, { simulate: true }),
           changes.length ? h('div', null, h('div', { class: 'form-subtitle' }, 'Rozložení změn ceny (%)'), histogram(changes, { ariaLabel: 'Histogram změn ceny v procentech' })) : null,
           h('div', { class: 'row-between' }, h('div', { class: 'form-subtitle', style: 'margin:0' }, 'Rozhodnutí'), segmented(SIM_FILTERS, filter, (v) => { filter = v; apply(); }, { label: 'Zobrazit rozhodnutí', class: 'seg-sm' })),

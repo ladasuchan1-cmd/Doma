@@ -37,7 +37,8 @@ function intervalLabel(m) {
 }
 
 function statsGrid(stats, kind) {
-  const list = statsList(stats);
+  const always = kind === 'products' ? ['received', 'created', 'updated', 'errors'] : ['received', 'matched', 'unmatched', 'created', 'updated', 'errors'];
+  const list = statsList(stats).filter((st) => st.value || always.includes(st.key));
   if (!list.length) return h('p', { class: 'muted' }, 'Bez statistik.');
   const tone = (st) => ((st.key === 'errors' || st.key === 'unmatched') && st.value ? 'is-bad' : ['matched', 'created'].includes(st.key) && st.value ? 'is-good' : null);
   return h(

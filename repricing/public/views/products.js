@@ -262,7 +262,7 @@ export async function show(root, ctx) {
       return;
     }
     let pending = st.filter || {};
-    fb = filterBuilder({ value: st.filter || {}, fields, facets, onChange: (f) => { pending = f; } });
+    fb = filterBuilder({ value: st.filter || {}, fields, facets, emptyText: 'Žádná podmínka – zobrazují se všechny produkty. Přidejte podmínku, např. Marže % je menší než 10.', onChange: (f) => { pending = f; } });
     mount(
       advPanel,
       card({

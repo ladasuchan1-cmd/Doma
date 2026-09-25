@@ -6,7 +6,7 @@
 // porušení CSP, nezachycené výjimky, chyby API 5xx a vodorovné přetečení stránky na mobilu.
 //
 // Použití:
-//   node tools/ui-smoke.js [--out=DIR] [--url=http://localhost:8080] [--password=demo] [--only=desktop|mobile] [--no-dark] [--headed]
+//   node tools/ui-smoke.js [--out=DIR] [--url=http://localhost:8080] [--password=demo] [--only=desktop|mobile|extensions] [--no-dark] [--headed]
 // Playwright: require('playwright'), jinak PLAYWRIGHT_PATH, jinak /opt/node22/lib/node_modules/playwright.
 // Návratový kód 1 = nalezeny chyby.
 
@@ -287,6 +287,24 @@ async function interactions(page, base, vp) {
     await page.waitForTimeout(300);
   }
 
+  // --- konkurence: vypnutí konkurenta, ruční spárování nabídky
+  step('konkurence');
+  if (vp === 'desktop') {
+    await go(page, base, '/konkurence');
+    r = await act(page, (x) => x.request().method() === 'PATCH' && x.url().includes('/api/v1/competitors/'), () => page.locator('.dt tbody [role=switch]').first().click());
+    if (r.request().postDataJSON().enabled === undefined) problem(vp, W('konkurent'), 'PATCH bez enabled');
+    await go(page, base, '/konkurence?tab=unmatched');
+    await page.locator('[data-action="match"]').first().click();
+    await expectVisible(page, 'dialog[open] input[type=search]', vp, W('dialog párování'));
+    await act(page, (x) => x.url().includes('/api/v1/products?') && x.url().includes('q=trek'), () => page.locator('dialog[open] input[type=search]').fill('trek'));
+    await expectVisible(page, 'dialog[open] .match-item', vp, W('výsledky hledání produktu'));
+    await page.locator('dialog[open] .match-item').first().click();
+    r = await act(page, (x) => x.url().includes('/match') && x.request().method() === 'POST', () => page.click('dialog[open] [data-action="confirm-match"]'));
+    if (!r.request().postDataJSON().product_id) problem(vp, W('spárování'), 'chybí product_id');
+    await page.waitForTimeout(300);
+    await shot(page, vp + '-konkurence-sparovano', false);
+  }
+
   // --- tokeny
   step('tokeny');
   if (vp === 'desktop') {
@@ -387,6 +405,32 @@ async function runViewport(browser, base, vp, colorScheme = 'light') {
   await context.close();
 }
 
+async function runExtensions(browser, base) {
+  const label = 'rozšíření';
+  const context = await browser.newContext({ viewport: { width: 1366, height: 850 }, locale: 'cs-CZ' });
+  const page = await context.newPage();
+  page.on('console', (m) => {
+    if (/status of 401/.test(m.text())) return;
+    if (m.type() === 'error') problem(label, 'konzole', m.text());
+  });
+  page.on('pageerror', (e) => problem(label, 'výjimka', e.message));
+  await page.goto(base + '/#/strategie/nova');
+  await page.waitForSelector('[data-view="login"]');
+  const prev = await currentSeq(page);
+  await page.fill('#login-password', PASSWORD);
+  await page.click('.login-card button[type=submit]');
+  await waitReady(page, prev);
+  await expectVisible(page, '[data-section="schedule"] .fb', label, 'sekce Platnost a podmínky s editorem podmínek');
+  await page.selectOption('select[data-path="target.mode"]', 'clearance');
+  await expectVisible(page, 'input[data-path="target.step_pct"]', label, 'pole doprodeje');
+  await page.locator('[data-section="schedule"] .segmented button').nth(5).click();
+  const sum = await page.locator('.summary-text').innerText();
+  if (!/zlevní o 5/.test(sum.replace(/\u00a0/g, ' ')) || !/jen so/.test(sum)) problem(label, 'shrnutí', sum.slice(0, 200));
+  await shot(page, 'desktop-rozsireni-strategie');
+  await page.locator('[data-section="schedule"]').screenshot({ path: path.join(OUT, 'desktop-rozsireni-platnost.png') });
+  await context.close();
+}
+
 process.on('unhandledRejection', (e) => problem('proces', 'nezachycené odmítnutí', String(e && e.message ? e.message.split('\n')[0] : e)));
 
 async function main() {
@@ -408,6 +452,17 @@ async function main() {
       if (!args['no-dark'] && vp.name === 'desktop') {
         console.log('▶ ' + vp.name + ' tmavý režim');
         await runViewport(browser, base, vp, 'dark');
+      }
+    }
+    // Rozšíření enginu (časové okno, podmínky, doprodej) – druhý mock server s --extensions
+    if (!args.url && (!args.only || args.only === 'extensions')) {
+      console.log('▶ desktop – rozšíření strategií');
+      const { createMockServer } = require('./ui-mock-server.js');
+      const ext = await createMockServer({ port: 0, password: PASSWORD, extensions: true });
+      try {
+        await runExtensions(browser, ext.url);
+      } finally {
+        await ext.close();
       }
     }
   } finally {

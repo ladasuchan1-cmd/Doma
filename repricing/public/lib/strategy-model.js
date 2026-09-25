@@ -3,6 +3,7 @@
 // Čistý modul bez DOM.
 
 import { money, number, NBSP } from './format.js';
+import { describeFilter, isEmptyFilter } from './filter-model.js';
 
 /** Výchozí konfigurace – musí odpovídat SPEC §6.5 / engine/presets.js DEFAULT_CONFIG. */
 export const DEFAULT_CONFIG = Object.freeze({
@@ -27,6 +28,35 @@ export const DEFAULT_CONFIG = Object.freeze({
   stock: { zero_stock: 'reprice' },
   approval: { auto: false, auto_max_change_pct: 5 },
 });
+
+/**
+ * Rozšíření konfigurace nad rámec SPEC §6.5, která implementuje engine (src/engine/presets.js):
+ * časové okno (schedule), doplňující podmínky (conditions), režim doprodeje (clearance),
+ * vyloučení nabídek podle klíčových slov a záložní režim „next“. UI je nabízí jen tehdy,
+ * když je server podporuje (normalizovaná konfigurace ze serveru obsahuje tyto klíče – viz hasExtensions).
+ */
+export const EXTENSION_DEFAULTS = Object.freeze({
+  conditions: {},
+  schedule: { valid_from: null, valid_to: null, weekdays: [], hours: null },
+  target: { step_pct: 5, every_days: 14, max_sales_30: 0 },
+  competitors: { exclude_keywords: [] },
+});
+
+/** Podporuje server rozšíření? (pozná se z normalizované konfigurace strategie nebo předvolby) */
+export function hasExtensions(cfg) {
+  if (!cfg || typeof cfg !== 'object') return false;
+  return 'schedule' in cfg || 'conditions' in cfg || Boolean(cfg.target && 'step_pct' in cfg.target) || Boolean(cfg.competitors && 'exclude_keywords' in cfg.competitors);
+}
+
+export const WEEKDAYS = [
+  { value: 1, short: 'Po', label: 'pondělí' },
+  { value: 2, short: 'Út', label: 'úterý' },
+  { value: 3, short: 'St', label: 'středa' },
+  { value: 4, short: 'Čt', label: 'čtvrtek' },
+  { value: 5, short: 'Pá', label: 'pátek' },
+  { value: 6, short: 'So', label: 'sobota' },
+  { value: 7, short: 'Ne', label: 'neděle' },
+];
 
 export const TARGET_MODES = [
   {
@@ -69,11 +99,16 @@ export const TARGET_MODES = [
     value: 'fixed', label: 'Pevná cena', market: false, offsets: false,
     help: 'Všem produktům, na které strategie platí, nastaví zadanou cenu s DPH (limity se přesto uplatní).',
   },
+  {
+    value: 'clearance', label: 'Doprodej – postupné slevy', market: false, offsets: false, ext: true,
+    help: 'Každých N dní zlevní o zadané %, dokud se produkt neprodává (prodeje za 30 dní nejvýše limit). Limity dál platí – např. min. marže 0 % a nejvýše 40 % pod MOC. Vhodné pro ležáky bez konkurence.',
+  },
 ];
 
 export const TARGET_MODE_MAP = Object.fromEntries(TARGET_MODES.map((m) => [m.value, m]));
 
 export const FALLBACK_MODES = [
+  { value: 'next', label: 'Předat další strategii', ext: true, help: 'Produkt převezme další strategie v pořadí; když žádná nevyhoví, cena se nemění.' },
   { value: 'keep', label: 'Ponechat cenu', help: 'Cena zůstane; pokud porušuje limity (např. je pod minimální marží), upraví se na hranici.' },
   { value: 'msrp', label: 'Nastavit MOC ± posun', help: 'Cena = doporučená cena výrobce upravená o posun v %.' },
   { value: 'cost_plus', label: 'Nákup + přirážka', help: 'Cena bez DPH = nákupní cena × (1 + přirážka).' },
@@ -135,6 +170,16 @@ export const HELP = {
   'stock.zero_stock': 'Co dělat s produkty s nulovým nebo záporným skladem.',
   'approval.auto': 'Návrhy se rovnou schválí a půjdou do exportu. Nikdy se automaticky neschválí návrhy s příznakem konflikt limitů, pod nákupní cenou, velká změna nebo min. cena nad limit změny.',
   'approval.auto_max_change_pct': 'Automaticky schválit jen změny do ± tolika %. Větší změny dostanou příznak „Velká změna“ a čekají na člověka.',
+  // rozšíření enginu
+  'target.step_pct': 'O kolik % zlevnit v jednom kroku doprodeje.',
+  'target.every_days': 'Jak často zlevnit – další krok až po uplynutí tolika dní od poslední změny ceny.',
+  'target.max_sales_30': 'Zlevňovat, jen dokud se za 30 dní neprodá víc kusů (0 = jen zboží bez prodejů).',
+  'competitors.exclude_keywords': 'Nabídky, jejichž název obsahuje některé z těchto slov (např. „bazar“, „použité“, „rozbaleno“), se ignorují.',
+  'schedule.valid_from': 'Strategie platí od tohoto okamžiku. Prázdné = hned.',
+  'schedule.valid_to': 'Strategie platí do tohoto okamžiku (např. konec akce). Prázdné = bez konce.',
+  'schedule.weekdays': 'Jen ve vybrané dny. Nic nevybráno = každý den.',
+  'schedule.hours': 'Jen v tomto rozmezí hodin (např. 18–24). Prázdné = celý den. Mimo okno produkt převezme další strategie.',
+  conditions: 'Podmínky navíc k segmentu – strategie se použije jen na produkty, které je splní (např. sklad > 0, marže ≥ 15 %). Jinak produkt převezme další strategie.',
 };
 
 function isPlain(v) {
@@ -153,9 +198,14 @@ export function deepMerge(base, over) {
   return out;
 }
 
-/** Doplní konfiguraci výchozími hodnotami. */
-export function mergeConfig(cfg) {
-  return deepMerge(DEFAULT_CONFIG, isPlain(cfg) ? cfg : {});
+/**
+ * Doplní konfiguraci výchozími hodnotami.
+ * @param {object} cfg
+ * @param {{extensions?: boolean}} [opts] extensions = doplnit i výchozí hodnoty rozšíření enginu
+ */
+export function mergeConfig(cfg, opts = {}) {
+  const base = opts.extensions ? deepMerge(DEFAULT_CONFIG, EXTENSION_DEFAULTS) : DEFAULT_CONFIG;
+  return deepMerge(base, isPlain(cfg) ? cfg : {});
 }
 
 /** Čtení/zápis hodnoty podle cesty „limits.min_margin_pct“. */
@@ -286,6 +336,25 @@ export function validateConfig(cfg) {
     if (bands.length && bands[bands.length - 1].up_to != null) warnings.push('Poslední pásmo má horní mez – dražší ceny použijí poslední pásmo.');
   }
   if (c.approval.auto && !(c.approval.auto_max_change_pct > 0)) warnings.push('Automatické schvalování bez limitu změny – zadejte max. změnu v %.');
+  // rozšíření enginu
+  if (t.mode === 'clearance') {
+    if (!(t.step_pct > 0 && t.step_pct < 100)) errors.push('Krok doprodeje musí být mezi 0 a 100 %.');
+    if (!(t.every_days >= 0)) errors.push('Interval doprodeje musí být nezáporný počet dní.');
+    if (!(t.max_sales_30 >= 0)) errors.push('Limit prodejů musí být nezáporné číslo.');
+  }
+  const sch = c.schedule;
+  if (sch && typeof sch === 'object') {
+    const from = sch.valid_from ? Date.parse(sch.valid_from) : null;
+    const to = sch.valid_to ? Date.parse(sch.valid_to) : null;
+    if (sch.valid_from && Number.isNaN(from)) errors.push('Neplatné datum „platí od“.');
+    if (sch.valid_to && Number.isNaN(to)) errors.push('Neplatné datum „platí do“.');
+    if (from != null && to != null && from >= to) errors.push('„Platí od“ musí být dříve než „platí do“.');
+    if (to != null && to < Date.now()) warnings.push('Platnost strategie už skončila – na nic se neuplatní.');
+    if (sch.hours != null) {
+      const hh = sch.hours;
+      if (!(Array.isArray(hh) && hh.length === 2 && hh.every((x) => Number.isFinite(x) && x >= 0 && x <= 24) && hh[0] !== hh[1] && hh[0] < 24)) errors.push('Hodiny platnosti musí být od–do v rozsahu 0–24 a od ≠ do.');
+    }
+  }
   return { errors, warnings };
 }
 
@@ -362,6 +431,7 @@ export function describeTargetShort(cfg) {
     case 'cost_plus': return 'Nákup +' + (t.markup_pct != null ? pctTxt(t.markup_pct) : '?');
     case 'keep': return 'Ponechat cenu';
     case 'fixed': return 'Pevně ' + (t.fixed_price != null ? money(t.fixed_price) : '?');
+    case 'clearance': return 'Doprodej −' + (t.step_pct != null ? pctTxt(t.step_pct) : '?') + ' / ' + (t.every_days ?? '?') + NBSP + 'd';
     default: return String(t.mode);
   }
 }
@@ -390,6 +460,7 @@ function targetSentence(t) {
     case 'cost_plus': return 'nastaví cenu = nákup + ' + (t.markup_pct != null ? pctTxt(t.markup_pct) : '? %') + ' (bez DPH)';
     case 'keep': return 'ponechá současnou cenu a jen hlídá limity';
     case 'fixed': return 'nastaví pevnou cenu ' + (t.fixed_price != null ? money(t.fixed_price) : '(nezadáno)');
+    case 'clearance': return 'každých ' + (t.every_days ?? '?') + NBSP + 'dní zlevní o ' + (t.step_pct != null ? pctTxt(t.step_pct) : '? %') + ', dokud se za 30 dní neprodá víc než ' + (t.max_sales_30 ?? 0) + NBSP + 'ks';
     default: return 'nastaví cenu (režim ' + t.mode + ')';
   }
 }
@@ -413,6 +484,7 @@ function marketSentence(c) {
   if (c.exclude?.length) s += '; ignoruje ' + listCz(c.exclude);
   if (c.include_tags?.length) s += '; jen se štítkem ' + listCz(c.include_tags);
   if (c.exclude_tags?.length) s += '; bez štítku ' + listCz(c.exclude_tags);
+  if (c.exclude_keywords?.length) s += '; ignoruje nabídky se slovy ' + listCz(c.exclude_keywords);
   return s + '.';
 }
 
@@ -422,6 +494,7 @@ function fallbackSentence(f) {
     return 'Když konkurence nestačí, nastaví MOC' + (p ? ' ' + (p > 0 ? '+' : '−') + pctTxt(p) : '') + '.';
   }
   if (f.mode === 'cost_plus') return 'Když konkurence nestačí, nastaví nákup + ' + (f.markup_pct != null ? pctTxt(f.markup_pct) : '? %') + '.';
+  if (f.mode === 'next') return 'Když konkurence nestačí, předá produkt další strategii v pořadí.';
   return 'Když konkurence nestačí, cenu ponechá.';
 }
 
@@ -471,6 +544,28 @@ function stockSentence(s) {
   return '';
 }
 
+function scheduleSentence(sch) {
+  if (!sch || typeof sch !== 'object') return '';
+  const parts = [];
+  if (Array.isArray(sch.weekdays) && sch.weekdays.length && sch.weekdays.length < 7) {
+    const names = WEEKDAYS.filter((d) => sch.weekdays.includes(d.value)).map((d) => d.short.toLowerCase());
+    parts.push('jen ' + names.join(', '));
+  }
+  if (Array.isArray(sch.hours) && sch.hours.length === 2) parts.push('od ' + sch.hours[0] + ' do ' + sch.hours[1] + NBSP + 'h');
+  const d = (v) => {
+    const t = Date.parse(v);
+    return Number.isNaN(t) ? String(v) : new Date(t).toLocaleString('cs-CZ', { day: 'numeric', month: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+  };
+  if (sch.valid_from) parts.push('od ' + d(sch.valid_from));
+  if (sch.valid_to) parts.push('do ' + d(sch.valid_to));
+  return parts.length ? 'Platí ' + parts.join(', ') + '; mimo toto okno produkt převezme další strategie.' : '';
+}
+
+function conditionsSentence(cond, fieldsMap) {
+  if (!cond || typeof cond !== 'object' || isEmptyFilter(cond)) return '';
+  return 'Navíc jen pro produkty, kde ' + describeFilter(cond, fieldsMap) + '.';
+}
+
 function approvalSentence(a) {
   if (a.auto) {
     return a.auto_max_change_pct != null
@@ -483,13 +578,17 @@ function approvalSentence(a) {
 /**
  * Lidsky čitelné shrnutí strategie v češtině.
  * @param {object} cfg konfigurace (doplní se výchozí)
- * @param {{segmentName?: string|null}} [ctx]
+ * @param {{segmentName?: string|null, fieldsMap?: Map}} [ctx] fieldsMap = popisky polí pro doplňující podmínky
  */
 export function describeStrategy(cfg, ctx = {}) {
-  const c = mergeConfig(cfg);
+  const c = mergeConfig(cfg, { extensions: hasExtensions(cfg) });
   const scope = ctx.segmentName ? 'Pro segment „' + ctx.segmentName + '“' : 'Pro všechny produkty';
   const mode = TARGET_MODE_MAP[c.target.mode];
   const sentences = [scope + ' ' + targetSentence(c.target) + '.'];
+  const cond = conditionsSentence(c.conditions, ctx.fieldsMap);
+  if (cond) sentences.push(cond);
+  const sch = scheduleSentence(c.schedule);
+  if (sch) sentences.push(sch);
   if (mode?.market) {
     sentences.push(marketSentence(c.competitors));
     sentences.push(fallbackSentence(c.fallback));

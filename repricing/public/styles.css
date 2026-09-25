@@ -383,7 +383,7 @@ textarea.input { height: auto; padding: 8px 10px; line-height: 1.45; resize: ver
 }
 .segmented button:last-child { border-right: 0; }
 .segmented button:hover { background: var(--surface-2); color: var(--text); }
-.segmented button[aria-checked="true"] { background: var(--primary-soft); color: var(--primary-text); font-weight: 600; }
+.segmented button[aria-checked="true"], .segmented button[aria-pressed="true"] { background: var(--primary-soft); color: var(--primary-text); font-weight: 600; }
 .segmented button:focus-visible { outline-offset: -2px; }
 .seg-sm button { height: 26px; font-size: 12.5px; padding: 0 10px; }
 .seg-count { font-size: 11px; background: var(--surface-3); color: var(--text-2); padding: 0 6px; border-radius: 999px; line-height: 17px; font-variant-numeric: tabular-nums; }

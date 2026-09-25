@@ -29,7 +29,7 @@ export function suggestionsFor(field, facets) {
 }
 
 /**
- * @param {{value?: object, fields: {key, label, type, group, values?}[], facets?: object, onChange?: (filter: object, errors: object[]) => void, maxDepth?: number}} o
+ * @param {{value?: object, fields: {key, label, type, group, values?}[], facets?: object, onChange?: (filter: object, errors: object[]) => void, maxDepth?: number, emptyText?: string}} o
  * @returns {{el: HTMLElement, getFilter: () => object, getErrors: () => object[], setFilter: (f: object) => void}}
  */
 export function filterBuilder(o) {
@@ -270,7 +270,7 @@ export function filterBuilder(o) {
         { class: 'fb-items' },
         items.length
           ? items
-          : h('div', { class: 'fb-empty' }, parent ? 'Prázdná skupina se ignoruje – přidejte podmínku.' : 'Žádná podmínka – segment obsahuje všechny aktivní produkty. Přidejte podmínku, např. Výrobce je jedno z Trek, Specialized.')
+          : h('div', { class: 'fb-empty' }, parent ? 'Prázdná skupina se ignoruje – přidejte podmínku.' : o.emptyText || 'Žádná podmínka – segment obsahuje všechny aktivní produkty. Přidejte podmínku, např. Výrobce je jedno z Trek, Specialized.')
       )
     );
   }
