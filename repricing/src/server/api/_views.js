@@ -249,16 +249,93 @@ function fingerprints(db, s) {
 
 const posNum = (v) => (typeof v === 'number' && Number.isFinite(v) && v > 0 ? v : null);
 
+const attrsObject = (text) => {
+  const a = parseJson(text, {});
+  return a && typeof a === 'object' && !Array.isArray(a) ? a : {};
+};
+const makers = new Map();
+
+/**
+ * Všechny produkty (i neaktivní) jedním dotazem, attrs jako objekt.
+ * Rychlá cesta: řádky jako pole (statement.setReturnArrays, Node ≥ 22.16) → objekty pevného tvaru. Objekty řádků
+ * z node:sqlite (null prototyp) jsou ve slovníkovém režimu a productView nad nimi běží ~2× pomaleji.
+ * Starší Node → engine loadProducts (JSON přenos).
+ */
+function loadAllProducts(db) {
+  const stmt = db.prepare('SELECT * FROM products ORDER BY id');
+  if (typeof stmt.setReturnArrays !== 'function') return loadProducts(db, { activeOnly: false });
+  const cols = db.prepare('PRAGMA table_info(products)').all().map((c) => c.name);
+  const key = cols.join(',');
+  let make = makers.get(key);
+  if (!make) {
+    // sloupce pochází ze schématu (ne od uživatele); klíče jsou JSON literály
+    // eslint-disable-next-line no-new-func
+    make = new Function('a', 'attrs', `return {${cols.map((c, i) => `${JSON.stringify(c)}: ${c === 'attrs' ? `attrs(a[${i}])` : `a[${i}]`}`).join(', ')}};`);
+    makers.set(key, make);
+  }
+  stmt.setReturnArrays(true);
+  const rows = stmt.all();
+  const out = new Array(rows.length);
+  for (let i = 0; i < rows.length; i++) out[i] = make(rows[i], attrsObject);
+  return out;
+}
+
+/**
+ * Nabídky všech produktů pro metriky pohledu (SPEC §6.1 tvar), seskupené po produktech.
+ * Jen sloupce, které výchozí trh pro metriky potřebuje (název/URL/dodací lhůta se nenačítají – detail produktu
+ * používá engine loadOffers).
+ * @returns {Map<number, object[]>}
+ */
+function loadAllOffers(db) {
+  const comps = new Map();
+  for (const c of db.prepare('SELECT id, name, label, enabled, tags FROM competitors').all()) {
+    const tags = parseJson(c.tags, []);
+    comps.set(c.id, { name: c.name, label: c.label, enabled: c.enabled === 1, tags: Object.freeze(Array.isArray(tags) ? tags.filter((t) => t != null).map(String) : []) });
+  }
+  let rows;
+  const stmt = db.prepare('SELECT product_id, competitor_id, price, shipping, in_stock, observed_at FROM offers');
+  if (typeof stmt.setReturnArrays === 'function') {
+    stmt.setReturnArrays(true);
+    rows = stmt.all();
+  } else {
+    rows = JSON.parse(db.prepare('SELECT json_group_array(json_array(product_id, competitor_id, price, shipping, in_stock, observed_at)) AS j FROM offers').get().j || '[]');
+  }
+  const out = new Map();
+  for (const a of rows) {
+    const c = comps.get(a[1]);
+    if (!c) continue;
+    const o = {
+      competitor_id: a[1],
+      competitor: c.name,
+      label: c.label,
+      tags: c.tags,
+      enabled: c.enabled,
+      price: a[2],
+      shipping: a[3],
+      in_stock: a[4],
+      delivery_days: null,
+      url: null,
+      name: null,
+      observed_at: a[5],
+    };
+    const list = out.get(a[0]);
+    if (list) list.push(o);
+    else out.set(a[0], [o]);
+  }
+  return out;
+}
+
 /** Postaví pohledy na všechny produkty (i neaktivní) + statistiky konkurentů. */
 function buildViews(db) {
   const t0 = performance.now();
   const now = new Date();
   const settings = getSettings(db);
-  const products = loadProducts(db, { activeOnly: false });
-  const offersMap = loadOffers(db);
+  const products = loadAllProducts(db);
+  const t1 = performance.now();
+  const offersMap = loadAllOffers(db);
+  const t2 = performance.now();
   const n = products.length;
   const views = new Array(n);
-  const search = new Array(n);
   const byId = new Map();
   const active = [];
   // statistiky konkurentů (GET /competitors, přehled) – ze stejného průchodu nabídkami
@@ -269,7 +346,6 @@ function buildViews(db) {
     const v = productView(p, offers, { now, settings });
     views[i] = v;
     byId.set(p.id, i);
-    search[i] = fold([p.code, p.name, p.ean, p.mpn].filter((x) => x != null && x !== '').join(' '));
     const isActive = p.active === 1 || p.active === true;
     if (isActive) active.push(i);
     const ours = isActive ? posNum(typeof p.price === 'string' ? Number(p.price) : p.price) : null;
@@ -302,7 +378,7 @@ function buildViews(db) {
     now,
     settings,
     views,
-    search,
+    search: null, // lazy – searchOf()
     byId,
     active,
     competitorStats,
@@ -311,6 +387,7 @@ function buildViews(db) {
     facets: null,
     attrFields: null,
     build_ms: Math.round(performance.now() - t0),
+    timing_ms: { products: Math.round(t1 - t0), offers: Math.round(t2 - t1), views: Math.round(performance.now() - t2) },
   };
 }
 
@@ -375,7 +452,7 @@ function buildProposals(s) {
 /**
  * Aktuální cache pohledů pro databázi (postaví / obnoví, co je potřeba).
  * @param {import('node:sqlite').DatabaseSync} db
- * @returns {{views: object[], search: string[], byId: Map<number, number>, active: number[], settings: object, now: Date,
+ * @returns {{views: object[], search: string[]|null, byId: Map<number, number>, active: number[], settings: object, now: Date,
  *   competitorStats: Map, segments: {list, byId, idsByIdx, counts}, proposals: {byProduct: Map}}}
  */
 function getCache(db) {
@@ -443,7 +520,7 @@ function writeAndRefresh(db, productIds, write) {
     }
     const v = productView(p, offersMap.get(p.id) || [], { now, settings });
     cache.views[i] = v;
-    cache.search[i] = fold([p.code, p.name, p.ean, p.mpn].filter((x) => x != null && x !== '').join(' '));
+    if (cache.search) cache.search[i] = searchText(p);
     if (st.segments) {
       const ids = [];
       for (const g of st.segments.list) {
@@ -526,6 +603,17 @@ function sortedOrder(cache, field, dir) {
   return order;
 }
 
+/** Text pro hledání q: kód, název, EAN, MPN bez diakritiky a velikosti písmen. */
+function searchText(p) {
+  return fold([p.code, p.name, p.ean, p.mpn].filter((x) => x != null && x !== '').join(' '));
+}
+
+/** Texty pro hledání (počítají se až při prvním hledání). */
+function searchOf(cache) {
+  if (!cache.search) cache.search = cache.views.map(searchText);
+  return cache.search;
+}
+
 /** Složené (fold) hodnoty pole pro rychlé porovnání bez diakritiky. */
 function foldedField(cache, field) {
   let arr = cache.foldCache.get(field);
@@ -551,7 +639,7 @@ function matchProducts(cache, f, order) {
   else if (status === 'inactive') tests.push((v) => !(v.active === 1 || v.active === true));
   if (f.q != null && String(f.q).trim() !== '') {
     const needle = fold(f.q);
-    const search = cache.search;
+    const search = searchOf(cache);
     tests.push((v, i) => search[i].includes(needle));
   }
   for (const k of ['manufacturer', 'category', 'owner', 'supplier']) {

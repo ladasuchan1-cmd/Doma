@@ -37,8 +37,9 @@ function fileResponse(res, { attachment = true, headers = {} } = {}) {
   });
 }
 
+/** ?mark=1 – u HEAD se nikdy neoznačuje (klient by tělo s označenými změnami vůbec nedostal). */
 function markRequested(ctx) {
-  return queryBool(ctx, 'mark', false);
+  return ctx.method !== 'HEAD' && queryBool(ctx, 'mark', false);
 }
 
 /**
@@ -121,8 +122,8 @@ module.exports = {
     router.get(
       '/api/v1/export/proposals.xlsx',
       (ctx) => {
-        const { ids, cache } = listIds(ctx.db, ctx.query);
-        if (ids.length > MAX_XLSX_ROWS) throw new HttpError(400, `Příliš mnoho návrhů pro XLSX (${ids.length}); zužte filtr (max. ${MAX_XLSX_ROWS}).`);
+        const { ids, total, cache } = listIds(ctx.db, ctx.query, { maxAll: MAX_XLSX_ROWS });
+        if (total > MAX_XLSX_ROWS) throw new HttpError(400, `Příliš mnoho návrhů pro XLSX (${total}); zužte filtr (max. ${MAX_XLSX_ROWS}).`);
         const items = [];
         for (let i = 0; i < ids.length; i += 2000) items.push(...proposalItems(ctx.db, ids.slice(i, i + 2000), { cache }));
         const body = proposalsXlsx(items);
@@ -175,4 +176,5 @@ module.exports = {
     );
   },
   sendChanges,
+  markRequested,
 };

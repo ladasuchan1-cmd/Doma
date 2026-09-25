@@ -14,7 +14,7 @@ function testRoutes(r) {
   r.post('/api/test/import', () => ({ ok: 'import' }), { auth: 'import' });
   r.get('/api/test/export', () => ({ ok: 'export' }), { auth: 'export' });
   r.post('/api/test/admin', (ctx) => ({ ok: 'admin', user: ctx.user }), { auth: 'admin' });
-  r.get('/feed/:name.:ext(xml|json|csv)', (ctx) => ({ feed: ctx.params.name, query: ctx.query }), { auth: 'export' });
+  r.get('/test-feed/:name.:ext(xml|json|csv)', (ctx) => ({ feed: ctx.params.name, query: ctx.query }), { auth: 'export' });
 }
 
 /** Aplikace s plnou API vrstvou (auth modul) + testovací routy. */
@@ -255,14 +255,14 @@ test('tokeny: rozsahy, Bearer / X-Api-Key / ?token=, neplatný a smazaný token'
     assert.strictEqual(r.status, 403, 'read token nesmí na admin routu');
 
     // export token: feed přes ?token= (a token se neobjeví v ctx.query)
-    r = await api('GET', `/feed/changes.xml?token=${exp.token}&mark=1`);
+    r = await api('GET', `/test-feed/changes.xml?token=${exp.token}&mark=1`);
     assert.strictEqual(r.status, 200);
     assert.deepStrictEqual(r.json(), { feed: 'changes', query: { mark: '1' } });
     r = await api('GET', '/api/test/export', { headers: { 'x-api-key': exp.token } });
     assert.strictEqual(r.status, 200);
     r = await api('GET', '/api/test/read', { headers: { 'x-api-key': exp.token } });
     assert.strictEqual(r.status, 403, 'export neimplikuje read');
-    r = await api('GET', '/feed/changes.xml');
+    r = await api('GET', '/test-feed/changes.xml');
     assert.strictEqual(r.status, 401);
 
     // admin zahrnuje vše

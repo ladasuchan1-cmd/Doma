@@ -155,26 +155,41 @@ function whereOf(db, f, cache) {
   return { sql: where.length ? 'WHERE ' + where.join(' AND ') : '', args };
 }
 
+// Do LIMITS.jsSortMax návrhů se řadí v JS (česká kolace textů, čísla číselně); nad tím SQL ORDER BY + LIMIT
+// (texty bez ohledu na velikost písmen, diakritika ale binárně) – ochrana paměti při status=all nad miliony návrhů.
+const LIMITS = { jsSortMax: 60000 };
+const TEXT_SORTS = new Set(['status', 'code', 'name', 'manufacturer', 'category', 'strategy_name', 'segment_name', 'strategy', 'segment', 'created_at', 'decided_at', 'exported_at']);
+
 /**
- * Id návrhů odpovídajících filtru (seřazená) + souhrn směrů.
- * @returns {{ids: number[], up: number, down: number}}
+ * Id návrhů odpovídajících filtru (seřazená) + počet a souhrn směrů.
+ * @param {{sort?: string, dir?: 'asc'|'desc', cache?: object, offset?: number, limit?: number|null, maxAll?: number}} [opts]
+ *   limit null = všechna id (schvalování „vše dle filtru“, XLSX); maxAll = při větším počtu vrátit jen počty (tooMany)
+ * @returns {{ids: number[], total: number, up: number, down: number, paged?: boolean, tooMany?: boolean}}
  */
-function selectIds(db, f, { sort = 'abs_change_pct', dir = 'desc', cache } = {}) {
+function selectIds(db, f, { sort = 'abs_change_pct', dir = 'desc', cache, offset = 0, limit = null, maxAll = Infinity } = {}) {
   const w = whereOf(db, f, cache);
   const expr = SORTS[sort];
-  const rows = db.prepare(`SELECT pr.id AS id, ${expr} AS k, (${FINAL} - pr.old_price) AS d ${FROM} ${w.sql} ORDER BY pr.id DESC`).all(...w.args);
-  let up = 0;
-  let down = 0;
-  for (const r of rows) {
-    if (r.d > 0) up++;
-    else if (r.d < 0) down++;
+  const agg = db
+    .prepare(`SELECT count(*) AS c, COALESCE(SUM(${FINAL} > pr.old_price), 0) AS up, COALESCE(SUM(${FINAL} < pr.old_price), 0) AS down ${FROM} ${w.sql}`)
+    .get(...w.args);
+  const base = { total: agg.c, up: agg.up, down: agg.down };
+  if (!agg.c) return { ids: [], ...base };
+  if (limit == null && agg.c > maxAll) return { ids: [], ...base, tooMany: true };
+  if (agg.c > LIMITS.jsSortMax && limit != null) {
+    const coll = TEXT_SORTS.has(sort) ? ' COLLATE NOCASE' : '';
+    const d = dir === 'desc' ? 'DESC' : 'ASC';
+    const rows = db
+      .prepare(`SELECT pr.id AS id ${FROM} ${w.sql} ORDER BY (${expr}) IS NULL, (${expr})${coll} ${d}, pr.id DESC LIMIT ? OFFSET ?`)
+      .all(...w.args, limit, offset);
+    return { ids: rows.map((r) => r.id), ...base, paged: true };
   }
+  const rows = db.prepare(`SELECT pr.id AS id, ${expr} AS k ${FROM} ${w.sql} ORDER BY pr.id DESC`).all(...w.args);
   const order = V.sortIndices(
     rows.map((_, i) => i),
     (i) => rows[i].k,
     dir
   );
-  return { ids: order.map((i) => rows[i].id), up, down };
+  return { ids: order.map((i) => rows[i].id), ...base };
 }
 
 /**
@@ -279,13 +294,14 @@ function sortParams(query) {
 
 /**
  * Seznam návrhů podle query (sdílí GET /proposals a GET /export/proposals.xlsx).
- * @returns {{ids: number[], up: number, down: number, cache: object}}
+ * @param {{offset?: number, limit?: number|null, maxAll?: number}} [page] stránka (limit null = všechna id)
+ * @returns {{ids: number[], total: number, up: number, down: number, paged?: boolean, cache: object}}
  */
-function listIds(db, query) {
+function listIds(db, query, page = {}) {
   const f = normalizeFilter(query);
   const { sort, dir } = sortParams(query);
   const cache = V.getCache(db);
-  return { ...selectIds(db, f, { sort, dir, cache }), cache };
+  return { ...selectIds(db, f, { sort, dir, cache, offset: page.offset ?? 0, limit: page.limit ?? null, maxAll: page.maxAll }), cache };
 }
 
 function summaryCounts(db, up, down) {
@@ -358,11 +374,12 @@ module.exports = {
       '/api/v1/proposals',
       (ctx) => {
         const { page, limit, offset } = paging(ctx, { defaultLimit: 50, maxLimit: 500 });
-        const { ids, up, down, cache } = listIds(ctx.db, ctx.query);
-        const pageIds = ids.slice(offset, offset + limit);
+        const res = listIds(ctx.db, ctx.query, { offset, limit });
+        const { up, down, cache } = res;
+        const pageIds = res.paged ? res.ids : res.ids.slice(offset, offset + limit);
         return {
           items: proposalItems(ctx.db, pageIds, { cache }),
-          total: ids.length,
+          total: res.total,
           page,
           limit,
           summary: summaryCounts(ctx.db, up, down),
@@ -422,4 +439,5 @@ module.exports = {
   pragueTodayStartIso,
   SORTS,
   FILTER_KEYS,
+  LIMITS,
 };
