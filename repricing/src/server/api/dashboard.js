@@ -7,7 +7,7 @@
 //     price_index: {vs_min, vs_median},                                 // průměr % jen za produkty s trhem
 //     proposals: {pending, approved, exported_7d, up, down, avg_change_pct, margin_impact_abs},
 //     last_run: běh|null, last_imports: importy[≤5] (+ source_name),
-//     competitors: [{id, name, label, offers, cheaper_than_us_pct}] (top 10 podle počtu nabídek),
+//     competitors: [{id, name, label, enabled, offers, cheaper_than_us_pct}] (zapnutí, top 10 podle počtu nabídek),
 //     by_manufacturer: [{manufacturer, products, with_market, avg_index, cheapest_pct, avg_margin_pct}] (top 15),
 //     alerts: [{type, severity, text, count, link, product_id?, items?}] }
 //
@@ -81,7 +81,8 @@ function competitorsTop(db, cache) {
       const s = cache.competitorStats.get(c.id);
       return { id: c.id, name: c.name, label: c.label ?? null, enabled: c.enabled === 1, offers: s ? s.offers : 0, cheaper_than_us_pct: s ? s.cheaper_than_us_pct : null };
     })
-    .filter((c) => c.offers > 0)
+    // vypnutí konkurenti se v cenotvorbě ignorují → v přehledu je nezobrazujeme
+    .filter((c) => c.enabled && c.offers > 0)
     .sort((a, b) => b.offers - a.offers || V.collator.compare(a.name, b.name))
     .slice(0, 10);
 }

@@ -197,13 +197,21 @@ function patchProduct(ctx) {
   const changes = {};
   for (const [k, v] of Object.entries(next)) if (cur[k] !== v) changes[k] = { from: cur[k] ?? null, to: v };
   if (Object.keys(changes).length) {
-    tx(db, () => {
-      const cols = Object.keys(next);
-      db.prepare(`UPDATE products SET ${cols.map((c) => `${c} = ?`).join(', ')}, updated_at = ? WHERE id = ?`).run(...cols.map((c) => next[c]), now, id);
-      if (priceChanged) db.prepare("INSERT INTO price_history (product_id, price, source, ref_id, at) VALUES (?, ?, 'manual', NULL, ?)").run(id, next.price, now);
-    });
+    const write = () =>
+      tx(db, () => {
+        const cols = Object.keys(next);
+        db.prepare(`UPDATE products SET ${cols.map((c) => `${c} = ?`).join(', ')}, updated_at = ? WHERE id = ?`).run(...cols.map((c) => next[c]), now, id);
+        if (priceChanged) db.prepare("INSERT INTO price_history (product_id, price, source, ref_id, at) VALUES (?, ?, 'manual', NULL, ?)").run(id, next.price, now);
+      });
+    if (priceChanged) {
+      // změna ceny mění i statistiky konkurentů → celá přestavba cache
+      write();
+      V.invalidate(db, 'views');
+    } else {
+      // zámek / limity / poznámka → přepočet jen tohoto pohledu v cache
+      V.writeAndRefresh(db, [id], write);
+    }
     ctx.audit({ action: 'product.update', entity: 'product', entity_id: id, detail: { code: cur.code, changes } });
-    V.invalidate(db, 'views');
   }
   return singleView(db, id);
 }

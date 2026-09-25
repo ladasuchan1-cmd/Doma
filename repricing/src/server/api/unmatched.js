@@ -96,7 +96,8 @@ function listUnmatched(ctx) {
   const reason = ctx.query.reason != null ? String(ctx.query.reason).trim().toLowerCase() : '';
   if (reason && reason !== 'all') {
     if (!REASONS.includes(reason)) throw new HttpError(400, 'Parametr „reason“ musí být „not_found“ (nenalezeno) nebo „ambiguous“ (nejednoznačné).', { field: 'reason' });
-    where.push("(CASE WHEN json_valid(u.raw) THEN json_extract(u.raw, '$._reason') END) = ?");
+    // řádek bez _reason (starší data) se zobrazuje i filtruje jako not_found
+    where.push("COALESCE(CASE WHEN json_valid(u.raw) THEN json_extract(u.raw, '$._reason') END, 'not_found') = ?");
     args.push(reason);
   }
 

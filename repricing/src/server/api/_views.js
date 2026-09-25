@@ -406,6 +406,73 @@ function getCache(db) {
 }
 
 /**
+ * Zápis, po kterém se pohledy dotčených produktů přepočítají přímo v cache (bez přestavby 30 000 pohledů).
+ * Jen pro změny, které neovlivní nic jiného než pohled produktu samotného (zámek, limity, poznámka) – změna
+ * ceny mění i statistiky konkurentů, tu řešte přes invalidate(db, 'views').
+ * Postup: nejdřív se cache srovná s DB (getCache), pak proběhne `write` (synchronně, nic jiného mezitím nezapisuje),
+ * pohledy se přepočítají a uloží se nové otisky, aby se změna nepovažovala za cizí.
+ * @param {import('node:sqlite').DatabaseSync} db
+ * @param {number[]} productIds
+ * @param {() => *} write synchronní zápis do DB
+ * @returns {*} návratová hodnota write
+ */
+function writeAndRefresh(db, productIds, write) {
+  const st = states.get(db);
+  const hadCache = !!(st && st.views);
+  if (hadCache) getCache(db);
+  const result = write();
+  if (!hadCache || !st.views) return result;
+  const s = stmts(db, st);
+  const cache = st.views;
+  const settings = getSettings(db);
+  const now = new Date();
+  const products = loadProducts(db, { productIds, activeOnly: false });
+  const offersMap = loadOffers(db, productIds);
+  for (const p of products) {
+    const i = cache.byId.get(p.id);
+    if (i === undefined) {
+      // nový produkt – raději celá přestavba
+      st.dirty.views = true;
+      return result;
+    }
+    const wasActive = cache.views[i].active === 1 || cache.views[i].active === true;
+    const isActive = p.active === 1 || p.active === true;
+    if (wasActive !== isActive) {
+      st.dirty.views = true;
+      return result;
+    }
+    const v = productView(p, offersMap.get(p.id) || [], { now, settings });
+    cache.views[i] = v;
+    cache.search[i] = fold([p.code, p.name, p.ean, p.mpn].filter((x) => x != null && x !== '').join(' '));
+    if (st.segments) {
+      const ids = [];
+      for (const g of st.segments.list) {
+        let ok = false;
+        try {
+          ok = g.match(v);
+        } catch {
+          ok = false;
+        }
+        if (ok) ids.push(g.id);
+      }
+      const old = st.segments.idsByIdx[i];
+      if (isActive) {
+        for (const id of old) st.segments.counts.set(id, st.segments.counts.get(id) - 1);
+        for (const id of ids) st.segments.counts.set(id, st.segments.counts.get(id) + 1);
+      }
+      st.segments.idsByIdx[i] = ids.length ? ids : EMPTY_IDS;
+    }
+  }
+  cache.sortCache.clear();
+  cache.foldCache.clear();
+  cache.facets = null;
+  cache.attrFields = null;
+  st.fp = fingerprints(db, s);
+  st.gate = `${s.tc.get().tc}:${s.dv.get().data_version}`;
+  return result;
+}
+
+/**
  * Zneplatní cache po zápisu přes API.
  * @param {import('node:sqlite').DatabaseSync} db
  * @param {...('views'|'segments'|'proposals'|'all')} parts co se změnilo (výchozí vše)
@@ -588,6 +655,7 @@ module.exports = {
   // cache
   getCache,
   invalidate,
+  writeAndRefresh,
   sortedOrder,
   matchProducts,
   productItem,
