@@ -91,7 +91,7 @@ test('proposalsXlsx: listy Návrhy a Souhrn, české hlavičky, hodnoty', () => 
   assert.equal(b['Změna %'], -5.27, 'přepočet podle ruční ceny');
   assert.equal(b['Změna Kč'], -50);
   assert.equal(b['Nejlevnější konkurent'], 'Kolo-shop.cz');
-  assert.equal(b['Příznaky'], 'spodní hranice, vlastni');
+  assert.equal(b['Příznaky'], 'zvednuto na spodní hranici, vlastni');
   assert.equal(b['Stav'], 'Schváleno');
 
   assert.equal(c['Stav'], 'Exportováno');
