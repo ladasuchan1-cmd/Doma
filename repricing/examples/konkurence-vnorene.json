@@ -1,0 +1,858 @@
+{
+  "products": [
+    {
+      "code": "SRA-00007",
+      "ean": "8597315660484",
+      "offers": [
+        {
+          "shop": "VeloMarket.cz",
+          "price": "839 Kč",
+          "stock": "skladem"
+        },
+        {
+          "shop": "KoloPointer.cz",
+          "price": "959 Kč",
+          "stock": "skladem"
+        },
+        {
+          "shop": "CykloDům.cz",
+          "price": "899 Kč",
+          "stock": "skladem"
+        },
+        {
+          "shop": "BikeRanger.cz",
+          "price": "849 Kč",
+          "stock": "skladem"
+        },
+        {
+          "shop": "SpeedKola.cz",
+          "price": "959 Kč",
+          "stock": "skladem"
+        },
+        {
+          "shop": "MegaSportík.cz",
+          "price": "889 Kč",
+          "stock": "skladem"
+        }
+      ]
+    },
+    {
+      "code": "SAN-00014-XS",
+      "ean": "8591959453532",
+      "offers": [
+        {
+          "shop": "MegaSportík.cz",
+          "price": "88 990 Kč",
+          "stock": "na dotaz"
+        }
+      ]
+    },
+    {
+      "code": "SAN-00021-S",
+      "ean": "8591762416328",
+      "offers": [
+        {
+          "shop": "KoloPointer.cz",
+          "price": "97 990 Kč",
+          "stock": "skladem"
+        },
+        {
+          "shop": "MegaSportík.cz",
+          "price": "94 990 Kč",
+          "stock": "skladem"
+        }
+      ]
+    },
+    {
+      "code": "MAX-00028",
+      "ean": "8595234463384",
+      "offers": [
+        {
+          "shop": "VeloMarket.cz",
+          "price": "879 Kč",
+          "stock": "skladem"
+        },
+        {
+          "shop": "CykloDům.cz",
+          "price": "899 Kč",
+          "stock": "skladem"
+        },
+        {
+          "shop": "BikeRanger.cz",
+          "price": "859 Kč",
+          "stock": "na dotaz"
+        }
+      ]
+    },
+    {
+      "code": "FOC-00035-XS",
+      "ean": "8594887001561",
+      "offers": [
+        {
+          "shop": "VeloMarket.cz",
+          "price": "184 990 Kč",
+          "stock": "skladem"
+        },
+        {
+          "shop": "KoloPointer.cz",
+          "price": "193 990 Kč",
+          "stock": "na dotaz"
+        },
+        {
+          "shop": "BikeRanger.cz",
+          "price": "180 990 Kč",
+          "stock": "skladem"
+        },
+        {
+          "shop": "SpeedKola.cz",
+          "price": "200 990 Kč",
+          "stock": "skladem"
+        }
+      ]
+    },
+    {
+      "code": "FOC-00042-S",
+      "ean": "8594577716546",
+      "offers": [
+        {
+          "shop": "VeloMarket.cz",
+          "price": "173 990 Kč",
+          "stock": "skladem"
+        },
+        {
+          "shop": "KoloPointer.cz",
+          "price": "186 990 Kč",
+          "stock": "skladem"
+        },
+        {
+          "shop": "CykloDům.cz",
+          "price": "183 990 Kč",
+          "stock": "skladem"
+        },
+        {
+          "shop": "BikeRanger.cz",
+          "price": "173 990 Kč",
+          "stock": "skladem"
+        },
+        {
+          "shop": "HoryNaKole.cz",
+          "price": "185 990 Kč",
+          "stock": "na dotaz"
+        }
+      ]
+    },
+    {
+      "code": "FOC-00049-M",
+      "ean": "8590002665908",
+      "offers": [
+        {
+          "shop": "KoloPointer.cz",
+          "price": "178 990 Kč",
+          "stock": "skladem"
+        }
+      ]
+    },
+    {
+      "code": "ABU-00056",
+      "ean": "8596683838433",
+      "offers": [
+        {
+          "shop": "CykloDům.cz",
+          "price": "2 490 Kč",
+          "stock": "skladem"
+        },
+        {
+          "shop": "MegaSportík.cz",
+          "price": "2 390 Kč",
+          "stock": "skladem"
+        }
+      ]
+    },
+    {
+      "code": "KEL-00063-XS",
+      "ean": "8593886002722",
+      "offers": [
+        {
+          "shop": "KoloPointer.cz",
+          "price": "95 990 Kč",
+          "stock": "skladem"
+        },
+        {
+          "shop": "CykloDům.cz",
+          "price": "100 990 Kč",
+          "stock": "skladem"
+        },
+        {
+          "shop": "SpeedKola.cz",
+          "price": "110 990 Kč",
+          "stock": "skladem"
+        },
+        {
+          "shop": "HoryNaKole.cz",
+          "price": "92 990 Kč",
+          "stock": "skladem"
+        }
+      ]
+    },
+    {
+      "code": "KEL-00070-S",
+      "ean": "8597327510746",
+      "offers": [
+        {
+          "shop": "KoloPointer.cz",
+          "price": "96 990 Kč",
+          "stock": "skladem"
+        },
+        {
+          "shop": "BikeRanger.cz",
+          "price": "90 990 Kč",
+          "stock": "skladem"
+        },
+        {
+          "shop": "SpeedKola.cz",
+          "price": "112 340 Kč",
+          "stock": "skladem"
+        }
+      ]
+    },
+    {
+      "code": "KEL-00077-M",
+      "ean": "8598416518018",
+      "offers": [
+        {
+          "shop": "VeloMarket.cz",
+          "price": "97 990 Kč",
+          "stock": "skladem"
+        },
+        {
+          "shop": "BikeRanger.cz",
+          "price": "90 990 Kč",
+          "stock": "skladem"
+        },
+        {
+          "shop": "HoryNaKole.cz",
+          "price": "98 990 Kč",
+          "stock": "skladem"
+        }
+      ]
+    },
+    {
+      "code": "KEL-00084-L",
+      "ean": "8597680554548",
+      "offers": [
+        {
+          "shop": "VeloMarket.cz",
+          "price": "90 990 Kč",
+          "stock": "skladem"
+        },
+        {
+          "shop": "BikeRanger.cz",
+          "price": "95 990 Kč",
+          "stock": "skladem"
+        }
+      ]
+    },
+    {
+      "code": "KEL-00091-XS",
+      "ean": "8594656869996",
+      "offers": [
+        {
+          "shop": "VeloMarket.cz",
+          "price": "111 990 Kč",
+          "stock": "skladem"
+        },
+        {
+          "shop": "SpeedKola.cz",
+          "price": "135 990 Kč",
+          "stock": "skladem"
+        },
+        {
+          "shop": "HoryNaKole.cz",
+          "price": "114 990 Kč",
+          "stock": "skladem"
+        },
+        {
+          "shop": "MegaSportík.cz",
+          "price": "108 990 Kč",
+          "stock": "skladem"
+        }
+      ]
+    },
+    {
+      "code": "KEL-00098-S",
+      "ean": "8598258438635",
+      "offers": [
+        {
+          "shop": "VeloMarket.cz",
+          "price": "118 990 Kč",
+          "stock": "skladem"
+        },
+        {
+          "shop": "KoloPointer.cz",
+          "price": "123 990 Kč",
+          "stock": "skladem"
+        },
+        {
+          "shop": "CykloDům.cz",
+          "price": "133 990 Kč",
+          "stock": "skladem"
+        }
+      ]
+    },
+    {
+      "code": "KEL-00105-M",
+      "ean": "8590050760488",
+      "offers": [
+        {
+          "shop": "VeloMarket.cz",
+          "price": "110 990 Kč",
+          "stock": "na dotaz"
+        },
+        {
+          "shop": "KoloPointer.cz",
+          "price": "120 990 Kč",
+          "stock": "skladem"
+        },
+        {
+          "shop": "CykloDům.cz",
+          "price": "120 990 Kč",
+          "stock": "skladem"
+        }
+      ]
+    },
+    {
+      "code": "KEL-00112-L",
+      "ean": "8599592139592",
+      "offers": [
+        {
+          "shop": "KoloPointer.cz",
+          "price": "128 990 Kč",
+          "stock": "skladem"
+        },
+        {
+          "shop": "BikeRanger.cz",
+          "price": "110 990 Kč",
+          "stock": "na dotaz"
+        },
+        {
+          "shop": "SpeedKola.cz",
+          "price": "130 990 Kč",
+          "stock": "skladem"
+        }
+      ]
+    },
+    {
+      "code": "KEL-00119-XL",
+      "ean": "8596456641079",
+      "offers": [
+        {
+          "shop": "VeloMarket.cz",
+          "price": "119 990 Kč",
+          "stock": "skladem"
+        },
+        {
+          "shop": "CykloDům.cz",
+          "price": "129 990 Kč",
+          "stock": "skladem"
+        },
+        {
+          "shop": "BikeRanger.cz",
+          "price": "112 990 Kč",
+          "stock": "na dotaz"
+        },
+        {
+          "shop": "SpeedKola.cz",
+          "price": "125 990 Kč",
+          "stock": "skladem"
+        }
+      ]
+    },
+    {
+      "code": "CAN-00126-XS",
+      "ean": "8590555956591",
+      "offers": [
+        {
+          "shop": "KoloPointer.cz",
+          "price": "209 990 Kč",
+          "stock": "skladem"
+        },
+        {
+          "shop": "CykloDům.cz",
+          "price": "207 990 Kč",
+          "stock": "skladem"
+        },
+        {
+          "shop": "BikeRanger.cz",
+          "price": "193 990 Kč",
+          "stock": "na dotaz"
+        }
+      ]
+    },
+    {
+      "code": "CAN-00133-S",
+      "ean": "8593754397431",
+      "offers": [
+        {
+          "shop": "VeloMarket.cz",
+          "price": "187 990 Kč",
+          "stock": "skladem"
+        },
+        {
+          "shop": "CykloDům.cz",
+          "price": "217 990 Kč",
+          "stock": "skladem"
+        },
+        {
+          "shop": "SpeedKola.cz",
+          "price": "226 990 Kč",
+          "stock": "skladem"
+        },
+        {
+          "shop": "MegaSportík.cz",
+          "price": "185 990 Kč",
+          "stock": "skladem"
+        }
+      ]
+    },
+    {
+      "code": "CAN-00140-M",
+      "ean": "8591679882759",
+      "offers": [
+        {
+          "shop": "BikeRanger.cz",
+          "price": "100 990 Kč",
+          "stock": "na dotaz"
+        },
+        {
+          "shop": "HoryNaKole.cz",
+          "price": "203 990 Kč",
+          "stock": "skladem"
+        }
+      ]
+    },
+    {
+      "code": "CAN-00147-XS",
+      "ean": "8593997132066",
+      "offers": [
+        {
+          "shop": "VeloMarket.cz",
+          "price": "40 990 Kč",
+          "stock": "skladem"
+        },
+        {
+          "shop": "KoloPointer.cz",
+          "price": "46 990 Kč",
+          "stock": "skladem"
+        },
+        {
+          "shop": "BikeRanger.cz",
+          "price": "40 990 Kč",
+          "stock": "skladem"
+        }
+      ]
+    },
+    {
+      "code": "CAN-00154-S",
+      "ean": "8598847146415",
+      "offers": [
+        {
+          "shop": "CykloDům.cz",
+          "price": "46 990 Kč",
+          "stock": "skladem"
+        },
+        {
+          "shop": "SpeedKola.cz",
+          "price": "49 990 Kč",
+          "stock": "skladem"
+        }
+      ]
+    },
+    {
+      "code": "CAN-00161-M",
+      "ean": "8590712070757",
+      "offers": [
+        {
+          "shop": "VeloMarket.cz",
+          "price": "42 990 Kč",
+          "stock": "skladem"
+        },
+        {
+          "shop": "CykloDům.cz",
+          "price": "45 990 Kč",
+          "stock": "skladem"
+        },
+        {
+          "shop": "BikeRanger.cz",
+          "price": "41 990 Kč",
+          "stock": "skladem"
+        },
+        {
+          "shop": "SpeedKola.cz",
+          "price": "48 990 Kč",
+          "stock": "na dotaz"
+        }
+      ]
+    },
+    {
+      "code": "CAN-00168-L",
+      "ean": "8596017121392",
+      "offers": [
+        {
+          "shop": "KoloPointer.cz",
+          "price": "46 990 Kč",
+          "stock": "skladem"
+        },
+        {
+          "shop": "MegaSportík.cz",
+          "price": "41 990 Kč",
+          "stock": "na dotaz"
+        }
+      ]
+    },
+    {
+      "code": "CAN-00175-XL",
+      "ean": "8599808782185",
+      "offers": [
+        {
+          "shop": "VeloMarket.cz",
+          "price": "42 990 Kč",
+          "stock": "skladem"
+        },
+        {
+          "shop": "HoryNaKole.cz",
+          "price": "41 990 Kč",
+          "stock": "skladem"
+        }
+      ]
+    },
+    {
+      "code": "CON-00182",
+      "ean": "8594534446264",
+      "offers": [
+        {
+          "shop": "VeloMarket.cz",
+          "price": "709 Kč",
+          "stock": "skladem"
+        },
+        {
+          "shop": "KoloPointer.cz",
+          "price": "729 Kč",
+          "stock": "skladem"
+        },
+        {
+          "shop": "CykloDům.cz",
+          "price": "809 Kč",
+          "stock": "na dotaz"
+        },
+        {
+          "shop": "BikeRanger.cz",
+          "price": "679 Kč",
+          "stock": "skladem"
+        },
+        {
+          "shop": "SpeedKola.cz",
+          "price": "799 Kč",
+          "stock": "skladem"
+        }
+      ]
+    },
+    {
+      "code": "MAX-00189",
+      "ean": "8596299792709",
+      "offers": []
+    },
+    {
+      "code": "FOX-00196",
+      "ean": "8592011993386",
+      "offers": [
+        {
+          "shop": "VeloMarket.cz",
+          "price": "529 Kč",
+          "stock": "skladem"
+        },
+        {
+          "shop": "BikeRanger.cz",
+          "price": "499 Kč",
+          "stock": "skladem"
+        }
+      ]
+    },
+    {
+      "code": "GIR-00203",
+      "ean": "8596316820019",
+      "offers": [
+        {
+          "shop": "VeloMarket.cz",
+          "price": "1 790 Kč",
+          "stock": "skladem"
+        },
+        {
+          "shop": "CykloDům.cz",
+          "price": "1 890 Kč",
+          "stock": "skladem"
+        },
+        {
+          "shop": "HoryNaKole.cz",
+          "price": "1 690 Kč",
+          "stock": "skladem"
+        },
+        {
+          "shop": "MegaSportík.cz",
+          "price": "1 690 Kč",
+          "stock": "skladem"
+        }
+      ]
+    },
+    {
+      "code": "FOC-00210-XS",
+      "ean": "8592916856366",
+      "offers": [
+        {
+          "shop": "VeloMarket.cz",
+          "price": "17 990 Kč",
+          "stock": "skladem"
+        },
+        {
+          "shop": "KoloPointer.cz",
+          "price": "18 990 Kč",
+          "stock": "skladem"
+        },
+        {
+          "shop": "BikeRanger.cz",
+          "price": "17 990 Kč",
+          "stock": "skladem"
+        },
+        {
+          "shop": "SpeedKola.cz",
+          "price": "20 990 Kč",
+          "stock": "skladem"
+        },
+        {
+          "shop": "HoryNaKole.cz",
+          "price": "18 990 Kč",
+          "stock": "skladem"
+        }
+      ]
+    },
+    {
+      "code": "FOC-00217-S",
+      "ean": "8599786111977",
+      "offers": [
+        {
+          "shop": "VeloMarket.cz",
+          "price": "18 990 Kč",
+          "stock": "na dotaz"
+        },
+        {
+          "shop": "BikeRanger.cz",
+          "price": "17 990 Kč",
+          "stock": "skladem"
+        },
+        {
+          "shop": "SpeedKola.cz",
+          "price": "19 990 Kč",
+          "stock": "skladem"
+        },
+        {
+          "shop": "MegaSportík.cz",
+          "price": "18 990 Kč",
+          "stock": "skladem"
+        }
+      ]
+    },
+    {
+      "code": "FOC-00224-M",
+      "ean": "8591427569673",
+      "offers": [
+        {
+          "shop": "VeloMarket.cz",
+          "price": "18 990 Kč",
+          "stock": "skladem"
+        },
+        {
+          "shop": "KoloPointer.cz",
+          "price": "18 990 Kč",
+          "stock": "skladem"
+        },
+        {
+          "shop": "HoryNaKole.cz",
+          "price": "17 990 Kč",
+          "stock": "skladem"
+        },
+        {
+          "shop": "MegaSportík.cz",
+          "price": "16 990 Kč",
+          "stock": "skladem"
+        }
+      ]
+    },
+    {
+      "code": "SCH-00231",
+      "ean": "8599594441761",
+      "offers": [
+        {
+          "shop": "VeloMarket.cz",
+          "price": "1 590 Kč",
+          "stock": "skladem"
+        },
+        {
+          "shop": "BikeRanger.cz",
+          "price": "1 690 Kč",
+          "stock": "skladem"
+        },
+        {
+          "shop": "HoryNaKole.cz",
+          "price": "1 690 Kč",
+          "stock": "skladem"
+        },
+        {
+          "shop": "MegaSportík.cz",
+          "price": "1 490 Kč",
+          "stock": "na dotaz"
+        }
+      ]
+    },
+    {
+      "code": "MAX-00238",
+      "ean": "8595141895926",
+      "offers": [
+        {
+          "shop": "VeloMarket.cz",
+          "price": "1 490 Kč",
+          "stock": "na dotaz"
+        },
+        {
+          "shop": "KoloPointer.cz",
+          "price": "1 590 Kč",
+          "stock": "skladem"
+        },
+        {
+          "shop": "CykloDům.cz",
+          "price": "1 590 Kč",
+          "stock": "skladem"
+        },
+        {
+          "shop": "BikeRanger.cz",
+          "price": "1 590 Kč",
+          "stock": "na dotaz"
+        }
+      ]
+    },
+    {
+      "code": "CAN-00245-XS",
+      "ean": "8599903852080",
+      "offers": [
+        {
+          "shop": "VeloMarket.cz",
+          "price": "175 990 Kč",
+          "stock": "na dotaz"
+        },
+        {
+          "shop": "KoloPointer.cz",
+          "price": "184 990 Kč",
+          "stock": "skladem"
+        },
+        {
+          "shop": "CykloDům.cz",
+          "price": "203 990 Kč",
+          "stock": "skladem"
+        },
+        {
+          "shop": "BikeRanger.cz",
+          "price": "183 990 Kč",
+          "stock": "skladem"
+        },
+        {
+          "shop": "MegaSportík.cz",
+          "price": "177 990 Kč",
+          "stock": "skladem"
+        }
+      ]
+    },
+    {
+      "code": "CAN-00252-S",
+      "ean": "8593183364318",
+      "offers": [
+        {
+          "shop": "VeloMarket.cz",
+          "price": "168 990 Kč",
+          "stock": "skladem"
+        },
+        {
+          "shop": "KoloPointer.cz",
+          "price": "195 990 Kč",
+          "stock": "skladem"
+        },
+        {
+          "shop": "SpeedKola.cz",
+          "price": "187 990 Kč",
+          "stock": "na dotaz"
+        }
+      ]
+    },
+    {
+      "code": "CAN-00259-M",
+      "ean": "8594163319809",
+      "offers": [
+        {
+          "shop": "SpeedKola.cz",
+          "price": "207 990 Kč",
+          "stock": "skladem"
+        }
+      ]
+    },
+    {
+      "code": "CAN-00266-L",
+      "ean": "8599076561635",
+      "offers": [
+        {
+          "shop": "VeloMarket.cz",
+          "price": "178 990 Kč",
+          "stock": "skladem"
+        },
+        {
+          "shop": "KoloPointer.cz",
+          "price": "190 990 Kč",
+          "stock": "na dotaz"
+        },
+        {
+          "shop": "CykloDům.cz",
+          "price": "199 990 Kč",
+          "stock": "skladem"
+        }
+      ]
+    },
+    {
+      "code": "CAN-00273-XL",
+      "ean": "8599109820562",
+      "offers": [
+        {
+          "shop": "KoloPointer.cz",
+          "price": "178 990 Kč",
+          "stock": "skladem"
+        },
+        {
+          "shop": "HoryNaKole.cz",
+          "price": "178 990 Kč",
+          "stock": "skladem"
+        }
+      ]
+    },
+    {
+      "code": "CON-00280",
+      "ean": "8596825360259",
+      "offers": [
+        {
+          "shop": "KoloPointer.cz",
+          "price": "1 790 Kč",
+          "stock": "skladem"
+        },
+        {
+          "shop": "HoryNaKole.cz",
+          "price": "1 890 Kč",
+          "stock": "skladem"
+        }
+      ]
+    }
+  ]
+}

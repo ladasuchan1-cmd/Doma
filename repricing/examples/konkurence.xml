@@ -1,0 +1,864 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<prices>
+  <offer shop="VeloMarket.cz">
+    <ean>8597315660484</ean>
+    <price>839</price>
+    <shipping>99</shipping>
+    <availability>in stock</availability>
+    <url>https://velomarket.cz/p/8597315660484</url>
+  </offer>
+  <offer shop="KoloPointer.cz">
+    <ean>8597315660484</ean>
+    <price>959</price>
+    <shipping>79</shipping>
+    <availability>in stock</availability>
+    <url>https://kolopointer.cz/p/8597315660484</url>
+  </offer>
+  <offer shop="CykloDům.cz">
+    <ean>8597315660484</ean>
+    <price>899</price>
+    <shipping>0</shipping>
+    <availability>in stock</availability>
+    <url>https://cyklodum.cz/p/8597315660484</url>
+  </offer>
+  <offer shop="BikeRanger.cz">
+    <ean>8597315660484</ean>
+    <price>849</price>
+    <shipping>99</shipping>
+    <availability>in stock</availability>
+    <url>https://bikeranger.cz/p/8597315660484</url>
+  </offer>
+  <offer shop="SpeedKola.cz">
+    <ean>8597315660484</ean>
+    <price>959</price>
+    <shipping>99</shipping>
+    <availability>in stock</availability>
+    <url>https://speedkola.cz/p/8597315660484</url>
+  </offer>
+  <offer shop="MegaSportík.cz">
+    <ean>8597315660484</ean>
+    <price>889</price>
+    <shipping>0</shipping>
+    <availability>in stock</availability>
+    <url>https://megasportik.cz/p/8597315660484</url>
+  </offer>
+  <offer shop="MegaSportík.cz">
+    <ean>8591959453532</ean>
+    <price>88990</price>
+    <shipping>0</shipping>
+    <availability>out of stock</availability>
+    <url>https://megasportik.cz/p/8591959453532</url>
+  </offer>
+  <offer shop="KoloPointer.cz">
+    <ean>8591762416328</ean>
+    <price>97990</price>
+    <shipping>0</shipping>
+    <availability>in stock</availability>
+    <url>https://kolopointer.cz/p/8591762416328</url>
+  </offer>
+  <offer shop="MegaSportík.cz">
+    <ean>8591762416328</ean>
+    <price>94990</price>
+    <shipping>0</shipping>
+    <availability>in stock</availability>
+    <url>https://megasportik.cz/p/8591762416328</url>
+  </offer>
+  <offer shop="VeloMarket.cz">
+    <ean>8595234463384</ean>
+    <price>879</price>
+    <shipping>79</shipping>
+    <availability>in stock</availability>
+    <url>https://velomarket.cz/p/8595234463384</url>
+  </offer>
+  <offer shop="CykloDům.cz">
+    <ean>8595234463384</ean>
+    <price>899</price>
+    <shipping>0</shipping>
+    <availability>in stock</availability>
+    <url>https://cyklodum.cz/p/8595234463384</url>
+  </offer>
+  <offer shop="BikeRanger.cz">
+    <ean>8595234463384</ean>
+    <price>859</price>
+    <shipping>79</shipping>
+    <availability>out of stock</availability>
+    <url>https://bikeranger.cz/p/8595234463384</url>
+  </offer>
+  <offer shop="VeloMarket.cz">
+    <ean>8594887001561</ean>
+    <price>184990</price>
+    <shipping>0</shipping>
+    <availability>in stock</availability>
+    <url>https://velomarket.cz/p/8594887001561</url>
+  </offer>
+  <offer shop="KoloPointer.cz">
+    <ean>8594887001561</ean>
+    <price>193990</price>
+    <shipping>0</shipping>
+    <availability>out of stock</availability>
+    <url>https://kolopointer.cz/p/8594887001561</url>
+  </offer>
+  <offer shop="BikeRanger.cz">
+    <ean>8594887001561</ean>
+    <price>180990</price>
+    <shipping>0</shipping>
+    <availability>in stock</availability>
+    <url>https://bikeranger.cz/p/8594887001561</url>
+  </offer>
+  <offer shop="SpeedKola.cz">
+    <ean>8594887001561</ean>
+    <price>200990</price>
+    <shipping>0</shipping>
+    <availability>in stock</availability>
+    <url>https://speedkola.cz/p/8594887001561</url>
+  </offer>
+  <offer shop="VeloMarket.cz">
+    <ean>8594577716546</ean>
+    <price>173990</price>
+    <shipping>0</shipping>
+    <availability>in stock</availability>
+    <url>https://velomarket.cz/p/8594577716546</url>
+  </offer>
+  <offer shop="KoloPointer.cz">
+    <ean>8594577716546</ean>
+    <price>186990</price>
+    <shipping>0</shipping>
+    <availability>in stock</availability>
+    <url>https://kolopointer.cz/p/8594577716546</url>
+  </offer>
+  <offer shop="CykloDům.cz">
+    <ean>8594577716546</ean>
+    <price>183990</price>
+    <shipping>0</shipping>
+    <availability>in stock</availability>
+    <url>https://cyklodum.cz/p/8594577716546</url>
+  </offer>
+  <offer shop="BikeRanger.cz">
+    <ean>8594577716546</ean>
+    <price>173990</price>
+    <shipping>0</shipping>
+    <availability>in stock</availability>
+    <url>https://bikeranger.cz/p/8594577716546</url>
+  </offer>
+  <offer shop="HoryNaKole.cz">
+    <ean>8594577716546</ean>
+    <price>185990</price>
+    <shipping>0</shipping>
+    <availability>out of stock</availability>
+    <url>https://horynakole.cz/p/8594577716546</url>
+  </offer>
+  <offer shop="KoloPointer.cz">
+    <ean>8590002665908</ean>
+    <price>178990</price>
+    <shipping>0</shipping>
+    <availability>in stock</availability>
+    <url>https://kolopointer.cz/p/8590002665908</url>
+  </offer>
+  <offer shop="CykloDům.cz">
+    <ean>8596683838433</ean>
+    <price>2490</price>
+    <shipping>79</shipping>
+    <availability>in stock</availability>
+    <url>https://cyklodum.cz/p/8596683838433</url>
+  </offer>
+  <offer shop="MegaSportík.cz">
+    <ean>8596683838433</ean>
+    <price>2390</price>
+    <shipping>79</shipping>
+    <availability>in stock</availability>
+    <url>https://megasportik.cz/p/8596683838433</url>
+  </offer>
+  <offer shop="KoloPointer.cz">
+    <ean>8593886002722</ean>
+    <price>95990</price>
+    <shipping>0</shipping>
+    <availability>in stock</availability>
+    <url>https://kolopointer.cz/p/8593886002722</url>
+  </offer>
+  <offer shop="CykloDům.cz">
+    <ean>8593886002722</ean>
+    <price>100990</price>
+    <shipping>0</shipping>
+    <availability>in stock</availability>
+    <url>https://cyklodum.cz/p/8593886002722</url>
+  </offer>
+  <offer shop="SpeedKola.cz">
+    <ean>8593886002722</ean>
+    <price>110990</price>
+    <shipping>0</shipping>
+    <availability>in stock</availability>
+    <url>https://speedkola.cz/p/8593886002722</url>
+  </offer>
+  <offer shop="HoryNaKole.cz">
+    <ean>8593886002722</ean>
+    <price>92990</price>
+    <shipping>0</shipping>
+    <availability>in stock</availability>
+    <url>https://horynakole.cz/p/8593886002722</url>
+  </offer>
+  <offer shop="KoloPointer.cz">
+    <ean>8597327510746</ean>
+    <price>96990</price>
+    <shipping>0</shipping>
+    <availability>in stock</availability>
+    <url>https://kolopointer.cz/p/8597327510746</url>
+  </offer>
+  <offer shop="BikeRanger.cz">
+    <ean>8597327510746</ean>
+    <price>90990</price>
+    <shipping>0</shipping>
+    <availability>in stock</availability>
+    <url>https://bikeranger.cz/p/8597327510746</url>
+  </offer>
+  <offer shop="SpeedKola.cz">
+    <ean>8597327510746</ean>
+    <price>112340</price>
+    <shipping>0</shipping>
+    <availability>in stock</availability>
+    <url>https://speedkola.cz/p/8597327510746</url>
+  </offer>
+  <offer shop="VeloMarket.cz">
+    <ean>8598416518018</ean>
+    <price>97990</price>
+    <shipping>0</shipping>
+    <availability>in stock</availability>
+    <url>https://velomarket.cz/p/8598416518018</url>
+  </offer>
+  <offer shop="BikeRanger.cz">
+    <ean>8598416518018</ean>
+    <price>90990</price>
+    <shipping>0</shipping>
+    <availability>in stock</availability>
+    <url>https://bikeranger.cz/p/8598416518018</url>
+  </offer>
+  <offer shop="HoryNaKole.cz">
+    <ean>8598416518018</ean>
+    <price>98990</price>
+    <shipping>0</shipping>
+    <availability>in stock</availability>
+    <url>https://horynakole.cz/p/8598416518018</url>
+  </offer>
+  <offer shop="VeloMarket.cz">
+    <ean>8597680554548</ean>
+    <price>90990</price>
+    <shipping>0</shipping>
+    <availability>in stock</availability>
+    <url>https://velomarket.cz/p/8597680554548</url>
+  </offer>
+  <offer shop="BikeRanger.cz">
+    <ean>8597680554548</ean>
+    <price>95990</price>
+    <shipping>0</shipping>
+    <availability>in stock</availability>
+    <url>https://bikeranger.cz/p/8597680554548</url>
+  </offer>
+  <offer shop="VeloMarket.cz">
+    <ean>8594656869996</ean>
+    <price>111990</price>
+    <shipping>0</shipping>
+    <availability>in stock</availability>
+    <url>https://velomarket.cz/p/8594656869996</url>
+  </offer>
+  <offer shop="SpeedKola.cz">
+    <ean>8594656869996</ean>
+    <price>135990</price>
+    <shipping>0</shipping>
+    <availability>in stock</availability>
+    <url>https://speedkola.cz/p/8594656869996</url>
+  </offer>
+  <offer shop="HoryNaKole.cz">
+    <ean>8594656869996</ean>
+    <price>114990</price>
+    <shipping>0</shipping>
+    <availability>in stock</availability>
+    <url>https://horynakole.cz/p/8594656869996</url>
+  </offer>
+  <offer shop="MegaSportík.cz">
+    <ean>8594656869996</ean>
+    <price>108990</price>
+    <shipping>0</shipping>
+    <availability>in stock</availability>
+    <url>https://megasportik.cz/p/8594656869996</url>
+  </offer>
+  <offer shop="VeloMarket.cz">
+    <ean>8598258438635</ean>
+    <price>118990</price>
+    <shipping>0</shipping>
+    <availability>in stock</availability>
+    <url>https://velomarket.cz/p/8598258438635</url>
+  </offer>
+  <offer shop="KoloPointer.cz">
+    <ean>8598258438635</ean>
+    <price>123990</price>
+    <shipping>0</shipping>
+    <availability>in stock</availability>
+    <url>https://kolopointer.cz/p/8598258438635</url>
+  </offer>
+  <offer shop="CykloDům.cz">
+    <ean>8598258438635</ean>
+    <price>133990</price>
+    <shipping>0</shipping>
+    <availability>in stock</availability>
+    <url>https://cyklodum.cz/p/8598258438635</url>
+  </offer>
+  <offer shop="VeloMarket.cz">
+    <ean>8590050760488</ean>
+    <price>110990</price>
+    <shipping>0</shipping>
+    <availability>out of stock</availability>
+    <url>https://velomarket.cz/p/8590050760488</url>
+  </offer>
+  <offer shop="KoloPointer.cz">
+    <ean>8590050760488</ean>
+    <price>120990</price>
+    <shipping>0</shipping>
+    <availability>in stock</availability>
+    <url>https://kolopointer.cz/p/8590050760488</url>
+  </offer>
+  <offer shop="CykloDům.cz">
+    <ean>8590050760488</ean>
+    <price>120990</price>
+    <shipping>0</shipping>
+    <availability>in stock</availability>
+    <url>https://cyklodum.cz/p/8590050760488</url>
+  </offer>
+  <offer shop="KoloPointer.cz">
+    <ean>8599592139592</ean>
+    <price>128990</price>
+    <shipping>0</shipping>
+    <availability>in stock</availability>
+    <url>https://kolopointer.cz/p/8599592139592</url>
+  </offer>
+  <offer shop="BikeRanger.cz">
+    <ean>8599592139592</ean>
+    <price>110990</price>
+    <shipping>0</shipping>
+    <availability>out of stock</availability>
+    <url>https://bikeranger.cz/p/8599592139592</url>
+  </offer>
+  <offer shop="SpeedKola.cz">
+    <ean>8599592139592</ean>
+    <price>130990</price>
+    <shipping>0</shipping>
+    <availability>in stock</availability>
+    <url>https://speedkola.cz/p/8599592139592</url>
+  </offer>
+  <offer shop="VeloMarket.cz">
+    <ean>8596456641079</ean>
+    <price>119990</price>
+    <shipping>0</shipping>
+    <availability>in stock</availability>
+    <url>https://velomarket.cz/p/8596456641079</url>
+  </offer>
+  <offer shop="CykloDům.cz">
+    <ean>8596456641079</ean>
+    <price>129990</price>
+    <shipping>0</shipping>
+    <availability>in stock</availability>
+    <url>https://cyklodum.cz/p/8596456641079</url>
+  </offer>
+  <offer shop="BikeRanger.cz">
+    <ean>8596456641079</ean>
+    <price>112990</price>
+    <shipping>0</shipping>
+    <availability>out of stock</availability>
+    <url>https://bikeranger.cz/p/8596456641079</url>
+  </offer>
+  <offer shop="SpeedKola.cz">
+    <ean>8596456641079</ean>
+    <price>125990</price>
+    <shipping>0</shipping>
+    <availability>in stock</availability>
+    <url>https://speedkola.cz/p/8596456641079</url>
+  </offer>
+  <offer shop="KoloPointer.cz">
+    <ean>8590555956591</ean>
+    <price>209990</price>
+    <shipping>0</shipping>
+    <availability>in stock</availability>
+    <url>https://kolopointer.cz/p/8590555956591</url>
+  </offer>
+  <offer shop="CykloDům.cz">
+    <ean>8590555956591</ean>
+    <price>207990</price>
+    <shipping>0</shipping>
+    <availability>in stock</availability>
+    <url>https://cyklodum.cz/p/8590555956591</url>
+  </offer>
+  <offer shop="BikeRanger.cz">
+    <ean>8590555956591</ean>
+    <price>193990</price>
+    <shipping>0</shipping>
+    <availability>out of stock</availability>
+    <url>https://bikeranger.cz/p/8590555956591</url>
+  </offer>
+  <offer shop="VeloMarket.cz">
+    <ean>8593754397431</ean>
+    <price>187990</price>
+    <shipping>0</shipping>
+    <availability>in stock</availability>
+    <url>https://velomarket.cz/p/8593754397431</url>
+  </offer>
+  <offer shop="CykloDům.cz">
+    <ean>8593754397431</ean>
+    <price>217990</price>
+    <shipping>0</shipping>
+    <availability>in stock</availability>
+    <url>https://cyklodum.cz/p/8593754397431</url>
+  </offer>
+  <offer shop="SpeedKola.cz">
+    <ean>8593754397431</ean>
+    <price>226990</price>
+    <shipping>0</shipping>
+    <availability>in stock</availability>
+    <url>https://speedkola.cz/p/8593754397431</url>
+  </offer>
+  <offer shop="MegaSportík.cz">
+    <ean>8593754397431</ean>
+    <price>185990</price>
+    <shipping>0</shipping>
+    <availability>in stock</availability>
+    <url>https://megasportik.cz/p/8593754397431</url>
+  </offer>
+  <offer shop="BikeRanger.cz">
+    <ean>8591679882759</ean>
+    <price>100990</price>
+    <shipping>0</shipping>
+    <availability>out of stock</availability>
+    <url>https://bikeranger.cz/p/8591679882759</url>
+  </offer>
+  <offer shop="HoryNaKole.cz">
+    <ean>8591679882759</ean>
+    <price>203990</price>
+    <shipping>0</shipping>
+    <availability>in stock</availability>
+    <url>https://horynakole.cz/p/8591679882759</url>
+  </offer>
+  <offer shop="VeloMarket.cz">
+    <ean>8593997132066</ean>
+    <price>40990</price>
+    <shipping>0</shipping>
+    <availability>in stock</availability>
+    <url>https://velomarket.cz/p/8593997132066</url>
+  </offer>
+  <offer shop="KoloPointer.cz">
+    <ean>8593997132066</ean>
+    <price>46990</price>
+    <shipping>0</shipping>
+    <availability>in stock</availability>
+    <url>https://kolopointer.cz/p/8593997132066</url>
+  </offer>
+  <offer shop="BikeRanger.cz">
+    <ean>8593997132066</ean>
+    <price>40990</price>
+    <shipping>0</shipping>
+    <availability>in stock</availability>
+    <url>https://bikeranger.cz/p/8593997132066</url>
+  </offer>
+  <offer shop="CykloDům.cz">
+    <ean>8598847146415</ean>
+    <price>46990</price>
+    <shipping>0</shipping>
+    <availability>in stock</availability>
+    <url>https://cyklodum.cz/p/8598847146415</url>
+  </offer>
+  <offer shop="SpeedKola.cz">
+    <ean>8598847146415</ean>
+    <price>49990</price>
+    <shipping>0</shipping>
+    <availability>in stock</availability>
+    <url>https://speedkola.cz/p/8598847146415</url>
+  </offer>
+  <offer shop="VeloMarket.cz">
+    <ean>8590712070757</ean>
+    <price>42990</price>
+    <shipping>0</shipping>
+    <availability>in stock</availability>
+    <url>https://velomarket.cz/p/8590712070757</url>
+  </offer>
+  <offer shop="CykloDům.cz">
+    <ean>8590712070757</ean>
+    <price>45990</price>
+    <shipping>0</shipping>
+    <availability>in stock</availability>
+    <url>https://cyklodum.cz/p/8590712070757</url>
+  </offer>
+  <offer shop="BikeRanger.cz">
+    <ean>8590712070757</ean>
+    <price>41990</price>
+    <shipping>0</shipping>
+    <availability>in stock</availability>
+    <url>https://bikeranger.cz/p/8590712070757</url>
+  </offer>
+  <offer shop="SpeedKola.cz">
+    <ean>8590712070757</ean>
+    <price>48990</price>
+    <shipping>0</shipping>
+    <availability>out of stock</availability>
+    <url>https://speedkola.cz/p/8590712070757</url>
+  </offer>
+  <offer shop="KoloPointer.cz">
+    <ean>8596017121392</ean>
+    <price>46990</price>
+    <shipping>0</shipping>
+    <availability>in stock</availability>
+    <url>https://kolopointer.cz/p/8596017121392</url>
+  </offer>
+  <offer shop="MegaSportík.cz">
+    <ean>8596017121392</ean>
+    <price>41990</price>
+    <shipping>0</shipping>
+    <availability>out of stock</availability>
+    <url>https://megasportik.cz/p/8596017121392</url>
+  </offer>
+  <offer shop="VeloMarket.cz">
+    <ean>8599808782185</ean>
+    <price>42990</price>
+    <shipping>0</shipping>
+    <availability>in stock</availability>
+    <url>https://velomarket.cz/p/8599808782185</url>
+  </offer>
+  <offer shop="HoryNaKole.cz">
+    <ean>8599808782185</ean>
+    <price>41990</price>
+    <shipping>0</shipping>
+    <availability>in stock</availability>
+    <url>https://horynakole.cz/p/8599808782185</url>
+  </offer>
+  <offer shop="VeloMarket.cz">
+    <ean>8594534446264</ean>
+    <price>709</price>
+    <shipping>99</shipping>
+    <availability>in stock</availability>
+    <url>https://velomarket.cz/p/8594534446264</url>
+  </offer>
+  <offer shop="KoloPointer.cz">
+    <ean>8594534446264</ean>
+    <price>729</price>
+    <shipping>129</shipping>
+    <availability>in stock</availability>
+    <url>https://kolopointer.cz/p/8594534446264</url>
+  </offer>
+  <offer shop="CykloDům.cz">
+    <ean>8594534446264</ean>
+    <price>809</price>
+    <shipping>129</shipping>
+    <availability>out of stock</availability>
+    <url>https://cyklodum.cz/p/8594534446264</url>
+  </offer>
+  <offer shop="BikeRanger.cz">
+    <ean>8594534446264</ean>
+    <price>679</price>
+    <shipping>99</shipping>
+    <availability>in stock</availability>
+    <url>https://bikeranger.cz/p/8594534446264</url>
+  </offer>
+  <offer shop="SpeedKola.cz">
+    <ean>8594534446264</ean>
+    <price>799</price>
+    <shipping>0</shipping>
+    <availability>in stock</availability>
+    <url>https://speedkola.cz/p/8594534446264</url>
+  </offer>
+  <offer shop="VeloMarket.cz">
+    <ean>8592011993386</ean>
+    <price>529</price>
+    <shipping>129</shipping>
+    <availability>in stock</availability>
+    <url>https://velomarket.cz/p/8592011993386</url>
+  </offer>
+  <offer shop="BikeRanger.cz">
+    <ean>8592011993386</ean>
+    <price>499</price>
+    <shipping>129</shipping>
+    <availability>in stock</availability>
+    <url>https://bikeranger.cz/p/8592011993386</url>
+  </offer>
+  <offer shop="VeloMarket.cz">
+    <ean>8596316820019</ean>
+    <price>1790</price>
+    <shipping>0</shipping>
+    <availability>in stock</availability>
+    <url>https://velomarket.cz/p/8596316820019</url>
+  </offer>
+  <offer shop="CykloDům.cz">
+    <ean>8596316820019</ean>
+    <price>1890</price>
+    <shipping>0</shipping>
+    <availability>in stock</availability>
+    <url>https://cyklodum.cz/p/8596316820019</url>
+  </offer>
+  <offer shop="HoryNaKole.cz">
+    <ean>8596316820019</ean>
+    <price>1690</price>
+    <shipping>79</shipping>
+    <availability>in stock</availability>
+    <url>https://horynakole.cz/p/8596316820019</url>
+  </offer>
+  <offer shop="MegaSportík.cz">
+    <ean>8596316820019</ean>
+    <price>1690</price>
+    <shipping>99</shipping>
+    <availability>in stock</availability>
+    <url>https://megasportik.cz/p/8596316820019</url>
+  </offer>
+  <offer shop="VeloMarket.cz">
+    <ean>8592916856366</ean>
+    <price>17990</price>
+    <shipping>0</shipping>
+    <availability>in stock</availability>
+    <url>https://velomarket.cz/p/8592916856366</url>
+  </offer>
+  <offer shop="KoloPointer.cz">
+    <ean>8592916856366</ean>
+    <price>18990</price>
+    <shipping>0</shipping>
+    <availability>in stock</availability>
+    <url>https://kolopointer.cz/p/8592916856366</url>
+  </offer>
+  <offer shop="BikeRanger.cz">
+    <ean>8592916856366</ean>
+    <price>17990</price>
+    <shipping>0</shipping>
+    <availability>in stock</availability>
+    <url>https://bikeranger.cz/p/8592916856366</url>
+  </offer>
+  <offer shop="SpeedKola.cz">
+    <ean>8592916856366</ean>
+    <price>20990</price>
+    <shipping>0</shipping>
+    <availability>in stock</availability>
+    <url>https://speedkola.cz/p/8592916856366</url>
+  </offer>
+  <offer shop="HoryNaKole.cz">
+    <ean>8592916856366</ean>
+    <price>18990</price>
+    <shipping>0</shipping>
+    <availability>in stock</availability>
+    <url>https://horynakole.cz/p/8592916856366</url>
+  </offer>
+  <offer shop="VeloMarket.cz">
+    <ean>8599786111977</ean>
+    <price>18990</price>
+    <shipping>0</shipping>
+    <availability>out of stock</availability>
+    <url>https://velomarket.cz/p/8599786111977</url>
+  </offer>
+  <offer shop="BikeRanger.cz">
+    <ean>8599786111977</ean>
+    <price>17990</price>
+    <shipping>0</shipping>
+    <availability>in stock</availability>
+    <url>https://bikeranger.cz/p/8599786111977</url>
+  </offer>
+  <offer shop="SpeedKola.cz">
+    <ean>8599786111977</ean>
+    <price>19990</price>
+    <shipping>0</shipping>
+    <availability>in stock</availability>
+    <url>https://speedkola.cz/p/8599786111977</url>
+  </offer>
+  <offer shop="MegaSportík.cz">
+    <ean>8599786111977</ean>
+    <price>18990</price>
+    <shipping>0</shipping>
+    <availability>in stock</availability>
+    <url>https://megasportik.cz/p/8599786111977</url>
+  </offer>
+  <offer shop="VeloMarket.cz">
+    <ean>8591427569673</ean>
+    <price>18990</price>
+    <shipping>0</shipping>
+    <availability>in stock</availability>
+    <url>https://velomarket.cz/p/8591427569673</url>
+  </offer>
+  <offer shop="KoloPointer.cz">
+    <ean>8591427569673</ean>
+    <price>18990</price>
+    <shipping>0</shipping>
+    <availability>in stock</availability>
+    <url>https://kolopointer.cz/p/8591427569673</url>
+  </offer>
+  <offer shop="HoryNaKole.cz">
+    <ean>8591427569673</ean>
+    <price>17990</price>
+    <shipping>0</shipping>
+    <availability>in stock</availability>
+    <url>https://horynakole.cz/p/8591427569673</url>
+  </offer>
+  <offer shop="MegaSportík.cz">
+    <ean>8591427569673</ean>
+    <price>16990</price>
+    <shipping>0</shipping>
+    <availability>in stock</availability>
+    <url>https://megasportik.cz/p/8591427569673</url>
+  </offer>
+  <offer shop="VeloMarket.cz">
+    <ean>8599594441761</ean>
+    <price>1590</price>
+    <shipping>0</shipping>
+    <availability>in stock</availability>
+    <url>https://velomarket.cz/p/8599594441761</url>
+  </offer>
+  <offer shop="BikeRanger.cz">
+    <ean>8599594441761</ean>
+    <price>1690</price>
+    <shipping>79</shipping>
+    <availability>in stock</availability>
+    <url>https://bikeranger.cz/p/8599594441761</url>
+  </offer>
+  <offer shop="HoryNaKole.cz">
+    <ean>8599594441761</ean>
+    <price>1690</price>
+    <shipping>79</shipping>
+    <availability>in stock</availability>
+    <url>https://horynakole.cz/p/8599594441761</url>
+  </offer>
+  <offer shop="MegaSportík.cz">
+    <ean>8599594441761</ean>
+    <price>1490</price>
+    <shipping>0</shipping>
+    <availability>out of stock</availability>
+    <url>https://megasportik.cz/p/8599594441761</url>
+  </offer>
+  <offer shop="VeloMarket.cz">
+    <ean>8595141895926</ean>
+    <price>1490</price>
+    <shipping>129</shipping>
+    <availability>out of stock</availability>
+    <url>https://velomarket.cz/p/8595141895926</url>
+  </offer>
+  <offer shop="KoloPointer.cz">
+    <ean>8595141895926</ean>
+    <price>1590</price>
+    <shipping>79</shipping>
+    <availability>in stock</availability>
+    <url>https://kolopointer.cz/p/8595141895926</url>
+  </offer>
+  <offer shop="CykloDům.cz">
+    <ean>8595141895926</ean>
+    <price>1590</price>
+    <shipping>79</shipping>
+    <availability>in stock</availability>
+    <url>https://cyklodum.cz/p/8595141895926</url>
+  </offer>
+  <offer shop="BikeRanger.cz">
+    <ean>8595141895926</ean>
+    <price>1590</price>
+    <shipping>99</shipping>
+    <availability>out of stock</availability>
+    <url>https://bikeranger.cz/p/8595141895926</url>
+  </offer>
+  <offer shop="VeloMarket.cz">
+    <ean>8599903852080</ean>
+    <price>175990</price>
+    <shipping>0</shipping>
+    <availability>out of stock</availability>
+    <url>https://velomarket.cz/p/8599903852080</url>
+  </offer>
+  <offer shop="KoloPointer.cz">
+    <ean>8599903852080</ean>
+    <price>184990</price>
+    <shipping>0</shipping>
+    <availability>in stock</availability>
+    <url>https://kolopointer.cz/p/8599903852080</url>
+  </offer>
+  <offer shop="CykloDům.cz">
+    <ean>8599903852080</ean>
+    <price>203990</price>
+    <shipping>0</shipping>
+    <availability>in stock</availability>
+    <url>https://cyklodum.cz/p/8599903852080</url>
+  </offer>
+  <offer shop="BikeRanger.cz">
+    <ean>8599903852080</ean>
+    <price>183990</price>
+    <shipping>0</shipping>
+    <availability>in stock</availability>
+    <url>https://bikeranger.cz/p/8599903852080</url>
+  </offer>
+  <offer shop="MegaSportík.cz">
+    <ean>8599903852080</ean>
+    <price>177990</price>
+    <shipping>0</shipping>
+    <availability>in stock</availability>
+    <url>https://megasportik.cz/p/8599903852080</url>
+  </offer>
+  <offer shop="VeloMarket.cz">
+    <ean>8593183364318</ean>
+    <price>168990</price>
+    <shipping>0</shipping>
+    <availability>in stock</availability>
+    <url>https://velomarket.cz/p/8593183364318</url>
+  </offer>
+  <offer shop="KoloPointer.cz">
+    <ean>8593183364318</ean>
+    <price>195990</price>
+    <shipping>0</shipping>
+    <availability>in stock</availability>
+    <url>https://kolopointer.cz/p/8593183364318</url>
+  </offer>
+  <offer shop="SpeedKola.cz">
+    <ean>8593183364318</ean>
+    <price>187990</price>
+    <shipping>0</shipping>
+    <availability>out of stock</availability>
+    <url>https://speedkola.cz/p/8593183364318</url>
+  </offer>
+  <offer shop="SpeedKola.cz">
+    <ean>8594163319809</ean>
+    <price>207990</price>
+    <shipping>0</shipping>
+    <availability>in stock</availability>
+    <url>https://speedkola.cz/p/8594163319809</url>
+  </offer>
+  <offer shop="VeloMarket.cz">
+    <ean>8599076561635</ean>
+    <price>178990</price>
+    <shipping>0</shipping>
+    <availability>in stock</availability>
+    <url>https://velomarket.cz/p/8599076561635</url>
+  </offer>
+  <offer shop="KoloPointer.cz">
+    <ean>8599076561635</ean>
+    <price>190990</price>
+    <shipping>0</shipping>
+    <availability>out of stock</availability>
+    <url>https://kolopointer.cz/p/8599076561635</url>
+  </offer>
+  <offer shop="CykloDům.cz">
+    <ean>8599076561635</ean>
+    <price>199990</price>
+    <shipping>0</shipping>
+    <availability>in stock</availability>
+    <url>https://cyklodum.cz/p/8599076561635</url>
+  </offer>
+  <offer shop="KoloPointer.cz">
+    <ean>8599109820562</ean>
+    <price>178990</price>
+    <shipping>0</shipping>
+    <availability>in stock</availability>
+    <url>https://kolopointer.cz/p/8599109820562</url>
+  </offer>
+  <offer shop="HoryNaKole.cz">
+    <ean>8599109820562</ean>
+    <price>178990</price>
+    <shipping>0</shipping>
+    <availability>in stock</availability>
+    <url>https://horynakole.cz/p/8599109820562</url>
+  </offer>
+  <offer shop="KoloPointer.cz">
+    <ean>8596825360259</ean>
+    <price>1790</price>
+    <shipping>79</shipping>
+    <availability>in stock</availability>
+    <url>https://kolopointer.cz/p/8596825360259</url>
+  </offer>
+  <offer shop="HoryNaKole.cz">
+    <ean>8596825360259</ean>
+    <price>1890</price>
+    <shipping>129</shipping>
+    <availability>in stock</availability>
+    <url>https://horynakole.cz/p/8596825360259</url>
+  </offer>
+</prices>

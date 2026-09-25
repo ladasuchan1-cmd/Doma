@@ -1,0 +1,6 @@
+data
+test
+docs
+examples
+*.db
+node_modules

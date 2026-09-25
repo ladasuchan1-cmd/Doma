@@ -1,0 +1,1111 @@
+{
+  "items": [
+    {
+      "ean": "8597315660484",
+      "competitor": "VeloMarket.cz",
+      "price": 839,
+      "shipping": 99,
+      "in_stock": true,
+      "url": "https://velomarket.cz/p/8597315660484",
+      "observed_at": "2026-09-23T13:03:30.855Z"
+    },
+    {
+      "ean": "8597315660484",
+      "competitor": "KoloPointer.cz",
+      "price": 959,
+      "shipping": 79,
+      "in_stock": true,
+      "url": "https://kolopointer.cz/p/8597315660484",
+      "observed_at": "2026-09-23T11:03:30.855Z"
+    },
+    {
+      "ean": "8597315660484",
+      "competitor": "CykloDům.cz",
+      "price": 899,
+      "shipping": 0,
+      "in_stock": true,
+      "url": "https://cyklodum.cz/p/8597315660484",
+      "observed_at": "2026-09-24T03:03:30.855Z"
+    },
+    {
+      "ean": "8597315660484",
+      "competitor": "BikeRanger.cz",
+      "price": 849,
+      "shipping": 99,
+      "in_stock": true,
+      "url": "https://bikeranger.cz/p/8597315660484",
+      "observed_at": "2026-09-23T08:03:30.855Z"
+    },
+    {
+      "ean": "8597315660484",
+      "competitor": "SpeedKola.cz",
+      "price": 959,
+      "shipping": 99,
+      "in_stock": true,
+      "url": "https://speedkola.cz/p/8597315660484",
+      "observed_at": "2026-09-23T22:03:30.855Z"
+    },
+    {
+      "ean": "8597315660484",
+      "competitor": "MegaSportík.cz",
+      "price": 889,
+      "shipping": 0,
+      "in_stock": true,
+      "url": "https://megasportik.cz/p/8597315660484",
+      "observed_at": "2026-09-23T02:03:30.855Z"
+    },
+    {
+      "ean": "8591959453532",
+      "competitor": "MegaSportík.cz",
+      "price": 88990,
+      "shipping": 0,
+      "in_stock": false,
+      "url": "https://megasportik.cz/p/8591959453532",
+      "observed_at": "2026-09-24T23:03:30.855Z"
+    },
+    {
+      "ean": "8591762416328",
+      "competitor": "KoloPointer.cz",
+      "price": 97990,
+      "shipping": 0,
+      "in_stock": true,
+      "url": "https://kolopointer.cz/p/8591762416328",
+      "observed_at": "2026-09-24T19:03:30.855Z"
+    },
+    {
+      "ean": "8591762416328",
+      "competitor": "MegaSportík.cz",
+      "price": 94990,
+      "shipping": 0,
+      "in_stock": true,
+      "url": "https://megasportik.cz/p/8591762416328",
+      "observed_at": "2026-09-25T08:03:30.855Z"
+    },
+    {
+      "ean": "8595234463384",
+      "competitor": "VeloMarket.cz",
+      "price": 879,
+      "shipping": 79,
+      "in_stock": true,
+      "url": "https://velomarket.cz/p/8595234463384",
+      "observed_at": "2026-09-24T22:03:30.855Z"
+    },
+    {
+      "ean": "8595234463384",
+      "competitor": "CykloDům.cz",
+      "price": 899,
+      "shipping": 0,
+      "in_stock": true,
+      "url": "https://cyklodum.cz/p/8595234463384",
+      "observed_at": "2026-09-24T23:03:30.855Z"
+    },
+    {
+      "ean": "8595234463384",
+      "competitor": "BikeRanger.cz",
+      "price": 859,
+      "shipping": 79,
+      "in_stock": false,
+      "url": "https://bikeranger.cz/p/8595234463384",
+      "observed_at": "2026-09-24T11:03:30.855Z"
+    },
+    {
+      "ean": "8594887001561",
+      "competitor": "VeloMarket.cz",
+      "price": 184990,
+      "shipping": 0,
+      "in_stock": true,
+      "url": "https://velomarket.cz/p/8594887001561",
+      "observed_at": "2026-09-24T02:03:30.855Z"
+    },
+    {
+      "ean": "8594887001561",
+      "competitor": "KoloPointer.cz",
+      "price": 193990,
+      "shipping": 0,
+      "in_stock": false,
+      "url": "https://kolopointer.cz/p/8594887001561",
+      "observed_at": "2026-09-24T20:03:30.855Z"
+    },
+    {
+      "ean": "8594887001561",
+      "competitor": "BikeRanger.cz",
+      "price": 180990,
+      "shipping": 0,
+      "in_stock": true,
+      "url": "https://bikeranger.cz/p/8594887001561",
+      "observed_at": "2026-09-24T19:03:30.855Z"
+    },
+    {
+      "ean": "8594887001561",
+      "competitor": "SpeedKola.cz",
+      "price": 200990,
+      "shipping": 0,
+      "in_stock": true,
+      "url": "https://speedkola.cz/p/8594887001561",
+      "observed_at": "2026-09-23T01:03:30.855Z"
+    },
+    {
+      "ean": "8594577716546",
+      "competitor": "VeloMarket.cz",
+      "price": 173990,
+      "shipping": 0,
+      "in_stock": true,
+      "url": "https://velomarket.cz/p/8594577716546",
+      "observed_at": "2026-09-24T09:03:30.855Z"
+    },
+    {
+      "ean": "8594577716546",
+      "competitor": "KoloPointer.cz",
+      "price": 186990,
+      "shipping": 0,
+      "in_stock": true,
+      "url": "https://kolopointer.cz/p/8594577716546",
+      "observed_at": "2026-09-24T14:03:30.855Z"
+    },
+    {
+      "ean": "8594577716546",
+      "competitor": "CykloDům.cz",
+      "price": 183990,
+      "shipping": 0,
+      "in_stock": true,
+      "url": "https://cyklodum.cz/p/8594577716546",
+      "observed_at": "2026-09-25T17:03:30.855Z"
+    },
+    {
+      "ean": "8594577716546",
+      "competitor": "BikeRanger.cz",
+      "price": 173990,
+      "shipping": 0,
+      "in_stock": true,
+      "url": "https://bikeranger.cz/p/8594577716546",
+      "observed_at": "2026-09-23T10:03:30.855Z"
+    },
+    {
+      "ean": "8594577716546",
+      "competitor": "HoryNaKole.cz",
+      "price": 185990,
+      "shipping": 0,
+      "in_stock": false,
+      "url": "https://horynakole.cz/p/8594577716546",
+      "observed_at": "2026-09-25T15:03:30.855Z"
+    },
+    {
+      "ean": "8590002665908",
+      "competitor": "KoloPointer.cz",
+      "price": 178990,
+      "shipping": 0,
+      "in_stock": true,
+      "url": "https://kolopointer.cz/p/8590002665908",
+      "observed_at": "2026-09-23T01:03:30.855Z"
+    },
+    {
+      "ean": "8596683838433",
+      "competitor": "CykloDům.cz",
+      "price": 2490,
+      "shipping": 79,
+      "in_stock": true,
+      "url": "https://cyklodum.cz/p/8596683838433",
+      "observed_at": "2026-09-24T10:03:30.855Z"
+    },
+    {
+      "ean": "8596683838433",
+      "competitor": "MegaSportík.cz",
+      "price": 2390,
+      "shipping": 79,
+      "in_stock": true,
+      "url": "https://megasportik.cz/p/8596683838433",
+      "observed_at": "2026-09-24T06:03:30.855Z"
+    },
+    {
+      "ean": "8593886002722",
+      "competitor": "KoloPointer.cz",
+      "price": 95990,
+      "shipping": 0,
+      "in_stock": true,
+      "url": "https://kolopointer.cz/p/8593886002722",
+      "observed_at": "2026-09-25T04:03:30.855Z"
+    },
+    {
+      "ean": "8593886002722",
+      "competitor": "CykloDům.cz",
+      "price": 100990,
+      "shipping": 0,
+      "in_stock": true,
+      "url": "https://cyklodum.cz/p/8593886002722",
+      "observed_at": "2026-09-24T08:03:30.855Z"
+    },
+    {
+      "ean": "8593886002722",
+      "competitor": "SpeedKola.cz",
+      "price": 110990,
+      "shipping": 0,
+      "in_stock": true,
+      "url": "https://speedkola.cz/p/8593886002722",
+      "observed_at": "2026-09-23T03:03:30.855Z"
+    },
+    {
+      "ean": "8593886002722",
+      "competitor": "HoryNaKole.cz",
+      "price": 92990,
+      "shipping": 0,
+      "in_stock": true,
+      "url": "https://horynakole.cz/p/8593886002722",
+      "observed_at": "2026-09-25T04:03:30.855Z"
+    },
+    {
+      "ean": "8597327510746",
+      "competitor": "KoloPointer.cz",
+      "price": 96990,
+      "shipping": 0,
+      "in_stock": true,
+      "url": "https://kolopointer.cz/p/8597327510746",
+      "observed_at": "2026-09-23T21:03:30.855Z"
+    },
+    {
+      "ean": "8597327510746",
+      "competitor": "BikeRanger.cz",
+      "price": 90990,
+      "shipping": 0,
+      "in_stock": true,
+      "url": "https://bikeranger.cz/p/8597327510746",
+      "observed_at": "2026-09-24T02:03:30.855Z"
+    },
+    {
+      "ean": "8597327510746",
+      "competitor": "SpeedKola.cz",
+      "price": 112340,
+      "shipping": 0,
+      "in_stock": true,
+      "url": "https://speedkola.cz/p/8597327510746",
+      "observed_at": "2026-09-23T16:03:30.855Z"
+    },
+    {
+      "ean": "8598416518018",
+      "competitor": "VeloMarket.cz",
+      "price": 97990,
+      "shipping": 0,
+      "in_stock": true,
+      "url": "https://velomarket.cz/p/8598416518018",
+      "observed_at": "2026-09-23T21:03:30.855Z"
+    },
+    {
+      "ean": "8598416518018",
+      "competitor": "BikeRanger.cz",
+      "price": 90990,
+      "shipping": 0,
+      "in_stock": true,
+      "url": "https://bikeranger.cz/p/8598416518018",
+      "observed_at": "2026-09-23T15:03:30.855Z"
+    },
+    {
+      "ean": "8598416518018",
+      "competitor": "HoryNaKole.cz",
+      "price": 98990,
+      "shipping": 0,
+      "in_stock": true,
+      "url": "https://horynakole.cz/p/8598416518018",
+      "observed_at": "2026-09-23T07:03:30.855Z"
+    },
+    {
+      "ean": "8597680554548",
+      "competitor": "VeloMarket.cz",
+      "price": 90990,
+      "shipping": 0,
+      "in_stock": true,
+      "url": "https://velomarket.cz/p/8597680554548",
+      "observed_at": "2026-09-25T08:03:30.855Z"
+    },
+    {
+      "ean": "8597680554548",
+      "competitor": "BikeRanger.cz",
+      "price": 95990,
+      "shipping": 0,
+      "in_stock": true,
+      "url": "https://bikeranger.cz/p/8597680554548",
+      "observed_at": "2026-09-24T12:03:30.855Z"
+    },
+    {
+      "ean": "8594656869996",
+      "competitor": "VeloMarket.cz",
+      "price": 111990,
+      "shipping": 0,
+      "in_stock": true,
+      "url": "https://velomarket.cz/p/8594656869996",
+      "observed_at": "2026-09-25T19:03:30.855Z"
+    },
+    {
+      "ean": "8594656869996",
+      "competitor": "SpeedKola.cz",
+      "price": 135990,
+      "shipping": 0,
+      "in_stock": true,
+      "url": "https://speedkola.cz/p/8594656869996",
+      "observed_at": "2026-09-23T03:03:30.855Z"
+    },
+    {
+      "ean": "8594656869996",
+      "competitor": "HoryNaKole.cz",
+      "price": 114990,
+      "shipping": 0,
+      "in_stock": true,
+      "url": "https://horynakole.cz/p/8594656869996",
+      "observed_at": "2026-09-23T17:03:30.855Z"
+    },
+    {
+      "ean": "8594656869996",
+      "competitor": "MegaSportík.cz",
+      "price": 108990,
+      "shipping": 0,
+      "in_stock": true,
+      "url": "https://megasportik.cz/p/8594656869996",
+      "observed_at": "2026-09-24T19:03:30.855Z"
+    },
+    {
+      "ean": "8598258438635",
+      "competitor": "VeloMarket.cz",
+      "price": 118990,
+      "shipping": 0,
+      "in_stock": true,
+      "url": "https://velomarket.cz/p/8598258438635",
+      "observed_at": "2026-09-23T23:03:30.855Z"
+    },
+    {
+      "ean": "8598258438635",
+      "competitor": "KoloPointer.cz",
+      "price": 123990,
+      "shipping": 0,
+      "in_stock": true,
+      "url": "https://kolopointer.cz/p/8598258438635",
+      "observed_at": "2026-09-24T17:03:30.855Z"
+    },
+    {
+      "ean": "8598258438635",
+      "competitor": "CykloDům.cz",
+      "price": 133990,
+      "shipping": 0,
+      "in_stock": true,
+      "url": "https://cyklodum.cz/p/8598258438635",
+      "observed_at": "2026-09-23T21:03:30.855Z"
+    },
+    {
+      "ean": "8590050760488",
+      "competitor": "VeloMarket.cz",
+      "price": 110990,
+      "shipping": 0,
+      "in_stock": false,
+      "url": "https://velomarket.cz/p/8590050760488",
+      "observed_at": "2026-09-24T03:03:30.855Z"
+    },
+    {
+      "ean": "8590050760488",
+      "competitor": "KoloPointer.cz",
+      "price": 120990,
+      "shipping": 0,
+      "in_stock": true,
+      "url": "https://kolopointer.cz/p/8590050760488",
+      "observed_at": "2026-09-24T16:03:30.855Z"
+    },
+    {
+      "ean": "8590050760488",
+      "competitor": "CykloDům.cz",
+      "price": 120990,
+      "shipping": 0,
+      "in_stock": true,
+      "url": "https://cyklodum.cz/p/8590050760488",
+      "observed_at": "2026-09-23T17:03:30.855Z"
+    },
+    {
+      "ean": "8599592139592",
+      "competitor": "KoloPointer.cz",
+      "price": 128990,
+      "shipping": 0,
+      "in_stock": true,
+      "url": "https://kolopointer.cz/p/8599592139592",
+      "observed_at": "2026-09-23T01:03:30.855Z"
+    },
+    {
+      "ean": "8599592139592",
+      "competitor": "BikeRanger.cz",
+      "price": 110990,
+      "shipping": 0,
+      "in_stock": false,
+      "url": "https://bikeranger.cz/p/8599592139592",
+      "observed_at": "2026-09-23T02:03:30.855Z"
+    },
+    {
+      "ean": "8599592139592",
+      "competitor": "SpeedKola.cz",
+      "price": 130990,
+      "shipping": 0,
+      "in_stock": true,
+      "url": "https://speedkola.cz/p/8599592139592",
+      "observed_at": "2026-09-24T13:03:30.855Z"
+    },
+    {
+      "ean": "8596456641079",
+      "competitor": "VeloMarket.cz",
+      "price": 119990,
+      "shipping": 0,
+      "in_stock": true,
+      "url": "https://velomarket.cz/p/8596456641079",
+      "observed_at": "2026-09-25T18:03:30.855Z"
+    },
+    {
+      "ean": "8596456641079",
+      "competitor": "CykloDům.cz",
+      "price": 129990,
+      "shipping": 0,
+      "in_stock": true,
+      "url": "https://cyklodum.cz/p/8596456641079",
+      "observed_at": "2026-09-25T01:03:30.855Z"
+    },
+    {
+      "ean": "8596456641079",
+      "competitor": "BikeRanger.cz",
+      "price": 112990,
+      "shipping": 0,
+      "in_stock": false,
+      "url": "https://bikeranger.cz/p/8596456641079",
+      "observed_at": "2026-09-24T12:03:30.855Z"
+    },
+    {
+      "ean": "8596456641079",
+      "competitor": "SpeedKola.cz",
+      "price": 125990,
+      "shipping": 0,
+      "in_stock": true,
+      "url": "https://speedkola.cz/p/8596456641079",
+      "observed_at": "2026-09-23T06:03:30.855Z"
+    },
+    {
+      "ean": "8590555956591",
+      "competitor": "KoloPointer.cz",
+      "price": 209990,
+      "shipping": 0,
+      "in_stock": true,
+      "url": "https://kolopointer.cz/p/8590555956591",
+      "observed_at": "2026-09-24T14:03:30.855Z"
+    },
+    {
+      "ean": "8590555956591",
+      "competitor": "CykloDům.cz",
+      "price": 207990,
+      "shipping": 0,
+      "in_stock": true,
+      "url": "https://cyklodum.cz/p/8590555956591",
+      "observed_at": "2026-09-23T07:03:30.855Z"
+    },
+    {
+      "ean": "8590555956591",
+      "competitor": "BikeRanger.cz",
+      "price": 193990,
+      "shipping": 0,
+      "in_stock": false,
+      "url": "https://bikeranger.cz/p/8590555956591",
+      "observed_at": "2026-09-24T08:03:30.855Z"
+    },
+    {
+      "ean": "8593754397431",
+      "competitor": "VeloMarket.cz",
+      "price": 187990,
+      "shipping": 0,
+      "in_stock": true,
+      "url": "https://velomarket.cz/p/8593754397431",
+      "observed_at": "2026-09-24T18:03:30.855Z"
+    },
+    {
+      "ean": "8593754397431",
+      "competitor": "CykloDům.cz",
+      "price": 217990,
+      "shipping": 0,
+      "in_stock": true,
+      "url": "https://cyklodum.cz/p/8593754397431",
+      "observed_at": "2026-09-25T17:03:30.855Z"
+    },
+    {
+      "ean": "8593754397431",
+      "competitor": "SpeedKola.cz",
+      "price": 226990,
+      "shipping": 0,
+      "in_stock": true,
+      "url": "https://speedkola.cz/p/8593754397431",
+      "observed_at": "2026-09-23T00:03:30.855Z"
+    },
+    {
+      "ean": "8593754397431",
+      "competitor": "MegaSportík.cz",
+      "price": 185990,
+      "shipping": 0,
+      "in_stock": true,
+      "url": "https://megasportik.cz/p/8593754397431",
+      "observed_at": "2026-09-24T18:03:30.855Z"
+    },
+    {
+      "ean": "8591679882759",
+      "competitor": "BikeRanger.cz",
+      "price": 100990,
+      "shipping": 0,
+      "in_stock": false,
+      "url": "https://bikeranger.cz/p/8591679882759",
+      "observed_at": "2026-09-23T01:03:30.855Z"
+    },
+    {
+      "ean": "8591679882759",
+      "competitor": "HoryNaKole.cz",
+      "price": 203990,
+      "shipping": 0,
+      "in_stock": true,
+      "url": "https://horynakole.cz/p/8591679882759",
+      "observed_at": "2026-09-23T12:03:30.855Z"
+    },
+    {
+      "ean": "8593997132066",
+      "competitor": "VeloMarket.cz",
+      "price": 40990,
+      "shipping": 0,
+      "in_stock": true,
+      "url": "https://velomarket.cz/p/8593997132066",
+      "observed_at": "2026-09-23T20:03:30.855Z"
+    },
+    {
+      "ean": "8593997132066",
+      "competitor": "KoloPointer.cz",
+      "price": 46990,
+      "shipping": 0,
+      "in_stock": true,
+      "url": "https://kolopointer.cz/p/8593997132066",
+      "observed_at": "2026-09-24T15:03:30.855Z"
+    },
+    {
+      "ean": "8593997132066",
+      "competitor": "BikeRanger.cz",
+      "price": 40990,
+      "shipping": 0,
+      "in_stock": true,
+      "url": "https://bikeranger.cz/p/8593997132066",
+      "observed_at": "2026-09-24T02:03:30.855Z"
+    },
+    {
+      "ean": "8598847146415",
+      "competitor": "CykloDům.cz",
+      "price": 46990,
+      "shipping": 0,
+      "in_stock": true,
+      "url": "https://cyklodum.cz/p/8598847146415",
+      "observed_at": "2026-09-25T02:03:30.855Z"
+    },
+    {
+      "ean": "8598847146415",
+      "competitor": "SpeedKola.cz",
+      "price": 49990,
+      "shipping": 0,
+      "in_stock": true,
+      "url": "https://speedkola.cz/p/8598847146415",
+      "observed_at": "2026-09-23T01:03:30.855Z"
+    },
+    {
+      "ean": "8590712070757",
+      "competitor": "VeloMarket.cz",
+      "price": 42990,
+      "shipping": 0,
+      "in_stock": true,
+      "url": "https://velomarket.cz/p/8590712070757",
+      "observed_at": "2026-09-23T07:03:30.855Z"
+    },
+    {
+      "ean": "8590712070757",
+      "competitor": "CykloDům.cz",
+      "price": 45990,
+      "shipping": 0,
+      "in_stock": true,
+      "url": "https://cyklodum.cz/p/8590712070757",
+      "observed_at": "2026-09-22T23:03:30.855Z"
+    },
+    {
+      "ean": "8590712070757",
+      "competitor": "BikeRanger.cz",
+      "price": 41990,
+      "shipping": 0,
+      "in_stock": true,
+      "url": "https://bikeranger.cz/p/8590712070757",
+      "observed_at": "2026-09-23T21:03:30.855Z"
+    },
+    {
+      "ean": "8590712070757",
+      "competitor": "SpeedKola.cz",
+      "price": 48990,
+      "shipping": 0,
+      "in_stock": false,
+      "url": "https://speedkola.cz/p/8590712070757",
+      "observed_at": "2026-09-24T05:03:30.855Z"
+    },
+    {
+      "ean": "8596017121392",
+      "competitor": "KoloPointer.cz",
+      "price": 46990,
+      "shipping": 0,
+      "in_stock": true,
+      "url": "https://kolopointer.cz/p/8596017121392",
+      "observed_at": "2026-09-25T03:03:30.855Z"
+    },
+    {
+      "ean": "8596017121392",
+      "competitor": "MegaSportík.cz",
+      "price": 41990,
+      "shipping": 0,
+      "in_stock": false,
+      "url": "https://megasportik.cz/p/8596017121392",
+      "observed_at": "2026-09-25T02:03:30.855Z"
+    },
+    {
+      "ean": "8599808782185",
+      "competitor": "VeloMarket.cz",
+      "price": 42990,
+      "shipping": 0,
+      "in_stock": true,
+      "url": "https://velomarket.cz/p/8599808782185",
+      "observed_at": "2026-09-25T18:03:30.855Z"
+    },
+    {
+      "ean": "8599808782185",
+      "competitor": "HoryNaKole.cz",
+      "price": 41990,
+      "shipping": 0,
+      "in_stock": true,
+      "url": "https://horynakole.cz/p/8599808782185",
+      "observed_at": "2026-09-25T01:03:30.855Z"
+    },
+    {
+      "ean": "8594534446264",
+      "competitor": "VeloMarket.cz",
+      "price": 709,
+      "shipping": 99,
+      "in_stock": true,
+      "url": "https://velomarket.cz/p/8594534446264",
+      "observed_at": "2026-09-25T14:03:30.855Z"
+    },
+    {
+      "ean": "8594534446264",
+      "competitor": "KoloPointer.cz",
+      "price": 729,
+      "shipping": 129,
+      "in_stock": true,
+      "url": "https://kolopointer.cz/p/8594534446264",
+      "observed_at": "2026-09-25T16:03:30.855Z"
+    },
+    {
+      "ean": "8594534446264",
+      "competitor": "CykloDům.cz",
+      "price": 809,
+      "shipping": 129,
+      "in_stock": false,
+      "url": "https://cyklodum.cz/p/8594534446264",
+      "observed_at": "2026-09-24T08:03:30.855Z"
+    },
+    {
+      "ean": "8594534446264",
+      "competitor": "BikeRanger.cz",
+      "price": 679,
+      "shipping": 99,
+      "in_stock": true,
+      "url": "https://bikeranger.cz/p/8594534446264",
+      "observed_at": "2026-09-23T13:03:30.855Z"
+    },
+    {
+      "ean": "8594534446264",
+      "competitor": "SpeedKola.cz",
+      "price": 799,
+      "shipping": 0,
+      "in_stock": true,
+      "url": "https://speedkola.cz/p/8594534446264",
+      "observed_at": "2026-09-24T12:03:30.855Z"
+    },
+    {
+      "ean": "8592011993386",
+      "competitor": "VeloMarket.cz",
+      "price": 529,
+      "shipping": 129,
+      "in_stock": true,
+      "url": "https://velomarket.cz/p/8592011993386",
+      "observed_at": "2026-09-23T19:03:30.855Z"
+    },
+    {
+      "ean": "8592011993386",
+      "competitor": "BikeRanger.cz",
+      "price": 499,
+      "shipping": 129,
+      "in_stock": true,
+      "url": "https://bikeranger.cz/p/8592011993386",
+      "observed_at": "2026-09-25T05:03:30.855Z"
+    },
+    {
+      "ean": "8596316820019",
+      "competitor": "VeloMarket.cz",
+      "price": 1790,
+      "shipping": 0,
+      "in_stock": true,
+      "url": "https://velomarket.cz/p/8596316820019",
+      "observed_at": "2026-09-24T09:03:30.855Z"
+    },
+    {
+      "ean": "8596316820019",
+      "competitor": "CykloDům.cz",
+      "price": 1890,
+      "shipping": 0,
+      "in_stock": true,
+      "url": "https://cyklodum.cz/p/8596316820019",
+      "observed_at": "2026-09-24T07:03:30.855Z"
+    },
+    {
+      "ean": "8596316820019",
+      "competitor": "HoryNaKole.cz",
+      "price": 1690,
+      "shipping": 79,
+      "in_stock": true,
+      "url": "https://horynakole.cz/p/8596316820019",
+      "observed_at": "2026-09-22T23:03:30.855Z"
+    },
+    {
+      "ean": "8596316820019",
+      "competitor": "MegaSportík.cz",
+      "price": 1690,
+      "shipping": 99,
+      "in_stock": true,
+      "url": "https://megasportik.cz/p/8596316820019",
+      "observed_at": "2026-09-24T21:03:30.855Z"
+    },
+    {
+      "ean": "8592916856366",
+      "competitor": "VeloMarket.cz",
+      "price": 17990,
+      "shipping": 0,
+      "in_stock": true,
+      "url": "https://velomarket.cz/p/8592916856366",
+      "observed_at": "2026-09-25T12:03:30.855Z"
+    },
+    {
+      "ean": "8592916856366",
+      "competitor": "KoloPointer.cz",
+      "price": 18990,
+      "shipping": 0,
+      "in_stock": true,
+      "url": "https://kolopointer.cz/p/8592916856366",
+      "observed_at": "2026-09-24T22:03:30.855Z"
+    },
+    {
+      "ean": "8592916856366",
+      "competitor": "BikeRanger.cz",
+      "price": 17990,
+      "shipping": 0,
+      "in_stock": true,
+      "url": "https://bikeranger.cz/p/8592916856366",
+      "observed_at": "2026-09-23T22:03:30.855Z"
+    },
+    {
+      "ean": "8592916856366",
+      "competitor": "SpeedKola.cz",
+      "price": 20990,
+      "shipping": 0,
+      "in_stock": true,
+      "url": "https://speedkola.cz/p/8592916856366",
+      "observed_at": "2026-09-25T08:03:30.855Z"
+    },
+    {
+      "ean": "8592916856366",
+      "competitor": "HoryNaKole.cz",
+      "price": 18990,
+      "shipping": 0,
+      "in_stock": true,
+      "url": "https://horynakole.cz/p/8592916856366",
+      "observed_at": "2026-09-23T14:03:30.855Z"
+    },
+    {
+      "ean": "8599786111977",
+      "competitor": "VeloMarket.cz",
+      "price": 18990,
+      "shipping": 0,
+      "in_stock": false,
+      "url": "https://velomarket.cz/p/8599786111977",
+      "observed_at": "2026-09-24T16:03:30.855Z"
+    },
+    {
+      "ean": "8599786111977",
+      "competitor": "BikeRanger.cz",
+      "price": 17990,
+      "shipping": 0,
+      "in_stock": true,
+      "url": "https://bikeranger.cz/p/8599786111977",
+      "observed_at": "2026-09-25T05:03:30.855Z"
+    },
+    {
+      "ean": "8599786111977",
+      "competitor": "SpeedKola.cz",
+      "price": 19990,
+      "shipping": 0,
+      "in_stock": true,
+      "url": "https://speedkola.cz/p/8599786111977",
+      "observed_at": "2026-09-23T09:03:30.855Z"
+    },
+    {
+      "ean": "8599786111977",
+      "competitor": "MegaSportík.cz",
+      "price": 18990,
+      "shipping": 0,
+      "in_stock": true,
+      "url": "https://megasportik.cz/p/8599786111977",
+      "observed_at": "2026-09-24T02:03:30.855Z"
+    },
+    {
+      "ean": "8591427569673",
+      "competitor": "VeloMarket.cz",
+      "price": 18990,
+      "shipping": 0,
+      "in_stock": true,
+      "url": "https://velomarket.cz/p/8591427569673",
+      "observed_at": "2026-09-25T18:03:30.855Z"
+    },
+    {
+      "ean": "8591427569673",
+      "competitor": "KoloPointer.cz",
+      "price": 18990,
+      "shipping": 0,
+      "in_stock": true,
+      "url": "https://kolopointer.cz/p/8591427569673",
+      "observed_at": "2026-09-25T15:03:30.855Z"
+    },
+    {
+      "ean": "8591427569673",
+      "competitor": "HoryNaKole.cz",
+      "price": 17990,
+      "shipping": 0,
+      "in_stock": true,
+      "url": "https://horynakole.cz/p/8591427569673",
+      "observed_at": "2026-09-24T04:03:30.855Z"
+    },
+    {
+      "ean": "8591427569673",
+      "competitor": "MegaSportík.cz",
+      "price": 16990,
+      "shipping": 0,
+      "in_stock": true,
+      "url": "https://megasportik.cz/p/8591427569673",
+      "observed_at": "2026-09-25T08:03:30.855Z"
+    },
+    {
+      "ean": "8599594441761",
+      "competitor": "VeloMarket.cz",
+      "price": 1590,
+      "shipping": 0,
+      "in_stock": true,
+      "url": "https://velomarket.cz/p/8599594441761",
+      "observed_at": "2026-09-23T19:03:30.855Z"
+    },
+    {
+      "ean": "8599594441761",
+      "competitor": "BikeRanger.cz",
+      "price": 1690,
+      "shipping": 79,
+      "in_stock": true,
+      "url": "https://bikeranger.cz/p/8599594441761",
+      "observed_at": "2026-09-23T04:03:30.855Z"
+    },
+    {
+      "ean": "8599594441761",
+      "competitor": "HoryNaKole.cz",
+      "price": 1690,
+      "shipping": 79,
+      "in_stock": true,
+      "url": "https://horynakole.cz/p/8599594441761",
+      "observed_at": "2026-09-23T14:03:30.855Z"
+    },
+    {
+      "ean": "8599594441761",
+      "competitor": "MegaSportík.cz",
+      "price": 1490,
+      "shipping": 0,
+      "in_stock": false,
+      "url": "https://megasportik.cz/p/8599594441761",
+      "observed_at": "2026-09-24T09:03:30.855Z"
+    },
+    {
+      "ean": "8595141895926",
+      "competitor": "VeloMarket.cz",
+      "price": 1490,
+      "shipping": 129,
+      "in_stock": false,
+      "url": "https://velomarket.cz/p/8595141895926",
+      "observed_at": "2026-09-25T11:03:30.855Z"
+    },
+    {
+      "ean": "8595141895926",
+      "competitor": "KoloPointer.cz",
+      "price": 1590,
+      "shipping": 79,
+      "in_stock": true,
+      "url": "https://kolopointer.cz/p/8595141895926",
+      "observed_at": "2026-09-24T13:03:30.855Z"
+    },
+    {
+      "ean": "8595141895926",
+      "competitor": "CykloDům.cz",
+      "price": 1590,
+      "shipping": 79,
+      "in_stock": true,
+      "url": "https://cyklodum.cz/p/8595141895926",
+      "observed_at": "2026-09-25T12:03:30.855Z"
+    },
+    {
+      "ean": "8595141895926",
+      "competitor": "BikeRanger.cz",
+      "price": 1590,
+      "shipping": 99,
+      "in_stock": false,
+      "url": "https://bikeranger.cz/p/8595141895926",
+      "observed_at": "2026-09-24T07:03:30.855Z"
+    },
+    {
+      "ean": "8599903852080",
+      "competitor": "VeloMarket.cz",
+      "price": 175990,
+      "shipping": 0,
+      "in_stock": false,
+      "url": "https://velomarket.cz/p/8599903852080",
+      "observed_at": "2026-09-25T02:03:30.855Z"
+    },
+    {
+      "ean": "8599903852080",
+      "competitor": "KoloPointer.cz",
+      "price": 184990,
+      "shipping": 0,
+      "in_stock": true,
+      "url": "https://kolopointer.cz/p/8599903852080",
+      "observed_at": "2026-09-25T08:03:30.855Z"
+    },
+    {
+      "ean": "8599903852080",
+      "competitor": "CykloDům.cz",
+      "price": 203990,
+      "shipping": 0,
+      "in_stock": true,
+      "url": "https://cyklodum.cz/p/8599903852080",
+      "observed_at": "2026-09-24T22:03:30.855Z"
+    },
+    {
+      "ean": "8599903852080",
+      "competitor": "BikeRanger.cz",
+      "price": 183990,
+      "shipping": 0,
+      "in_stock": true,
+      "url": "https://bikeranger.cz/p/8599903852080",
+      "observed_at": "2026-09-23T19:03:30.855Z"
+    },
+    {
+      "ean": "8599903852080",
+      "competitor": "MegaSportík.cz",
+      "price": 177990,
+      "shipping": 0,
+      "in_stock": true,
+      "url": "https://megasportik.cz/p/8599903852080",
+      "observed_at": "2026-09-25T16:03:30.855Z"
+    },
+    {
+      "ean": "8593183364318",
+      "competitor": "VeloMarket.cz",
+      "price": 168990,
+      "shipping": 0,
+      "in_stock": true,
+      "url": "https://velomarket.cz/p/8593183364318",
+      "observed_at": "2026-09-24T11:03:30.855Z"
+    },
+    {
+      "ean": "8593183364318",
+      "competitor": "KoloPointer.cz",
+      "price": 195990,
+      "shipping": 0,
+      "in_stock": true,
+      "url": "https://kolopointer.cz/p/8593183364318",
+      "observed_at": "2026-09-23T14:03:30.855Z"
+    },
+    {
+      "ean": "8593183364318",
+      "competitor": "SpeedKola.cz",
+      "price": 187990,
+      "shipping": 0,
+      "in_stock": false,
+      "url": "https://speedkola.cz/p/8593183364318",
+      "observed_at": "2026-09-25T13:03:30.855Z"
+    },
+    {
+      "ean": "8594163319809",
+      "competitor": "SpeedKola.cz",
+      "price": 207990,
+      "shipping": 0,
+      "in_stock": true,
+      "url": "https://speedkola.cz/p/8594163319809",
+      "observed_at": "2026-09-23T17:03:30.855Z"
+    },
+    {
+      "ean": "8599076561635",
+      "competitor": "VeloMarket.cz",
+      "price": 178990,
+      "shipping": 0,
+      "in_stock": true,
+      "url": "https://velomarket.cz/p/8599076561635",
+      "observed_at": "2026-09-24T20:03:30.855Z"
+    },
+    {
+      "ean": "8599076561635",
+      "competitor": "KoloPointer.cz",
+      "price": 190990,
+      "shipping": 0,
+      "in_stock": false,
+      "url": "https://kolopointer.cz/p/8599076561635",
+      "observed_at": "2026-09-25T14:03:30.855Z"
+    },
+    {
+      "ean": "8599076561635",
+      "competitor": "CykloDům.cz",
+      "price": 199990,
+      "shipping": 0,
+      "in_stock": true,
+      "url": "https://cyklodum.cz/p/8599076561635",
+      "observed_at": "2026-09-25T03:03:30.855Z"
+    },
+    {
+      "ean": "8599109820562",
+      "competitor": "KoloPointer.cz",
+      "price": 178990,
+      "shipping": 0,
+      "in_stock": true,
+      "url": "https://kolopointer.cz/p/8599109820562",
+      "observed_at": "2026-09-22T22:03:30.855Z"
+    },
+    {
+      "ean": "8599109820562",
+      "competitor": "HoryNaKole.cz",
+      "price": 178990,
+      "shipping": 0,
+      "in_stock": true,
+      "url": "https://horynakole.cz/p/8599109820562",
+      "observed_at": "2026-09-25T04:03:30.855Z"
+    },
+    {
+      "ean": "8596825360259",
+      "competitor": "KoloPointer.cz",
+      "price": 1790,
+      "shipping": 79,
+      "in_stock": true,
+      "url": "https://kolopointer.cz/p/8596825360259",
+      "observed_at": "2026-09-24T14:03:30.855Z"
+    },
+    {
+      "ean": "8596825360259",
+      "competitor": "HoryNaKole.cz",
+      "price": 1890,
+      "shipping": 129,
+      "in_stock": true,
+      "url": "https://horynakole.cz/p/8596825360259",
+      "observed_at": "2026-09-25T12:03:30.855Z"
+    }
+  ]
+}
