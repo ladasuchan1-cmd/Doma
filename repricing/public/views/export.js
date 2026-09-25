@@ -77,7 +77,7 @@ export async function show(root, ctx) {
         { class: 'download' },
         h('h3', null, 'POHODA XML'),
         h('p', null, 'Datový balík pro import do POHODY (aktualizace prodejní ceny zásob, párování podle kódu nebo EAN).'),
-        h('div', { class: 'form-grid form-grid-2' }, field({ label: 'Rozsah', control: pohodaScope }), field({ label: 'Kódování', control: pohodaEnc })),
+        h('div', { class: 'stack-sm' }, field({ label: 'Rozsah', control: pohodaScope }), field({ label: 'Kódování', control: pohodaEnc })),
         checkbox('Označit jako exportované', false, (v) => { pohodaMark.v = v; updatePohoda(); }),
         h('div', null, pohodaLink)
       ),

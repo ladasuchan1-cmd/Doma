@@ -902,7 +902,7 @@ dialog.modal::backdrop { background: rgba(12, 16, 24, 0.5); }
 .api-example + .api-example { margin-top: 18px; }
 .copy-field { display: flex; gap: 6px; min-width: 0; }
 .copy-field .input { flex: 1 1 auto; min-width: 0; }
-.feed-row { display: grid; grid-template-columns: 170px minmax(0, 1fr); gap: 10px; align-items: center; }
+.feed-row { display: grid; grid-template-columns: 210px minmax(0, 1fr); gap: 10px; align-items: center; }
 .feed-row + .feed-row { margin-top: 8px; }
 @media (max-width: 640px) { .feed-row { grid-template-columns: minmax(0, 1fr); gap: 4px; } }
 .download-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 12px; }
