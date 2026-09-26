@@ -199,3 +199,122 @@ test('contract-12: úprava ceny schváleného návrhu hlásí návrat ke schvál
   await dom.settle();
   assert.ok(dom.toasts().some((t) => /návrh se vrátil ke schválení/.test(t)), dom.toasts().join(' | '));
 });
+
+// ------------------------------------------------------------------ C4 filtry podle produktu, C5 vrátit ke schválení
+const apiLib = () => import(pathToFileURL(path.join(PUB, 'lib', 'api.js')).href);
+
+async function renderWithFacets(query = {}) {
+  (await apiLib()).invalidate();
+  dom.api({
+    'GET /segments': { items: [{ id: 3, name: 'Ležáky', count: 40 }, { id: 5, name: 'Klíčové značky', count: 300 }] },
+    'GET /products/facets': { manufacturers: [{ value: 'Trek', count: 10 }], owners: [{ value: 'Jana Dvořáková', count: 30 }, { value: 'Petr', count: 5 }], categories: [{ value: 'Horská kola', count: 25 }], suppliers: [] },
+    'POST /proposals/unapprove': (req) => {
+      posts.push(['unapprove', req.body]);
+      return { updated: req.body.ids ? req.body.ids.length : items.filter((p) => p.status === 'approved').length };
+    },
+  });
+  return render(query);
+}
+
+test('C4: filtry Zodpovědná osoba, Kategorie, Segment produktu; „Segment strategie“ zůstává zvlášť', async () => {
+  items = [proposal()];
+  dom.requests.length = 0;
+  const { root, ctx } = await renderWithFacets({ owner: 'Jana Dvořáková' });
+  const sel = (k) => root.querySelector(`select[data-filter="${k}"]`);
+  assert.ok(sel('owner') && sel('category') && sel('product_segment') && sel('segment'));
+  assert.strictEqual(sel('segment').getAttribute('aria-label'), 'Segment strategie');
+  assert.strictEqual(sel('product_segment').getAttribute('aria-label'), 'Segment produktu');
+  assert.deepStrictEqual(sel('product_segment').querySelectorAll('option').map((o) => text(o)), ['Segment produktu: vše', 'Ležáky', 'Klíčové značky']);
+  assert.strictEqual(sel('owner').value, 'Jana Dvořáková', 'hodnota z URL');
+  const lastGet = () => dom.requests.filter((r) => r.method === 'GET' && r.path === '/proposals').at(-1).query;
+  assert.strictEqual(lastGet().owner, 'Jana Dvořáková');
+  sel('category').value = 'Horská kola';
+  dom.change(sel('category'));
+  await dom.settle();
+  sel('product_segment').value = '5';
+  dom.change(sel('product_segment'));
+  await dom.settle();
+  assert.deepStrictEqual([lastGet().owner, lastGet().category, lastGet().product_segment], ['Jana Dvořáková', 'Horská kola', '5']);
+  assert.strictEqual(ctx.calls.query.at(-1).product_segment, '5', 'filtr je v adrese stránky');
+  // „Schválit vše dle filtru“ pošle i nové filtry
+  posts.length = 0;
+  dom.click(ctx.actionsEl.querySelector('[data-action="approve-all"]'));
+  await dom.settle();
+  const dlg = dom.dialogs().at(-1);
+  assert.match(text(dlg), /Filtr: segment produktu Klíčové značky, zodpovědná osoba Jana Dvořáková, kategorie Horská kola/);
+  dom.click(dlg.querySelector('[data-confirm]'));
+  await dom.settle();
+  const [kind, body] = posts.at(-1);
+  assert.strictEqual(kind, 'approve');
+  assert.deepStrictEqual({ ...body.filter }, { status: 'pending', owner: 'Jana Dvořáková', category: 'Horská kola', product_segment: '5' });
+});
+
+test('C4: filtr nad produkty a dodavatel z URL (bez vlastního výběru) jsou vidět jako štítky a jdou zrušit', async () => {
+  items = [proposal()];
+  const flt = JSON.stringify({ field: 'group_code', op: '=', value: 'TRK-MARLIN7' });
+  const { root } = await renderWithFacets({ supplier: 'Cyklo Distribuce s.r.o.', filter: flt });
+  const pills = root.querySelector('[data-role="extra-filters"]');
+  assert.strictEqual(pills.hidden, false);
+  assert.match(text(pills), /Dodavatel: Cyklo Distribuce s\.r\.o\./);
+  assert.match(text(pills), /Filtr produktů:/);
+  const lastGet = () => dom.requests.filter((r) => r.method === 'GET' && r.path === '/proposals').at(-1).query;
+  assert.strictEqual(lastGet().filter, flt);
+  assert.strictEqual(lastGet().supplier, 'Cyklo Distribuce s.r.o.');
+  dom.click(pills.querySelector('button[aria-label^="Zrušit filtr Dodavatel"]'));
+  await dom.settle();
+  assert.strictEqual(lastGet().supplier, undefined);
+  assert.strictEqual(lastGet().filter, flt, 'filtr produktů zůstal');
+});
+
+test('C5: schválený návrh „Vrátit ke schválení“ – řádek, výběr i vše dle filtru na záložce Schváleno', async () => {
+  items = [
+    proposal({ id: 20, status: 'approved', decided_at: '2026-09-26T08:00:00Z', decided_by: 'Jana' }),
+    proposal({ id: 21, status: 'approved', decided_at: '2026-09-26T08:00:00Z', decided_by: 'auto' }),
+  ];
+  posts.length = 0;
+  const { root, ctx } = await renderWithFacets({ status: 'approved', owner: 'Petr' });
+  const row = root.querySelector('tr[data-key="20"]');
+  dom.click(row.querySelector('[data-action="unapprove-row"]'));
+  await dom.settle();
+  assert.deepStrictEqual(posts.at(-1), ['unapprove', { ids: [20] }]);
+  assert.ok(dom.toasts().some((t) => /Vráceno ke schválení: 1/.test(t.replace(/[ ]/g, ' '))), dom.toasts().join(' | '));
+  // výběr → „Vrátit ke schválení“ v liště hromadných akcí
+  const cb = root.querySelector('tr[data-key="21"] input[type="checkbox"]');
+  cb.checked = true;
+  dom.change(cb);
+  const bulkBtn = root.querySelector('[data-action="unapprove-selected"]');
+  assert.strictEqual(bulkBtn.hidden, false);
+  dom.click(bulkBtn);
+  await dom.settle();
+  assert.deepStrictEqual(posts.at(-1), ['unapprove', { ids: [21] }]);
+  // vše dle filtru – jen schválené, s filtrem a expect
+  const allBtn = ctx.actionsEl.querySelector('[data-action="unapprove-all"]');
+  assert.strictEqual(allBtn.hidden, false);
+  assert.strictEqual(allBtn.disabled, false);
+  dom.click(allBtn);
+  await dom.settle();
+  const dlg = dom.dialogs().at(-1);
+  assert.match(text(dlg), /Vrátit ke schválení všechny 2 schválené \(neexportované\) návrhy odpovídající aktuálnímu filtru/);
+  assert.match(text(dlg), /do exportu .* nepůjdou/);
+  dom.click(dlg.querySelector('[data-confirm]'));
+  await dom.settle();
+  const [kind, body] = posts.at(-1);
+  assert.strictEqual(kind, 'unapprove');
+  assert.strictEqual(body.all, true);
+  assert.deepStrictEqual({ ...body.filter }, { status: 'approved', owner: 'Petr' });
+  assert.deepStrictEqual(body.expect, { count: 2, max_id: 21 });
+});
+
+test('C5: na záložce Čeká se „Vrátit vše ke schválení“ nenabízí; exportovaný návrh vrátit nejde', async () => {
+  const m = await model();
+  assert.strictEqual(m.bulkStatus('unapprove', 'pending'), null);
+  assert.strictEqual(m.bulkStatus('unapprove', 'approved'), 'approved');
+  assert.strictEqual(m.bulkStatus('unapprove', 'all'), 'approved');
+  assert.strictEqual(m.isUnapprovable({ status: 'approved' }), true);
+  assert.strictEqual(m.isUnapprovable({ status: 'approved', exported_at: '2026-09-26T08:00:00Z' }), false);
+  assert.strictEqual(m.isUnapprovable({ status: 'exported' }), false);
+  items = [proposal()];
+  const { root, ctx } = await renderWithFacets();
+  assert.strictEqual(ctx.actionsEl.querySelector('[data-action="unapprove-all"]').hidden, true);
+  assert.strictEqual(root.querySelector('[data-action="unapprove-row"]'), null);
+});

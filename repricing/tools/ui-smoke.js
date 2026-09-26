@@ -196,6 +196,34 @@ async function interactions(page, base, vp, ids) {
     await expectVisible(page, '.fb', vp, W('pokročilý filtr'));
     await shot(page, vp + '-produkty-pokrocily-filtr');
   }
+  if (vp === 'desktop') {
+    // výběr sloupců (C3 group_code, atributy): přidat Skupinu / model a první atribut, seřadit podle skupiny, vrátit výchozí
+    step('produkty – sloupce');
+    await page.click('[data-action="columns"]');
+    await expectVisible(page, 'dialog[open] input[data-col="group_code"]', vp, W('výběr sloupců'));
+    await page.locator('dialog[open] input[data-col="group_code"]').check();
+    const attrBox = page.locator('dialog[open] input[data-col^="attrs."]').first();
+    if (await attrBox.count()) await attrBox.check();
+    await shot(page, vp + '-produkty-sloupce', false);
+    await page.click('dialog[open] [data-action="apply-columns"]');
+    await page.waitForTimeout(200);
+    const heads = await page.locator('.dt thead th').allInnerTexts();
+    if (!heads.some((t) => /Skupina \/ model/.test(t))) problem(vp, W('výběr sloupců'), 'sloupec Skupina / model chybí: ' + heads.join(' | '));
+    if (!/cols=/.test(await page.evaluate(() => location.hash))) problem(vp, W('výběr sloupců'), 'výběr sloupců není v adrese (?cols=)');
+    const groupTh = page.locator('.dt thead th', { hasText: 'Skupina / model' }).locator('button');
+    if (await groupTh.count()) {
+      r = await act(page, (x) => x.url().includes('/api/v1/products?') && x.url().includes('sort=group_code'), () => groupTh.first().click());
+      if (r.status() !== 200) problem(vp, W('řazení podle skupiny'), 'GET products ' + r.status());
+      await page.waitForTimeout(200);
+      await shot(page, vp + '-produkty-skupiny');
+    }
+    await page.click('[data-action="columns"]');
+    await page.click('dialog[open] [data-action="reset-columns"]');
+    await page.click('dialog[open] [data-action="apply-columns"]');
+    await page.waitForTimeout(200);
+    if (await page.evaluate(() => { try { return localStorage.getItem('ct-products-cols'); } catch { return null; } })) problem(vp, W('výběr sloupců'), 'výchozí sloupce nesmazaly uložený výběr');
+    step('produkty');
+  }
   const prev = await currentSeq(page);
   await page.locator('.dt tbody tr.is-clickable').first().click();
   await waitReady(page, prev);
@@ -275,6 +303,34 @@ async function interactions(page, base, vp, ids) {
     const after = (await page.locator('.price-edit').first().innerText()).replace(/\D/g, '');
     if (after !== String(manual)) problem(vp, W('ruční cena'), `v tabulce je ${after}, čekáno ${manual} (cena k exportu)`);
     await shot(page, vp + '-navrhy-po-akcich');
+    // C4: filtry podle produktu; „Segment strategie“ odlišený od „Segment produktu“
+    for (const k of ['owner', 'category', 'product_segment', 'segment']) {
+      if (!(await page.locator(`select[data-filter="${k}"]`).count())) problem(vp, W('filtry návrhů'), 'chybí filtr ' + k);
+    }
+    const ownerVal = await page.locator('select[data-filter="owner"] option').nth(1).getAttribute('value').catch(() => null);
+    if (ownerVal) {
+      r = await act(page, (x) => x.url().includes('/api/v1/proposals?') && x.url().includes('owner='), () => page.selectOption('select[data-filter="owner"]', ownerVal));
+      if (r.status() !== 200) problem(vp, W('filtr osoby'), 'GET proposals ' + r.status());
+      await page.waitForTimeout(200);
+      await act(page, (x) => x.url().includes('/api/v1/proposals?') && !x.url().includes('owner='), () => page.selectOption('select[data-filter="owner"]', ''));
+    } else problem(vp, W('filtry návrhů'), 'filtr Zodpovědná osoba nemá hodnoty (facety)');
+    const segVal = await page.locator('select[data-filter="product_segment"] option').nth(1).getAttribute('value').catch(() => null);
+    if (segVal) {
+      r = await act(page, (x) => x.url().includes('/api/v1/proposals?') && x.url().includes('product_segment='), () => page.selectOption('select[data-filter="product_segment"]', segVal));
+      if (r.status() !== 200) problem(vp, W('filtr segmentu produktu'), 'GET proposals ' + r.status());
+      await act(page, (x) => x.url().includes('/api/v1/proposals?') && !x.url().includes('product_segment='), () => page.selectOption('select[data-filter="product_segment"]', ''));
+    }
+    // C5: schválený návrh vrátit ke schválení
+    await go(page, base, '/navrhy?status=approved');
+    const unRow = page.locator('[data-action="unapprove-row"]').first();
+    if (await unRow.count()) {
+      r = await act(page, (x) => x.url().includes('/api/v1/proposals/unapprove') && x.request().method() === 'POST', () => unRow.click());
+      if (r.status() !== 200) problem(vp, W('vrátit ke schválení'), 'POST unapprove ' + r.status());
+      else if (!((await r.json().catch(() => ({}))).updated >= 1)) problem(vp, W('vrátit ke schválení'), 'nic se nevrátilo');
+      await page.waitForTimeout(300);
+      await expectVisible(page, '[data-action="unapprove-all"]', vp, W('vrátit vše ke schválení'));
+      await shot(page, vp + '-navrhy-schvalene');
+    } else problem(vp, W('vrátit ke schválení'), 'na záložce Schváleno není žádný návrh k vrácení');
   }
 
   // --- strategie: úprava + simulace + uložení, přeřazení
@@ -292,9 +348,18 @@ async function interactions(page, base, vp, ids) {
   for (const v of ['next', 'keep', 'msrp', 'cost_plus']) if (!fbOpts.includes(v)) problem(vp, W('strategie'), 'náhradní režim bez volby ' + v);
   await expectVisible(page, '[data-section="schedule"]', vp, W('sekce Platnost a podmínky'));
   step('strategie – simulace');
+  // C3 / C7: nové volby formuláře
+  await expectVisible(page, 'select[data-path="group.align"]', vp, W('sjednocení skupiny'));
+  const alignOpts = await page.locator('select[data-path="group.align"] option').evaluateAll((o) => o.map((x) => x.value));
+  if (alignOpts.join() !== 'off,max,min,median') problem(vp, W('sjednocení skupiny'), 'volby ' + alignOpts.join());
+  if (!(await page.locator('[data-field="max-delivery-days"] input').count())) problem(vp, W('dodání do X dnů'), 'chybí pole competitors.max_delivery_days');
   r = await act(page, (x) => x.url().includes('/api/v1/simulate'), () => page.click('[data-action="simulate"]'), 30000);
   if (r.status() !== 200) problem(vp, W('simulace'), 'POST simulate ' + r.status());
+  // C2: uložená strategie se simuluje v kontextu celé sady strategií
+  if (Number(r.request().postDataJSON().strategy_id) !== Number(ids.strategy)) problem(vp, W('kontextová simulace'), 'chybí strategy_id: ' + r.request().postData().slice(0, 120));
+  else if ((await r.json().catch(() => ({}))).context !== true) problem(vp, W('kontextová simulace'), 'server nevrátil context: true');
   await expectVisible(page, '[data-card="simulation"] .kpi', vp, W('výsledek simulace'), 15000);
+  await expectVisible(page, '[data-role="claimed"]', vp, W('zabrané produkty'));
   await page.waitForTimeout(300);
   // karta simulace je pod dlouhým formulářem – snímek jen jí (celostránkový by ji s limitem 2400 px uřízl)
   await page.locator('[data-card="simulation"]').screenshot({ path: path.join(OUT, vp + '-strategie-simulace.png') });
@@ -304,6 +369,20 @@ async function interactions(page, base, vp, ids) {
   if (vp === 'desktop') {
     await go(page, base, '/strategie');
     if (!(await page.locator('.strategy-meta [data-meta="conditions"], .strategy-meta [data-meta="schedule"]').count())) problem(vp, W('seznam strategií'), 'chybí souhrn podmínek / platnosti');
+    // C2: simulace celého přecenění – nic se nezapíše
+    step('strategie – simulace celého přecenění');
+    const runsBefore = (await apiCall(page, 'GET', '/runs?limit=1')).body?.total;
+    r = await act(page, (x) => x.url().endsWith('/api/v1/runs') && x.request().method() === 'POST', () => page.click('[data-action="dry-run"]'), 60000);
+    if (r.status() !== 200) problem(vp, W('simulace celého přecenění'), 'POST runs ' + r.status());
+    if (r.request().postDataJSON().dry_run !== true) problem(vp, W('simulace celého přecenění'), 'neposlán dry_run: ' + r.request().postData());
+    const dryBody = await r.json().catch(() => ({}));
+    if (dryBody.run_id !== null || !Array.isArray(dryBody.sample)) problem(vp, W('simulace celého přecenění'), 'odpověď ' + JSON.stringify(dryBody).slice(0, 150));
+    await expectVisible(page, '[data-card="dry-run"] .kpi', vp, W('výsledek simulace celého přecenění'), 30000);
+    if (dryBody.sample?.length) await expectVisible(page, '[data-card="dry-run"] tbody tr[data-key]', vp, W('největší změny'));
+    await page.locator('[data-card="dry-run"]').screenshot({ path: path.join(OUT, vp + '-strategie-simulace-cele.png') });
+    const runsAfter = (await apiCall(page, 'GET', '/runs?limit=1')).body?.total;
+    if (runsBefore !== runsAfter) problem(vp, W('simulace celého přecenění'), `zapsala běh (${runsBefore} → ${runsAfter})`);
+    step('strategie');
     r = await act(page, (x) => x.url().includes('/api/v1/strategies/reorder'), () => page.locator('[data-move="down"]').first().click());
     if (r.status() !== 200) problem(vp, W('přeřazení'), 'reorder ' + r.status());
     await page.waitForTimeout(300);
@@ -390,6 +469,22 @@ async function interactions(page, base, vp, ids) {
     await go(page, base, '/import?tab=log');
     const logText = await page.locator('main').innerText();
     if (!/Ceny konkurence/.test(logText)) problem(vp, W('historie importů'), 'import se neobjevil v historii');
+    // C6: katalog „jen aktualizovat existující produkty“ – zkušební import (nic nezapíše)
+    step('import – jen aktualizovat');
+    await go(page, base, '/import?kind=products');
+    const KATALOG = path.join(__dirname, '..', 'examples', 'katalog.csv');
+    if (fs.existsSync(KATALOG)) {
+      r = await act(page, (x) => x.url().includes('/api/v1/import/preview'), () => page.setInputFiles('#import-file', { name: 'katalog.csv', mimeType: 'text/csv', buffer: fs.readFileSync(KATALOG) }));
+      if (r.status() !== 200) problem(vp, W('náhled katalogu'), 'preview ' + r.status());
+      await expectVisible(page, '[data-card="mapping"]', vp, W('mapování katalogu'));
+      if (!(await page.locator('select[data-canonical="group_code"]').count())) problem(vp, W('mapování katalogu'), 'chybí pole Skupina / model (group_code)');
+      await page.locator('label.check-update-only input').check();
+      r = await act(page, (x) => x.url().includes('/api/v1/import/products') && x.url().includes('dry_run=1'), () => page.click('[data-action="dry-run"]'), 30000);
+      if (!r.url().includes('create_missing=0')) problem(vp, W('jen aktualizovat'), 'chybí create_missing=0: ' + r.url());
+      if (r.status() !== 200) problem(vp, W('jen aktualizovat'), 'zkušební import ' + r.status() + ' ' + (await r.text().catch(() => '')).slice(0, 200));
+      await page.waitForTimeout(300);
+      await shot(page, vp + '-import-jen-aktualizovat');
+    }
   }
 
   // --- konkurence: vypnutí/zapnutí konkurenta, ruční spárování nabídky
@@ -420,6 +515,27 @@ async function interactions(page, base, vp, ids) {
     if (!okStatus(r)) problem(vp, W('spárování'), 'POST match ' + r.status());
     await page.waitForTimeout(300);
     await shot(page, vp + '-konkurence-sparovano', false);
+  }
+
+  // --- nastavení (C10)
+  step('nastavení');
+  if (vp === 'desktop') {
+    await go(page, base, '/nastaveni');
+    const txt = await page.locator('main').innerText();
+    for (const label of ['Pamatovat zamítnuté ceny', 'Uchovávat nahrazené návrhy', 'Ceny cenové hladiny jsou s DPH']) if (!txt.includes(label)) problem(vp, W('nastavení'), 'chybí ' + label);
+    const mem = page.locator('.field', { hasText: 'Pamatovat zamítnuté ceny' }).locator('input').first();
+    if (await mem.count()) {
+      const before = await mem.inputValue();
+      await mem.fill('21');
+      r = await act(page, (x) => x.url().endsWith('/api/v1/settings') && x.request().method() === 'PUT', () => page.click('[data-action="save-settings"]'));
+      if (r.status() !== 200 || (await r.json().catch(() => ({}))).reject_memory_days !== 21) problem(vp, W('nastavení'), 'reject_memory_days se neuložilo (' + r.status() + ')');
+      // toast „Nastavení uloženo“ překrývá tlačítko v liště dole vpravo a pod kurzorem nezmizí (hover pozastaví
+      // odpočet) – kurzor pryč a počkat, až zmizí
+      await page.mouse.move(5, 5);
+      await page.locator('.toast').first().waitFor({ state: 'detached', timeout: 12000 }).catch(() => {});
+      await mem.fill(before || '14');
+      await act(page, (x) => x.url().endsWith('/api/v1/settings') && x.request().method() === 'PUT', () => page.click('[data-action="save-settings"]'));
+    }
   }
 
   // --- tokeny
@@ -472,8 +588,34 @@ async function interactions(page, base, vp, ids) {
     await shot(page, vp + '-export-schvaleno');
     if (vp === 'desktop') {
       // stažení souboru přes UI (fetch → blob) – bez označení jako exportované
-      const [dl] = await Promise.all([page.waitForEvent('download', { timeout: 15000 }), page.click('a[data-format="json"]')]);
+      const [dl] = await Promise.all([page.waitForEvent('download', { timeout: 15000 }), page.click('[data-card="downloads"] a[data-format="json"]')]);
       if (!/\.json$/.test(dl.suggestedFilename())) problem(vp, W('stažení změn'), 'neočekávaný název souboru ' + dl.suggestedFilename());
+      // C8: znovu stažení doručených změn z historie exportů (jen u exportů s návrhy)
+      let exps = itemsOf((await apiCall(page, 'GET', '/exports')).body);
+      if (!exps.some((e) => e.redownload)) {
+        // demo data zatím nic nedoručila → označit schválené změny jako exportované (feed s mark=1) a stránku obnovit
+        const marked = await page.evaluate(async () => (await fetch('api/v1/export/changes.json?mark=1', { credentials: 'same-origin', headers: { 'X-Requested-With': 'cenotvorba' } })).status);
+        if (marked !== 200) problem(vp, W('znovu stáhnout'), 'export s mark=1 vrátil ' + marked);
+        await go(page, base, '/export');
+        exps = itemsOf((await apiCall(page, 'GET', '/exports')).body);
+      }
+      if (exps.some((e) => typeof e.redownload !== 'boolean')) problem(vp, W('historie exportů'), 'položky bez příznaku redownload');
+      const withRows = exps.find((e) => e.redownload);
+      if (!withRows) problem(vp, W('znovu stáhnout'), 'žádný export s doručenými změnami');
+      if (withRows) {
+        const link = page.locator(`[data-redownload="${withRows.id}"] a[data-format="csv"]`);
+        if (!(await link.count())) problem(vp, W('znovu stáhnout'), 'u exportu #' + withRows.id + ' chybí odkazy');
+        else {
+          const [dl2] = await Promise.all([page.waitForEvent('download', { timeout: 15000 }), link.click()]);
+          if (!/\.csv$/.test(dl2.suggestedFilename())) problem(vp, W('znovu stáhnout'), 'neočekávaný název souboru ' + dl2.suggestedFilename());
+          const again = await apiCall(page, 'GET', '/exports/' + withRows.id + '/changes.json');
+          if (again.status !== 200 || !itemsOf(again.body).length) problem(vp, W('znovu stáhnout'), 'GET /exports/' + withRows.id + '/changes.json → ' + again.status);
+          await shot(page, vp + '-export-historie');
+        }
+      }
+      for (const e of exps.filter((x) => !x.redownload).slice(0, 3)) {
+        if (await page.locator(`[data-redownload="${e.id}"]`).count()) problem(vp, W('znovu stáhnout'), 'export #' + e.id + ' bez změn nabízí stažení');
+      }
     }
   }
 
@@ -534,10 +676,15 @@ async function runViewport(browser, base, vp, colorScheme = 'light') {
   await page.click('.login-card button[type=submit]');
   await page.waitForFunction(() => /Nesprávné/.test(document.querySelector('.login-error')?.textContent || ''), null, { timeout: 5000 }).catch(() => problem(label, 'přihlášení', 'chybí hláška o špatném hesle'));
   const prev = await currentSeq(page);
+  // C9: nepovinné jméno (jen označení, kdo schvaluje) – zobrazí se v postranním panelu
+  if (await page.locator('#login-name').count()) await page.fill('#login-name', 'Smoke Tester');
+  else problem(label, 'přihlášení', 'chybí pole Jméno');
   await page.fill('#login-password', PASSWORD);
   await page.click('.login-card button[type=submit]');
   await waitReady(page, prev);
   if (!(await page.locator('.sidebar').count())) problem(label, 'přihlášení', 'po přihlášení se nezobrazila aplikace');
+  const who = (await page.locator('[data-role="user-name"]').innerText().catch(() => '')).trim();
+  if (who !== 'Smoke Tester') problem(label, 'přihlášení', 'v postranním panelu je „' + who + '“ místo jména z přihlášení');
 
   const ids = await discoverIds(page);
   const routes = colorScheme === 'dark'

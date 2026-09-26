@@ -552,7 +552,8 @@ function runPricing(db, opts = {}) {
       for (const { product, decision } of results) {
         const open = openByProduct.get(product.id) || null;
         const change = decision && decision.action === 'change';
-        const human = open && (open.manual_price != null || (open.status === 'approved' && open.decided_by != null && open.decided_by !== 'auto'));
+        // lidské rozhodnutí: ruční cena, ruční schválení, nebo zrušené schválení (pending s decided_by člověka – C5)
+        const human = open && (open.manual_price != null || (open.decided_by != null && open.decided_by !== 'auto'));
         if (!change) {
           // běh změnu nenavrhl: ruční cenu (lidské přebití) nezahazovat
           if (open && open.manual_price != null) keepIds.push(open.id);
@@ -803,6 +804,23 @@ function simulate(db, opts = {}) {
   return { stats, decisions: rep.decisions, truncated: rep.truncated, errors, context: false };
 }
 
+/** Počty skupin z rozhodnutí (decision.group z alignGroups) – {aligned, conflicts, members} jako vrací alignGroups. */
+function groupStatsOf(entries) {
+  const aligned = new Set();
+  const conflicts = new Set();
+  let members = 0;
+  for (const { decision: d } of entries) {
+    if (!d || !d.group) continue;
+    const k = groupKey({ group_code: d.group.code });
+    if (d.group.conflict) conflicts.add(k);
+    else {
+      aligned.add(k);
+      members += 1;
+    }
+  }
+  return { aligned: aligned.size, conflicts: conflicts.size, members };
+}
+
 /** Simulace upravené strategie v kontextu celé sady zapnutých strategií (viz simulate). */
 function simulateInContext(db, opts, { now, limit, stats, errors }) {
   const id = Number(opts.strategy_id);
@@ -842,7 +860,7 @@ function simulateInContext(db, opts, { now, limit, stats, errors }) {
     const res = evaluateProduct(ctx, p, offers.get(p.id) || []);
     results.push({ product: p, decision: res.decision, strategy: res.strategy, res });
   }
-  const groups = alignGroups(results, { settings: ctx.settings });
+  alignGroups(results, { settings: ctx.settings }); // celá sada – ceny členů skupin jiných strategií se sjednotí také
   const entries = [];
   let claimed = 0;
   for (const r of results) {
@@ -864,7 +882,9 @@ function simulateInContext(db, opts, { now, limit, stats, errors }) {
   const rep = reportDecisions(entries, stats, limit, ctx.settings);
   // stats.products = produkty segmentu strategie; evaluated = rozhodla simulovaná strategie
   stats.claimed_by_earlier = claimed;
-  stats.groups = groups;
+  // skupiny jen simulované strategie (alignGroups vrací počty za celou sadu – ty by UI zavádějícím způsobem přičetlo
+  // strategii, která sama nic nesjednocuje)
+  stats.groups = groupStatsOf(entries);
   stats.segment = segmentId != null ? ctx.segmentById.get(segmentId)?.name ?? null : 'Všechny produkty';
   stats.strategy = st.name;
   return { stats, decisions: rep.decisions, truncated: rep.truncated, errors: [], context: true };

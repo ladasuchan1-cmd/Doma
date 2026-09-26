@@ -146,3 +146,45 @@ test('contract-1: nastavení plánování varuje, že přecenění nahradí i sc
   assert.ok(warn);
   assert.match(text(warn), /i schválené, dosud neexportované; jejich schválení se ztratí/);
 });
+
+test('C10: paměť zamítnutých cen, uchování nahrazených návrhů a ceny cenové hladiny s DPH', async () => {
+  puts.length = 0;
+  const full = JSON.parse(JSON.stringify(SETTINGS));
+  Object.assign(full, { reject_memory_days: 14, retention_superseded_days: 14 });
+  full.export.pohoda.price_level_includes_vat = true;
+  dom.api({ 'GET /settings': () => JSON.parse(JSON.stringify(full)) });
+  try {
+    const root = await render();
+    const mem = fieldInput(root, 'Pamatovat zamítnuté ceny');
+    const sup = fieldInput(root, 'Uchovávat nahrazené návrhy');
+    assert.ok(mem && sup, 'pole paměti zamítnutí a uchování nahrazených');
+    assert.strictEqual(mem.value, '14');
+    assert.match(text(mem.closest('.field')), /0 = vypnuto/);
+    assert.match(text(mem.closest('.field')), /stejná cena byla nedávno zamítnuta/);
+    const vatSwitch = root.querySelector('[data-field="price-level-vat"] [role="switch"]');
+    assert.ok(vatSwitch, 'přepínač cen cenové hladiny s DPH');
+    assert.strictEqual(vatSwitch.getAttribute('aria-checked'), 'true');
+    assert.match(text(root.querySelector('[data-field="price-level-vat"]')), /cena bez DPH/);
+    // mimo rozsah 0–365 → chyba, neuloží se
+    dom.type(mem, '400');
+    assert.ok(mem.classList.contains('is-invalid'));
+    dom.click(saveBtn(root));
+    await dom.settle();
+    assert.deepStrictEqual(puts, []);
+    dom.type(mem, '0');
+    dom.type(sup, '30');
+    dom.click(vatSwitch);
+    dom.click(saveBtn(root));
+    await dom.settle();
+    assert.strictEqual(puts.length, 1);
+    assert.strictEqual(puts[0].reject_memory_days, 0, '0 = vypnuto je platná hodnota');
+    assert.strictEqual(puts[0].retention_superseded_days, 30);
+    assert.strictEqual(puts[0].export.pohoda.price_level_includes_vat, false);
+    // starší server bez klíče: přepínač ukazuje výchozí chování (s DPH), ne „vypnuto“
+    delete full.export.pohoda.price_level_includes_vat;
+    const root2 = await render();
+    assert.strictEqual(root2.querySelector('[data-field="price-level-vat"] [role="switch"]').getAttribute('aria-checked'), 'true');
+  } finally {
+    dom.api({ 'GET /settings': () => JSON.parse(JSON.stringify(SETTINGS)) });
+  }
+});

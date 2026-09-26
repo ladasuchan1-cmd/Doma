@@ -158,6 +158,12 @@ export async function show(root, ctx) {
     },
   };
 
+  // řazení podle pole, které už neexistuje (atribut zmizel z dat, starý odkaz) – API by vrátilo 400 → řadit podle kódu
+  if (fields.length && !BUILTIN[st.sort] && !fieldsMap().has(st.sort) && !String(st.sort).startsWith('proposal.')) {
+    st.sort = 'code';
+    st.dir = 'asc';
+  }
+
   /** Obecný sloupec pole z /fields: hodnota podle cesty (attrs.X), formát podle typu a jednotky, řazení na serveru. */
   function genericColumn(key) {
     const f = fieldsMap().get(key) || { key, label: key.startsWith('attrs.') ? key.slice(6) : key, type: 'string' };

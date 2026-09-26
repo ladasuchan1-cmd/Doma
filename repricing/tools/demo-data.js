@@ -82,6 +82,7 @@ function generateDemo({ products: count = 600, seed = 42, now = new Date() } = {
   const between = (a, b) => a + (b - a) * rand();
   const products = [];
   const offers = [];
+  const groupSeen = new Map(); // základ kódu skupiny → počet modelů
   let n = 0;
   while (products.length < count) {
     const cat = pick(CATEGORIES);
@@ -94,14 +95,35 @@ function generateDemo({ products: count = 600, seed = 42, now = new Date() } = {
     const msrp = roundEnding(Math.exp(between(logMin, logMax)));
     const variants = isBike ? SIZES.slice(0, 2 + Math.floor(rand() * 4)) : [null];
     const color = pick(COLORS);
-    // cenová skupina: velikosti jednoho modelu kola (značka-model-rok) – strategie s group.align jim dá jednu cenu
-    const groupCode = isBike ? `${slug(brand).slice(0, 3)}-${slug(model)}-${year}` : null;
+    // cenová skupina: velikosti jednoho modelu kola (značka-model-rok, např. CAN-TOPSTONE-2026) – strategie s group.align
+    // jim dá jednu cenu. Generátor může stejnou značku+model+rok vylosovat znovu (jiná MOC, jiná barva) → další
+    // model dostane pořadové číslo (CAN-TOPSTONE-2026-2), skupina = vždy velikosti téhož modelu se stejnou MOC.
+    let groupCode = null;
+    if (isBike) {
+      const base = `${slug(brand).slice(0, 3)}-${slug(model)}-${year}`;
+      const k = (groupSeen.get(base) || 0) + 1;
+      groupSeen.set(base, k);
+      groupCode = k === 1 ? base : `${base}-${k}`;
+    }
+    // Velikosti jednoho modelu mají ve skutečnosti stejný nákup i prodejní cenu a konkurence je nabízí za (skoro)
+    // stejnou cenu. Hodnoty modelu určí první velikost; další velikosti je převezmou (náhodná čísla se čerpají dál
+    // stejně, takže ostatní data i ukázkové soubory zůstávají stejné). Občas je jedna velikost ve vlastní slevě
+    // (doprodej velikosti) – přesně to sjednocení ve skupině (group.align) srovná.
+    let variantBase = null;
     for (const size of variants) {
       if (products.length >= count) break;
       n += 1;
       const code = `${brand.replace(/[^A-Za-z]/g, '').slice(0, 3).toUpperCase()}-${String(100000 + n * 7).slice(1)}${size ? '-' + size : ''}`;
-      const purchase = Math.round((msrp / 1.21) * between(0.58, 0.74));
-      const price = roundEnding(msrp * pick([1, 1, 0.95, 0.92, 0.9, 0.85]));
+      let purchase = Math.round((msrp / 1.21) * between(0.58, 0.74));
+      const priceFactor = pick([1, 1, 0.95, 0.92, 0.9, 0.85]);
+      let price = roundEnding(msrp * priceFactor);
+      if (isBike) {
+        if (!variantBase) variantBase = { purchase, price, factors: new Map() };
+        else {
+          purchase = variantBase.purchase;
+          price = priceFactor === 0.85 ? roundEnding(variantBase.price * 0.95) : variantBase.price;
+        }
+      }
       // stáří zásoby N0–N8 (N7/N8 = ležáky), u starších modelových roků vyšší
       const ageClass = Math.min(8, Math.max(0, Math.round((2026 - year) * 2.5 + between(-1, 3))));
       const stock = rand() < 0.15 ? 0 : Math.ceil(between(1, isBike ? 6 : 25));
@@ -134,6 +156,12 @@ function generateDemo({ products: count = 600, seed = 42, now = new Date() } = {
       for (const c of COMPETITORS) {
         if (rand() > c.coverage) continue;
         let factor = c.bias * between(0.94, 1.06);
+        if (variantBase) {
+          // stejný model u konkurenta: ceny velikostí se liší jen málo (±1,5 %)
+          const base = variantBase.factors.get(c.name);
+          if (base == null) variantBase.factors.set(c.name, factor);
+          else factor = base * (1 + (factor / c.bias - 1) * 0.25);
+        }
         // občas výrazná akce nebo chyba v datech (outlier)
         if (rand() < 0.02) factor *= 0.55;
         const cPrice = Math.min(roundEnding(msrp * factor), Math.round(msrp * 1.05));
@@ -173,10 +201,11 @@ function writeExampleFiles(dir, data) {
   const someOffers = data.offers.filter((o) => codes.has(o.code));
 
   // 1) Katalog jako CSV exportovaný z Pohody/Excelu (středník, desetinná čárka, české hlavičky)
-  const head = ['Kód', 'EAN', 'Název', 'Výrobce', 'Kategorie', 'Dodavatel', 'Zodpovědná osoba', 'Nákupní cena', 'Prodejní cena s DPH', 'Sazba DPH', 'MOC', 'Stav skladu', 'Prodej 30 dní', 'N', 'Sezóna', 'Imprese 30'];
+  // „Model“ = skupina velikostí jednoho kola (kanonické pole group_code, alias „model“)
+  const head = ['Kód', 'EAN', 'Název', 'Výrobce', 'Kategorie', 'Model', 'Dodavatel', 'Zodpovědná osoba', 'Nákupní cena', 'Prodejní cena s DPH', 'Sazba DPH', 'MOC', 'Stav skladu', 'Prodej 30 dní', 'N', 'Sezóna', 'Imprese 30'];
   const lines = [head.join(';')];
   for (const p of some) {
-    lines.push([p.code, p.ean, p.name, p.manufacturer, p.category, p.supplier, p.owner, p.purchase_price, p.price, p.vat_rate, p.msrp, p.stock, p.sales_30, p.attrs.N, p.attrs.sezona, p.attrs.imprese_30].map(csvCell).join(';'));
+    lines.push([p.code, p.ean, p.name, p.manufacturer, p.category, p.group_code, p.supplier, p.owner, p.purchase_price, p.price, p.vat_rate, p.msrp, p.stock, p.sales_30, p.attrs.N, p.attrs.sezona, p.attrs.imprese_30].map(csvCell).join(';'));
   }
   fs.writeFileSync(path.join(dir, 'katalog.csv'), '﻿' + lines.join('\r\n') + '\r\n');
 

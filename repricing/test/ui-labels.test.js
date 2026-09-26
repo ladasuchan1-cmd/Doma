@@ -100,3 +100,29 @@ test('příznaky ruční ceny a životního cyklu návrhu (API návrhů, běh p�
     assert.ok(f.FLAG_SEVERITY[code], 'chybí závažnost příznaku ' + code);
   }
 });
+
+test('sjednocení skupin (groups.js) a paměť zamítnutí: kroky vysvětlení, příznaky a důvody mají český popisek', async () => {
+  const f = await loadFormat();
+  let groups = '';
+  try {
+    groups = src('groups.js');
+  } catch {
+    /* starší engine bez skupin */
+  }
+  const steps = new Set(['group', 'rejected', ...literals(groups, /step: '([a-z_]+)'/g)]);
+  for (const s of steps) assert.ok(hasLabel(f.STEP_LABELS, s), 'chybí popisek kroku ' + s);
+  const flags = new Set(['group_aligned', 'group_conflict', ...literals(groups, /flagOn\([^,]+, '([a-z_]+)'\)/g)]);
+  for (const code of flags) {
+    assert.ok(hasLabel(f.FLAG_LABELS, code), 'chybí popisek příznaku ' + code);
+    assert.ok(f.FLAG_HELP[code], 'chybí nápověda příznaku ' + code);
+    assert.ok(f.FLAG_SEVERITY[code], 'chybí závažnost příznaku ' + code);
+  }
+  assert.strictEqual(f.reasonLabel('rejected_before'), 'Stejná cena byla nedávno zamítnuta');
+  assert.strictEqual(f.flagLabel('group_aligned'), 'Sjednoceno ve skupině');
+  assert.strictEqual(f.flagLabel('group_conflict'), 'Skupinu nelze sjednotit (limity)');
+  // popisky UI odpovídají textům enginu (jen velké první písmeno)
+  const cap = (x) => x.charAt(0).toUpperCase() + x.slice(1);
+  if (pricing.FLAG_LABELS.group_aligned) assert.strictEqual(f.FLAG_LABELS.group_aligned, cap(pricing.FLAG_LABELS.group_aligned));
+  if (pricing.FLAG_LABELS.group_conflict) assert.strictEqual(f.FLAG_LABELS.group_conflict, cap(pricing.FLAG_LABELS.group_conflict));
+  if (pricing.REASON_LABELS.rejected_before) assert.strictEqual(f.REASON_LABELS.rejected_before, cap(pricing.REASON_LABELS.rejected_before));
+});

@@ -45,7 +45,11 @@ export function parseCols(v) {
     if (out.length >= MAX_COLUMNS) break;
   }
   if (!out.length) return null;
-  if (!out.includes(REQUIRED_COLUMN)) out.unshift(REQUIRED_COLUMN);
+  if (!out.includes(REQUIRED_COLUMN)) {
+    out.unshift(REQUIRED_COLUMN);
+    // povinný sloupec se vejde do limitu – poslední navíc odpadne
+    if (out.length > MAX_COLUMNS) out.length = MAX_COLUMNS;
+  }
   return out;
 }
 

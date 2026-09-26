@@ -32,7 +32,8 @@ const CENT = 0.005;
  * horní hranice (typicky MOC strop nebo ruční max. cena) vynutila snížení větší, než dovoluje limit změny
  * (max_decrease_pct / allow_decrease) → takové snížení nikdy neschvalovat automaticky.
  */
-const BLOCKING_FLAGS = Object.freeze(['limits_conflict', 'floor_over_change_limit', 'ceiling_over_change_limit', 'below_cost', 'big_change']);
+// `group_conflict` (groups.js) – velikosti jednoho modelu nejde sjednotit, každá má jinou cenu → vždy ručně.
+const BLOCKING_FLAGS = Object.freeze(['limits_conflict', 'floor_over_change_limit', 'ceiling_over_change_limit', 'below_cost', 'big_change', 'group_conflict']);
 
 /** České popisky příznaků. */
 const FLAG_LABELS = Object.freeze({

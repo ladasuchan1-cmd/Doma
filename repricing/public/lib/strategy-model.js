@@ -191,7 +191,7 @@ export const HELP = {
   'rounding.direction': 'Dolů = nejbližší cenový bod pod cílem. Spodní hranice má vždy přednost – když by ji zaokrouhlení porušilo, zaokrouhlí se nahoru.',
   'rounding.bands': 'Pásma se vyhodnocují shora; první, do kterého cena spadá, určí konec. Konec 90 → …390, …490; konec 990 → 12 990, 13 990. Krok je nepovinný (výchozí 10 pro konec 9, 100 pro 90, 1000 pro 990).',
   'stock.zero_stock': 'Co dělat s produkty s nulovým nebo záporným skladem.',
-  'approval.auto': 'Návrhy se rovnou schválí a půjdou do exportu. Nikdy se automaticky neschválí návrhy s příznakem konflikt limitů, pod nákupní cenou, velká změna nebo min. cena nad limit změny.',
+  'approval.auto': 'Návrhy se rovnou schválí a půjdou do exportu. Nikdy se automaticky neschválí návrhy s příznakem konflikt limitů, pod nákupní cenou, velká změna, min. cena nad limit změny nebo skupinu nelze sjednotit.',
   'approval.auto_max_change_pct': 'Automaticky schválit jen změny do ± tolika %. Větší změny dostanou příznak „Velká změna“ a čekají na člověka.',
   // rozšíření enginu
   'target.step_pct': 'O kolik % zlevnit v jednom kroku doprodeje.',
@@ -203,7 +203,7 @@ export const HELP = {
   'schedule.weekdays': 'Jen ve vybrané dny. Nic nevybráno = každý den.',
   'schedule.hours': 'Jen v tomto rozmezí hodin (např. 18–24). Prázdné = celý den. Mimo okno produkt převezme další strategie.',
   'competitors.max_delivery_days': 'S volbou „Jen nabídky skladem“ se započítá i nabídka, která skladem není, ale konkurent ji dodá nejvýše do tolika dní (např. 3 = „do 3 dnů“). Prázdné = jen nabídky skladem.',
-  'group.align': 'Varianty jednoho modelu (velikosti, barvy – stejná „Skupina / model“ v katalogu) dostanou jednu společnou cenu, spočítanou z cen, které strategie vyšla pro jednotlivé varianty. Sjednocují se jen varianty, o kterých rozhodla tato strategie; zamčené a přeskočené varianty drží svou cenu. Společná cena respektuje limity všech variant (min. marže, MOC, min./max. cena) – když se limity nepřekrývají, ceny se nesjednotí a návrhy dostanou příznak „Skupinu nelze sjednotit“.',
+  'group.align': 'Varianty jednoho modelu (velikosti, barvy – stejná „Skupina / model“ v katalogu) dostanou jednu společnou cenu, spočítanou z cen, které strategie vyšla pro jednotlivé varianty. Sjednocují se jen varianty, o kterých rozhodla tato strategie; zamčené a přeskočené varianty drží svou cenu. Společná cena respektuje limity všech variant (min. marže, MOC, min./max. cena) – když se limity nepřekrývají, ceny se nesjednotí a návrhy dostanou příznak „Skupinu nelze sjednotit“ (ty se nikdy neschválí automaticky). Společná cena mimo limit změny varianty (max. snížení / zvýšení) také vždy čeká na ruční schválení.',
   conditions: 'Podmínky navíc k segmentu – strategie se použije jen na produkty, které je splní (např. sklad > 0, marže ≥ 15 %). Jinak produkt převezme další strategie.',
 };
 

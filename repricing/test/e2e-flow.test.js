@@ -12,6 +12,8 @@
 //   8. uzavření smyčky: další import katalogu s novými cenami (bez upozornění not_applied) / s jinou cenou (upozornění)
 //   9. přehled, pole, facety, běhy, log exportů a audit odpovídají provedeným akcím
 //  10. plánovač: druhý server se zapnutým plánovačem, zdroj s URL, přecenění po importu, automatické odeslání
+//  11. cenová skupina (3 velikosti za jednu cenu), zkušební běh celé sady, import metrik „jen aktualizovat“,
+//      zrušení schválení, znovustažení exportu, přihlášení se jménem → decided_by / audit
 // Robustnost: poškozená těla (XML/CSV/JSON/XLSX) → 400 s českou zprávou, import 30 000 produktů, souběžné požadavky
 // během přecenění i při zámku databáze jiným procesem, restart serveru nad souborovou databází.
 //
@@ -23,7 +25,7 @@ const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
 const { spawn, spawnSync } = require('node:child_process');
-const { startServer, localServer, example, hardErrors } = require('./api-import-helpers');
+const { startServer, localServer, example, hardErrors, PASSWORD } = require('./api-import-helpers');
 const { encodeWindows1250, decodeBuffer } = require('../src/formats/decode');
 const { parseCsv } = require('../src/formats/csv');
 const { parseXml } = require('../src/formats/xml');
@@ -56,7 +58,8 @@ function catalogLines() {
 /** Katalog CSV s cenami podle mapy kód → cena (ostatní beze změny). */
 function catalogWithPrices(prices) {
   const { head, rows } = catalogLines();
-  const PRICE_COL = 8; // „Prodejní cena s DPH“
+  const PRICE_COL = head.split(';').indexOf('Prodejní cena s DPH');
+  assert.ok(PRICE_COL > 0, 'sloupec Prodejní cena s DPH v examples/katalog.csv');
   const out = rows.map((cells) => {
     const c = [...cells];
     if (prices.has(c[0])) c[PRICE_COL] = String(prices.get(c[0]));
@@ -1120,6 +1123,165 @@ describe('E2E 10: plánovač – zdroj s URL, přecenění po importu, automatic
     assert.ok(sum3.run && sum3.run.ok && sum3.run.reason === 'import', JSON.stringify(sum3.run));
     const runs2 = await s2.call('GET', '/api/v1/runs');
     assert.equal(runs2.data.total, 2);
+  });
+});
+
+// =========================================================================================================
+describe('E2E 11: cenová skupina, zkušební běh, import jen aktualizací, zrušení schválení, znovustažení exportu, jméno', () => {
+  let s;
+  const T = {};
+  const GROUP = 'FOC-JAM-2026';
+  const SIZES = ['JAM-S', 'JAM-M', 'JAM-L'];
+  let jana; // požadavky se session přihlášenou se jménem
+
+  before(async () => {
+    s = await startServer();
+    T.imp = await s.token(['import'], 'e2e11-import');
+    T.exp = await s.token(['export'], 'e2e11-export');
+    T.read = await s.token(['read'], 'e2e11-read');
+    const login = await s.call('POST', '/api/v1/auth/login', { as: 'none', json: { password: PASSWORD, name: 'Jana Nováková' } });
+    assert.equal(login.status, 200, login.text);
+    const cookie = String(login.headers['set-cookie'][0]).split(';')[0];
+    jana = (method, p, o = {}) => s.call(method, p, { ...o, as: 'none', headers: { ...(o.headers || {}), cookie, 'x-requested-with': 'cenotvorba' } });
+  });
+  after(async () => {
+    if (s) await s.stop();
+  });
+
+  test('model kola ve 3 velikostech → jedna cena; dry run; update-only metriky; unapprove; re-download; decided_by', async () => {
+    // přihlášení se jménem
+    const me = await jana('GET', '/api/v1/auth/me');
+    assert.equal(me.data.user, 'Jana Nováková');
+
+    // katalog: sloupec „Model“ se sám namapuje na group_code (Skupina / model)
+    const catalog = [
+      'kod;nazev;vyrobce;Model;nakupni_cena;cena;moc',
+      'JAM-S;Focus Jam 2026 vel. S;Focus;FOC-JAM-2026;50000;79990;84990',
+      'JAM-M;Focus Jam 2026 vel. M;Focus;FOC-JAM-2026;50000;76990;84990',
+      'JAM-L;Focus Jam 2026 vel. L;Focus;foc-jam-2026;50000;74990;84990',
+      'LAHEV;Lahev Elite;Elite;;60;249;299',
+    ].join('\n');
+    const cat = await s.call('POST', '/api/v1/import/products', { as: T.imp, body: catalog, type: 'text/csv' });
+    assert.equal(cat.status, 200, cat.text);
+    assert.equal(cat.data.stats.created, 4);
+    const grp = await s.call('GET', '/api/v1/products?filter=' + encodeURIComponent(JSON.stringify({ field: 'group_code', op: '=', value: GROUP })), { as: T.read });
+    assert.equal(grp.status, 200);
+    assert.deepEqual(grp.data.items.map((p) => p.code).sort(), ['JAM-L', 'JAM-M', 'JAM-S']);
+    const fields = await s.call('GET', '/api/v1/fields', { as: T.read });
+    assert.ok(fields.data.fields.some((f) => f.key === 'group_code' && f.label === 'Skupina / model'));
+
+    const offers = await s.call('POST', '/api/v1/import/offers', {
+      as: T.imp,
+      json: {
+        items: [
+          { code: 'JAM-S', competitor: 'VeloMarket.cz', price: 80000 },
+          { code: 'JAM-M', competitor: 'VeloMarket.cz', price: 78000 },
+          { code: 'JAM-L', competitor: 'VeloMarket.cz', price: 76000 },
+          { code: 'LAHEV', competitor: 'VeloMarket.cz', price: 239 },
+        ],
+      },
+    });
+    assert.equal(offers.status, 200, offers.text);
+    assert.equal(offers.data.stats.matched, 4);
+
+    const st = await jana('POST', '/api/v1/strategies', {
+      json: {
+        name: 'Focus – velikosti za jednu cenu',
+        config: {
+          target: { mode: 'undercut_min', offset_pct: -1 },
+          limits: { min_margin_pct: 5, max_above_msrp_pct: 0, max_decrease_pct: 20, max_increase_pct: 20 },
+          group: { align: 'max' },
+        },
+      },
+    });
+    assert.equal(st.status, 201, st.text);
+    assert.equal(st.data.config.group.align, 'max');
+
+    // zkušební běh celé sady: nic se nezapíše
+    const dry = await jana('POST', '/api/v1/runs', { json: { dry_run: true } });
+    assert.equal(dry.status, 200, dry.text);
+    assert.equal(dry.data.run_id, null);
+    assert.equal(dry.data.dry_run, true);
+    assert.deepEqual(dry.data.stats.groups, { aligned: 1, conflicts: 0, members: 3 });
+    const drySizes = dry.data.sample.filter((d) => SIZES.includes(d.product.code));
+    assert.equal(drySizes.length, 3);
+    assert.ok(drySizes.every((d) => d.action === 'change' && d.new_price === 78990 && d.flags.includes('group_aligned')));
+    const absPct = dry.data.sample.map((d) => Math.abs(d.change_pct ?? 0));
+    assert.deepEqual(absPct, [...absPct].sort((a, b) => b - a));
+    assert.equal((await s.call('GET', '/api/v1/runs', { as: T.read })).data.total, 0);
+    assert.equal((await s.call('GET', '/api/v1/proposals?status=all', { as: T.read })).data.total, 0);
+
+    // skutečný běh: tři velikosti za 78 990 Kč
+    const run = await jana('POST', '/api/v1/runs', { json: {} });
+    assert.equal(run.status, 200, run.text);
+    assert.ok(run.data.run_id > 0);
+    const list = await s.call('GET', '/api/v1/proposals?' + new URLSearchParams({ filter: JSON.stringify({ field: 'group_code', op: '=', value: GROUP }) }), { as: T.read });
+    assert.equal(list.data.total, 3);
+    for (const p of list.data.items) {
+      assert.equal(p.new_price, 78990, p.product.code);
+      assert.ok(p.flags.includes('group_aligned'));
+      assert.ok(p.explain.some((e) => /^Sjednoceno ve skupině FOC-JAM-2026 \(3 produkty, režim nejvyšší\) → 78\s990 Kč/.test(e.text)));
+    }
+
+    // metriky z Disiva: jen kód + imprese, neznámé kódy se nezakládají
+    const pendingBefore = (await s.call('GET', '/api/v1/proposals', { as: T.read })).data.total;
+    const metrics = await s.call('POST', '/api/v1/import/products?create_missing=0', { as: T.imp, body: 'kod;imprese_30\nJAM-S;1500\nJAM-M;900\nNEZNAMY-99;5\n', type: 'text/csv' });
+    assert.equal(metrics.status, 200, metrics.text);
+    assert.equal(metrics.data.stats.created, 0);
+    assert.equal(metrics.data.stats.updated, 2);
+    assert.equal(metrics.data.stats.skipped_unknown, 1);
+    assert.deepEqual(metrics.data.stats.unknown_codes, ['NEZNAMY-99']);
+    const all = await s.call('GET', '/api/v1/products?status=all', { as: T.read });
+    assert.equal(all.data.total, 4);
+    const jamS = all.data.items.find((p) => p.code === 'JAM-S');
+    assert.equal(jamS.attrs.imprese_30, 1500);
+    assert.equal(jamS.price, 79990, 'cena se importem metrik nezměnila');
+    // otevřené návrhy import metrik nezneplatnil (cenové vstupy se nezměnily)
+    assert.equal((await s.call('GET', '/api/v1/proposals', { as: T.read })).data.total, pendingBefore);
+
+    // Jana schválí celou skupinu (filtr nad pohledem produktu), pak L vrátí ke schválení
+    const appr = await jana('POST', '/api/v1/proposals/approve', { json: { all: true, filter: { filter: { field: 'group_code', op: '=', value: GROUP } }, include_flagged: true, expect: { count: 3 } } });
+    assert.equal(appr.status, 200, appr.text);
+    assert.equal(appr.data.updated, 3);
+    const byCode = async () => Object.fromEntries((await s.call('GET', '/api/v1/proposals?status=all', { as: T.read })).data.items.map((p) => [p.product.code, p]));
+    let m = await byCode();
+    for (const c of SIZES) {
+      assert.equal(m[c].status, 'approved');
+      assert.equal(m[c].decided_by, 'Jana Nováková');
+    }
+    const un = await jana('POST', '/api/v1/proposals/unapprove', { json: { ids: [m['JAM-L'].id] } });
+    assert.equal(un.status, 200, un.text);
+    assert.deepEqual(un.data, { updated: 1 });
+    m = await byCode();
+    assert.equal(m['JAM-L'].status, 'pending');
+
+    // export feedem s označením → znovustažení stejného exportu
+    const feed = await s.call('GET', '/api/v1/export/changes.json?mark=1', { as: T.exp });
+    assert.equal(feed.status, 200);
+    assert.deepEqual(feed.data.items.map((i) => i.code).sort(), ['JAM-M', 'JAM-S']);
+    const exportId = Number(feed.headers['x-export-id']);
+    assert.ok(exportId > 0);
+    const again = await s.call('GET', `/api/v1/exports/${exportId}/changes.json`, { as: T.exp });
+    assert.equal(again.status, 200, again.text);
+    assert.deepEqual(again.data.items.map((i) => [i.code, i.price]).sort(), [['JAM-M', 78990], ['JAM-S', 78990]]);
+    const xml = await s.call('GET', `/api/v1/exports/${exportId}/changes.xml`, { as: T.exp });
+    assert.equal(xml.status, 200);
+    assert.equal(countElements(parseXml(xml.text), 'item'), 2);
+    const exports = await s.call('GET', '/api/v1/exports', { as: T.read });
+    assert.equal(exports.data.items.find((e) => e.id === exportId).redownload, true);
+    // po exportu mají S a M novou cenu, L čeká na nové schválení
+    const after = await s.call('GET', '/api/v1/products?status=all', { as: T.read });
+    const prices = Object.fromEntries(after.data.items.map((p) => [p.code, p.price]));
+    assert.equal(prices['JAM-S'], 78990);
+    assert.equal(prices['JAM-M'], 78990);
+    assert.equal(prices['JAM-L'], 74990);
+
+    // audit nese jméno
+    const au = await jana('GET', '/api/v1/audit');
+    const byAction = (a) => au.data.items.filter((x) => x.action === a);
+    assert.ok(byAction('proposals.approve').some((x) => x.actor === 'Jana Nováková'));
+    assert.ok(byAction('proposals.unapprove').some((x) => x.actor === 'Jana Nováková'));
+    assert.equal(byAction('run.start').length, 1, 'zkušební běh se neaudituje');
   });
 });
 

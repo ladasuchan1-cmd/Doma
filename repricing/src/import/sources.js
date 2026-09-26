@@ -149,8 +149,9 @@ function emptyStats(kind) {
  * ukazují, co by se stalo (spárováno, nově založeno…); `preview` = prvních 20 kanonických záznamů.
  * @param {import('node:sqlite').DatabaseSync} db
  * @param {{kind: 'products'|'offers', input: object|Buffer|string, mapping?: object|string, options?: object,
- *          sourceId?: number|null, origin?: string, dryRun?: boolean, now?: Date|string}} params
- *   options: products {deactivate_missing, force_deactivate, create_missing (výchozí true)}, offers {replace: false|'competitors'|'all', max_age_days}
+ *          sourceId?: number|null, origin?: string, dryRun?: boolean, now?: Date|string, createMissing?: boolean}} params
+ *   options: products {deactivate_missing, force_deactivate, create_missing (výchozí true)}, offers {replace: false|'competitors'|'all', max_age_days};
+ *   createMissing: false = jen aktualizovat existující produkty (totéž jako options.create_missing = false, má přednost)
  * @returns {{import_id: number|null, stats: object, preview?: object[], format: string, itemPath: string|null}}
  */
 function runImport(db, params = {}) {
@@ -182,6 +183,8 @@ function runImport(db, params = {}) {
     };
     const allErrors = () => finalizeErrors([...mapped.errors, ...importErrors], mapped.errorCount + importErrorCount);
     const opts = { ...importOptions(kind, options), sourceId: sourceId ?? null, now: nowStr, importId, rowNumbers: mapped.rowNumbers, onError };
+    // runImport({createMissing: false}) – „jen aktualizovat“ i jako přímá volba (přebije options.create_missing)
+    if (kind === 'products' && params.createMissing !== undefined) opts.createMissing = createOpt(params.createMissing);
     if (kind === 'offers') {
       opts.failedCompetitors = mapped.failedCompetitors;
       opts.failedUnknown = mapped.failedUnknown;

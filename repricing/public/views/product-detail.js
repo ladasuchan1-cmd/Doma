@@ -152,7 +152,11 @@ export async function show(root, ctx) {
             p.manufacturer ? h('span', null, 'Výrobce ', h('b', null, p.manufacturer)) : null,
             p.category ? h('span', null, 'Kategorie ', h('b', null, p.category)) : null,
             p.supplier ? h('span', null, 'Dodavatel ', h('b', null, p.supplier)) : null,
-            p.owner ? h('span', null, 'Odpovídá ', h('b', null, p.owner)) : null
+            p.owner ? h('span', null, 'Odpovídá ', h('b', null, p.owner)) : null,
+            // C3: varianty jednoho modelu (velikosti / barvy) – odkaz na všechny produkty skupiny
+            p.group_code
+              ? h('span', { dataset: { role: 'group-code' } }, 'Skupina ', h('a', { class: 'mono strong', href: buildHash('/produkty', { filter: { field: 'group_code', op: '=', value: p.group_code }, cols: 'code,name,group_code,stock,price,margin_pct,market_min,position,proposal' }), title: 'Zobrazit všechny varianty modelu (velikosti, barvy)' }, p.group_code))
+              : null
           ),
           h(
             'div',

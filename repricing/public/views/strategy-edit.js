@@ -272,7 +272,11 @@ export async function show(root, ctx) {
     // C2: uložená strategie se simuluje v kontextu celé sady zapnutých strategií (strategy_id + upravená konfigurace)
     // – produkty, které převezme strategie dřív v pořadí, se nezapočítají. Nová strategie zatím nemá místo v pořadí.
     const body = { config: model.config, segment_id: model.segment_id, limit: 200 };
-    if (!isNew) body.strategy_id = Number(ctx.params.id);
+    if (!isNew) {
+      body.strategy_id = Number(ctx.params.id);
+      // neuložená změna priority = jiné místo v pořadí (server strategii zařadí podle ní)
+      if (Number.isInteger(model.priority)) body.priority = model.priority;
+    }
     try {
       res = await api.post('/simulate', body, { signal: ctx.signal });
     } catch (e) {
@@ -343,6 +347,7 @@ export async function show(root, ctx) {
           { class: 'stack' },
           simErrors.length ? callout(h('ul', { class: 'validation-list' }, simErrors.map((e) => h('li', null, typeof e === 'string' ? e : e.message || JSON.stringify(e)))), 'danger') : null,
           h('div', { dataset: { role: 'simulation-note' } }, context ? contextNote(stats) : simulationNote()),
+          // stats.groups kontextové simulace = jen skupiny sjednocené touto strategií (server nepočítá ostatní strategie sady)
           runStatsView(stats, { simulate: true }),
           changes.length ? h('div', null, h('div', { class: 'form-subtitle' }, 'Rozložení změn ceny (%)'), histogram(changes, { ariaLabel: 'Histogram změn ceny v procentech' })) : null,
           h('div', { class: 'row-between' }, h('div', { class: 'form-subtitle', style: 'margin:0' }, 'Rozhodnutí'), segmented(SIM_FILTERS, filter, (v) => { filter = v; apply(); }, { label: 'Zobrazit rozhodnutí', class: 'seg-sm' })),

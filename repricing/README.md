@@ -59,7 +59,8 @@ dvakrát souběžně (plánovač + ruční spuštění → 409).
 
 1. **Import katalogu** – kód (POHODA „Kód“ = klíč pro export), EAN, název, výrobce, kategorie, nákupní cena (bez DPH),
    prodejní cena (s DPH), DPH, MOC, sklad, prodeje. **Každý další sloupec** (N-kategorie, sezóna, imprese z Disiva, ABC…)
-   se uloží jako vlastní atribut a dá se podle něj segmentovat.
+   se uloží jako vlastní atribut a dá se podle něj segmentovat. Sloupec, jehož název se od existujícího atributu liší jen
+   velikostí písmen, diakritikou či oddělovači („Imprese 30“ vs. `imprese_30`), se zapíše do toho existujícího.
 2. **Import konkurence** – řádek = produkt × konkurent: identifikace (náš kód / EAN / kód výrobce), konkurent, cena s DPH,
    doprava, dostupnost, URL, čas zjištění. Párování: kód → EAN → MPN → ruční párování. Nespárované nabídky najdete
    v záložce Konkurence a spárujete je ručně (párování se zapamatuje).
@@ -74,11 +75,22 @@ dvakrát souběžně (plánovač + ruční spuštění → 409).
    - limity: **minimální marže** a zisk v Kč (spodní hranice vždy vyhrává), strop MOC, max. marže, max. snížení/zvýšení
      za jedno přecenění, jen zvyšovat / jen snižovat, ignorovat drobné změny, ruční min./max. cena produktu;
    - zaokrouhlení podle cenových pásem (…9 / …90 / …990), dolů / nahoru / nejbližší;
-   - schvalování: ručně, nebo automaticky do zvolené velikosti změny (rizikové změny jdou vždy k ručnímu schválení).
+   - schvalování: ručně, nebo automaticky do zvolené velikosti změny (rizikové změny jdou vždy k ručnímu schválení);
+   - **cenové skupiny**: velikosti a barvy jednoho modelu (sloupec „Skupina / model“ – `group_code`, alias `model`,
+     `nadrazeny_kod`, `parent_code`, `item_group_id`…) dostanou od strategie jednu cenu – nejvyšší, nejnižší nebo medián
+     cen členů, vždy v mezích všech členů (když to limity nedovolí, ceny zůstanou samostatné s upozorněním);
+   - dostupnost: s volbou „jen skladem“ lze počítat i nabídky „u dodavatele do N dní“ (`max_delivery_days`).
 5. **Přecenění** – ručně, přes API nebo plánovaně. Vznikne dávka **návrhů** s vysvětlením krok za krokem
    („nejnižší cena trhu 12 490 Kč (VeloMarket.cz) → −1 % → 12 365 Kč → min. marže 12 % → 12 800 Kč → zaokrouhleno 12 890 Kč“).
+   **Zkušební přecenění** (`POST /api/v1/runs {"dry_run": true}`) ukáže dopad celé sady strategií bez zápisu; simulace
+   jedné strategie umí počítat v kontextu ostatních (co jí „seberou“ strategie s vyšší prioritou).
 6. **Schválení a export** – schválené změny si admin stáhne (feed + potvrzení), nebo je dostane webhookem; pro POHODU je
    připraven XML dataPack. Po exportu se zapíše historie cen (včetně nejnižší ceny za 30 dní pro slevové akce).
+   Schválení lze do exportu zrušit – návrh se vrátí ke schválení (`POST /api/v1/proposals/unapprove`). Cenu, kterou
+   někdo nedávno **zamítl**, další přecenění znovu nenavrhne (Nastavení → paměť zamítnutých cen, výchozí 14 dní,
+   0 = vypnuto).
+   Při přihlášení lze zadat jméno – zobrazí se u schválení a v auditu. Je to jen **označení**, ne ověření identity
+   (heslo je společné).
 
 ## Posílání dat přes API
 
@@ -99,18 +111,27 @@ curl -X POST "http://server:8080/api/v1/import/offers?source=3" \
 curl -X POST "http://server:8080/api/v1/import/products?deactivate_missing=1" \
   -H "Authorization: Bearer $TOKEN" -H "Content-Type: text/csv" --data-binary @katalog.csv
 
-# spustit přecenění
+# metriky z Disiva (kód + imprese) – jen aktualizovat existující produkty, neznámé kódy nezakládat
+curl -X POST "http://server:8080/api/v1/import/products?create_missing=0" \
+  -H "Authorization: Bearer $TOKEN" -H "Content-Type: text/csv" --data-binary @imprese.csv
+
+# spustit přecenění (s {"dry_run": true} jen zkušebně, bez zápisu)
 curl -X POST "http://server:8080/api/v1/runs" -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" --data '{}'
 ```
 
 Parametr `replace=competitors` zajistí, že nabídky konkurentů, kteří v dávce jsou, ale produkt v ní chybí, se smažou
 (plný snapshot). U konkurenta s chybnými řádky (neplatná cena…) se nic nemaže. `dry_run=1` jen ověří mapování.
+`create_missing=0` (nebo volba zdroje `create_missing: false`) importuje katalog v režimu „jen aktualizovat“: neznámé
+kódy se nezaloží, statistika vrátí jejich počet (`skipped_unknown`) a prvních 50 (`unknown_codes`).
 
 Čísla se čtou podle formátu: v XML a JSON je tečka vždy desetinná (`1299.000` = 1 299), v CSV se středníkem je čárka
 vždy desetinná (`123,456` = 123,456) a `12.990` jsou tisíce. Ceny v cizí měně (`1 299 €`, `USD`) se neimportují.
 POHODA: základ DPH se bere z atributu `payVAT` u `sellingPrice` / `purchasingPrice` (viz [docs/POHODA.md](docs/POHODA.md)).
 
 ## Napojení adminu
+
+Kompletní integrační příručka pro vývojáře adminu – tokeny, doporučený tok „feed → nasadit → potvrdit“, formáty
+JSON/XML/CSV, webhook, potvrzení převzetí, chyby, obnova po výpadku a referenční klient: **[docs/ADMIN-API.md](docs/ADMIN-API.md)**.
 
 | Způsob | Endpoint |
 |---|---|
@@ -119,6 +140,7 @@ POHODA: základ DPH se bere z atributu `payVAT` u `sellingPrice` / `purchasingPr
 | Webhook (push) | Nastavení → Export → URL webhooku; po přecenění se schválené změny odešlou jako JSON/XML `POST` |
 | POHODA | `GET /api/v1/export/pohoda.xml?mark=1` → XML dataPack (Windows-1250) pro XML import nebo mServer, viz [docs/POHODA.md](docs/POHODA.md) |
 | Excel | `GET /api/v1/export/proposals.xlsx` – návrhy k revizi |
+| Znovustažení exportu | `GET /api/v1/exports/{id}/changes.json` (také `.xml`, `.csv`) – přesně řádky, které export doručil (obnova po ztracené odpovědi s `mark=1`) |
 
 Výchozí XML feed:
 

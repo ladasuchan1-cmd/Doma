@@ -64,7 +64,9 @@ test('dashboard, fields, facets – tvary odpovědí', async () => {
   assert.ok(d.products.active > 50);
   const f = (await json('/fields')).body.fields;
   assert.ok(f.find((x) => x.key === 'position' && x.type === 'enum'));
-  assert.ok(f.find((x) => x.key === 'attrs.N' && x.group === 'Atributy'));
+  assert.ok(f.find((x) => x.key === 'attrs.N' && x.group === 'Vlastní atributy'));
+  assert.ok(f.find((x) => x.key === 'group_code' && x.group === 'Produkt'), 'C3: skupina / model');
+  assert.strictEqual(f.find((x) => x.key === 'price').unit, 'Kč');
   const fc = (await json('/products/facets')).body;
   assert.ok(Array.isArray(fc.manufacturers) && fc.manufacturers[0].value && fc.manufacturers[0].count);
   assert.ok(fc.attrs.N.length);
@@ -93,10 +95,12 @@ test('produkty: seznam, filtr, řazení, detail, úprava', async () => {
 });
 
 test('návrhy: seznam se summary, schválení, ruční cena, XLSX', async () => {
-  const l = (await json('/proposals?limit=3')).body;
+  const l = (await json('/proposals?limit=30')).body;
   for (const k of ['items', 'total', 'page', 'limit', 'summary']) assert.ok(k in l, k);
   for (const k of ['pending', 'approved', 'exported_today', 'up', 'down']) assert.ok(k in l.summary, k);
-  const p = l.items[0];
+  // návrh dražšího produktu – ruční cena 999 Kč je u něj „velká změna“ (překlep?)
+  const p = l.items.find((x) => x.old_price >= 3000);
+  assert.ok(p, 'návrh s cenou nad 3 000 Kč');
   assert.strictEqual(p.status, 'pending');
   assert.ok(p.product && p.product.code && Array.isArray(p.flags) && Array.isArray(p.explain));
   assert.ok(Math.abs(l.items[0].change_pct) >= Math.abs(l.items[1].change_pct), 'výchozí řazení abs_change_pct desc');
@@ -220,4 +224,150 @@ test('export, feed s tokenem, tokeny, nastavení, audit', async () => {
   assert.strictEqual(exps[0].kind, 'webhook');
   assert.ok((await json('/audit')).body.items.length > 0);
   assert.strictEqual((await json('/settings/password', { method: 'POST', body: JSON.stringify({ current: 'x', new: '12345678' }) })).status, 400);
+});
+
+// ------------------------------------------------------------------ nový kontrakt C1–C10
+test('C9: jméno při přihlášení → /auth/me, decided_by a audit; neplatné jméno 400', async () => {
+  const bad = await fetch(m.url + '/api/v1/auth/login', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ password: 'tajne', name: 'auto' }) });
+  assert.strictEqual(bad.status, 400);
+  const r = await fetch(m.url + '/api/v1/auth/login', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ password: 'tajne', name: '  Jana Dvořáková ' }) });
+  assert.strictEqual(r.status, 200);
+  const jana = r.headers.get('set-cookie').split(';')[0];
+  const J = (p, init = {}) => fetch(m.url + '/api/v1' + p, { ...init, headers: { cookie: jana, 'x-requested-with': 'cenotvorba', 'content-type': 'application/json' } }).then(async (x) => ({ status: x.status, body: await x.json() }));
+  assert.strictEqual((await J('/auth/me')).body.user, 'Jana Dvořáková');
+  const p = (await J('/proposals?limit=1')).body.items[0];
+  assert.deepStrictEqual((await J('/proposals/approve', { method: 'POST', body: JSON.stringify({ ids: [p.id] }) })).body, { updated: 1 });
+  const after = (await J('/proposals?status=approved&limit=500')).body.items.find((x) => x.id === p.id);
+  assert.strictEqual(after.decided_by, 'Jana Dvořáková');
+  assert.strictEqual((await J('/audit')).body.items.some((a) => a.actor === 'Jana Dvořáková' && a.action === 'proposals.approve'), true);
+  // C5: vrátit ke schválení
+  assert.deepStrictEqual((await J('/proposals/unapprove', { method: 'POST', body: JSON.stringify({ ids: [p.id] }) })).body, { updated: 1 });
+  const back = (await J('/proposals?status=pending&limit=500')).body.items.find((x) => x.id === p.id);
+  assert.ok(back && back.decided_at == null && back.decided_by == null, 'znovu čeká, rozhodnutí smazané');
+  assert.deepStrictEqual((await J('/proposals/unapprove', { method: 'POST', body: JSON.stringify({ ids: [p.id] }) })).body, { updated: 0 }, 'jen schválené');
+});
+
+test('C3/C1: pole group_code, řazení podle atributu a skupiny, sjednocení skupin v přecenění', async () => {
+  const f = (await json('/fields')).body.fields;
+  assert.ok(f.some((x) => x.key === 'sales_30' && x.unit === 'ks') && f.some((x) => x.key === 'msrp' && x.unit === 'Kč'));
+  const byAttr = (await json('/products?limit=10&sort=attrs.N&dir=desc')).body.items.map((x) => x.attrs.N).filter(Boolean);
+  assert.deepStrictEqual(byAttr, [...byAttr].sort().reverse(), 'řazení podle attrs.N');
+  const byGroup = (await json('/products?limit=500&sort=group_code')).body.items;
+  assert.ok(byGroup.some((x) => x.group_code), 'kola mají skupinu / model');
+  const g = byGroup.find((x) => x.group_code).group_code;
+  const members = (await json('/products?limit=500&filter=' + encodeURIComponent(JSON.stringify({ field: 'group_code', op: '=', value: g })))).body.items;
+  assert.ok(members.length >= 2 && members.every((x) => x.group_code === g), 'filtr podle skupiny');
+  // čerstvá data (předchozí testy mění pořadí strategií): „Klíčové značky“ sjednocují velikosti na nejvyšší cenu
+  const fresh = await createMockServer({ port: 0, autologin: true });
+  try {
+    const dry = await (await fetch(fresh.url + '/api/v1/runs', { method: 'POST', headers: { 'content-type': 'application/json', 'x-requested-with': 'cenotvorba' }, body: JSON.stringify({ dry_run: true }) })).json();
+    assert.ok(dry.stats.flags.group_aligned > 0, 'strategie se sjednocením skupin');
+    const aligned = dry.sample.filter((d) => d.flags.includes('group_aligned'));
+    assert.ok(aligned.length > 0 && aligned.every((d) => d.group && d.group.code && d.explain.some((e) => e.step === 'group' && /^Sjednoceno ve skupině /.test(e.text))));
+    const byGroup = new Map();
+    for (const d of aligned) byGroup.set(d.group.code, [...(byGroup.get(d.group.code) || []), d.new_price]);
+    for (const prices of byGroup.values()) assert.strictEqual(new Set(prices).size, 1, 'varianty jednoho modelu mají stejnou cenu');
+  } finally {
+    await fresh.close();
+  }
+});
+
+test('C2: simulace celého přecenění nic nezapíše; kontextová simulace strategie hlásí zabrané produkty', async () => {
+  const runsBefore = (await json('/runs')).body.total;
+  const propsBefore = (await json('/proposals?status=all&limit=1')).body.total;
+  const dry = await json('/runs', { method: 'POST', body: JSON.stringify({ dry_run: true }) });
+  assert.strictEqual(dry.status, 200);
+  assert.strictEqual(dry.body.run_id, null);
+  assert.strictEqual(dry.body.dry_run, true);
+  assert.ok(dry.body.stats.products > 0 && dry.body.sample.length > 0 && dry.body.sample.length <= 200);
+  const pcts = dry.body.sample.map((d) => Math.abs(d.change_pct));
+  assert.deepStrictEqual(pcts, [...pcts].sort((a, b) => b - a), 'seřazeno podle |change_pct| sestupně');
+  assert.deepStrictEqual(Object.keys(dry.body.sample[0].product).sort(), ['category', 'code', 'id', 'manufacturer', 'name']);
+  assert.strictEqual((await json('/runs')).body.total, runsBefore, 'žádný běh');
+  assert.strictEqual((await json('/proposals?status=all&limit=1')).body.total, propsBefore, 'žádné návrhy');
+  assert.strictEqual((await json('/runs', { method: 'POST', body: JSON.stringify({ dry_run: 'ano' }) })).status, 400);
+  const strategies = (await json('/strategies')).body.items;
+  const later = strategies.filter((s) => s.enabled).sort((a, b) => a.priority - b.priority).at(-1);
+  const ctxSim = (await json('/simulate', { method: 'POST', body: JSON.stringify({ strategy_id: later.id, config: later.config }) })).body;
+  assert.strictEqual(ctxSim.context, true);
+  assert.ok(Number.isInteger(ctxSim.stats.claimed_by_earlier));
+  assert.ok(ctxSim.decisions.every((d) => d.strategy_id === later.id));
+  const plain = (await json('/simulate', { method: 'POST', body: JSON.stringify({ config: later.config }) })).body;
+  assert.strictEqual(plain.context, false);
+  assert.strictEqual('claimed_by_earlier' in plain.stats, false);
+  assert.strictEqual((await json('/simulate', { method: 'POST', body: JSON.stringify({ strategy_id: 99999, config: {} }) })).status, 400);
+});
+
+test('C4: filtry návrhů podle produktu (osoba, kategorie, dodavatel, segment produktu, filtr) i pro hromadné akce', async () => {
+  const all = (await json('/proposals?limit=500')).body;
+  const owner = all.items.find((x) => x.product && x.product.code) && (await json('/products/facets')).body.owners[0].value;
+  const byOwner = (await json('/proposals?limit=500&owner=' + encodeURIComponent(owner.toUpperCase()))).body;
+  assert.ok(byOwner.total > 0 && byOwner.total < all.total, 'osoba bez ohledu na velikost písmen');
+  const seg = (await json('/segments')).body.items[0];
+  const bySeg = (await json('/proposals?limit=500&product_segment=' + seg.id)).body;
+  assert.ok(bySeg.total <= all.total);
+  assert.strictEqual((await json('/proposals?product_segment=99999')).body.total, 0, 'neznámý segment = nic');
+  assert.strictEqual((await json('/proposals?filter=' + encodeURIComponent('{nejde'))).status, 400);
+  const flt = encodeURIComponent(JSON.stringify({ field: 'stock', op: '>', value: 0 }));
+  const inStock = (await json('/proposals?limit=500&filter=' + flt)).body;
+  assert.ok(inStock.items.every((x) => x.product.stock > 0));
+  // hromadné zamítnutí jen pro osobu
+  const rej = await json('/proposals/reject', { method: 'POST', body: JSON.stringify({ all: true, filter: { status: 'pending', owner }, expect: { count: byOwner.total, max_id: byOwner.max_id } }) });
+  assert.strictEqual(rej.body.updated, byOwner.total);
+  assert.strictEqual((await json('/proposals?owner=' + encodeURIComponent(owner))).body.total, 0);
+});
+
+test('C1: zamítnutá cena se v dalším přecenění znovu nenavrhne (rejected_before); reject_memory_days 0 = vypnuto', async () => {
+  const p = (await json('/proposals?limit=1')).body.items[0];
+  await json('/proposals/reject', { method: 'POST', body: JSON.stringify({ ids: [p.id] }) });
+  const run = (await json('/runs', { method: 'POST', body: JSON.stringify({ product_ids: [p.product_id] }) })).body;
+  assert.strictEqual(run.stats.changes, 0);
+  assert.strictEqual(run.stats.no_change_reasons.rejected_before, 1);
+  assert.strictEqual((await json('/settings', { method: 'PUT', body: JSON.stringify({ reject_memory_days: 400 }) })).status, 400);
+  assert.strictEqual((await json('/settings', { method: 'PUT', body: JSON.stringify({ reject_memory_days: 0 }) })).body.reject_memory_days, 0);
+  const run2 = (await json('/runs', { method: 'POST', body: JSON.stringify({ product_ids: [p.product_id] }) })).body;
+  assert.strictEqual(run2.stats.changes, 1, 'bez paměti se cena navrhne znovu');
+  await json('/settings', { method: 'PUT', body: JSON.stringify({ reject_memory_days: 14 }) });
+});
+
+test('C6: import katalogu jen pro existující produkty (create_missing=0)', async () => {
+  const csv = 'Kód;Název;Cena\nTRK-MAR7GEN3-M;Trek Marlin 7;20990\nNEZNAMY-1;Nový;1000\nNEZNAMY-2;Nový 2;1000\n';
+  const post = (q) => fetch(m.url + '/api/v1/import/products' + q, { method: 'POST', headers: { cookie, 'x-requested-with': 'cenotvorba', 'content-type': 'text/csv' }, body: csv }).then(async (x) => ({ status: x.status, body: await x.json() }));
+  const r = await post('?create_missing=0');
+  assert.strictEqual(r.status, 200);
+  assert.strictEqual(r.body.stats.created, 0);
+  assert.strictEqual(r.body.stats.skipped_unknown, 2);
+  assert.deepStrictEqual(r.body.stats.unknown_codes, ['NEZNAMY-1', 'NEZNAMY-2']);
+  assert.strictEqual((await json('/products?q=NEZNAMY')).body.total, 0);
+  assert.strictEqual((await post('?create_missing=nevim')).status, 400);
+});
+
+test('C8: historie exportů – redownload a znovu stažení doručených změn (json/xml/csv), 404 bez řádků', async () => {
+  const exps = (await json('/exports')).body.items;
+  const withRows = exps.find((e) => e.redownload);
+  assert.ok(withRows, 'export s doručenými změnami');
+  assert.ok(exps.every((e) => typeof e.redownload === 'boolean'));
+  const tok = (await json('/tokens', { method: 'POST', body: JSON.stringify({ name: 'admin feed', scopes: ['export'] }) })).body.token;
+  const get = (p, t = tok) => fetch(m.url + '/api/v1' + p, { headers: { authorization: 'Bearer ' + t } });
+  const jr = await get('/exports/' + withRows.id + '/changes.json');
+  assert.strictEqual(jr.status, 200);
+  assert.strictEqual(jr.headers.get('x-export-id'), String(withRows.id));
+  const body = await jr.json();
+  assert.ok(body.items.length > 0 && body.items.every((i) => i.proposal_id && i.code && i.price > 0));
+  assert.match(await (await get('/exports/' + withRows.id + '/changes.xml')).text(), /<prices /);
+  assert.match(await (await get('/exports/' + withRows.id + '/changes.csv')).text(), /^﻿?code;ean;name;price/);
+  const without = exps.find((e) => !e.redownload);
+  assert.strictEqual((await get('/exports/' + without.id + '/changes.json')).status, 404);
+  assert.strictEqual((await get('/exports/99999/changes.json')).status, 404);
+  const readTok = (await json('/tokens', { method: 'POST', body: JSON.stringify({ name: 'jen čtení', scopes: ['read'] }) })).body.token;
+  assert.strictEqual((await get('/exports/' + withRows.id + '/changes.json', readTok)).status, 403, 'vyžaduje oprávnění export');
+});
+
+test('C10: nastavení obsahuje paměť zamítnutí, uchování nahrazených a ceny hladiny s DPH', async () => {
+  const s = (await json('/settings')).body;
+  assert.strictEqual(s.reject_memory_days, 14);
+  assert.strictEqual(s.retention_superseded_days, 14);
+  assert.strictEqual(s.export.pohoda.price_level_includes_vat, true);
+  assert.strictEqual((await json('/settings', { method: 'PUT', body: JSON.stringify({ retention_superseded_days: 0 }) })).status, 400);
+  assert.strictEqual((await json('/settings', { method: 'PUT', body: JSON.stringify({ export: { pohoda: { price_level_includes_vat: 'ano' } } }) })).status, 400);
 });

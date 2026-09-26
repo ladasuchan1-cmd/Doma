@@ -11,7 +11,7 @@ import {
 import { openModal, confirmDialog } from '../lib/modal.js';
 import { toast } from '../lib/toast.js';
 import {
-  CANONICAL, buildMapping, missingRequired, hasMatchKey, statsList, curlExamples, deactivateMissingConfirm, unknownCodesInfo,
+  CANONICAL, buildMapping, missingRequired, hasMatchKey, statsList, curlExamples, deactivateMissingConfirm, unknownCodesInfo, attrsMergedList,
 } from '../lib/import-model.js';
 import {
   int, bytes, dateTime, relTime, duration, KIND_LABELS, ORIGIN_LABELS, truncate, count, parseInputNumber,
@@ -46,6 +46,7 @@ function statsGrid(stats, kind) {
     { class: 'stack-sm' },
     h('div', { class: 'stat-grid' }, list.map((st) => h('div', { class: ['stat', tone(st)], dataset: { stat: st.key } }, h('div', { class: 'stat-label' }, st.label), h('div', { class: 'stat-value' }, int(st.value))))),
     kind === 'products' ? unknownCodesList(stats) : null,
+    kind === 'products' ? attrsMergedNote(stats) : null,
     errorsList(stats?.errors),
     kind === 'offers' && stats?.unmatched
       ? callout(h('span', null, count(stats.unmatched, 'nabídka se nespárovala', 'nabídky se nespárovaly', 'nabídek se nespárovalo') + ' s katalogem. ', h('a', { href: '#/konkurence?tab=unmatched' }, 'Spárovat ručně →')), 'warning')
@@ -63,6 +64,17 @@ function unknownCodesList(stats) {
     h('summary', null, icon('chevron-right', { size: 14 }), 'Neznámé kódy – nezaloženo ' + count(info.count, 'produkt', 'produkty', 'produktů')),
     h('p', { class: 'field-help' }, 'Tyto kódy v katalogu nejsou a import je podle volby „Jen aktualizovat existující produkty“ přeskočil.' + (info.more ? ' Zobrazeno prvních ' + int(info.codes.length) + '.' : '')),
     info.codes.length ? h('p', { class: 'mono small unknown-codes' }, info.codes.join(', ') + (info.more ? ' … a další ' + int(info.more) : '')) : null
+  );
+}
+
+/** Sloupce zapsané do existujícího atributu jiného zápisu („Imprese 30“ → imprese_30). */
+function attrsMergedNote(stats) {
+  const list = attrsMergedList(stats);
+  if (!list.length) return null;
+  return h(
+    'p',
+    { class: 'field-help', dataset: { role: 'attrs-merged' } },
+    'Sloupce uložené do existujících atributů: ' + list.map(([a, b]) => '„' + a + '“ → ' + b).join(', ') + ' (liší se jen velikostí písmen, diakritikou nebo oddělovači).'
   );
 }
 

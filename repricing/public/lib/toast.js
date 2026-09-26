@@ -75,13 +75,20 @@ export function toast(message, opts = {}) {
   while (host.children.length > 4) host.firstChild.remove();
   if (timeout > 0) {
     timer = setTimeout(close, timeout);
-    // pozastavit jen při najetí myší – na dotykových zařízeních by emulovaný mouseenter bez mouseleave
-    // nechal oznámení viset navždy
-    el.addEventListener('pointerenter', (e) => {
-      if (e.pointerType === 'mouse' && timer) clearTimeout(timer);
+    // Pozastavit jen při skutečném pohybu myši nad oznámením (pointermove), ne při pointerenter: oznámení se objeví
+    // vpravo dole – často přímo pod kurzorem, který právě klikl na tlačítko v liště (Uložit, Schválit…). Enter bez
+    // pohybu by ho nechal viset a zakrývat tlačítko, dokud uživatel neuhne myší. Dotyk: emulovaný mouseenter bez
+    // mouseleave by oznámení nechal navždy – proto jen pointerType 'mouse'.
+    let paused = false;
+    el.addEventListener('pointermove', (e) => {
+      if (e.pointerType !== 'mouse' || paused) return;
+      paused = true;
+      if (timer) clearTimeout(timer);
     });
     el.addEventListener('pointerleave', (e) => {
-      if (e.pointerType === 'mouse') timer = setTimeout(close, 2000);
+      if (e.pointerType !== 'mouse' || !paused) return;
+      paused = false;
+      timer = setTimeout(close, 2000);
     });
   }
   return { close };

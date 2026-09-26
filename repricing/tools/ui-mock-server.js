@@ -544,6 +544,7 @@ function productView(st, p, ctx) {
     position: positionOf(price, m),
     price_index: m.min ? round((price / m.min) * 100, 1) : null,
     price_index_median: m.median ? round((price / m.median) * 100, 1) : null,
+    price_index_avg: m.avg ? round((price / m.avg) * 100, 1) : null,
     gap_min_abs: m.min != null ? round(price - m.min, 2) : null,
     gap_min_pct: m.min ? round(((price - m.min) / m.min) * 100, 2) : null,
     msrp_diff_pct: p.msrp ? round(((price - p.msrp) / p.msrp) * 100, 2) : null,
@@ -861,7 +862,7 @@ function decide(st, product, offers, strategy, ctx) {
   }
   if (product.purchase_price != null && net(np, vat) < product.purchase_price) flags.push('below_cost');
   if (d.change_pct != null && Math.abs(d.change_pct) > (cfg.approval.auto_max_change_pct ?? Infinity)) flags.push('big_change');
-  d.auto_approve = Boolean(cfg.approval.auto) && !flags.some((f) => ['limits_conflict', 'floor_over_change_limit', 'below_cost', 'big_change'].includes(f));
+  d.auto_approve = Boolean(cfg.approval.auto) && !flags.some((f) => ['limits_conflict', 'floor_over_change_limit', 'ceiling_over_change_limit', 'below_cost', 'big_change', 'group_conflict'].includes(f));
   explain.push({ step: 'result', text: 'Nová cena ' + money(np) + ' (' + (d.change_pct > 0 ? '+' : '') + pct(d.change_pct) + ')' + (d.auto_approve ? ' – schváleno automaticky' : '') });
   return { ...d, action: 'change', reason: null };
 }
@@ -1008,7 +1009,7 @@ function reapplyPrice(st, p, d, price, cfg) {
   d.reason = null;
   if (p.purchase_price != null && net(price, vat) < p.purchase_price) d.flags.push('below_cost');
   if (Math.abs(d.change_pct) > (cfg.approval.auto_max_change_pct ?? Infinity)) d.flags.push('big_change');
-  d.auto_approve = Boolean(cfg.approval.auto) && !d.flags.some((f) => ['limits_conflict', 'floor_over_change_limit', 'below_cost', 'big_change'].includes(f));
+  d.auto_approve = Boolean(cfg.approval.auto) && !d.flags.some((f) => ['limits_conflict', 'floor_over_change_limit', 'ceiling_over_change_limit', 'below_cost', 'big_change', 'group_conflict'].includes(f));
   return d;
 }
 
@@ -1019,13 +1020,14 @@ function reapplyPrice(st, p, d, price, cfg) {
  * @param {{p: object, strategy: object|null, decision: object|null}[]} entries
  */
 function alignGroups(st, entries) {
+  const out = { aligned: 0, conflicts: 0, members: 0 };
   const groups = new Map();
   for (const e of entries) {
     if (!e.decision || !e.strategy || !e.p.group_code) continue;
     const cfg = deepMerge(DEFAULT_CONFIG, e.strategy.config || {});
     const align = cfg.group && cfg.group.align;
     if (!align || align === 'off') continue;
-    const key = String(e.strategy.id ?? 'sim') + '|' + fold(e.p.group_code);
+    const key = String(e.strategy.id ?? 'sim') + '|' + codeKey(e.p.group_code);
     if (!groups.has(key)) groups.set(key, { align, cfg, code: e.p.group_code, members: [] });
     groups.get(key).members.push(e);
   }
@@ -1044,8 +1046,11 @@ function alignGroups(st, entries) {
     if (lo != null && hi != null && lo > hi) {
       for (const e of used) {
         e.decision.flags.push('group_conflict');
+        e.decision.auto_approve = false; // jako engine: konflikt skupiny nikdy automaticky
+        e.decision.group = { code: g.code, align: g.align, members: used.length, price: null, conflict: true };
         e.decision.explain.push({ step: 'group', text: 'Skupinu ' + g.code + ' nelze sjednotit: limity variant se nepřekrývají (spodní ' + money(lo) + ' > horní ' + money(hi) + ') – cena zůstává individuální' + skipTxt });
       }
+      out.conflicts += 1;
       continue;
     }
     let target = g.align === 'max' ? Math.max(...prices) : g.align === 'min' ? Math.min(...prices) : median(prices);
@@ -1061,9 +1066,13 @@ function alignGroups(st, entries) {
     for (const e of used) {
       reapplyPrice(st, e.p, e.decision, price, g.cfg);
       e.decision.flags.push('group_aligned');
-      e.decision.explain.push({ step: 'group', text: 'Sjednoceno ve skupině ' + g.code + ' (' + used.length + ' produktů, režim ' + modeTxt + ') → ' + money(price) + skipTxt });
+      e.decision.group = { code: g.code, align: g.align, members: used.length, price, conflict: false };
+      e.decision.explain.push({ step: 'group', text: 'Sjednoceno ve skupině ' + g.code + ' (' + used.length + (used.length < 5 ? ' produkty' : ' produktů') + ', režim ' + modeTxt + ') → ' + money(price) + skipTxt });
     }
+    out.aligned += 1;
+    out.members += used.length;
   }
+  return out;
 }
 
 /**
@@ -1101,9 +1110,10 @@ function computeRun(st, { productIds, at } = {}) {
     const ev = evaluate(st, ctx, p, compiled);
     return { p, strategy: ev.strategy, decision: ev.decision, fellThrough: ev.fellThrough };
   });
-  alignGroups(st, entries);
+  const groupStats = alignGroups(st, entries);
   applyRejectMemory(st, entries, ctx.now);
   const stats = emptyStats();
+  stats.groups = groupStats;
   for (const e of entries) {
     stats.products += 1;
     if (e.fellThrough) stats.fallthrough += 1;
@@ -1217,11 +1227,11 @@ function filterProposals(st, q) {
     };
     if (q.product_segment) {
       // segment produktu = kterýkoli segment, do kterého produkt patří (nezávisle na strategii návrhu)
+      // jako skutečné API: neznámý segment = žádný produkt (ne chyba)
       const seg = st.segments.find((x) => String(x.id) === String(q.product_segment));
-      if (!seg) throw new HttpError(400, `Segment ${q.product_segment} neexistuje.`);
-      let fn;
+      let fn = () => false;
       try {
-        fn = compileFilter(seg.filter);
+        if (seg) fn = compileFilter(seg.filter);
       } catch {
         fn = () => false;
       }
@@ -1650,6 +1660,17 @@ function rowsBody(st, rows, format) {
   return { body: '﻿' + [cols.join(';'), ...rows.map((r) => cols.map((c) => q(r[c])).join(';'))].join('\r\n') + '\r\n', type: 'text/csv; charset=utf-8' };
 }
 
+/** C8: řádky doručené exportem id (návrhy s export_id = id, cena = doručená cena) – tvar řádků feedu změn. */
+function exportedRows(st, exportId) {
+  const rows = [];
+  for (const pr of st.proposals) {
+    if (pr.export_id !== exportId) continue;
+    const p = st.products.find((x) => x.id === pr.product_id) || {};
+    rows.push({ proposal_id: pr.id, product_id: pr.product_id, code: p.code, ean: p.ean, name: p.name, manufacturer: p.manufacturer, price: pr.delivered_price ?? pr.manual_price ?? pr.new_price, old_price: pr.old_price, change_pct: pr.change_pct, vat_rate: p.vat_rate, currency: 'CZK', changed_at: pr.exported_at || pr.decided_at });
+  }
+  return rows;
+}
+
 function markExported(st, proposalIds, kind, target) {
   const now = iso(st.now());
   const exp = { id: st.nextId('exports'), created_at: now, kind, target, count: 0, status: 'ok', detail: null };
@@ -1658,6 +1679,7 @@ function markExported(st, proposalIds, kind, target) {
       pr.status = 'exported';
       pr.exported_at = now;
       pr.export_id = exp.id;
+      pr.delivered_price = pr.manual_price ?? pr.new_price;
       exp.count += 1;
       if (st.settings.export.update_current_price) {
         const p = st.products.find((x) => x.id === pr.product_id);
@@ -1687,31 +1709,44 @@ function xlsxOrCsv(st, name, columns, rows) {
 
 // ------------------------------------------------------------------ pole a facety
 
+// Kopie FIELDS enginu (src/engine/metrics.js) – klíč, popisek, typ, skupina, jednotka (formátování sloupců v UI).
+const POSITION_VALUE_LABELS = { cheapest: 'Nejlevnější', middle: 'Uprostřed', most_expensive: 'Nejdražší', no_data: 'Bez dat o trhu' };
 const BASE_FIELDS = [
   ['code', 'Kód', 'string', 'Produkt'], ['name', 'Název', 'string', 'Produkt'], ['ean', 'EAN', 'string', 'Produkt'], ['mpn', 'Kód výrobce (MPN)', 'string', 'Produkt'],
   ['manufacturer', 'Výrobce', 'string', 'Produkt'], ['category', 'Kategorie', 'string', 'Produkt'], ['supplier', 'Dodavatel', 'string', 'Produkt'], ['owner', 'Zodpovědná osoba', 'string', 'Produkt'],
-  ['active', 'Aktivní', 'boolean', 'Produkt'], ['locked', 'Zamčený', 'boolean', 'Produkt'], ['note', 'Poznámka', 'string', 'Produkt'],
-  ['price', 'Prodejní cena', 'number', 'Ceny a marže'], ['purchase_price', 'Nákupní cena', 'number', 'Ceny a marže'], ['msrp', 'MOC', 'number', 'Ceny a marže'],
-  ['vat_rate', 'Sazba DPH', 'number', 'Ceny a marže'], ['margin_pct', 'Marže %', 'number', 'Ceny a marže'], ['markup_pct', 'Přirážka %', 'number', 'Ceny a marže'],
-  ['profit_abs', 'Zisk na kus (Kč)', 'number', 'Ceny a marže'], ['msrp_diff_pct', 'Rozdíl proti MOC %', 'number', 'Ceny a marže'], ['min_price', 'Min. cena produktu', 'number', 'Ceny a marže'], ['max_price', 'Max. cena produktu', 'number', 'Ceny a marže'],
-  ['stock', 'Sklad (ks)', 'number', 'Sklad a prodeje'], ['stock_value', 'Hodnota skladu', 'number', 'Sklad a prodeje'], ['sales_30', 'Prodeje 30 dní', 'number', 'Sklad a prodeje'],
-  ['sales_90', 'Prodeje 90 dní', 'number', 'Sklad a prodeje'], ['days_of_cover', 'Zásoba na dní', 'number', 'Sklad a prodeje'],
-  ['market_count', 'Počet konkurentů', 'number', 'Trh'], ['market_min', 'Nejnižší cena trhu', 'number', 'Trh'], ['market_max', 'Nejvyšší cena trhu', 'number', 'Trh'],
-  ['market_avg', 'Průměrná cena trhu', 'number', 'Trh'], ['market_median', 'Medián trhu', 'number', 'Trh'], ['cheapest_competitor', 'Nejlevnější konkurent', 'string', 'Trh'],
-  ['rank', 'Pořadí (1 = nejlevnější)', 'number', 'Trh'], ['position', 'Pozice', 'enum', 'Trh'], ['price_index', 'Cenový index vs. min.', 'number', 'Trh'],
-  ['price_index_median', 'Cenový index vs. medián', 'number', 'Trh'], ['gap_min_abs', 'Rozdíl od min. (Kč)', 'number', 'Trh'], ['gap_min_pct', 'Rozdíl od min. %', 'number', 'Trh'],
-  ['offers_instock', 'Nabídek skladem', 'number', 'Trh'],
+  ['group_code', 'Skupina / model', 'string', 'Produkt'],
+  ['active', 'Aktivní', 'boolean', 'Produkt'], ['locked', 'Zamčeno (příznak)', 'boolean', 'Produkt'], ['lock_active', 'Zámek platí', 'boolean', 'Produkt'], ['locked_until', 'Zamčeno do', 'string', 'Produkt'],
+  ['note', 'Poznámka', 'string', 'Produkt'], ['id', 'ID produktu', 'number', 'Produkt'], ['created_at', 'Založeno', 'string', 'Produkt'], ['updated_at', 'Aktualizováno', 'string', 'Produkt'],
+  ['price', 'Prodejní cena s DPH', 'number', 'Ceny a marže', 'Kč'], ['purchase_price', 'Nákupní cena bez DPH', 'number', 'Ceny a marže', 'Kč'], ['msrp', 'MOC (doporučená cena)', 'number', 'Ceny a marže', 'Kč'],
+  ['min_price', 'Minimální cena (ruční)', 'number', 'Ceny a marže', 'Kč'], ['max_price', 'Maximální cena (ruční)', 'number', 'Ceny a marže', 'Kč'],
+  ['vat_rate', 'Sazba DPH produktu', 'number', 'Ceny a marže', '%'], ['vat', 'Sazba DPH (použitá)', 'number', 'Ceny a marže', '%'],
+  ['margin_pct', 'Marže', 'number', 'Ceny a marže', '%'], ['markup_pct', 'Přirážka', 'number', 'Ceny a marže', '%'], ['profit_abs', 'Zisk na kus bez DPH', 'number', 'Ceny a marže', 'Kč'],
+  ['below_cost', 'Prodáváme pod nákupní cenou', 'boolean', 'Ceny a marže'], ['msrp_diff_pct', 'Rozdíl proti MOC', 'number', 'Ceny a marže', '%'],
+  ['price_changed_at', 'Poslední změna ceny', 'string', 'Ceny a marže'], ['days_since_change', 'Dní od poslední změny ceny', 'number', 'Ceny a marže', 'dní'],
+  ['market_count', 'Počet konkurentů (trh)', 'number', 'Trh'], ['offers_count', 'Počet čerstvých nabídek (i neskladem)', 'number', 'Trh'], ['offers_instock', 'Konkurentů skladem', 'number', 'Trh'],
+  ['market_min', 'Nejnižší cena trhu', 'number', 'Trh', 'Kč'], ['market_max', 'Nejvyšší cena trhu', 'number', 'Trh', 'Kč'], ['market_avg', 'Průměrná cena trhu', 'number', 'Trh', 'Kč'],
+  ['market_median', 'Medián cen trhu', 'number', 'Trh', 'Kč'], ['cheapest_competitor', 'Nejlevnější konkurent', 'string', 'Trh'], ['rank', 'Pořadí na trhu (1 = nejlevnější)', 'number', 'Trh'],
+  ['position', 'Pozice na trhu', 'enum', 'Trh'], ['price_index', 'Cenový index vůči minimu trhu', 'number', 'Trh', '%'], ['price_index_median', 'Cenový index vůči mediánu', 'number', 'Trh', '%'],
+  ['price_index_avg', 'Cenový index vůči průměru', 'number', 'Trh', '%'], ['gap_min_abs', 'Rozdíl proti minimu trhu', 'number', 'Trh', 'Kč'], ['gap_min_pct', 'Rozdíl proti minimu trhu (%)', 'number', 'Trh', '%'],
+  ['min_below_cost', 'Konkurence prodává pod naším nákupem', 'boolean', 'Trh'],
+  ['stock', 'Skladem (ks)', 'number', 'Sklad a prodeje', 'ks'], ['has_stock', 'Je skladem', 'boolean', 'Sklad a prodeje'], ['sales_30', 'Prodej za 30 dní (ks)', 'number', 'Sklad a prodeje', 'ks'],
+  ['sales_90', 'Prodej za 90 dní (ks)', 'number', 'Sklad a prodeje', 'ks'], ['stock_value', 'Hodnota skladu v nákupních cenách', 'number', 'Sklad a prodeje', 'Kč'], ['days_of_cover', 'Zásoba na počet dní', 'number', 'Sklad a prodeje', 'dní'],
 ];
 
 function fieldsList(st) {
-  const out = BASE_FIELDS.map(([key, label, type, group]) => (type === 'enum' ? { key, label, type, group, values: ['cheapest', 'middle', 'most_expensive', 'no_data'] } : { key, label, type, group }));
+  const out = BASE_FIELDS.map(([key, label, type, group, unit]) => {
+    const f = { key, label, type, group };
+    if (unit) f.unit = unit;
+    if (type === 'enum') Object.assign(f, { values: Object.keys(POSITION_VALUE_LABELS), value_labels: { ...POSITION_VALUE_LABELS }, options: Object.entries(POSITION_VALUE_LABELS).map(([value, lbl]) => ({ value, label: lbl })) });
+    return f;
+  });
   const attrTypes = new Map();
   for (const p of st.products) for (const [k, v] of Object.entries(p.attrs || {})) {
-    const t = typeof v === 'number' ? 'number' : 'string';
+    const t = typeof v === 'number' ? 'number' : typeof v === 'boolean' ? 'boolean' : 'string';
     const prev = attrTypes.get(k);
     attrTypes.set(k, prev && prev !== t ? 'string' : t);
   }
-  for (const [k, t] of attrTypes) out.push({ key: 'attrs.' + k, label: k, type: t, group: 'Atributy' });
+  for (const [k, t] of [...attrTypes].sort((a, b) => a[0].localeCompare(b[0], 'cs'))) out.push({ key: 'attrs.' + k, label: k, type: t, group: 'Vlastní atributy' });
   return out;
 }
 
@@ -1906,7 +1941,18 @@ function productDetail(st, id) {
   const p = st.products.find((x) => x.id === id);
   if (!p) throw new HttpError(404, 'Produkt nenalezen.');
   const ctx = ctxOf(st);
-  const ev = evaluate(st, ctx, p, new Map());
+  const compiledSeg = new Map();
+  const ev = evaluate(st, ctx, p, compiledSeg);
+  // C3: vysvětlení počítá se sjednocením skupiny (varianty stejného modelu rozhodnuté stejnou strategií)
+  if (ev.decision && ev.strategy && p.group_code && deepMerge(DEFAULT_CONFIG, ev.strategy.config || {}).group.align !== 'off') {
+    const members = st.products.filter((x) => x.active && x.id !== p.id && x.group_code && codeKey(x.group_code) === codeKey(p.group_code));
+    const entries = [{ p, strategy: ev.strategy, decision: ev.decision }];
+    for (const x of members) {
+      const e = evaluate(st, ctx, x, compiledSeg);
+      if (e.strategy && e.strategy.id === ev.strategy.id) entries.push({ p: x, strategy: e.strategy, decision: e.decision });
+    }
+    alignGroups(st, entries);
+  }
   const offersEngine = productOffers(st, p.id).map((o) => engineOffer(st, o));
   const m = buildMarket(offersEngine, { in_stock_only: st.settings.metrics_in_stock_only }, ctx);
   const exReason = new Map(m.excluded.map((x) => [x.offer.competitor_id, x.reason]));
@@ -1966,6 +2012,21 @@ const PRESETS = [
   { key: 'vychozi', name: 'Výchozí – medián trhu −2 %', description: 'Všechny produkty 2 % pod mediánem trhu, minimální marže 12 %, změny do 3 % schválit automaticky.', segment: null, config: deepMerge(DEFAULT_CONFIG, { target: { mode: 'market_median', offset_pct: -2 }, limits: { min_margin_pct: 12 }, approval: { auto: true, auto_max_change_pct: 3 } }) },
 ];
 
+/**
+ * C9: jméno z přihlášení jako skutečné API (src/server/auth.js normalizeUserName) – ořezané, 1–64 znaků, bez řídicích
+ * znaků; „auto“ a „token:…“ jsou vyhrazené. Chybějící / prázdné → null (uživatel „admin“).
+ */
+function normalizeUserName(v) {
+  if (v === undefined || v === null) return { name: null, error: null };
+  if (typeof v !== 'string') return { name: null, error: 'Jméno musí být text.' };
+  const s = v.trim();
+  if (!s) return { name: null, error: null };
+  if (s.length > 64) return { name: null, error: 'Jméno může mít nejvýše 64 znaků.' };
+  if (/[\u0000-\u001f\u007f-\u009f\u2028\u2029]/.test(s)) return { name: null, error: 'Jméno nesmí obsahovat řídicí znaky ani konce řádků.' };
+  if (s.toLowerCase() === 'auto' || /^token:/i.test(s)) return { name: null, error: 'Jméno „auto“ a jména začínající „token:“ jsou vyhrazená – zvolte jiné.' };
+  return { name: s, error: null };
+}
+
 function toNumId(v) {
   const n = Number(v);
   if (!Number.isInteger(n) || n < 1) throw new HttpError(400, 'Neplatné ID.');
@@ -1983,9 +2044,12 @@ function buildRoutes(st) {
 
   add('GET', '/health', () => ({ ok: true, version: VERSION, time: iso(st.now()) }), 'public');
   add('POST', '/auth/login', (ctx) => {
+    // C9: nepovinné jméno – jen označení, kdo schvaluje (decided_by, audit), heslo je společné
+    const who = normalizeUserName(ctx.body ? ctx.body.name : undefined);
+    if (who.error) throw new HttpError(400, who.error, { field: 'name' });
     if (!ctx.body || ctx.body.password !== st.password) throw new HttpError(401, 'Nesprávné heslo.');
     const sid = crypto.randomBytes(12).toString('hex');
-    st.sessions.add(sid);
+    st.sessions.set(sid, { name: who.name || 'admin' });
     ctx.setCookie = `ct_session=${sid}; Path=/; HttpOnly; SameSite=Strict; Max-Age=1209600`;
     return { ok: true };
   }, 'public');
@@ -2167,7 +2231,7 @@ function buildRoutes(st) {
     let fn = () => true;
     if (b.segment_id) {
       const s = st.segments.find((x) => x.id === Number(b.segment_id));
-      if (!s) throw new HttpError(404, 'Segment nenalezen.');
+      if (!s) throw new HttpError(400, `Segment ${b.segment_id} neexistuje.`);
       fn = compileFilter(s.filter);
     } else if (b.filter) fn = compileFilter(b.filter);
     const ctxE = ctxOf(st);
@@ -2181,7 +2245,7 @@ function buildRoutes(st) {
       if (!fn(v)) continue;
       entries.push({ p, strategy, decision: decide(st, p, productOffers(st, p.id).map((o) => engineOffer(st, o)), strategy, ctxE) });
     }
-    alignGroups(st, entries);
+    stats.groups = alignGroups(st, entries);
     for (const { p, decision: d } of entries) {
       stats.products += 1;
       addStats(stats, d, { id: 'sim', name: 'Simulace' }, p, p.vat_rate ?? 21);
@@ -2199,9 +2263,12 @@ function buildRoutes(st) {
   function contextSimulation(b, config) {
     const sid = Number(b.strategy_id);
     const base = st.strategies.find((x) => x.id === sid);
-    if (!base) throw new HttpError(404, 'Strategie nenalezena.');
+    if (!base) throw new HttpError(400, `Strategie ${b.strategy_id} neexistuje.`);
     const segId = b.segment_id !== undefined ? (b.segment_id == null ? null : Number(b.segment_id)) : base.segment_id;
-    const replaced = { ...base, config, segment_id: segId, enabled: 1 };
+    // bez config = uložená konfigurace; priority = neuložené místo v pořadí
+    const cfg = b.config == null ? deepMerge(DEFAULT_CONFIG, base.config || {}) : config;
+    const priority = Number.isInteger(b.priority) ? b.priority : base.priority;
+    const replaced = { ...base, config: cfg, segment_id: segId, priority, enabled: 1 };
     const list = st.strategies.map((x) => (x.id === sid ? replaced : x)).sort(byPriority);
     const earlier = new Set(list.filter((x) => x.enabled && byPriority(x, replaced) < 0).map((x) => x.id));
     let segFn = () => true;
@@ -2219,8 +2286,9 @@ function buildRoutes(st) {
       if (ev.strategy && ev.strategy.id === sid) entries.push({ p, strategy: replaced, decision: ev.decision, fellThrough: ev.fellThrough });
       else if (ev.strategy && earlier.has(ev.strategy.id) && segFn(ev.view)) claimed += 1;
     }
-    alignGroups(st, entries);
+    const groupStats = alignGroups(st, entries);
     const stats = emptyStats();
+    stats.groups = groupStats;
     const decisions = [];
     const limit = Math.min(1000, Number(b.limit) || 200);
     for (const e of entries) {
@@ -2527,7 +2595,17 @@ function buildRoutes(st) {
     audit(ctx, 'export.push', 'export', exp.id);
     return { ok: true, status: 200, body: '{"ok":true,"received":' + rows.length + '}', duration_ms: 287, export_id: exp.id, count: exp.count };
   }, 'export');
-  add('GET', '/exports', () => ({ items: [...st.exports].reverse().slice(0, 100).map(clone), total: st.exports.length, page: 1, limit: 100 }));
+  // C8: redownload = export doručil návrhy → lze je stáhnout znovu (GET /exports/:id/changes.json|xml|csv)
+  add('GET', '/exports', () => ({ items: [...st.exports].reverse().slice(0, 100).map((e) => ({ ...clone(e), redownload: st.proposals.some((pr) => pr.export_id === e.id) })), total: st.exports.length, page: 1, limit: 100 }));
+  add('GET', '/exports/:id/changes.:format', (ctx) => {
+    const id = toNumId(ctx.params.id);
+    const format = ctx.params.format;
+    if (!['json', 'xml', 'csv'].includes(format)) throw new HttpError(404, 'Neznámý formát (povoleno json, xml, csv).');
+    const rows = exportedRows(st, id);
+    if (!st.exports.some((e) => e.id === id) || !rows.length) throw new HttpError(404, `Export #${id} neexistuje nebo nedoručil žádné změny cen (nelze ho stáhnout znovu).`);
+    const { body, type } = rowsBody(st, rows, format);
+    return { status: 200, headers: { 'Content-Type': type, 'Content-Disposition': `attachment; filename="export-${id}-zmeny.${format}"`, 'X-Export-Id': String(id), 'X-Export-Count': String(rows.length) }, body };
+  }, 'export');
 
   add('GET', '/settings', () => clone(st.settings));
   add('PUT', '/settings', (ctx) => {
@@ -2536,6 +2614,16 @@ function buildRoutes(st) {
     for (const k of Object.keys(b)) if (k.startsWith('_')) throw new HttpError(400, 'Interní klíče nelze měnit.');
     if (b.vat_rate_default != null && !(b.vat_rate_default >= 0 && b.vat_rate_default < 100)) throw new HttpError(400, 'Sazba DPH musí být 0–99 %.');
     if (b.export?.webhook?.url && !/^https?:\/\//.test(b.export.webhook.url)) throw new HttpError(400, 'URL webhooku musí začínat http:// nebo https://');
+    // jako skutečné API (src/server/api/settings.js SCHEMA): celá čísla v rozsahu
+    const intIn = (k, min, max, label) => {
+      if (b[k] === undefined) return;
+      if (!(Number.isInteger(b[k]) && b[k] >= min && b[k] <= max)) throw new HttpError(400, `${label}: celé číslo ${min}–${max}.`, [{ field: k }]);
+    };
+    intIn('retention_days', 0, 36500, 'Doba uchování dat (dny)');
+    intIn('retention_superseded_days', 1, 36500, 'Doba uchování nahrazených návrhů (dny)');
+    intIn('reject_memory_days', 0, 365, 'Paměť zamítnutých cen (dny)');
+    const plv = b.export?.pohoda?.price_level_includes_vat;
+    if (plv !== undefined && typeof plv !== 'boolean') throw new HttpError(400, 'Ceny cenové hladiny s DPH: true/false.');
     st.settings = deepMerge(st.settings, b);
     audit(ctx, 'settings.update', 'settings', null);
     return clone(st.settings);
@@ -2670,7 +2758,7 @@ function createMockServer(opts = {}) {
       let via = null;
       let sid = null;
       if (cookies.ct_session && st.sessions.has(cookies.ct_session)) {
-        user = 'admin';
+        user = st.sessions.get(cookies.ct_session).name || 'admin';
         scopes = ['read', 'import', 'export', 'admin'];
         via = 'session';
         sid = cookies.ct_session;

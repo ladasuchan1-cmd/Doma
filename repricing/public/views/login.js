@@ -29,14 +29,16 @@ function rememberName(name) {
 }
 
 /**
- * Jméno pro přihlášení: ořízne mezery, řídicí znaky jsou chyba (server je odmítne), nejvýš 64 znaků.
- * @returns {{name: string|null, error: string|null}} name null = bez jména
+ * Jméno pro přihlášení (stejná pravidla jako server – src/server/auth.js normalizeUserName): ořízne mezery, nejvýš
+ * 64 znaků, řídicí znaky a konce řádků jsou chyba, „auto“ (automatické schválení) a „token:…“ (API tokeny) jsou vyhrazené.
+ * @returns {{name: string|null, error: string|null}} name null = bez jména (server použije „admin“)
  */
 export function normalizeName(v) {
   const s = String(v ?? '').trim();
   if (!s) return { name: null, error: null };
-  if (/[\u0000-\u001f\u007f-\u009f]/.test(s)) return { name: null, error: 'Jméno nesmí obsahovat řídicí znaky.' };
+  if (/[\u0000-\u001f\u007f-\u009f\u2028\u2029]/.test(s)) return { name: null, error: 'Jméno nesmí obsahovat řídicí znaky ani konce řádků.' };
   if (s.length > NAME_MAX) return { name: null, error: 'Jméno může mít nejvýš ' + NAME_MAX + ' znaků.' };
+  if (s.toLowerCase() === 'auto' || /^token:/i.test(s)) return { name: null, error: 'Jméno „auto“ a jména začínající „token:“ jsou vyhrazená – zvolte jiné.' };
   return { name: s, error: null };
 }
 

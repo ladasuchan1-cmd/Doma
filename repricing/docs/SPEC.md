@@ -87,6 +87,7 @@ Canonical import fields (all optional except `code`):
 | `msrp` | recommended retail price incl. VAT (MOC) |
 | `stock` | quantity on stock |
 | `sales_30`, `sales_90` | units sold in last 30/90 days |
+| `group_code` | price group (C3): sizes / colours of one bike model share it (e.g. `FOC-JAM-2026`); compared like a code (`codeKey`). Label „Skupina / model“ |
 | `attrs` | JSON object – **every other imported column** (e.g. `N` = stock-age class N0–N8, `sezona`, `imprese_30`) |
 | `active` | 1/0 |
 
@@ -129,6 +130,13 @@ ops-1, money-8, ops-5):
   always `pending` and gets flag `manual_carried`; when the run proposes no change, the manual-price proposal stays open.
 - a price a human **rejected** in the last 7 days (±0.5 %) is never auto-approved again: inserted as `pending` with flag
   `previously_rejected` (stats `held_by_human` counts both cases).
+- **rejected-price memory (C1)** – setting `reject_memory_days` (default 14, 0 = off, integer 0–365): when the product's
+  latest `rejected` proposal was decided within that many days and its `manual_price ?? new_price` equals the new decision
+  price (|diff| < 0.5 Kč), **no proposal is inserted** – the decision becomes `no_change` with reason `rejected_before`
+  (stats `no_change_reasons.rejected_before`, explain step `rejected`). Applied after group alignment, also in dry runs and
+  in `explainProduct`. The 7-day `previously_rejected` rule still applies to prices that differ by ≥ 0.5 Kč.
+- a proposal a human **un-approved** (C5 – `pending` with `decided_by` of a human) counts as a human decision: the same
+  decision keeps it `pending` (it is never re-approved automatically).
 - everything else → `superseded` (as before). A full run (no `productIds`) also supersedes open proposals of
   **inactive** products (money-4).
 
@@ -253,6 +261,8 @@ proposal is replaced by the current price.
   category: category, kategorie, categorytext, group, skupina; msrp: msrp, rrp, moc, doporucena_cena,
   recommended_price, standard_price; vat_rate: vat, dph, sazba_dph, vat_rate, ratevat; owner: owner,
   zodpovedna_osoba, responsible, category_manager, manager; supplier: supplier, dodavatel; url: url, link, odkaz;
+  group_code (C3, label „Skupina / model“): group_code, model, model_code, nadrazeny_kod, parent_code, group_id,
+  item_group_id (Google `g:item_group_id`; the parent code of exploded variants `parent.code` maps here too);
   observed_at: observed_at, date, datum, timestamp, scraped_at, updated_at; sales_30/sales_90: prodej_30, sales_30d…
 - `applyMapping(flatRecord, mapping, kind, ctx) → {value: object|null, errors: string[]}` – builds a canonical record:
   `mapping.fields[canonical] = sourceKey` (explicit wins; otherwise suggestions), `mapping.defaults[canonical] = constant`,
@@ -283,12 +293,19 @@ proposal is replaced by the current price.
 `importProducts(db, records (canonical), {deactivateMissing?=false, sourceId?, now?}) → stats`
 - upsert by `code_key`; update only fields present (non-undefined) in the record; merge `attrs` (new keys overwrite,
   others kept); `purchase_includes_vat` setting → divide purchase_price by (1+vat/100).
+- attribute keys are matched to **existing** attributes of the catalog by a folded key (no diacritics, lower case,
+  runs of non-alphanumerics → `_`): a column „Imprese 30“ updates an existing `imprese_30`, „Sezóna“ an existing `sezona`
+  (the most used spelling wins). New attributes keep the source spelling. Renames are reported in
+  `stats.attrs_merged = {source name: existing key}` (only when non-empty).
 - if `price` changed vs stored → `price_history` row (`source='import'`) and `price_changed_at` – measured on the FINAL
   value of the import (duplicate code rows → one warning per code, last row wins, at most one history row – data-11).
 - `deactivateMissing` → products not in this import get `active=0` (and reactivated when present again). If that would
   deactivate more than half of the active products, it is skipped with a general error unless `forceDeactivate`
   (`force_deactivate`) is set (data-5).
 - changed price inputs supersede open proposals (see §3.6); stats `superseded`.
+- `createMissing: false` (**update-only import**, C6 – e.g. Disivo metrics: code + impressions): unknown codes are not
+  created and the row is not processed; stats get `skipped_unknown` (distinct unknown codes) and `unknown_codes` (first 50).
+  Both keys exist only in this mode. Default `true`.
 - stats `{received, created, updated, unchanged, deactivated, superseded, errors: [{row, message}]}` (max 100 error entries).
 
 ### offers.js
@@ -315,7 +332,9 @@ proposal is replaced by the current price.
   (`ean` > `mpn` > `ext` > `code` > `name`), re-imports the stored raw offer, deletes the unmatched row.
 
 ### sources.js
-- `runImport(db, {kind, input, mapping, options, sourceId?, origin, dryRun?, now?}) → {import_id, stats, preview?}` –
+- `runImport(db, {kind, input, mapping, options, sourceId?, origin, dryRun?, now?, createMissing?}) → {import_id, stats, preview?}` –
+  products options `deactivate_missing`, `force_deactivate`, `create_missing` (default true; `false`/`0`/`"ne"` = update-only,
+  also as `sources.options.create_missing` and top-level `createMissing`, which wins) –
   logs to `imports` (`running` → `ok`/`error`), calls `extractRecords` → `applyMapping` → `importProducts`/`importOffers`
   inside one `tx`. `dryRun` → no writes except nothing (no import row), returns `preview` (first 20 canonical records) + stats of mapping errors.
 - `previewImport({input, mapping, kind}) → {format, itemPath, headers, suggested: mapping.fields, sample: flat[0..9], canonical: [0..9], errors}`
@@ -343,6 +362,9 @@ proposal is replaced by the current price.
   `min_competitors` (default 1). Name matching via `nameKey`.
 - excluded reasons: `disabled`, `excluded`, `not_included`, `tag`, `out_of_stock` (in_stock === 0; null = unknown counts as
   in stock), `stale`, `outlier` (price < median × (1 − outlier_pct/100), only when ≥ 3 offers remain).
+- `max_delivery_days` (C7, default null = off, number ≥ 0): with `in_stock_only`, an offer with `in_stock === 0` still counts
+  when `delivery_days != null && delivery_days <= max_delivery_days` („u dodavatele do 3 dnů“). `computePrice` adds an explain
+  step „Dostupnost: kromě nabídek skladem se počítají i nabídky s dodáním do N dnů (…)“.
 - `effective = price + (include_shipping ? shipping||0 : 0)`.
 - Market = `{offers: [...used, sorted by effective asc then name], excluded: [{offer, reason}], count, min, max, avg, median,
   cheapest: offer|null, prices: number[]}` (stats on effective prices, rounded 2 dp).
@@ -361,7 +383,8 @@ negotiation ammunition), `lock_active` (bool, effective lock), `days_since_chang
 Uses default market filter: enabled competitors, fresh (`offer_max_age_days`), `in_stock_only =
 settings.metrics_in_stock_only`, no shipping.
 `FIELDS` – array describing filterable fields `{key, label (Czech), type: 'string'|'number'|'boolean'|'enum', group}`
-(product fields, metrics, plus dynamic `attrs.*` added by API from data). `position` is enum
+(product fields incl. `group_code` „Skupina / model“ in group „Produkt“, metrics, plus dynamic `attrs.*` added by API from
+data). `position` is enum
 (`cheapest|middle|most_expensive|no_data`).
 
 ### 6.4 filter.js – segment filters
@@ -402,7 +425,8 @@ Op       := "=" "!=" ">" ">=" "<" "<=" "in" "not_in" "contains" "not_contains" "
   "competitors": { "include": [], "exclude": [], "include_tags": [], "exclude_tags": [],
                    "in_stock_only": true, "include_shipping": false, "max_age_days": null,
                    "outlier_pct": null, "min_competitors": 1,
-                   "exclude_keywords": [] },   // offers whose name contains any keyword (fold()) are excluded, e.g. ["bazar","použit","rozbalen","demo"]
+                   "exclude_keywords": [],      // offers whose name contains any keyword (fold()) are excluded, e.g. ["bazar","použit","rozbalen","demo"]
+                   "max_delivery_days": null }, // with in_stock_only: an out-of-stock offer delivering within N days counts (C7)
   "fallback": { "mode": "next", "markup_pct": null, "offset_pct": 0 },   // next | keep | msrp | cost_plus  (when the price base is unavailable)
   "limits": {
     "min_margin_pct": 10, "min_profit_abs": null, "max_margin_pct": null,
@@ -416,7 +440,8 @@ Op       := "=" "!=" ">" ">=" "<" "<=" "in" "not_in" "contains" "not_contains" "
   "rounding": { "mode": "ending", "direction": "down",
                 "bands": [ {"up_to": 1000, "ending": 9}, {"up_to": 10000, "ending": 90}, {"up_to": null, "ending": 990} ] },
   "stock": { "zero_stock": "reprice" },   // reprice | skip | msrp
-  "approval": { "auto": false, "auto_max_change_pct": 5 }
+  "approval": { "auto": false, "auto_max_change_pct": 5 },
+  "group": { "align": "off" }            // off | min | max | median – one price per group_code (C3, §6.10)
 }
 ```
 
@@ -469,8 +494,10 @@ Op       := "=" "!=" ">" ">=" "<" "<=" "in" "not_in" "contains" "not_contains" "
    flags `below_cost` (net new < purchase), `big_change` (|change_pct| > approval.auto_max_change_pct).
     Extra flag `ceiling_over_change_limit` when the ceiling forces a decrease beyond the change limit / `allow_decrease=false`.
     Skip reasons also include `invalid_vat` (VAT < 0 or ≥ 100) and `invalid_config`; no_change reasons include `keep`,
-    `same_price`, `below_threshold`, `no_price_point`, `clearance_wait`.
-10. `auto_approve = approval.auto && !flags.some(f => ['limits_conflict','floor_over_change_limit','ceiling_over_change_limit','below_cost','big_change'].includes(f))`
+    `same_price`, `below_threshold`, `no_price_point`, `clearance_wait` and (run.js) `rejected_before` („stejná cena byla
+    nedávno zamítnuta“, §3.6). Flags added by run.js: `group_aligned` („sjednoceno ve skupině“), `group_conflict` („skupinu
+    nelze sjednotit (limity)“) – §6.10.
+10. `auto_approve = approval.auto && !flags.some(f => BLOCKING_FLAGS.includes(f))`, BLOCKING_FLAGS = `['limits_conflict','floor_over_change_limit','ceiling_over_change_limit','below_cost','big_change','group_conflict']` (`group_conflict` is only set later by groups.js §6.10)
     and **not** (`no_cost` flag and the price goes down) – never auto-lower a price when the margin cannot be checked.
 
 Decision shape:
@@ -491,20 +518,35 @@ Explanation example texts (Czech): „Nejnižší cena trhu: 12 490 Kč (VeloMar
 - `evaluateProduct(ctx, product, offers) → {view, segmentIds: number[], strategy|null, decision|null, tried: [{strategy_id, name, result: 'not_applicable'|'fallthrough'|'decided', why}]}` –
   implements §3.5 (segment, conditions, schedule, fall-through). When a strategy falls through, prepend an explain step
   „Strategie X nepoužita: chybí …“ to the final decision.
-- `runPricing(db, {trigger='manual', productIds?, now?, dryRun?=false}) → {run_id|null, stats, decisions?}`
+- `runPricing(db, {trigger='manual', productIds?, now?, dryRun?=false}) → {run_id|null, stats, decisions?}` – `dryRun`
+  (C2) evaluates the whole enabled strategy set (incl. group alignment and rejected-price memory) and writes nothing (no
+  `runs` row, no proposals, no audit); `decisions` = all decisions of products some strategy decided. With `productIds` and
+  a strategy that aligns groups, the selection is extended by the active members of the selected products' groups.
   stats `{products, evaluated, changes, up, down, no_change, skipped: {reason: n}, no_strategy, fallthrough (count of products where ≥1 strategy fell through), auto_approved, pending,
   by_strategy: {[strategy_id]: {name, products, changes, up, down}}, margin_impact_abs}`
-  (`margin_impact_abs` = Σ (net new − net old) over changes, per unit). Writes `runs` + `proposals` + supersedes in one `tx`.
+  (`margin_impact_abs` = Σ (net new − net old) over changes, per unit), plus `groups: {aligned, conflicts, members}`,
+  `no_change_reasons`, `flags`, `kept`, `held_by_human`, `superseded`. Writes `runs` + `proposals` + supersedes in one `tx`.
   Loads offers in bulk (one query joined with competitors), not per product.
 - `simulate(db, {config, segment_id?|filter?, limit=200, now?}) → {stats, decisions (up to `limit` changes + up to `limit`
-  skips), truncated: {changes, skips, changes_total, skips_total}}` – no writes (contract-6).
-- `explainProduct(db, productId, {now?}) → {view, segments: [{id,name}], strategy, decision}`.
+  skips), truncated: {changes, skips, changes_total, skips_total}, errors, context: false}` – no writes (contract-6). Groups are
+  aligned as in a run (the ad-hoc strategy's `group.align`).
+- **contextual simulation (C2)** `simulate(db, {strategy_id, config?, segment_id?, priority?, limit?, now?})` → the FULL
+  enabled strategy set in priority order with that strategy's config replaced (missing `config` = the stored one); a disabled
+  strategy is inserted at its priority (`priority` overrides). Reports only products decided by that strategy;
+  `context: true`, `stats.products` = products of its segment, `stats.claimed_by_earlier` = products in the segment decided
+  by an earlier strategy, `stats.fallthrough` = its base was missing, `stats.skipped.conditions|schedule` = not applicable,
+  `stats.strategy`, `stats.segment`, `stats.groups` (only the groups aligned by THIS strategy – groups of the other
+  strategies of the set are aligned too, but not counted). Unknown strategy → `errors`.
+- `explainProduct(db, productId, {now?}) → {view, segments: [{id,name}], strategy, decision, tried}` – an active product in
+  a price group is evaluated together with the active members of its group (the decision shows the aligned price and
+  `decision.group = {code, align, members, price, conflict}`); the rejected-price memory applies too.
 - `latestProposal(db, productId)`.
 
 ### 6.9 presets.js
 `STRATEGY_PRESETS` – array of `{key, name, description, segment: {name, filter}|null, config}` in Czech, including:
 „Ležáky N7/N8 – doprodej“ (attrs.N in [N7,N8]; undercut_min −1 %; min margin 3 %; max decrease 15 %),
-„Klíčové značky – držet pozici 2“ (rank 2, min margin 18 %, MSRP ceiling),
+„Klíčové značky – držet pozici 2“ (rank 2, min margin 18 %, MSRP ceiling, `group.align: 'max'` – sizes of one model share
+the highest price),
 „Bez konkurence → MOC“ (target msrp, only for market_count = 0 segment),
 „Výchozí – medián trhu −2 %“ (all products, market_median −2 %, min margin 12 %, auto approve ≤ 3 %),
 „Návrat marže – jsme výrazně nejlevnější“ (conditions position = cheapest AND gap_min_pct <= −5; undercut_min −1 %),
@@ -512,6 +554,28 @@ Explanation example texts (Czech): „Nejnižší cena trhu: 12 490 Kč (VeloMar
 „Víkendová akce“ (example schedule weekdays [6,7], fixed/msrp −10 %, disabled by default).
 `DEFAULT_CONFIG` – the defaults of §6.5. `normalizeConfig(cfg)` deep-merges defaults and validates
 (returns `{config, errors}`).
+
+### 6.10 groups.js – price groups (C3)
+`alignGroups(items: [{product, decision, strategy}], {settings}) → {aligned, conflicts, members}` (mutates decisions),
+`groupKey(product)` (`codeKey(group_code)` or null). Called by `runPricing` / `simulate` / `explainProduct` after the
+individual decisions (and before the rejected-price memory):
+1. Members = products with the same `groupKey` decided by the **same** strategy (object identity) whose `group.align != 'off'`.
+   Members decided by another strategy are not aligned (the group splits by strategy). Groups with < 2 participants → nothing.
+2. Participants' resulting prices: `new_price` for `change`, the current price for `no_change`. `skip` members (locked, zero
+   stock, invalid VAT…) keep their price, are excluded from the computation and listed in the explain text („… – přeskočeno“).
+3. Group price = min / max / median of the resulting prices, clamped to `[max of participants' floors, min of their ceilings]`
+   (explained „zvednuto na spodní hranici skupiny …“ / „sníženo na horní hranici skupiny …“). Empty interval → individual
+   prices stay, every participant gets flag `group_conflict` and explain step „Skupinu X (N produktů, režim …) nelze sjednotit: …“.
+   `group_conflict` is a BLOCKING flag: such a change is **never auto-approved** (approval step „Nutné ruční schválení: …,
+   skupinu nelze sjednotit (limity)“) and bulk „approve all“ skips it unless `include_flagged` (RISKY_FLAGS).
+4. Re-rounding with the strategy rounding (configured direction, then the other side); a point outside the interval → the
+   unrounded whole-CZK value closest to the group price inside it („mezi hranicemi skupiny není cenový bod → bez zaokrouhlení“).
+5. Every participant gets the group price: no_change / `min_change_*` threshold re-evaluated against ITS current price
+   (`same_price` / `below_threshold`), `margin_after`, `rank_after` (from `market.used`), `change_abs`, `change_pct`,
+   `below_cost`, `big_change` and auto-approval recomputed (BLOCKING_FLAGS, no_cost decrease; a group price outside the
+   member's change limit is never auto-approved and gets a warning step). Flag `group_aligned`, explain step
+   `{step: 'group', text: „Sjednoceno ve skupině X (N produktů, režim nejvyšší|nejnižší|medián) → Y Kč“}`,
+   `decision.group = {code, align, members, price, conflict}`.
 
 ## 7. Export (`src/export/*`)
 
@@ -559,6 +623,11 @@ products and proposals failing `holdReason` are skipped.
 `ackExport(db, {items?: [{code|proposal_id, price}], proposal_ids?, codes?}) → {…, unknown_codes, mismatched}`.
 `logExport(db, {kind, target, count, status, detail})`.
 `exportChanges(db, {format, mark, actor}) → {body, contentType, export_id?, count}` convenience used by API/feeds.
+`markExported` also stores `proposals.exported_price` (the delivered price). **Export re-download (C8):**
+`exportedRows(db, exportId) → {export, rows}` – the rows delivered by that export (proposals with `export_id`, `price` =
+`exported_price` (older exports: `manual_price ?? new_price`), `lowest_30d` as of the export time, same Row shape);
+`exportRedownload(db, exportId, {format: json|xml|csv}) → {body, contentType, filename, count, export_id}|null` (null =
+unknown export or no rows). Nothing is marked or served.
 
 ## 8. Server & API
 
@@ -583,7 +652,11 @@ Security headers: `Content-Security-Policy: default-src 'self'; img-src 'self' d
 - Password: `CENOTVORBA_PASSWORD` env, else settings `_password_hash` (scrypt with salt). On first start without either →
   generate random 16-char password, store hash, print it once to the console (`console.log`).
 - Session: cookie `ct_session` (HttpOnly, SameSite=Strict, Secure when request is https / trustProxy+x-forwarded-proto),
-  value = base64url(JSON {u, exp}) + '.' + HMAC-SHA256(secret) ; 14 days; secret from env or settings `_secret` (generated).
+  value = base64url(JSON {u, exp, pv}) + '.' + HMAC-SHA256(secret) ; 14 days; secret from env or settings `_secret` (generated).
+- **Login name (C9)**: `POST /auth/login` accepts optional `name` (trimmed, 1–64 chars, no control characters / line
+  separators; `auto` and `token:…` are reserved → 400; empty/missing → `admin`). It is stored in the signed session (`u`),
+  becomes `ctx.user` and therefore `decided_by` of proposals and the audit `actor`. **Attribution only, not
+  authentication** – the password is shared, anyone who knows it can type any name. Tokens act as `token:<token name>`.
 - Tokens: `Authorization: Bearer <token>`, header `X-Api-Key`, or `?token=` (feeds). Stored as sha256 hex in `tokens`;
   token format `ct_` + 32 random base62 chars; `prefix` = first 7 chars for display. Scopes: `read`, `import`, `export`, `admin`.
   Session user = all scopes. Update `last_used_at` (at most once per minute).
@@ -606,10 +679,13 @@ as interrupted (ops-2).
 
 ### API endpoints (all JSON unless stated; prefix `/api/v1`; list endpoints return `{items, total, page, limit}`)
 
+The integration guide for the admin (feed → apply → ack, webhook, errors, recovery, reference client) is
+[docs/ADMIN-API.md](ADMIN-API.md) (Czech).
+
 | Method & path | Auth | Request | Response |
 |---|---|---|---|
 | GET `/health` | public | | `{ok:true, version, time}` |
-| POST `/auth/login` | public | `{password}` | `{ok:true}` + cookie |
+| POST `/auth/login` | public | `{password, name?}` (C9) | `{ok:true}` + cookie |
 | POST `/auth/logout` | public | | `{ok:true}` |
 | GET `/auth/me` | read | | `{user, scopes, via:'session'|'token'}` |
 | GET `/dashboard` | read | | see below |
@@ -626,16 +702,17 @@ as interrupted (ops-2).
 | POST `/strategies/reorder` | admin | `{ids: [..]}` | priorities set to 10,20,30… |
 | GET `/strategies/presets` | read | | `{items: STRATEGY_PRESETS}` |
 | POST `/strategies/presets/:key` | admin | | creates segment (if any) + strategy from preset – always **disabled**; a targeted preset is placed before an enabled catch-all strategy (no segment, no conditions) → `{strategy, segment, segment_created, warning}` (contract-4) |
-| POST `/simulate` | read | `{config, segment_id?, filter?, limit?}` | `simulate()` result (`decisions`, `truncated`) |
-| POST `/runs` | admin | `{product_ids?}` | `{run_id, stats}` |
+| POST `/simulate` | read | `{config, segment_id?, filter?, limit?}` or `{strategy_id, config?, segment_id?, priority?, limit?}` (C2 contextual) | `{stats, decisions (+product {id,code,name,manufacturer}), truncated, errors: [], context}` – `context: true` + `stats.claimed_by_earlier` with `strategy_id`; unknown strategy / invalid config → 400 |
+| POST `/runs` | admin | `{product_ids?, dry_run?}` | `{run_id, stats}`; `dry_run: true` (C2) → `{run_id: null, dry_run: true, stats, sample: [≤ 200 decisions sorted by abs(change_pct) desc, each + product {id, code, name, manufacturer, category}]}` – nothing written, no audit |
 | GET `/runs`, GET `/runs/:id` | read | | runs with parsed stats |
-| GET `/proposals` | read | query: `status` (default `pending`; `all`), `run`, `strategy`, `segment`, `direction` up/down, `flag`, `q`, `manufacturer`, `sort` (default `abs_change_pct` desc; own keys only), `page`, `limit` | `{items: [proposal + product {code,name,manufacturer,category,stock,purchase_price} + strategy_name + segment_name + flags[] + explain[]], total, page, limit, max_id, flagged, summary: {pending, approved, exported_today, up, down}}` |
+| GET `/proposals` | read | query: `status` (default `pending`; `all`), `run`, `strategy`, `segment` (deciding strategy's segment), `direction` up/down, `flag`, `q`, `manufacturer`, `owner`, `category`, `supplier` (exact, case/diacritics-insensitive), `product_segment` (any segment the product belongs to), `filter` (Filter JSON over the product view; invalid → 400) (C4), `sort` (default `abs_change_pct` desc; own keys only), `page`, `limit` | `{items: [proposal + product {code,name,manufacturer,category,stock,purchase_price} + strategy_name + segment_name + flags[] + explain[]], total, page, limit, max_id, flagged, summary: {pending, approved, exported_today, up, down}}` |
 | POST `/proposals/approve` | admin | `{ids?: [], all?: bool (+ same filter query fields in body.filter), expect?: {count, max_id}, include_flagged?: bool}` | `{updated, skipped_locked, skipped_inactive, skipped_flagged}` (only `pending` ones; `all` with `expect` not matching the current selection → 409 `PROPOSALS_CHANGED`; `all` skips proposals with risky flags – BLOCKING_FLAGS, manual price outside limits, previously_rejected – unless `include_flagged`; money-9) |
 | POST `/proposals/reject` | admin | same | `{updated}` |
+| POST `/proposals/unapprove` | admin | `{ids? \| all: true, filter?, expect?}` (C5) | `{updated}` – `approved` and not exported → `pending`; `decided_at`/`decided_by` = who un-approved, `served_*` cleared (an ack by code no longer marks it) |
 | PATCH `/proposals/:id` | admin | `{manual_price, confirm?}` (null clears) | proposal; a risky manual price (net below purchase, outside product min/max, > 50 % change) without `confirm: true` → 409 `MANUAL_PRICE_CONFIRM` with `details.reasons`; stored with flags `manual`, `manual_below_cost`, `below_min`, `above_max`, `big_manual_change`; editing an `approved` proposal returns it to `pending`; locked product → 409 (money-7) |
 | POST `/import/preview` | import | raw body (any format) + query `kind`, `mapping` (JSON string) or `source` id | `previewImport` result |
 | POST `/import/offers` | import | raw body + query `source`/`mapping`, `replace`, `dry_run` | `{import_id, stats}` ; also accepts `application/json` body `{items:[canonical offers]}` or an array |
-| POST `/import/products` | import | raw body + query `source`/`mapping`, `deactivate_missing`, `force_deactivate`, `dry_run` | `{import_id, stats}` |
+| POST `/import/products` | import | raw body + query `source`/`mapping`, `deactivate_missing`, `force_deactivate`, `create_missing` (C6: `0` = update-only; overrides `sources.options.create_missing`; invalid → 400), `dry_run` | `{import_id, stats}` (+ `skipped_unknown`, `unknown_codes` in update-only mode) |
 | GET `/imports` | read | | import log (latest 100) |
 | GET/POST `/sources`, GET/PUT/DELETE `/sources/:id`, POST `/sources/:id/run` | read/admin | `{name, kind, url, method, headers, mapping, options, interval_minutes, enabled}` | source / run result |
 | GET `/unmatched` | read | query `competitor`, `q`, page | `{items, total}` |
@@ -647,9 +724,10 @@ as interrupted (ops-2).
 | GET `/export/proposals.xlsx` | read | same filters as `/proposals` | XLSX attachment |
 | GET `/export/pricelist.(json|xml|csv|xlsx)` | export | | full price list (`scope=all`) |
 | POST `/export/push` | export | | `pushWebhook` result + marked export |
-| GET `/exports` | read | | export log |
+| GET `/exports` | read | | export log; items + `redownload` (bool – the export has proposals, C8) |
+| GET `/exports/:id/changes.(json\|xml\|csv)` | export | | C8 re-download: the rows delivered by export `:id` (price = delivered price), same body as the changes feed, headers `X-Export-Id`, `X-Export-Count`; unknown id / no rows → 404 |
 | GET `/feed/:name.(xml|json|csv)` (**no /api/v1 prefix**) | token `?token=` scope export | `name` = `changes` or `prices`; `mark=1` allowed for changes | feed |
-| GET/PUT `/settings` | read/admin | partial settings object (deep-merged) | settings |
+| GET/PUT `/settings` | read/admin | partial settings object (deep-merged); incl. `reject_memory_days` (integer 0–365), `retention_superseded_days`, `export.pohoda.price_level_includes_vat` | settings |
 | POST `/settings/password` | admin | `{current, new}` | `{ok}` |
 | GET/POST `/tokens`, DELETE `/tokens/:id` | admin | `{name, scopes}` | POST returns the plain token once `{id, token, prefix, scopes}` |
 | GET `/audit` | admin | | last 200 |

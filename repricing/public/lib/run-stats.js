@@ -10,6 +10,17 @@ function sumSkipped(skipped) {
   return Object.values(skipped).reduce((s, v) => s + (Number(v) || 0), 0);
 }
 
+/** C3: souhrn sjednocení cen ve skupinách (stats.groups = {aligned, conflicts, members}), null když nic. */
+function groupsRow(g) {
+  const aligned = Number(g?.aligned) || 0;
+  const conflicts = Number(g?.conflicts) || 0;
+  if (!aligned && !conflicts) return null;
+  const parts = [];
+  if (aligned) parts.push(count(aligned, 'skupina sjednocena', 'skupiny sjednoceny', 'skupin sjednoceno') + (Number(g.members) > 0 ? ' (' + count(Number(g.members), 'produkt', 'produkty', 'produktů') + ')' : ''));
+  if (conflicts) parts.push(count(conflicts, 'skupinu nelze sjednotit', 'skupiny nelze sjednotit', 'skupin nelze sjednotit') + ' (limity variant se nepřekrývají)');
+  return h('div', { class: 'row reason-row', dataset: { role: 'groups' } }, h('span', { class: 'muted small' }, 'Skupiny variant:'), h('span', { class: 'small' }, parts.join(' · ')));
+}
+
 /**
  * KPI dlaždice + rozpad přeskočených + tabulka podle strategií.
  * @param {object} stats
@@ -53,7 +64,8 @@ export function runStatsView(stats, o = {}) {
     reasonRow('Beze změny:', s.no_change_reasons, reasonLabel),
     reasonRow('Příznaky změn:', s.flags, flagLabel, 'info'),
     Number(s.held_by_human) > 0 ? h('div', { class: 'row reason-row' }, h('span', { class: 'muted small' }, 'Čeká na člověka:'), h('span', { class: 'small' }, count(s.held_by_human, 'návrh čeká', 'návrhy čekají', 'návrhů čeká') + ' na nové schválení (přenesená ruční cena nebo cena, kterou někdo nedávno zamítl)')) : null,
-    Number(s.fallthrough) > 0 ? h('div', { class: 'row reason-row' }, h('span', { class: 'muted small' }, 'Propadnutí:'), h('span', { class: 'small' }, count(s.fallthrough, 'produkt', 'produkty', 'produktů') + ' přešlo na další strategii (chyběl základ ceny)')) : null,
+    groupsRow(s.groups),
+    Number(s.fallthrough) > 0 ? h('div', { class: 'row reason-row' }, h('span', { class: 'muted small' }, 'Propadnutí:'), h('span', { class: 'small' }, count(s.fallthrough, 'produkt přešel', 'produkty přešly', 'produktů přešlo') + ' na další strategii (chyběl základ ceny)')) : null,
   ].filter(Boolean);
   if (rows.length) parts.push(h('div', { class: 'stack-sm', style: 'margin-top:10px' }, rows));
   const bs = s.by_strategy && typeof s.by_strategy === 'object' ? Object.entries(s.by_strategy) : [];

@@ -658,7 +658,8 @@ export async function show(root, ctx) {
       flagged = Number(res.flagged) || 0;
       summary = res.summary || null;
       editing = null;
-      table.el.classList.toggle('hide-status', st.status === 'pending');
+      // sloupec Stav jen na záložce Vše – jinak mají všechny řádky stejný stav (a široká tabulka by přetékala)
+      table.el.classList.toggle('hide-status', st.status !== 'all');
       table.setData(rows, { total, page: res.page, limit: res.limit });
       renderSummary();
       updateActions();

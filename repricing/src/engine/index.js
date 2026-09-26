@@ -8,6 +8,7 @@ const filter = require('./filter');
 const presets = require('./presets');
 const pricing = require('./pricing');
 const run = require('./run');
+const groups = require('./groups');
 
 module.exports = {
   // rounding.js
@@ -47,6 +48,8 @@ module.exports = {
   FALLBACK_MODES: presets.FALLBACK_MODES,
   TARGET_MODE_LABELS: presets.TARGET_MODE_LABELS,
   FALLBACK_MODE_LABELS: presets.FALLBACK_MODE_LABELS,
+  GROUP_ALIGN_MODES: presets.GROUP_ALIGN_MODES,
+  GROUP_ALIGN_LABELS: presets.GROUP_ALIGN_LABELS,
   // pricing.js
   computePrice: pricing.computePrice,
   formatMoney: pricing.formatMoney,
@@ -62,4 +65,7 @@ module.exports = {
   explainProduct: run.explainProduct,
   latestProposal: run.latestProposal,
   prepareStrategy: run.prepareStrategy,
+  // groups.js – cenové skupiny (C3)
+  alignGroups: groups.alignGroups,
+  groupKey: groups.groupKey,
 };

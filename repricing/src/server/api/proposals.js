@@ -16,7 +16,8 @@
 //                                            include_flagged?: bool} → {updated, skipped_locked, skipped_inactive, skipped_flagged}
 //   POST  /api/v1/proposals/reject   admin  totéž → {updated}
 //   POST  /api/v1/proposals/unapprove admin {ids | all: true, filter?, expect?} → {updated} – schválené a neexportované
-//                                           návrhy zpět do „pending“ (decided_* a údaj o vydání se smažou)
+//                                           návrhy zpět do „pending“ (decided_at/decided_by = kdo schválení zrušil,
+//                                           údaj o vydání served_* se smaže; přecenění stejný návrh nechá čekat)
 //   PATCH /api/v1/proposals/:id      admin  {manual_price: číslo > 0 | null, confirm?: true} → návrh (tvar položky seznamu)
 //
 // Rozhodnutí:
@@ -360,7 +361,7 @@ function summaryCounts(db, up, down) {
 }
 
 /**
- * Změní stav návrhů (approve/reject) podle ids nebo filtru.
+ * Změní stav návrhů (approve / reject / unapprove) podle ids nebo filtru.
  * @returns {{updated: number, skipped_locked?: number, skipped_inactive?: number, skipped_flagged?: number, ids: number[]}}
  */
 function decide(db, body, action, actor) {
@@ -441,12 +442,13 @@ function decide(db, body, action, actor) {
       ids.push(r.id);
     }
     let updated = 0;
-    // zrušení schválení: rozhodnutí i údaj o vydání (served_*) se smažou – admin návrh nesmí převzít, dokud ho někdo
-    // znovu neschválí (potvrzení převzetí podle kódu ho pak neoznačí)
+    // Zrušení schválení (C5): návrh zpět do „pending“; decided_at / decided_by = kdo a kdy schválení zrušil (lidské
+    // rozhodnutí – další přecenění stejný návrh ponechá čekat a znovu ho automaticky neschválí). Údaj o vydání
+    // (served_*) se smaže – admin návrh nesmí převzít, dokud ho někdo znovu neschválí (potvrzení podle kódu ho neoznačí).
     const upd =
       action === 'unapprove'
         ? db.prepare(
-            `UPDATE proposals SET status = ?, decided_at = NULL, decided_by = NULL, served_price = NULL, served_at = NULL
+            `UPDATE proposals SET status = ?, decided_at = ?, decided_by = ?, served_price = NULL, served_at = NULL
              WHERE id IN (SELECT value FROM json_each(?)) AND status IN (${allowed.map(() => '?').join(', ')}) AND exported_at IS NULL`
           )
         : db.prepare(
@@ -455,7 +457,7 @@ function decide(db, body, action, actor) {
           );
     for (let i = 0; i < ids.length; i += 5000) {
       const chunk = JSON.stringify(ids.slice(i, i + 5000));
-      updated += Number((action === 'unapprove' ? upd.run(target, chunk, ...allowed) : upd.run(target, now, actor, chunk, ...allowed)).changes);
+      updated += Number(upd.run(target, now, actor, chunk, ...allowed).changes);
     }
     return withSkips({ updated, ids, skipped_locked: skippedLocked, skipped_inactive: skippedInactive });
   });

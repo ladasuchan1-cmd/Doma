@@ -94,8 +94,10 @@ export async function show(root, ctx) {
     });
     return field({ label, control: h('div', null, withSuffix(inp, opts.suffix), err), input: inp, help: [opts.help, 'Povoleno: ' + rule + '.'].filter(Boolean).join(' ') });
   }
-  function boolField(path, label, help) {
-    const sw = switchEl({ checked: Boolean(get(draft, path)), label, onChange: (v) => { set(draft, path, v); markDirty(); } });
+  function boolField(path, label, help, dflt = false) {
+    // dflt = hodnota, když klíč v nastavení chybí (starší server) – jinak by přepínač ukazoval opak skutečného chování
+    const cur = get(draft, path);
+    const sw = switchEl({ checked: Boolean(cur ?? dflt), label, onChange: (v) => { set(draft, path, v); markDirty(); } });
     return h('div', { class: 'field field-switch' }, sw, help ? h('div', { class: 'field-help' }, help) : null);
   }
   /**
@@ -273,7 +275,7 @@ export async function show(root, ctx) {
               selField('export.pohoda.encoding', 'Kódování XML', [{ value: 'windows-1250', label: 'Windows-1250 (doporučeno)' }, { value: 'utf-8', label: 'UTF-8' }], 'Výchozí kódování souboru pro import do POHODY.')
             ),
             h('div', { style: 'margin-top:8px', dataset: { field: 'price-level-vat' } },
-              boolField('export.pohoda.price_level_includes_vat', 'Ceny cenové hladiny jsou s DPH', 'Platí jen s vyplněnou cenovou hladinou. Vypnuto = do POHODY se pošle cena bez DPH (přepočtená sazbou produktu) – pro hladiny, které POHODA vede bez DPH. Základní prodejní cena se posílá vždy s DPH.')),
+              boolField('export.pohoda.price_level_includes_vat', 'Ceny cenové hladiny jsou s DPH', 'Platí jen s vyplněnou cenovou hladinou. Vypnuto = do POHODY se pošle cena bez DPH (přepočtená sazbou produktu) – pro hladiny, které POHODA vede bez DPH. Základní prodejní cena se posílá vždy s DPH.', true)),
             h('h3', { class: 'form-subtitle' }, 'Webhook do adminu'),
             h('div', { class: 'form-grid form-grid-2' },
               textField('export.webhook.url', 'URL webhooku', { type: 'url', mono: true, placeholder: 'https://admin.example.cz/hooks/ceny' }),

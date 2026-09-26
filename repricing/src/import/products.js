@@ -5,7 +5,9 @@
 //  - mění se jen pole, která záznam obsahuje (undefined = beze změny; null = smazat hodnotu)
 //  - pole spravovaná v aplikaci (locked, locked_until, min_price, max_price, note) se změní jen tehdy, když je záznam
 //    výslovně obsahuje – applyMapping je z návrhu mapování nikdy nevytvoří
-//  - attrs: nové klíče přepisují, ostatní zůstávají; null = atribut smazat
+//  - attrs: nové klíče přepisují, ostatní zůstávají; null = atribut smazat. Sloupec se zapíše do už existujícího
+//    atributu, jehož název se liší jen velikostí písmen, diakritikou či oddělovači („Imprese 30“ → „imprese_30“,
+//    „Sezóna“ → „sezona“) – stats.attrs_merged = {název ze zdroje: existující atribut}
 //  - změna ceny (stará i nová známá) → price_history (source 'import') + price_changed_at. Nový produkt ani první
 //    doplnění ceny se za změnu nepovažují (strategie „doprodej“ bere „nikdy neměněno“ jako splatné). Při první
 //    zaznamenané změně se do historie nejdřív doplní dosavadní cena (util/price-history.js – Omnibus lowest_30d).
@@ -60,6 +62,20 @@ function toNum(v) {
   if (typeof v === 'number') return Number.isFinite(v) ? v : undefined;
   const n = parseNumber(v);
   return n == null ? undefined : n;
+}
+
+/**
+ * Klíč pro porovnání názvů atributů: bez diakritiky, malá písmena, oddělovače → „_“ („Imprese 30“ ~ „imprese_30“,
+ * „Sezóna“ ~ „sezona“). Import zapíše sloupec do UŽ EXISTUJÍCÍHO atributu se stejným klíčem – jinak by metriky
+ * z jiného zdroje (např. Disivo „Imprese 30“ vs. katalog „imprese_30“) založily druhý, souběžný atribut.
+ */
+function attrFold(k) {
+  return String(k)
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '_')
+    .replace(/^_+|_+$/g, '');
 }
 
 function parseAttrs(v) {
@@ -122,7 +138,8 @@ function normalizeRecord(rec) {
  *   rowNumbers = čísla řádků zdroje pro hlášení chyb (výchozí index + 1); onError = interní (runImport);
  *   createMissing = false → neznámé kódy se nezakládají (stats.skipped_unknown, stats.unknown_codes – jen v tomto režimu)
  * @returns {{received: number, created: number, updated: number, unchanged: number, deactivated: number, superseded: number,
- *   errors: {row: number|null, message: string}[], skipped_unknown?: number, unknown_codes?: string[]}}
+ *   errors: {row: number|null, message: string}[], skipped_unknown?: number, unknown_codes?: string[],
+ *   attrs_merged?: Object<string, string>}}
  */
 function importProducts(db, records, opts = {}) {
   const list = Array.isArray(records) ? records : [];
@@ -143,6 +160,30 @@ function importProducts(db, records, opts = {}) {
   tx(db, () => {
     const byKey = new Map();
     for (const r of db.prepare('SELECT * FROM products').iterate()) byKey.set(r.code_key, { ...r });
+
+    // existující atributy katalogu (attrFold → skutečný klíč; při shodě více klíčů ten nejpoužívanější)
+    let attrKeyOf = null;
+    const attrsMerged = {}; // název ze zdroje → existující atribut (stats.attrs_merged)
+    if (list.some((r) => r && typeof r === 'object' && r.attrs != null)) {
+      const known = new Map();
+      for (const r of db
+        .prepare("SELECT j.key AS k, count(*) AS c FROM products p, json_each(p.attrs) j WHERE p.attrs IS NOT NULL AND json_valid(p.attrs) AND json_type(p.attrs) = 'object' GROUP BY j.key ORDER BY c DESC, j.key")
+        .iterate()) {
+        const f = attrFold(r.k);
+        if (f && !known.has(f)) known.set(f, r.k);
+      }
+      attrKeyOf = (k) => {
+        const f = attrFold(k);
+        if (!f) return k;
+        const hit = known.get(f);
+        if (hit === undefined) {
+          known.set(f, k); // nový atribut – další sloupce se stejným klíčem (i v tomto importu) půjdou do něj
+          return k;
+        }
+        if (hit !== k) attrsMerged[k] = hit;
+        return hit;
+      };
+    }
 
     const insert = db.prepare(
       `INSERT INTO products (code, code_key, ean, ean_key, mpn, mpn_key, name, manufacturer, category, supplier, owner, purchase_price, price,
@@ -232,7 +273,8 @@ function importProducts(db, records, opts = {}) {
       if (n.attrs) {
         const base = cur ? (cur._attrs ??= parseAttrs(cur.attrs) || {}) : {};
         const merged = { ...base };
-        for (const [k, v] of Object.entries(n.attrs)) {
+        for (const [src, v] of Object.entries(n.attrs)) {
+          const k = attrKeyOf ? attrKeyOf(src) : src;
           if (v === null || v === undefined) delete merged[k];
           else merged[k] = v;
         }
@@ -310,6 +352,9 @@ function importProducts(db, records, opts = {}) {
       if (inputs || deact || locked) toSupersede.add(id);
       else if (!same(before.price, after.price)) keepPrice.set(id, after.price);
     }
+
+    // sloupce zapsané do existujícího atributu jiného zápisu („Imprese 30“ → „imprese_30“)
+    if (Object.keys(attrsMerged).length) stats.attrs_merged = attrsMerged;
 
     if (opts.deactivateMissing) {
       if (seen.size === 0) {

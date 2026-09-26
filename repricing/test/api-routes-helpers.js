@@ -135,6 +135,7 @@ function insertProduct(db, p) {
     max_price: p.max_price ?? null,
     note: p.note ?? null,
     price_changed_at: p.price_changed_at ?? null,
+    group_code: p.group_code ?? null,
     created_at: now,
     updated_at: now,
   };

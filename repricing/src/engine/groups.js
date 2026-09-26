@@ -196,6 +196,9 @@ function applyToMember(m, price, cfg, settings, groupStep) {
     d.explain.push({ step: 'warning', text: `Pozor: sjednocená cena ${formatMoney(round(net(price, vat), 2))} bez DPH je pod nákupní cenou ${formatMoney(purchase)}` });
   }
   if (A.auto_max_change_pct != null && d.change_pct != null && Math.abs(d.change_pct) > A.auto_max_change_pct + EPS) flagOn(d, 'big_change');
+  // cena skupiny může ležet mimo limit změny člena (max. snížení / zvýšení za běh) – upozornit, nikdy auto-schválit
+  const outsideLimit = !withinChangeLimit(price, cur, L);
+  if (outsideLimit) d.explain.push({ step: 'warning', text: 'Pozor: sjednocená cena je mimo limit změny strategie pro tento produkt (max. snížení / zvýšení za jedno přecenění)' });
 
   let res = cur != null ? `Nová cena po sjednocení ${formatMoney(price)} (${signed(d.change_pct, formatPct)}, ${signed(d.change_abs, formatMoney)})` : `Nová cena po sjednocení ${formatMoney(price)} (dosud bez ceny)`;
   if (d.margin_after != null) res += `, marže ${d.margin_before != null ? `${formatPct(d.margin_before)} → ` : ''}${formatPct(d.margin_after)}`;
@@ -211,7 +214,7 @@ function applyToMember(m, price, cfg, settings, groupStep) {
     if (d.flags.includes('no_cost') && cur != null && price < cur) reasons.push('snížení ceny bez známé nákupní ceny');
     if (cur == null) reasons.push('produkt dosud nemá cenu');
     // sjednocená cena může ležet mimo limit změny člena – takovou změnu vždy posoudí člověk
-    if (!withinChangeLimit(price, cur, L)) reasons.push('sjednocená cena je mimo limit změny strategie');
+    if (outsideLimit) reasons.push('sjednocená cena je mimo limit změny strategie');
     if (!reasons.length) {
       d.auto_approve = true;
       d.explain.push({
@@ -286,9 +289,18 @@ function alignGroups(items, ctx = {}) {
           text: `Skupinu ${code} (${count}, režim ${modeLabel}) nelze sjednotit: nejvyšší spodní hranice členů ${formatMoney(lo)} je nad nejnižší horní hranicí ${formatMoney(hi)} – ceny zůstávají samostatné${heldText}`,
         };
         for (const m of participants) {
-          flagOn(m.decision, 'group_conflict');
-          m.decision.explain.push(step);
-          m.decision.group = { code, align: mode, members: n, price: null, conflict: true };
+          const d = m.decision;
+          flagOn(d, 'group_conflict');
+          d.explain.push(step);
+          d.group = { code, align: mode, members: n, price: null, conflict: true };
+          // Velikosti jednoho modelu by měly různé ceny → takovou změnu vždy posoudí člověk (nikdy auto-schválení).
+          if (d.action === 'change' && cfg.approval && cfg.approval.auto) {
+            const prev = d.explain.find((s) => s.step === 'approval');
+            const prevReasons = prev && /^Nutné ruční schválení: /.test(prev.text) ? prev.text.replace(/^Nutné ruční schválení: /, '') : null;
+            d.explain = d.explain.filter((s) => s.step !== 'approval');
+            d.explain.push({ step: 'approval', text: `Nutné ruční schválení: ${prevReasons ? `${prevReasons}, ` : ''}${FLAG_LABELS.group_conflict}` });
+          }
+          d.auto_approve = false;
         }
         continue;
       }

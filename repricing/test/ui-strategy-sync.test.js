@@ -80,6 +80,9 @@ test('chyby, které hlásí engine, hlásí i UI (aby formulář neposlal konfig
     { target: { mode: 'clearance', step_pct: 0 } },
     { rounding: { mode: 'ending', bands: [{ up_to: null, ending: 10, step: 10 }] } },
     { conditions: { field: 'stock', op: 'neznamy', value: 1 } },
+    { group: { align: 'vse' } },
+    { competitors: { max_delivery_days: -1 } },
+    { competitors: { max_delivery_days: 366 } },
   ];
   for (const cfg of bad) {
     assert.ok(presets.normalizeConfig(cfg).errors.length > 0, 'engine: ' + JSON.stringify(cfg));
@@ -90,4 +93,16 @@ test('chyby, které hlásí engine, hlásí i UI (aby formulář neposlal konfig
 test('mock server UI (tools/ui-mock-server.js) má stejnou výchozí konfiguraci jako engine', () => {
   const mock = require('../tools/ui-mock-server.js');
   assert.deepStrictEqual(plain(mock.DEFAULT_CONFIG), plain(presets.DEFAULT_CONFIG));
+});
+
+test('C3: režimy sjednocení skupiny v UI = režimy enginu (s popiskem a nápovědou)', async () => {
+  const ui = await loadUi();
+  assert.deepStrictEqual(ui.GROUP_ALIGN_MODES.map((m) => m.value).sort(), [...presets.GROUP_ALIGN_MODES].sort());
+  for (const m of ui.GROUP_ALIGN_MODES) assert.ok(m.label && m.help, 'režim ' + m.value);
+  for (const align of presets.GROUP_ALIGN_MODES) {
+    assert.deepStrictEqual(presets.normalizeConfig({ group: { align } }).errors, [], 'engine ' + align);
+    assert.deepStrictEqual(ui.validateConfig({ group: { align } }).errors, [], 'UI ' + align);
+  }
+  assert.deepStrictEqual(ui.validateConfig({ competitors: { max_delivery_days: 3 } }).errors, []);
+  assert.deepStrictEqual(presets.normalizeConfig({ competitors: { max_delivery_days: 3 } }).errors, []);
 });

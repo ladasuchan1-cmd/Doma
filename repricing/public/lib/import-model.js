@@ -265,6 +265,20 @@ export function curlExamples(origin, base = '/api/v1') {
 }
 
 /**
+ * Sloupce, které import zapsal do už existujícího atributu jiného zápisu (stats.attrs_merged, např. „Imprese 30“ →
+ * „imprese_30“ – liší se jen velikostí písmen, diakritikou či oddělovači). Prázdné pole = nic takového.
+ * @param {object} stats
+ * @returns {Array<[string, string]>}
+ */
+export function attrsMergedList(stats) {
+  const m = stats?.attrs_merged;
+  if (!m || typeof m !== 'object' || Array.isArray(m)) return [];
+  return Object.entries(m)
+    .filter(([a, b]) => typeof b === 'string' && a !== b)
+    .slice(0, 50);
+}
+
+/**
  * Neznámé kódy z výsledku importu s „Jen aktualizovat existující produkty“ (stats.skipped_unknown, stats.unknown_codes –
  * server vrací nejvýš prvních 50). Vrací null, když se nic nepřeskočilo.
  * @param {object} stats

@@ -1,41 +1,41 @@
-﻿Kód;EAN;Název;Výrobce;Kategorie;Dodavatel;Zodpovědná osoba;Nákupní cena;Prodejní cena s DPH;Sazba DPH;MOC;Stav skladu;Prodej 30 dní;N;Sezóna;Imprese 30
-SRA-00007;8597315660484;SRAM XTR kliky;SRAM;Komponenty;Sportful Trade;Petr Svoboda;505;909;21;979;7;17;N2;2026;896
-SAN-00014-XS;8591959453532;Santa Cruz Thron 2026 vel. XS (šedá);Santa Cruz;Horská kola;PON Bike CZ;Jana Nováková;65113;107990;21;107990;4;3;N2;2026;1194
-SAN-00021-S;8591762416328;Santa Cruz Thron 2026 vel. S (šedá);Santa Cruz;Horská kola;PON Bike CZ;Jana Nováková;64684;107990;21;107990;2;3;N1;2026;3549
-MAX-00028;8595234463384;Maxxis Nobby Nic;Maxxis;Pláště;Maxxis CZ;Lucie Dvořáková;488;819;21;959;5;3;N4;2025;752
-FOC-00035-XS;8594887001561;Focus Izalco Max 2026 vel. XS (černá);Focus;Silniční kola;PON Bike CZ;Petr Svoboda;110542;177990;21;196990;4;3;N0;2026;3965
-FOC-00042-S;8594577716546;Focus Izalco Max 2026 vel. S (černá);Focus;Silniční kola;PON Bike CZ;Petr Svoboda;98206;196990;21;196990;0;1;N0;2026;1847
-FOC-00049-M;8590002665908;Focus Izalco Max 2026 vel. M (černá);Focus;Silniční kola;PON Bike CZ;Petr Svoboda;111648;177990;21;196990;4;0;N1;2026;1364
-ABU-00056;8596683838433;Abus Bordo 6500;Abus;Příslušenství;Abus CZ;Jana Nováková;1431;2390;21;2590;20;6;N3;2026;1258
-KEL-00063-XS;8593886002722;Kellys Tractive 2025 vel. XS (šedá);Kellys;E-kola;Kellys Bicycles;Jana Nováková;58611;106990;21;106990;0;0;N2;2025;2511
-KEL-00070-S;8597327510746;Kellys Tractive 2025 vel. S (šedá);Kellys;E-kola;Kellys Bicycles;Jana Nováková;59507;90990;21;106990;2;2;N3;2025;3172
-KEL-00077-M;8598416518018;Kellys Tractive 2025 vel. M (šedá);Kellys;E-kola;Kellys Bicycles;Jana Nováková;55302;106990;21;106990;5;1;N3;2025;862
-KEL-00084-L;8597680554548;Kellys Tractive 2025 vel. L (šedá);Kellys;E-kola;Kellys Bicycles;Jana Nováková;54843;98990;21;106990;2;3;N2;2025;2317
-KEL-00091-XS;8594656869996;Kellys Moterra 2026 vel. XS (šedá);Kellys;E-kola;Kellys Bicycles;Jana Nováková;70548;129990;21;129990;0;2;N3;2026;3830
-KEL-00098-S;8598258438635;Kellys Moterra 2026 vel. S (šedá);Kellys;E-kola;Kellys Bicycles;Jana Nováková;79059;123990;21;129990;2;2;N2;2026;2126
-KEL-00105-M;8590050760488;Kellys Moterra 2026 vel. M (šedá);Kellys;E-kola;Kellys Bicycles;Jana Nováková;75572;129990;21;129990;0;3;N0;2026;809
-KEL-00112-L;8599592139592;Kellys Moterra 2026 vel. L (šedá);Kellys;E-kola;Kellys Bicycles;Jana Nováková;68123;119990;21;129990;5;1;N3;2026;2614
-KEL-00119-XL;8596456641079;Kellys Moterra 2026 vel. XL (šedá);Kellys;E-kola;Kellys Bicycles;Jana Nováková;73639;119990;21;129990;6;1;N3;2026;1319
-CAN-00126-XS;8590555956591;Cannondale Izalco Max 2026 vel. XS (zelená);Cannondale;Silniční kola;PON Bike CZ;Petr Svoboda;109172;185990;21;217990;2;3;N1;2026;370
-CAN-00133-S;8593754397431;Cannondale Izalco Max 2026 vel. S (zelená);Cannondale;Silniční kola;PON Bike CZ;Petr Svoboda;110881;207990;21;217990;2;0;N0;2026;1180
-CAN-00140-M;8591679882759;Cannondale Izalco Max 2026 vel. M (zelená);Cannondale;Silniční kola;PON Bike CZ;Petr Svoboda;116037;217990;21;217990;3;0;N3;2026;860
-CAN-00147-XS;8593997132066;Cannondale SuperSix EVO 2024 vel. XS (červená);Cannondale;Silniční kola;PON Bike CZ;Petr Svoboda;26537;47990;21;47990;2;3;N4;2024;2409
-CAN-00154-S;8598847146415;Cannondale SuperSix EVO 2024 vel. S (červená);Cannondale;Silniční kola;PON Bike CZ;Petr Svoboda;25726;43990;21;47990;5;2;N4;2024;3689
-CAN-00161-M;8590712070757;Cannondale SuperSix EVO 2024 vel. M (červená);Cannondale;Silniční kola;PON Bike CZ;Petr Svoboda;25922;47990;21;47990;3;0;N5;2024;1354
-CAN-00168-L;8596017121392;Cannondale SuperSix EVO 2024 vel. L (červená);Cannondale;Silniční kola;PON Bike CZ;Petr Svoboda;26778;44990;21;47990;3;0;N6;2024;2872
-CAN-00175-XL;8599808782185;Cannondale SuperSix EVO 2024 vel. XL (červená);Cannondale;Silniční kola;PON Bike CZ;Petr Svoboda;28058;44990;21;47990;6;0;N7;2024;2275
-CON-00182;8594534446264;Continental Nobby Nic;Continental;Pláště;Continental CZ;Lucie Dvořáková;500;759;21;819;6;11;N3;2025;934
-MAX-00189;8596299792709;Maxxis Minion DHF;Maxxis;Pláště;Maxxis CZ;Lucie Dvořáková;1297;2090;21;2190;0;10;N0;2026;783
-FOX-00196;8592011993386;Fox Pike Ultimate;Fox;Komponenty;Fox Europe;Petr Svoboda;293;529;21;579;7;15;N0;2026;353
-GIR-00203;8596316820019;Giro Tectal;Giro;Helmy;Vista Outdoor;Petr Svoboda;1128;1790;21;1890;0;0;N5;2025;1408
-FOC-00210-XS;8592916856366;Focus Tallboy 2024 vel. XS (bílá);Focus;Horská kola;PON Bike CZ;Jana Nováková;10729;16990;21;19990;4;0;N8;2024;1029
-FOC-00217-S;8599786111977;Focus Tallboy 2024 vel. S (bílá);Focus;Horská kola;PON Bike CZ;Jana Nováková;11762;18990;21;19990;5;3;N6;2024;2200
-FOC-00224-M;8591427569673;Focus Tallboy 2024 vel. M (bílá);Focus;Horská kola;PON Bike CZ;Jana Nováková;10858;17990;21;19990;3;0;N7;2024;651
-SCH-00231;8599594441761;Schwalbe Nobby Nic;Schwalbe;Pláště;Schwalbe CZ;Lucie Dvořáková;897;1790;21;1790;3;2;N5;2025;1373
-MAX-00238;8595141895926;Maxxis Minion DHF;Maxxis;Pláště;Maxxis CZ;Lucie Dvořáková;849;1590;21;1690;25;15;N1;2026;1089
-CAN-00245-XS;8599903852080;Cannondale Jam² 2024 vel. XS (šedá);Cannondale;E-kola;PON Bike CZ;Jana Nováková;108745;198990;21;198990;5;0;N5;2024;3047
-CAN-00252-S;8593183364318;Cannondale Jam² 2024 vel. S (šedá);Cannondale;E-kola;PON Bike CZ;Jana Nováková;97709;169990;21;198990;5;0;N7;2024;2417
-CAN-00259-M;8594163319809;Cannondale Jam² 2024 vel. M (šedá);Cannondale;E-kola;PON Bike CZ;Jana Nováková;95465;169990;21;198990;2;1;N7;2024;1411
-CAN-00266-L;8599076561635;Cannondale Jam² 2024 vel. L (šedá);Cannondale;E-kola;PON Bike CZ;Jana Nováková;108667;183990;21;198990;0;3;N5;2024;695
-CAN-00273-XL;8599109820562;Cannondale Jam² 2024 vel. XL (šedá);Cannondale;E-kola;PON Bike CZ;Jana Nováková;113455;189990;21;198990;2;2;N6;2024;3150
-CON-00280;8596825360259;Continental Rekon;Continental;Pláště;Continental CZ;Lucie Dvořáková;1018;1690;21;1990;0;3;N1;2026;207
+﻿Kód;EAN;Název;Výrobce;Kategorie;Model;Dodavatel;Zodpovědná osoba;Nákupní cena;Prodejní cena s DPH;Sazba DPH;MOC;Stav skladu;Prodej 30 dní;N;Sezóna;Imprese 30
+SRA-00007;8597315660484;SRAM XTR kliky;SRAM;Komponenty;;Sportful Trade;Petr Svoboda;505;909;21;979;7;17;N2;2026;896
+SAN-00014-XS;8591959453532;Santa Cruz Thron 2026 vel. XS (šedá);Santa Cruz;Horská kola;SAN-THRON-2026;PON Bike CZ;Jana Nováková;65113;107990;21;107990;4;3;N2;2026;1194
+SAN-00021-S;8591762416328;Santa Cruz Thron 2026 vel. S (šedá);Santa Cruz;Horská kola;SAN-THRON-2026;PON Bike CZ;Jana Nováková;65113;107990;21;107990;2;3;N1;2026;3549
+MAX-00028;8595234463384;Maxxis Nobby Nic;Maxxis;Pláště;;Maxxis CZ;Lucie Dvořáková;488;819;21;959;5;3;N4;2025;752
+FOC-00035-XS;8594887001561;Focus Izalco Max 2026 vel. XS (černá);Focus;Silniční kola;FOC-IZALCO-MAX-2026;PON Bike CZ;Petr Svoboda;110542;177990;21;196990;4;3;N0;2026;3965
+FOC-00042-S;8594577716546;Focus Izalco Max 2026 vel. S (černá);Focus;Silniční kola;FOC-IZALCO-MAX-2026;PON Bike CZ;Petr Svoboda;110542;177990;21;196990;0;1;N0;2026;1847
+FOC-00049-M;8590002665908;Focus Izalco Max 2026 vel. M (černá);Focus;Silniční kola;FOC-IZALCO-MAX-2026;PON Bike CZ;Petr Svoboda;110542;177990;21;196990;4;0;N1;2026;1364
+ABU-00056;8596683838433;Abus Bordo 6500;Abus;Příslušenství;;Abus CZ;Jana Nováková;1431;2390;21;2590;20;6;N3;2026;1258
+KEL-00063-XS;8593886002722;Kellys Tractive 2025 vel. XS (šedá);Kellys;E-kola;KEL-TRACTIVE-2025;Kellys Bicycles;Jana Nováková;58611;106990;21;106990;0;0;N2;2025;2511
+KEL-00070-S;8597327510746;Kellys Tractive 2025 vel. S (šedá);Kellys;E-kola;KEL-TRACTIVE-2025;Kellys Bicycles;Jana Nováková;58611;101990;21;106990;2;2;N3;2025;3172
+KEL-00077-M;8598416518018;Kellys Tractive 2025 vel. M (šedá);Kellys;E-kola;KEL-TRACTIVE-2025;Kellys Bicycles;Jana Nováková;58611;106990;21;106990;5;1;N3;2025;862
+KEL-00084-L;8597680554548;Kellys Tractive 2025 vel. L (šedá);Kellys;E-kola;KEL-TRACTIVE-2025;Kellys Bicycles;Jana Nováková;58611;106990;21;106990;2;3;N2;2025;2317
+KEL-00091-XS;8594656869996;Kellys Moterra 2026 vel. XS (šedá);Kellys;E-kola;KEL-MOTERRA-2026;Kellys Bicycles;Jana Nováková;70548;129990;21;129990;0;2;N3;2026;3830
+KEL-00098-S;8598258438635;Kellys Moterra 2026 vel. S (šedá);Kellys;E-kola;KEL-MOTERRA-2026;Kellys Bicycles;Jana Nováková;70548;129990;21;129990;2;2;N2;2026;2126
+KEL-00105-M;8590050760488;Kellys Moterra 2026 vel. M (šedá);Kellys;E-kola;KEL-MOTERRA-2026;Kellys Bicycles;Jana Nováková;70548;129990;21;129990;0;3;N0;2026;809
+KEL-00112-L;8599592139592;Kellys Moterra 2026 vel. L (šedá);Kellys;E-kola;KEL-MOTERRA-2026;Kellys Bicycles;Jana Nováková;70548;129990;21;129990;5;1;N3;2026;2614
+KEL-00119-XL;8596456641079;Kellys Moterra 2026 vel. XL (šedá);Kellys;E-kola;KEL-MOTERRA-2026;Kellys Bicycles;Jana Nováková;70548;129990;21;129990;6;1;N3;2026;1319
+CAN-00126-XS;8590555956591;Cannondale Izalco Max 2026 vel. XS (zelená);Cannondale;Silniční kola;CAN-IZALCO-MAX-2026;PON Bike CZ;Petr Svoboda;109172;185990;21;217990;2;3;N1;2026;370
+CAN-00133-S;8593754397431;Cannondale Izalco Max 2026 vel. S (zelená);Cannondale;Silniční kola;CAN-IZALCO-MAX-2026;PON Bike CZ;Petr Svoboda;109172;185990;21;217990;2;0;N0;2026;1180
+CAN-00140-M;8591679882759;Cannondale Izalco Max 2026 vel. M (zelená);Cannondale;Silniční kola;CAN-IZALCO-MAX-2026;PON Bike CZ;Petr Svoboda;109172;185990;21;217990;3;0;N3;2026;860
+CAN-00147-XS;8593997132066;Cannondale SuperSix EVO 2024 vel. XS (červená);Cannondale;Silniční kola;CAN-SUPERSIX-EVO-2024;PON Bike CZ;Petr Svoboda;26537;47990;21;47990;2;3;N4;2024;2409
+CAN-00154-S;8598847146415;Cannondale SuperSix EVO 2024 vel. S (červená);Cannondale;Silniční kola;CAN-SUPERSIX-EVO-2024;PON Bike CZ;Petr Svoboda;26537;47990;21;47990;5;2;N4;2024;3689
+CAN-00161-M;8590712070757;Cannondale SuperSix EVO 2024 vel. M (červená);Cannondale;Silniční kola;CAN-SUPERSIX-EVO-2024;PON Bike CZ;Petr Svoboda;26537;47990;21;47990;3;0;N5;2024;1354
+CAN-00168-L;8596017121392;Cannondale SuperSix EVO 2024 vel. L (červená);Cannondale;Silniční kola;CAN-SUPERSIX-EVO-2024;PON Bike CZ;Petr Svoboda;26537;47990;21;47990;3;0;N6;2024;2872
+CAN-00175-XL;8599808782185;Cannondale SuperSix EVO 2024 vel. XL (červená);Cannondale;Silniční kola;CAN-SUPERSIX-EVO-2024;PON Bike CZ;Petr Svoboda;26537;47990;21;47990;6;0;N7;2024;2275
+CON-00182;8594534446264;Continental Nobby Nic;Continental;Pláště;;Continental CZ;Lucie Dvořáková;500;759;21;819;6;11;N3;2025;934
+MAX-00189;8596299792709;Maxxis Minion DHF;Maxxis;Pláště;;Maxxis CZ;Lucie Dvořáková;1297;2090;21;2190;0;10;N0;2026;783
+FOX-00196;8592011993386;Fox Pike Ultimate;Fox;Komponenty;;Fox Europe;Petr Svoboda;293;529;21;579;7;15;N0;2026;353
+GIR-00203;8596316820019;Giro Tectal;Giro;Helmy;;Vista Outdoor;Petr Svoboda;1128;1790;21;1890;0;0;N5;2025;1408
+FOC-00210-XS;8592916856366;Focus Tallboy 2024 vel. XS (bílá);Focus;Horská kola;FOC-TALLBOY-2024;PON Bike CZ;Jana Nováková;10729;16990;21;19990;4;0;N8;2024;1029
+FOC-00217-S;8599786111977;Focus Tallboy 2024 vel. S (bílá);Focus;Horská kola;FOC-TALLBOY-2024;PON Bike CZ;Jana Nováková;10729;16990;21;19990;5;3;N6;2024;2200
+FOC-00224-M;8591427569673;Focus Tallboy 2024 vel. M (bílá);Focus;Horská kola;FOC-TALLBOY-2024;PON Bike CZ;Jana Nováková;10729;16990;21;19990;3;0;N7;2024;651
+SCH-00231;8599594441761;Schwalbe Nobby Nic;Schwalbe;Pláště;;Schwalbe CZ;Lucie Dvořáková;897;1790;21;1790;3;2;N5;2025;1373
+MAX-00238;8595141895926;Maxxis Minion DHF;Maxxis;Pláště;;Maxxis CZ;Lucie Dvořáková;849;1590;21;1690;25;15;N1;2026;1089
+CAN-00245-XS;8599903852080;Cannondale Jam² 2024 vel. XS (šedá);Cannondale;E-kola;CAN-JAM-2024;PON Bike CZ;Jana Nováková;108745;198990;21;198990;5;0;N5;2024;3047
+CAN-00252-S;8593183364318;Cannondale Jam² 2024 vel. S (šedá);Cannondale;E-kola;CAN-JAM-2024;PON Bike CZ;Jana Nováková;108745;189990;21;198990;5;0;N7;2024;2417
+CAN-00259-M;8594163319809;Cannondale Jam² 2024 vel. M (šedá);Cannondale;E-kola;CAN-JAM-2024;PON Bike CZ;Jana Nováková;108745;189990;21;198990;2;1;N7;2024;1411
+CAN-00266-L;8599076561635;Cannondale Jam² 2024 vel. L (šedá);Cannondale;E-kola;CAN-JAM-2024;PON Bike CZ;Jana Nováková;108745;198990;21;198990;0;3;N5;2024;695
+CAN-00273-XL;8599109820562;Cannondale Jam² 2024 vel. XL (šedá);Cannondale;E-kola;CAN-JAM-2024;PON Bike CZ;Jana Nováková;108745;198990;21;198990;2;2;N6;2024;3150
+CON-00280;8596825360259;Continental Rekon;Continental;Pláště;;Continental CZ;Lucie Dvořáková;1018;1690;21;1990;0;3;N1;2026;207

@@ -107,6 +107,7 @@ function insertProduct(db, p) {
     min_price: p.min_price ?? null,
     max_price: p.max_price ?? null,
     price_changed_at: p.price_changed_at ?? null,
+    group_code: p.group_code ?? null,
   };
   const cols = Object.keys(row);
   return Number(
@@ -119,7 +120,7 @@ function insertProduct(db, p) {
 function insertOffer(db, productId, competitorId, price, extra = {}) {
   db.prepare(
     'INSERT INTO offers (product_id, competitor_id, price, shipping, in_stock, delivery_days, url, name, observed_at, first_seen_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
-  ).run(productId, competitorId, price, extra.shipping ?? null, extra.in_stock === undefined ? 1 : extra.in_stock, null, null, extra.name ?? null, extra.observed_at ?? NOW, NOW);
+  ).run(productId, competitorId, price, extra.shipping ?? null, extra.in_stock === undefined ? 1 : extra.in_stock, extra.delivery_days ?? null, null, extra.name ?? null, extra.observed_at ?? NOW, NOW);
 }
 
 function insertSegment(db, name, filter) {
