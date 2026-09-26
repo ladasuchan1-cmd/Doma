@@ -17,13 +17,14 @@ test('config: DEFAULT_CONFIG odpovídá SPEC §6.5 a je zmrazený', () => {
   });
   assert.deepEqual(DEFAULT_CONFIG.competitors, {
     include: [], exclude: [], include_tags: [], exclude_tags: [], in_stock_only: true, include_shipping: false, max_age_days: null,
-    outlier_pct: null, min_competitors: 1, exclude_keywords: [],
+    outlier_pct: null, min_competitors: 1, exclude_keywords: [], max_delivery_days: null,
   });
   assert.deepEqual(DEFAULT_CONFIG.fallback, { mode: 'next', markup_pct: null, offset_pct: 0 });
   assert.deepEqual(DEFAULT_CONFIG.rounding, { mode: 'ending', direction: 'down', bands: [{ up_to: 1000, ending: 9 }, { up_to: 10000, ending: 90 }, { up_to: null, ending: 990 }] });
   assert.deepEqual(DEFAULT_CONFIG.schedule, { valid_from: null, valid_to: null, weekdays: [], hours: null });
   assert.deepEqual(DEFAULT_CONFIG.stock, { zero_stock: 'reprice' });
   assert.deepEqual(DEFAULT_CONFIG.approval, { auto: false, auto_max_change_pct: 5 });
+  assert.deepEqual(DEFAULT_CONFIG.group, { align: 'off' });
   assert.deepEqual(DEFAULT_CONFIG.conditions, {});
   assert.ok(Object.isFrozen(DEFAULT_CONFIG.limits));
   assert.equal(engine.DEFAULT_CONFIG, DEFAULT_CONFIG);

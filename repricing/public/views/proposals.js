@@ -1,5 +1,6 @@
-// Návrhy cen – filtry, tabulka staré → nové ceny, hromadné schválení/zamítnutí, schválení vše dle filtru,
-// ruční úprava ceny v řádku, rozbalitelné vysvětlení, stažení XLSX.
+// Návrhy cen – filtry (i podle produktu: zodpovědná osoba, kategorie, segment produktu), tabulka staré → nové ceny,
+// hromadné schválení/zamítnutí/vrácení ke schválení, akce „vše dle filtru“, ruční úprava ceny v řádku,
+// rozbalitelné vysvětlení, stažení XLSX.
 import { h, mount, debounce } from '../lib/dom.js';
 import { api, apiUrl, cachedGet, itemsOf, isAbort, bindDownload } from '../lib/api.js';
 import { icon } from '../lib/icons.js';
@@ -7,13 +8,14 @@ import { DataTable } from '../lib/table.js';
 import { emptyState, flagBadges, statusBadge, changeEl, segmented, searchInput, badge, callout, dl } from '../lib/ui.js';
 import { explainList, priceMove } from '../lib/decision.js';
 import {
-  finalPrice, finalMargin, basePriceChange, basePrice, displayChange, staleProposals, isSelectableProposal, bulkStatus,
+  finalPrice, finalMargin, basePriceChange, basePrice, displayChange, staleProposals, isSelectableProposal, bulkStatus, isUnapprovable,
 } from '../lib/proposal-model.js';
 import { confirmDialog } from '../lib/modal.js';
 import { toast } from '../lib/toast.js';
 import {
-  money, signedMoney, percent, int, count, FLAG_LABELS, parseInputNumber, relTime, dateTime,
+  money, signedMoney, percent, int, count, FLAG_LABELS, parseInputNumber, relTime, dateTime, truncate,
 } from '../lib/format.js';
+import { describeFilter } from '../lib/filter-model.js';
 
 export const title = 'Návrhy cen';
 
@@ -45,6 +47,12 @@ export async function show(root, ctx) {
     direction: q.direction || '',
     flag: q.flag || '',
     manufacturer: q.manufacturer || '',
+    // C4: filtry podle produktu (zodpovědná osoba, kategorie, dodavatel, segment produktu, filtr nad produkty)
+    owner: q.owner || '',
+    category: q.category || '',
+    supplier: q.supplier || '',
+    product_segment: q.product_segment || '',
+    filter: q.filter || '',
     run: q.run || '',
     sort: q.sort || '',
     dir: q.dir || '',
@@ -63,7 +71,10 @@ export async function show(root, ctx) {
   if (ctx.signal.aborted) return;
   const strategies = strRes.status === 'fulfilled' ? itemsOf(strRes.value) : [];
   const segments = segRes.status === 'fulfilled' ? itemsOf(segRes.value) : [];
-  const manufacturers = facRes.status === 'fulfilled' ? facRes.value?.manufacturers || [] : [];
+  const facets = facRes.status === 'fulfilled' ? facRes.value || {} : {};
+  const manufacturers = facets.manufacturers || [];
+  const owners = facets.owners || [];
+  const categories = facets.categories || [];
 
   function filterParams() {
     return {
@@ -74,8 +85,18 @@ export async function show(root, ctx) {
       direction: st.direction || null,
       flag: st.flag || null,
       manufacturer: st.manufacturer || null,
+      owner: st.owner || null,
+      category: st.category || null,
+      supplier: st.supplier || null,
+      product_segment: st.product_segment || null,
+      filter: st.filter || null,
       run: st.run || null,
     };
+  }
+
+  /** Nějaký filtr kromě stavu (pro prázdný stav a texty potvrzení). */
+  function anyFilter() {
+    return Boolean(st.q || st.strategy || st.segment || st.direction || st.flag || st.manufacturer || st.owner || st.category || st.supplier || st.product_segment || st.filter || st.run);
   }
   function queryParams() {
     return { ...filterParams(), sort: st.sort || null, dir: st.dir || null, page: st.page, limit: st.limit };
@@ -84,7 +105,9 @@ export async function show(root, ctx) {
   const xlsxLink = bindDownload(h('a', { class: 'btn btn-ghost', download: '', dataset: { action: 'xlsx' } }, icon('download', { size: 16 }), h('span', { class: 'lbl' }, 'XLSX')));
   const approveAllBtn = h('button', { type: 'button', class: 'btn btn-success', dataset: { action: 'approve-all' }, onClick: () => decideAll('approve') }, icon('check', { size: 16 }), h('span', { class: 'lbl' }, 'Schválit vše dle filtru'));
   const rejectAllBtn = h('button', { type: 'button', class: 'btn btn-ghost', dataset: { action: 'reject-all' }, onClick: () => decideAll('reject') }, icon('x', { size: 16 }), h('span', { class: 'lbl' }, 'Zamítnout vše'));
-  ctx.setActions(xlsxLink, rejectAllBtn, approveAllBtn);
+  // C5: schválené (neexportované) návrhy vrátit ke schválení – hromadně dle filtru jen na záložkách se schválenými
+  const unapproveAllBtn = h('button', { type: 'button', class: 'btn btn-ghost', dataset: { action: 'unapprove-all' }, onClick: () => decideAll('unapprove') }, icon('undo', { size: 16 }), h('span', { class: 'lbl' }, 'Vrátit vše ke schválení'));
+  ctx.setActions(xlsxLink, unapproveAllBtn, rejectAllBtn, approveAllBtn);
 
   function updateActions() {
     xlsxLink.href = apiUrl('/export/proposals.xlsx', filterParams());
@@ -95,12 +118,16 @@ export async function show(root, ctx) {
     approveAllBtn.disabled = !canApprove;
     rejectAllBtn.disabled = !(rejectSt != null && total > 0);
     approveAllBtn.title = canApprove ? 'Schválit všechny čekající návrhy odpovídající filtru' : 'Hromadně lze schvalovat jen čekající návrhy';
+    const unSt = bulkStatus('unapprove', st.status);
+    unapproveAllBtn.hidden = unSt == null;
+    unapproveAllBtn.disabled = !(unSt != null && (st.status === 'approved' ? total > 0 : (summary?.approved ?? 0) > 0));
+    unapproveAllBtn.title = 'Vrátit všechny schválené (neexportované) návrhy odpovídající filtru ke schválení – do exportu nepůjdou, dokud je někdo znovu neschválí';
     rejectAllBtn.title = rejectSt === 'approved' ? 'Zamítnout všechny schválené (neexportované) návrhy odpovídající filtru – neodejdou do adminu' : 'Zamítnout všechny čekající návrhy odpovídající filtru';
   }
 
   // --------------------------------------------------------------- akce
   function decidedToast(kind, n, res = {}) {
-    const msg = (kind === 'approve' ? 'Schváleno: ' : 'Zamítnuto: ') + count(n, 'návrh', 'návrhy', 'návrhů');
+    const msg = (kind === 'approve' ? 'Schváleno: ' : kind === 'unapprove' ? 'Vráceno ke schválení: ' : 'Zamítnuto: ') + count(n, 'návrh', 'návrhy', 'návrhů');
     const skips = [
       [res.skipped_locked, 'zamčený produkt'],
       [res.skipped_inactive, 'neaktivní produkt'],
@@ -163,18 +190,21 @@ export async function show(root, ctx) {
       ? count(n, 'schválený (neexportovaný) návrh', 'schválené (neexportované) návrhy', 'schválených (neexportovaných) návrhů')
       : count(n, 'čekající návrh', 'čekající návrhy', 'čekajících návrhů');
     const pageStale = kind === 'approve' ? staleProposals(rows).length : 0;
+    const verb = kind === 'approve' ? 'Schválit ' : kind === 'unapprove' ? 'Vrátit ke schválení ' : 'Zamítnout ';
     const ok = await confirmDialog({
-      title: kind === 'approve' ? 'Schválit vše dle filtru' : 'Zamítnout vše dle filtru',
+      title: kind === 'approve' ? 'Schválit vše dle filtru' : kind === 'unapprove' ? 'Vrátit ke schválení vše dle filtru' : 'Zamítnout vše dle filtru',
       message: h(
         'div',
         null,
-        h('p', null, (kind === 'approve' ? 'Schválit ' : 'Zamítnout ') + (exact ? allOf(n) + what : 'všechny ' + (target === 'approved' ? 'schválené' : 'čekající') + ' návrhy') + ' odpovídající aktuálnímu filtru?'),
+        h('p', null, verb + (exact ? allOf(n) + what : 'všechny ' + (target === 'approved' ? 'schválené' : 'čekající') + ' návrhy') + ' odpovídající aktuálnímu filtru?'),
+        kind === 'unapprove' ? h('p', { class: 'muted small' }, 'Návrhy znovu počkají na schválení a do exportu (feed, webhook, POHODA) nepůjdou, dokud je někdo neschválí. Ruční ceny zůstanou.') : null,
+        filterSummary() ? h('p', { class: 'muted small', dataset: { role: 'filter-summary' } }, 'Filtr: ' + filterSummary()) : null,
         kind === 'approve' ? h('p', { class: 'muted small' }, 'Schválené ceny se objeví v exportu (feed, webhook, POHODA XML).') : null,
         kind === 'approve' && flagged > 0 ? h('p', { class: 'muted small' }, count(flagged, 'návrh s rizikovým příznakem se přeskočí', 'návrhy s rizikovým příznakem se přeskočí', 'návrhů s rizikovým příznakem se přeskočí') + ' (pod nákupem, velká změna, ruční cena mimo meze…) – schvalte je jednotlivě.') : null,
         pageStale ? callout(count(pageStale, 'návrh na této stránce vznikl', 'návrhy na této stránce vznikly', 'návrhů na této stránce vzniklo') + ' při jiné ceně produktu, než je teď – schválením se exportuje cena ze staré ceny. Doporučujeme je nejdřív přecenit.', 'warning') : null,
-        target === 'approved' ? h('p', { class: 'muted small' }, 'Zamítnuté návrhy se neodešlou do adminu (feed, webhook, POHODA).') : null
+        target === 'approved' && kind === 'reject' ? h('p', { class: 'muted small' }, 'Zamítnuté návrhy se neodešlou do adminu (feed, webhook, POHODA).') : null
       ),
-      confirmLabel: kind === 'approve' ? 'Schválit ' + (exact ? int(n) : 'vše') : 'Zamítnout',
+      confirmLabel: kind === 'approve' ? 'Schválit ' + (exact ? int(n) : 'vše') : kind === 'unapprove' ? 'Vrátit ke schválení' : 'Zamítnout',
       danger: kind === 'reject' || pageStale > 0,
     });
     if (!ok) return;
@@ -370,11 +400,18 @@ export async function show(root, ctx) {
           );
         }
         if (r.status === 'approved') {
-          // contract-10: omylem schválený (i automaticky) návrh jde vrátit zamítnutím, dokud není exportovaný
+          // contract-10: omylem schválený (i automaticky) návrh jde vrátit zamítnutím, dokud není exportovaný;
+          // C5: nebo jen vrátit ke schválení (znovu čeká, nic se neztratí)
           return h(
             'span',
             { class: 'row-actions' },
             decided,
+            isUnapprovable(r)
+              ? h('button', {
+                type: 'button', class: 'btn-icon', 'aria-label': 'Vrátit ke schválení návrh ' + (prod(r).code || ''), title: 'Vrátit ke schválení – zrušit schválení, návrh znovu čeká (do exportu nepůjde)', dataset: { action: 'unapprove-row' },
+                onClick: () => decide('unapprove', [r.id]),
+              }, icon('undo', { size: 16 }))
+              : null,
             h('button', {
               type: 'button', class: 'btn-icon reject', 'aria-label': 'Zamítnout schválený návrh ' + (prod(r).code || ''), title: 'Zamítnout – zrušit schválení (neodejde do adminu)', dataset: { action: 'reject-approved-row' },
               onClick: async () => {
@@ -392,11 +429,20 @@ export async function show(root, ctx) {
   const bulkCount = h('span', { class: 'strong' });
   // vybrané mohou být i schválené (jen k zamítnutí) – schválit má smysl jen čekající
   const approveSelBtn = h('button', { type: 'button', class: 'btn btn-sm btn-success', dataset: { action: 'approve-selected' }, onClick: () => decide('approve', [...table.selected]) }, icon('check', { size: 14 }), h('span', null, 'Schválit vybrané'));
+  // C5: z výběru vrátit ke schválení jen schválené (neexportované) řádky
+  const unapproveSelBtn = h('button', {
+    type: 'button', class: 'btn btn-sm', dataset: { action: 'unapprove-selected' },
+    onClick: () => {
+      const sel = new Set([...table.selected].map(String));
+      decide('unapprove', rows.filter((r) => sel.has(String(r.id)) && isUnapprovable(r)).map((r) => r.id));
+    },
+  }, icon('undo', { size: 14 }), h('span', null, 'Vrátit ke schválení'));
   const bulkbar = h(
     'div',
     { class: 'bulkbar', hidden: true, role: 'region', 'aria-label': 'Hromadné akce' },
     bulkCount,
     approveSelBtn,
+    unapproveSelBtn,
     h('button', { type: 'button', class: 'btn btn-sm btn-danger', dataset: { action: 'reject-selected' }, onClick: () => decide('reject', [...table.selected]) }, icon('x', { size: 14 }), h('span', null, 'Zamítnout vybrané')),
     h('button', { type: 'button', class: 'btn btn-sm btn-ghost', onClick: () => table.clearSelection() }, 'Zrušit výběr')
   );
@@ -425,6 +471,7 @@ export async function show(root, ctx) {
             ['Sklad', int(prod(r).stock)],
             ['Nejlevnější konkurent', r.cheapest_competitor ? r.cheapest_competitor + ' · ' + money(r.market_min) : money(r.market_min)],
             ['Vytvořeno', dateTime(r.created_at)],
+            r.decided_at ? ['Rozhodnuto', dateTime(r.decided_at) + (r.decided_by ? ' · ' + (r.decided_by === 'auto' ? 'automaticky' : r.decided_by) : '')] : null,
             r.exported_at ? ['Exportováno', dateTime(r.exported_at) + (r.export_id ? ' (export #' + r.export_id + ')' : '')] : null,
           ]),
           h('div', { class: 'row', style: 'margin-top:10px' }, h('a', { class: 'btn btn-sm', href: '#/produkty/' + encodeURIComponent(r.product_id) }, 'Detail produktu'))
@@ -435,6 +482,9 @@ export async function show(root, ctx) {
       bulkCount.textContent = 'Vybráno: ' + count(keys.length, 'návrh', 'návrhy', 'návrhů');
       const sel = new Set(keys.map(String));
       approveSelBtn.disabled = !rows.some((r) => sel.has(String(r.id)) && r.status === 'pending');
+      const nUn = rows.filter((r) => sel.has(String(r.id)) && isUnapprovable(r)).length;
+      unapproveSelBtn.hidden = nUn === 0;
+      unapproveSelBtn.title = nUn ? 'Vrátit ke schválení ' + count(nUn, 'schválený návrh', 'schválené návrhy', 'schválených návrhů') : '';
     },
     pagination: true,
     page: st.page,
@@ -453,7 +503,7 @@ export async function show(root, ctx) {
     },
     caption: 'Návrhy cen',
     empty: () => {
-      if (st.status === 'pending' && !st.q && !st.strategy && !st.segment && !st.direction && !st.flag && !st.manufacturer) {
+      if (st.status === 'pending' && !anyFilter()) {
         return emptyState({
           icon: 'check',
           title: 'Žádné čekající návrhy',
@@ -476,18 +526,23 @@ export async function show(root, ctx) {
     st.page = 1;
     load();
   }, 280);
-  const sel = (key, label, options) => {
+  const sel = (key, label, options, title) => {
     const s = h('select', {
-      class: 'select', 'aria-label': label,
+      class: 'select', 'aria-label': label, title, dataset: { filter: key },
       onChange: (e) => {
         st[key] = e.target.value;
         st.page = 1;
+        table.clearSelection();
+        renderPills();
         load();
       },
     }, h('option', { value: '' }, label + ': vše'), options.map((o) => h('option', { value: String(o.value) }, o.label)));
+    // hodnota z URL, kterou číselník nezná (např. osoba bez produktů) – nabídnout ji, ať filtr nezmizí potichu
+    if (st[key] && !options.some((o) => String(o.value) === String(st[key]))) s.appendChild(h('option', { value: st[key] }, st[key]));
     s.value = st[key];
     return s;
   };
+  const facetOpts = (list) => list.map((m) => ({ value: m.value, label: `${m.value} (${int(m.count)})` }));
   const filtersToggle = h('button', {
     type: 'button', class: 'btn filters-toggle', 'aria-expanded': 'false',
     onClick: () => { toolbar.classList.toggle('is-open'); filtersToggle.setAttribute('aria-expanded', toolbar.classList.contains('is-open') ? 'true' : 'false'); },
@@ -502,16 +557,62 @@ export async function show(root, ctx) {
     filtersToggle,
     h('span', { class: 'toolbar-more' },
       sel('strategy', 'Strategie', strategies.map((s) => ({ value: s.id, label: s.name }))),
-      sel('segment', 'Segment', segments.map((s) => ({ value: s.id, label: s.name }))),
+      sel('segment', 'Segment strategie', segments.map((s) => ({ value: s.id, label: s.name })), 'Segment strategie, která návrh spočítala'),
+      sel('product_segment', 'Segment produktu', segments.map((s) => ({ value: s.id, label: s.name })), 'Produkty, které do segmentu patří (bez ohledu na to, která strategie návrh spočítala)'),
       sel('direction', 'Směr', [{ value: 'up', label: '▲ Zdražení' }, { value: 'down', label: '▼ Zlevnění' }]),
       sel('flag', 'Příznak', Object.entries(FLAG_LABELS).map(([k, v]) => ({ value: k, label: v }))),
-      sel('manufacturer', 'Výrobce', manufacturers.map((m) => ({ value: m.value, label: `${m.value} (${int(m.count)})` }))))
+      sel('manufacturer', 'Výrobce', facetOpts(manufacturers)),
+      sel('owner', 'Zodpovědná osoba', facetOpts(owners)),
+      sel('category', 'Kategorie', facetOpts(categories)))
   );
+  // filtry z URL bez vlastního výběru (dodavatel, filtr nad produkty – např. odkaz ze stránky Produkty)
+  const pills = h('div', { class: 'filters-active', hidden: true, dataset: { role: 'extra-filters' } });
+  let fieldsMap = null;
+  function renderPills() {
+    const items = [];
+    const pill = (text, clear) => items.push(h('span', { class: 'filter-pill' }, text, h('button', { type: 'button', 'aria-label': 'Zrušit filtr ' + text, onClick: clear }, icon('x', { size: 12 }))));
+    if (st.supplier) pill('Dodavatel: ' + st.supplier, () => { st.supplier = ''; st.page = 1; renderPills(); load(); });
+    if (st.filter) pill('Filtr produktů: ' + productFilterText(), () => { st.filter = ''; st.page = 1; renderPills(); load(); });
+    mount(pills, items);
+    pills.hidden = !items.length;
+  }
+  function productFilterText() {
+    try {
+      return truncate(describeFilter(JSON.parse(st.filter), fieldsMap || new Map()), 120);
+    } catch {
+      return truncate(st.filter, 80);
+    }
+  }
+  /** Krátký popis aktivních filtrů do potvrzení hromadných akcí (co přesně se schválí / zamítne / vrátí). */
+  function filterSummary() {
+    const nameOf = (list, id) => list.find((x) => String(x.id) === String(id))?.name || '#' + id;
+    const parts = [];
+    if (st.q) parts.push('hledání „' + st.q + '“');
+    if (st.strategy) parts.push('strategie ' + nameOf(strategies, st.strategy));
+    if (st.segment) parts.push('segment strategie ' + nameOf(segments, st.segment));
+    if (st.product_segment) parts.push('segment produktu ' + nameOf(segments, st.product_segment));
+    if (st.direction) parts.push(st.direction === 'up' ? 'zdražení' : 'zlevnění');
+    if (st.flag) parts.push('příznak ' + (FLAG_LABELS[st.flag] || st.flag));
+    if (st.manufacturer) parts.push('výrobce ' + st.manufacturer);
+    if (st.owner) parts.push('zodpovědná osoba ' + st.owner);
+    if (st.category) parts.push('kategorie ' + st.category);
+    if (st.supplier) parts.push('dodavatel ' + st.supplier);
+    if (st.filter) parts.push('filtr produktů ' + productFilterText());
+    if (st.run) parts.push('běh #' + st.run);
+    return parts.join(', ');
+  }
+  if (st.filter) {
+    cachedGet('/fields').then((r) => {
+      fieldsMap = new Map((r?.fields || []).map((f) => [f.key, f]));
+      if (!ctx.signal.aborted) renderPills();
+    }, () => {});
+  }
+  renderPills();
   const summaryEl = h('div', { class: 'row small muted', style: 'margin:-4px 0 10px' });
   const runNote = h('div');
   const staleNote = h('div', { dataset: { role: 'stale-note' } });
 
-  mount(root, h('div', { class: 'stack-sm' }, h('div', { class: 'row-between', style: 'margin-bottom:8px' }, statusCtl), toolbar, runNote, summaryEl, staleNote, h('div', { class: 'card' }, table.el), bulkbar));
+  mount(root, h('div', { class: 'stack-sm' }, h('div', { class: 'row-between', style: 'margin-bottom:8px' }, statusCtl), toolbar, pills, runNote, summaryEl, staleNote, h('div', { class: 'card' }, table.el), bulkbar));
 
   function renderSummary() {
     if (!summary) return mount(summaryEl);

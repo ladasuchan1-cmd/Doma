@@ -266,6 +266,14 @@ const MIGRATIONS = [
   ALTER TABLE proposals ADD COLUMN served_price REAL;
   ALTER TABLE proposals ADD COLUMN served_at TEXT;
   `,
+  // v3 – cenové skupiny (velikosti / barvy jednoho modelu kola sdílí group_code → strategie je umí sjednotit)
+  //      a znovustažení exportu: exported_price = cena, která byla v exportu skutečně doručena (export_id).
+  `
+  ALTER TABLE products ADD COLUMN group_code TEXT;
+  CREATE INDEX products_group_code ON products(group_code) WHERE group_code IS NOT NULL;
+  ALTER TABLE proposals ADD COLUMN exported_price REAL;
+  CREATE INDEX proposals_export ON proposals(export_id) WHERE export_id IS NOT NULL;
+  `,
 ];
 
 const DEFAULT_SETTINGS = {
@@ -296,6 +304,9 @@ const DEFAULT_SETTINGS = {
   retention_days: 180,
   // Nahrazené (superseded) návrhy jsou jen historie – mažou se dřív (nejvýše retention_days).
   retention_superseded_days: 14,
+  // Paměť zamítnutí: stejnou cenu (±0,5 Kč), kterou člověk zamítl v posledních N dnech, přecenění znovu nenavrhne
+  // (rozhodnutí „beze změny“, důvod rejected_before). 0 = vypnuto.
+  reject_memory_days: 14,
 };
 
 function nowIso(d) {

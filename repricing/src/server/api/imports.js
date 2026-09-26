@@ -7,7 +7,9 @@
 //                                              max_age_days=N, dry_run=1, filename=
 //        → {ok, import_id, kind, dry_run, source_id, format, item_path, stats[, preview, fields]}
 //   POST /api/v1/import/products  import       surové tělo + ?source=ID, mapping=JSON, deactivate_missing=1, force_deactivate=1,
-//                                              dry_run=1, filename= (force_deactivate = dovolit vypnout i víc než polovinu katalogu)
+//                                              create_missing=0, dry_run=1, filename= (force_deactivate = dovolit vypnout i víc než
+//                                              polovinu katalogu; create_missing=0 = jen aktualizovat existující produkty – neznámé
+//                                              kódy se nezakládají, stats.skipped_unknown + stats.unknown_codes (prvních 50))
 //        → totéž (stats katalogu)
 //   GET  /api/v1/imports          read|import  ?kind, status, source, origin, page, limit (výchozí 100, max 500)
 //        → {items: [{id, source_id, source_name, kind, format, origin, started_at, finished_at, duration_ms, status, stats, error}], total, page, limit}
@@ -304,6 +306,12 @@ function importOptions(kind, source, q) {
       delete o.forceDeactivate;
       o.force_deactivate = boolValue(q.force_deactivate);
     }
+    if (q.create_missing !== undefined && String(q.create_missing).trim() !== '') {
+      // create_missing=0 → „jen aktualizovat“: neznámé kódy se nezakládají (stats.skipped_unknown, unknown_codes)
+      delete o.createMissing;
+      o.create_missing = boolValue(q.create_missing, null);
+      if (o.create_missing === null) throw new HttpError(400, 'Parametr „create_missing“ musí být 1 (zakládat nové produkty) nebo 0 (jen aktualizovat existující).', { field: 'create_missing' });
+    }
   }
   return o;
 }
@@ -311,7 +319,8 @@ function importOptions(kind, source, q) {
 /** Počet platných (zpracovaných) řádků ze statistik importu. */
 function validRows(kind, st) {
   const n = (k) => Number(st && st[k]) || 0;
-  return kind === 'offers' ? n('matched') + n('unmatched') + n('ambiguous') : n('created') + n('updated') + n('unchanged');
+  // import „jen aktualizovat“: řádek s neznámým kódem je platný, jen se nezaložil (není to chyba mapování)
+  return kind === 'offers' ? n('matched') + n('unmatched') + n('ambiguous') : n('created') + n('updated') + n('unchanged') + n('skipped_unknown');
 }
 
 /** Zapíše výsledek importu ke zdroji bez URL (zdroj „jen pro příjem dat“). */

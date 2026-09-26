@@ -11,6 +11,8 @@ const TARGET_MODES = ['undercut_min', 'match_min', 'rank', 'market_avg', 'market
 const MARKET_MODES = ['undercut_min', 'match_min', 'rank', 'market_avg', 'market_median'];
 const FALLBACK_MODES = ['next', 'keep', 'msrp', 'cost_plus'];
 const ZERO_STOCK_MODES = ['reprice', 'skip', 'msrp'];
+// Sjednocení ceny ve skupině (products.group_code – velikosti / barvy jednoho modelu)
+const GROUP_ALIGN_MODES = ['off', 'min', 'max', 'median'];
 
 /** Česky popsané režimy (pro UI a vysvětlení). */
 const TARGET_MODE_LABELS = Object.freeze({
@@ -25,6 +27,13 @@ const TARGET_MODE_LABELS = Object.freeze({
   keep: 'Držet aktuální cenu (jen hlídat limity)',
   fixed: 'Pevná cena',
   clearance: 'Doprodej – postupné slevy',
+});
+/** Režimy sjednocení ceny ve skupině (text do vysvětlení: „režim nejvyšší“). */
+const GROUP_ALIGN_LABELS = Object.freeze({
+  off: 'nesjednocovat',
+  min: 'nejnižší',
+  max: 'nejvyšší',
+  median: 'medián',
 });
 const FALLBACK_MODE_LABELS = Object.freeze({
   next: 'Přejít na další strategii',
@@ -68,6 +77,8 @@ const DEFAULT_CONFIG = deepFreeze({
     outlier_pct: null,
     min_competitors: 1,
     exclude_keywords: [],
+    // s in_stock_only se nabídka „není skladem“ s dodáním do N dní počítá jako dostupná; null = vypnuto
+    max_delivery_days: null,
   },
   fallback: { mode: 'next', markup_pct: null, offset_pct: 0 },
   limits: {
@@ -87,6 +98,9 @@ const DEFAULT_CONFIG = deepFreeze({
   rounding: { mode: 'ending', direction: 'down', bands: DEFAULT_BANDS.map((b) => ({ ...b })) },
   stock: { zero_stock: 'reprice' },
   approval: { auto: false, auto_max_change_pct: 5 },
+  // Cenové skupiny: členové skupiny (stejné group_code), o kterých rozhodla tato strategie, dostanou jednu cenu –
+  // nejnižší / nejvyšší / medián jejich výsledných cen, v mezích všech členů (off = každý produkt zvlášť)
+  group: { align: 'off' },
 });
 
 // Konfigurace, které prošly normalizeConfig bez chyb (computePrice je pak nenormalizuje znovu).
@@ -126,7 +140,7 @@ function normalizeConfig(input) {
   const cfg = deepMerge(base, clone(raw));
 
   // Sekce, které nejsou objektem → výchozí + chyba
-  for (const sec of ['schedule', 'target', 'competitors', 'fallback', 'limits', 'rounding', 'stock', 'approval']) {
+  for (const sec of ['schedule', 'target', 'competitors', 'fallback', 'limits', 'rounding', 'stock', 'approval', 'group']) {
     if (!isPlainObject(cfg[sec])) {
       if (cfg[sec] != null) errors.push(`${sec}: musí být objekt`);
       cfg[sec] = structuredClone(DEFAULT_CONFIG[sec]);
@@ -283,6 +297,7 @@ function normalizeConfig(input) {
   numField('competitors', 'max_age_days', { nullable: true, min: 0, minExcl: true });
   numField('competitors', 'outlier_pct', { nullable: true, min: 0, minExcl: true, max: 100, maxExcl: true });
   numField('competitors', 'min_competitors', { min: 1, integer: true });
+  numField('competitors', 'max_delivery_days', { nullable: true, min: 0, max: 365 });
 
   // --- fallback ---------------------------------------------------------------------------
   {
@@ -344,6 +359,7 @@ function normalizeConfig(input) {
 
   // --- stock, approval --------------------------------------------------------------------
   enumField('stock', 'zero_stock', ZERO_STOCK_MODES);
+  enumField('group', 'align', GROUP_ALIGN_MODES);
   boolField('approval', 'auto');
   numField('approval', 'auto_max_change_pct', { nullable: true, min: 0 });
 
@@ -439,7 +455,8 @@ const STRATEGY_PRESETS = [
   {
     key: 'key_brands_rank2',
     name: 'Klíčové značky – držet pozici 2',
-    description: 'Klíčové značky držíme na 2. místě v pořadí cen (ne nejlevnější), s minimální marží 18 % a nikdy nad MOC.',
+    description:
+      'Klíčové značky držíme na 2. místě v pořadí cen (ne nejlevnější), s minimální marží 18 % a nikdy nad MOC. Velikosti jednoho modelu (stejná skupina) mají stejnou cenu – nejvyšší z navržených.',
     enabled: true,
     priority: 50,
     segment: {
@@ -451,6 +468,7 @@ const STRATEGY_PRESETS = [
       target: { mode: 'rank', rank: 2 },
       limits: { min_margin_pct: 18, max_above_msrp_pct: 0 },
       fallback: { mode: 'next' },
+      group: { align: 'max' },
     }),
   },
   {
@@ -496,6 +514,8 @@ module.exports = {
   MARKET_MODES,
   FALLBACK_MODES,
   ZERO_STOCK_MODES,
+  GROUP_ALIGN_MODES,
+  GROUP_ALIGN_LABELS,
   TARGET_MODE_LABELS,
   FALLBACK_MODE_LABELS,
 };

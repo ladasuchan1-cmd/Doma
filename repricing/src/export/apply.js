@@ -20,7 +20,7 @@
 const { tx, nowIso, json, getSettings, audit } = require('../db');
 const { codeKey } = require('../util/keys');
 const { ensurePriceBaseline } = require('../util/price-history');
-const { exportRowsDetailed, idList, holdReason, LATEST_APPROVED_SQL, PRODUCT_COLS } = require('./rows');
+const { exportRowsDetailed, idList, holdReason, lowestPrices, changePct, LATEST_APPROVED_SQL, PRODUCT_COLS } = require('./rows');
 const { isLockActive } = require('../engine/metrics');
 const { CENT } = require('../util/proposals');
 const { round } = require('../util/num');
@@ -168,13 +168,16 @@ function markExported(db, proposalIds, opts = {}) {
       },
     });
 
-    const setExported = db.prepare("UPDATE proposals SET status = 'exported', exported_at = ?, export_id = ? WHERE id = ? AND status IN ('approved', 'superseded')");
+    // exported_price = cena, kterou export skutečně doručil (znovustažení exportu – exportedRows)
+    const setExported = db.prepare(
+      "UPDATE proposals SET status = 'exported', exported_at = ?, export_id = ?, exported_price = ? WHERE id = ? AND status IN ('approved', 'superseded')"
+    );
     const setPrice = db.prepare('UPDATE products SET price = ?, price_changed_at = ?, updated_at = ? WHERE id = ?');
     const addHistory = db.prepare("INSERT INTO price_history (product_id, price, source, ref_id, at) VALUES (?, ?, 'export', ?, ?)");
     const current = new Map(); // product_id → cena po předchozích změnách v této dávce
     let priceUpdates = 0;
     for (const p of props) {
-      setExported.run(now, exportId, p.id);
+      setExported.run(now, exportId, p.price ?? null, p.id);
       if (!updatePrice) continue;
       const price = p.price;
       if (price == null || !(price > 0)) continue;
@@ -331,6 +334,83 @@ function ackExport(db, opts = {}) {
     served,
   });
   return { ...res, unknown_codes: unknown, mismatched };
+}
+
+/**
+ * Řádky, které doručil export `exportId` (návrhy s export_id = exportId), ve stejném tvaru jako feed změn (Row, §7).
+ * price = doručená cena (exported_price; u starších exportů manual_price ?? new_price – jiná se označit nedala),
+ * lowest_30d = nejnižší cena za 30 dní PŘED exportem (bez exportované ceny), changed_at = čas rozhodnutí.
+ * @param {import('node:sqlite').DatabaseSync} db
+ * @param {number} exportId
+ * @returns {{export: object|null, rows: object[]}} export = řádek logu exportů (null = neexistuje)
+ */
+function exportedRows(db, exportId) {
+  const id = Number(exportId);
+  const exp = Number.isSafeInteger(id) && id > 0 ? db.prepare('SELECT * FROM exports WHERE id = ?').get(id) : null;
+  if (!exp) return { export: null, rows: [] };
+  const settings = getSettings(db);
+  const list = db
+    .prepare(
+      `SELECT pr.id AS proposal_id, pr.product_id, pr.old_price, pr.new_price, pr.manual_price, pr.exported_price, pr.change_pct,
+              pr.created_at, pr.decided_at, p.code, p.ean, p.name, p.manufacturer, p.vat_rate, s.name AS strategy_name, g.name AS segment_name
+       FROM proposals pr
+       JOIN products p ON p.id = pr.product_id
+       LEFT JOIN strategies s ON s.id = pr.strategy_id
+       LEFT JOIN segments g ON g.id = pr.segment_id
+       WHERE pr.export_id = ? ORDER BY p.code_key, pr.id`
+    )
+    .all(id);
+  if (!list.length) return { export: { ...exp }, rows: [] };
+  // nejnižší cena za 30 dní před okamžikem exportu (záznam historie samotného exportu má at = čas exportu → o 1 ms dřív)
+  const before = new Date(Date.parse(exp.created_at) - 1);
+  const lowest = lowestPrices(db, before, [...new Set(list.map((r) => r.product_id))]);
+  const money = (v) => (v == null || !Number.isFinite(Number(v)) ? null : round(Number(v), 2));
+  const rows = list.map((r) => {
+    const price = money(r.exported_price ?? r.manual_price ?? r.new_price);
+    const oldPrice = money(r.old_price);
+    let low = lowest.get(r.product_id);
+    if (oldPrice != null && oldPrice > 0 && (low === undefined || oldPrice < low)) low = oldPrice;
+    return {
+      proposal_id: r.proposal_id,
+      product_id: r.product_id,
+      code: r.code,
+      ean: r.ean ?? null,
+      name: r.name ?? null,
+      manufacturer: r.manufacturer ?? null,
+      price,
+      old_price: oldPrice,
+      change_pct: changePct(oldPrice, price) ?? r.change_pct ?? null,
+      vat_rate: r.vat_rate ?? settings.vat_rate_default ?? null,
+      currency: settings.currency || 'CZK',
+      changed_at: r.decided_at || r.created_at || null,
+      strategy: r.strategy_name ?? null,
+      segment: r.segment_name ?? null,
+      lowest_30d: low === undefined ? null : money(low),
+    };
+  });
+  return { export: { ...exp }, rows };
+}
+
+/**
+ * Znovustažení exportu (C8): řádky exportu `exportId` ve formátu feedu změn. Nic neoznačuje ani nezapisuje.
+ * @param {import('node:sqlite').DatabaseSync} db
+ * @param {number} exportId
+ * @param {{format?: 'json'|'xml'|'csv', now?: Date|string}} [opts]
+ * @returns {{body: string, contentType: string, filename: string, count: number, export_id: number}|null} null = export
+ *   neexistuje nebo nemá žádné návrhy
+ */
+function exportRedownload(db, exportId, opts = {}) {
+  const format = String(opts.format || 'json').toLowerCase();
+  if (!['json', 'xml', 'csv'].includes(format)) throw badRequest(`Nepodporovaný formát „${opts.format}“ (json, xml, csv)`);
+  const { export: exp, rows } = exportedRows(db, exportId);
+  if (!exp || !rows.length) return null;
+  const settings = getSettings(db);
+  const fo = { now: opts.now, currency: settings.currency };
+  let body;
+  if (format === 'json') body = JSON.stringify(feeds.toJson(rows, fo));
+  else if (format === 'xml') body = feeds.toXml(rows, settings.export?.xml, fo);
+  else body = feeds.toCsv(rows, {});
+  return { body, contentType: CONTENT_TYPES[format], filename: `cenotvorba-export-${exp.id}.${format}`, count: rows.length, export_id: exp.id };
 }
 
 /** yyyymmdd (pražský čas) pro název souboru. */
@@ -516,4 +596,17 @@ async function pushChanges(db, opts = {}) {
   return { ok: false, status: null, ...res, count: rows.length, export_id: exportId, marked: 0, held };
 }
 
-module.exports = { markExported, markServed, logExport, exportChanges, exportPohoda, pushChanges, ackExport, deliveredMap, EXPORT_KINDS, CONTENT_TYPES };
+module.exports = {
+  markExported,
+  markServed,
+  logExport,
+  exportChanges,
+  exportPohoda,
+  pushChanges,
+  ackExport,
+  exportedRows,
+  exportRedownload,
+  deliveredMap,
+  EXPORT_KINDS,
+  CONTENT_TYPES,
+};

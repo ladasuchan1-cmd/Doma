@@ -12,6 +12,10 @@
 //   GET  /api/v1/export/pricelist.:format(json|xml|csv|xlsx)  export  úplný ceník (scope all) → příloha
 //   POST /api/v1/export/push                                  export  → výsledek pushWebhook + {count, export_id, marked}
 //   GET  /api/v1/exports                                      read    ?page, limit (výchozí 100) → {items, total, page, limit}
+//                                                                    položka + redownload (bool – export má návrhy, lze ho stáhnout znovu)
+//   GET  /api/v1/exports/:id/changes.:format(json|xml|csv)    export  znovustažení exportu: řádky doručené exportem :id (návrhy
+//                                                                    s export_id = :id, price = doručená cena) ve formátu feedu změn;
+//                                                                    nic neoznačuje; neznámé id / export bez návrhů → 404
 //
 // Označení exportu (mark / ack / push) mění stav návrhů na „exported“ a (dle nastavení) products.price → cache
 // pohledů a návrhů se zneplatní.
@@ -20,10 +24,10 @@
 // Vydání řádků bez označení si návrh pamatuje (served_price) – potvrzení podle kódů pak označí to, co admin dostal.
 
 const { parseJson } = require('../../db');
-const { exportChanges, exportPohoda, pushChanges, ackExport } = require('../../export/apply');
+const { exportChanges, exportPohoda, pushChanges, ackExport, exportRedownload } = require('../../export/apply');
 const { proposalsXlsx } = require('../../export/xlsx-report');
 const { pragueDate } = require('../../export/pohoda');
-const { HttpError, paging, queryBool, raw } = require('../http');
+const { HttpError, intParam, paging, queryBool, raw } = require('../http');
 const V = require('./_views');
 const { listIds, proposalItems } = require('./proposals');
 
@@ -197,12 +201,34 @@ module.exports = {
         const { page, limit, offset } = paging(ctx, { defaultLimit: 100, maxLimit: 500 });
         const total = ctx.db.prepare('SELECT count(*) AS c FROM exports').get().c;
         const items = ctx.db
-          .prepare('SELECT * FROM exports ORDER BY id DESC LIMIT ? OFFSET ?')
+          .prepare('SELECT e.*, EXISTS (SELECT 1 FROM proposals pr WHERE pr.export_id = e.id) AS has_rows FROM exports e ORDER BY e.id DESC LIMIT ? OFFSET ?')
           .all(limit, offset)
-          .map((r) => ({ ...r, detail: parseJson(r.detail, r.detail) }));
+          .map(({ has_rows: hasRows, ...r }) => ({ ...r, detail: parseJson(r.detail, r.detail), redownload: hasRows === 1 }));
         return { items, total, page, limit };
       },
       { auth: 'read' }
+    );
+
+    router.get(
+      '/api/v1/exports/:id/changes.:format(json|xml|csv)',
+      (ctx) => {
+        const id = intParam(ctx, 'id');
+        let res;
+        try {
+          res = exportRedownload(ctx.db, id, { format: ctx.params.format });
+        } catch (e) {
+          throw V.toClientError(e);
+        }
+        if (!res) throw new HttpError(404, `Export #${id} neexistuje nebo nedoručil žádné změny cen (nelze ho stáhnout znovu).`);
+        return raw({
+          status: 200,
+          body: Buffer.from(res.body, 'utf8'),
+          contentType: res.contentType,
+          filename: res.filename,
+          headers: { 'X-Export-Id': String(res.export_id), 'X-Export-Count': String(res.count) },
+        });
+      },
+      { auth: 'export' }
     );
   },
   sendChanges,

@@ -7,7 +7,7 @@ import { chipsInput } from './chips.js';
 import { parseInputNumber, money } from './format.js';
 import {
   mergeConfig, getPath, setPath, HELP, TARGET_MODES, TARGET_MODE_MAP, FALLBACK_MODES, ZERO_STOCK_MODES, ROUNDING_MODES,
-  ROUNDING_DIRECTIONS, roundingExamples, stepFor, WEEKDAYS, BASE_MISSING_TEXT, usesFallback,
+  ROUNDING_DIRECTIONS, roundingExamples, stepFor, WEEKDAYS, BASE_MISSING_TEXT, usesFallback, GROUP_ALIGN_MODES,
 } from './strategy-model.js';
 import { filterBuilder } from './filter-builder.js';
 
@@ -37,7 +37,7 @@ export function strategyForm(o) {
     inp.dataset.path = path;
     inp.addEventListener('input', () => {
       const v = parseInputNumber(inp.value);
-      const bad = Number.isNaN(v) || (v == null && !nullable) || (opts.int && v != null && !Number.isInteger(v)) || (opts.min != null && v != null && v < opts.min);
+      const bad = Number.isNaN(v) || (v == null && !nullable) || (opts.int && v != null && !Number.isInteger(v)) || (opts.min != null && v != null && v < opts.min) || (opts.max != null && v != null && v > opts.max);
       inp.classList.toggle('is-invalid', Boolean(bad));
       inp.setAttribute('aria-invalid', bad ? 'true' : 'false');
       if (bad) return;
@@ -163,6 +163,9 @@ export function strategyForm(o) {
   });
 
   // ------------------------------------------------ Konkurence
+  // dodání do X dnů: nabídka „není skladem, ale do 3 dnů“ se započítá (jen s volbou Jen nabídky skladem)
+  const deliveryField = num('competitors.max_delivery_days', 'Započítat i dodání do X dnů', { min: 0, max: 365, suffix: 'dní', placeholder: 'jen skladem' });
+  deliveryField.dataset.field = 'max-delivery-days';
   const marketNote = h('div', { class: 'callout callout-info section-note' }, icon('info', { size: 16 }), h('div', null, 'Zvolený režim cíle konkurenci nepoužívá – tato nastavení se uplatní jen při změně režimu.'));
   const compSection = card({
     title: 'Konkurence',
@@ -181,7 +184,7 @@ export function strategyForm(o) {
         chips('competitors.exclude_tags', 'Vyloučit štítky', tagList, { placeholder: 'žádné' }),
         chips('competitors.exclude_keywords', 'Vyloučit nabídky se slovy', ['bazar', 'použité', 'rozbaleno', 'repasované', 'vystavené', 'demo'].map((x) => ({ value: x, label: x })), { placeholder: 'např. bazar' })
       ),
-      h('div', { class: 'form-grid form-grid-2' }, toggle('competitors.in_stock_only', 'Jen nabídky skladem'), toggle('competitors.include_shipping', 'Počítat s dopravou')),
+      h('div', { class: 'form-grid form-grid-2' }, h('div', { class: 'stack-sm' }, toggle('competitors.in_stock_only', 'Jen nabídky skladem'), deliveryField), toggle('competitors.include_shipping', 'Počítat s dopravou')),
       h(
         'div',
         { class: 'form-grid' },
@@ -334,6 +337,28 @@ export function strategyForm(o) {
     ],
   });
 
+  // ------------------------------------------------ Skupiny variant (velikosti / barvy jednoho modelu)
+  const groupHelp = h('p', { class: 'field-help group-mode-help' });
+  const groupSel = select(GROUP_ALIGN_MODES.map((g) => ({ value: g.value, label: g.label })), cfg.group?.align ?? 'off', {
+    onChange: (e) => {
+      setPath(cfg, 'group.align', e.target.value);
+      emit();
+    },
+  });
+  groupSel.dataset.path = 'group.align';
+  const groupSection = card({
+    title: 'Skupiny variant',
+    icon: 'layers',
+    subtitle: 'Velikosti a barvy jednoho kola za stejnou cenu.',
+    class: 'form-section',
+    dataset: { section: 'group' },
+    body: [
+      field({ label: 'Sjednotit cenu ve skupině (velikosti / barvy)', control: groupSel, help: HELP['group.align'] }),
+      groupHelp,
+      h('p', { class: 'field-help' }, 'Skupinu určuje pole „Skupina / model“ z importu katalogu (např. nadřazený kód v POHODĚ). Produkty bez skupiny se nesjednocují.'),
+    ],
+  });
+
   // ------------------------------------------------ Sklad
   const stockSection = card({
     title: 'Sklad',
@@ -467,6 +492,9 @@ export function strategyForm(o) {
     show(bandsWrap, cfg.rounding.mode === 'ending');
     show(dirCtl.closest('.field') || dirCtl, cfg.rounding.mode !== 'none');
     show(autoMax, Boolean(cfg.approval.auto));
+    show(deliveryField, Boolean(cfg.competitors.in_stock_only));
+    const gm = GROUP_ALIGN_MODES.find((g) => g.value === (cfg.group?.align ?? 'off'));
+    groupHelp.textContent = gm ? gm.help : '';
     // příklad výpočtu cíle (bez limitů a zaokrouhlení)
     const t = cfg.target;
     let ex = '';
@@ -495,6 +523,7 @@ export function strategyForm(o) {
     competitors: compSection,
     limits: limitsSection,
     rounding: roundingSection,
+    group: groupSection,
     stock: stockSection,
     approval: approvalSection,
   };

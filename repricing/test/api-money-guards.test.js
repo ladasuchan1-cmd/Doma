@@ -273,6 +273,8 @@ test('money-7: vědomě schválená ruční cena pod nákupem projde exportem', 
 test('money-8: zamítnutou cenu další běh znovu automaticky neschválí; ruční cenu přenese a nechá ke schválení', async (t) => {
   {
     const c = await setup(t);
+    // bez paměti zamítnutí (reject_memory_days = 0) vznikne stejný návrh znovu – jen čeká na ruční schválení
+    assert.equal((await c.s.put('/api/v1/settings', { reject_memory_days: 0 })).status, 200);
     let r = await c.s.post('/api/v1/proposals/reject', { ids: [c.first.id] });
     assert.equal(r.json.updated, 1);
     const res = runPricing(c.db, { trigger: 'schedule' });

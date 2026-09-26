@@ -126,6 +126,13 @@ export class DataTable {
     this.renderPager();
   }
 
+  /** Vymění sloupce (výběr sloupců uživatelem) a překreslí tabulku se stávajícími daty. */
+  setColumns(columns) {
+    this.o.columns = Array.isArray(columns) ? columns : [];
+    this.renderHead();
+    this.renderBody();
+  }
+
   clearSelection() {
     this.selected.clear();
     this.renderBody();

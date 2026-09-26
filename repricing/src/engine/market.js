@@ -20,6 +20,7 @@ const DEFAULT_MARKET_FILTER = Object.freeze({
   outlier_pct: null,
   min_competitors: 1,
   exclude_keywords: Object.freeze([]),
+  max_delivery_days: null,
 });
 
 /** Důvody vyřazení nabídky – české popisky pro UI a vysvětlení. */
@@ -87,6 +88,8 @@ function prepareFilter(filter) {
     max_age_days: toNumOrNull(f.max_age_days),
     outlier_pct: toNumOrNull(f.outlier_pct),
     min_competitors: Math.max(1, Math.floor(toNumOrNull(f.min_competitors) ?? 1)),
+    // s in_stock_only: nabídka „není skladem“, která dodá nejvýše do N dní, se počítá jako dostupná (null = vypnuto)
+    max_delivery_days: toNumOrNull(f.max_delivery_days),
     [PREPARED]: true,
   };
   return p;
@@ -137,6 +140,15 @@ function shippingOf(v) {
   return Number.isFinite(n) && n > 0 ? n : 0;
 }
 
+/** Dodá nabídka (i když není skladem) do limitu max_delivery_days? */
+function deliversInTime(offer, f) {
+  if (f.max_delivery_days == null) return false;
+  const d = offer.delivery_days;
+  if (d == null || d === '' || typeof d === 'boolean') return false;
+  const n = typeof d === 'number' ? d : Number(d);
+  return Number.isFinite(n) && n >= 0 && n <= f.max_delivery_days + EPS;
+}
+
 function exclusionReason(offer, f, cutoff) {
   const price = offer.price;
   if (typeof price !== 'number' || !Number.isFinite(price) || price <= 0) return 'invalid_price';
@@ -155,8 +167,9 @@ function exclusionReason(offer, f, cutoff) {
     const n = fold(offer.name);
     if (f.keywords.some((k) => n.includes(k))) return 'keyword';
   }
-  // in_stock null = neznámo → bereme jako skladem (SPEC §6.2)
-  if (f.in_stock_only && (offer.in_stock === 0 || offer.in_stock === false)) return 'out_of_stock';
+  // in_stock null = neznámo → bereme jako skladem (SPEC §6.2). S max_delivery_days se nabídka, která není skladem,
+  // ale dodá do limitu (delivery_days ≤ max_delivery_days), počítá jako dostupná (typicky kola „u dodavatele do 3 dnů“).
+  if (f.in_stock_only && (offer.in_stock === 0 || offer.in_stock === false) && !deliversInTime(offer, f)) return 'out_of_stock';
   if (cutoff != null && offer.observed_at) {
     const t = Date.parse(offer.observed_at);
     // nečitelné datum = neznámé stáří → konzervativně zastaralé
@@ -252,6 +265,7 @@ function findCompetitorOffer(market, name) {
 
 module.exports = {
   buildMarket,
+  deliversInTime,
   rankOf,
   positionOf,
   findCompetitorOffer,

@@ -121,13 +121,21 @@ export function isSelectableProposal(r) {
 
 /**
  * Stav, na který se omezí hromadné „… vše dle filtru“: schvalovat jde jen čekající; zamítat čekající,
- * na záložce Schváleno schválené (API zamítne i schválené, dokud nejsou exportované).
- * @param {'approve'|'reject'} kind
+ * na záložce Schváleno schválené (API zamítne i schválené, dokud nejsou exportované); vrátit ke schválení
+ * (unapprove) jen schválené neexportované.
+ * @param {'approve'|'reject'|'unapprove'} kind
  * @param {string} tab aktuální filtr stavu (pending | approved | all | …)
  * @returns {'pending'|'approved'|null} null = na této záložce hromadná akce nedává smysl
  */
 export function bulkStatus(kind, tab) {
   if (kind === 'approve') return tab === 'pending' || tab === 'all' ? 'pending' : null;
+  // C5: vrátit ke schválení jde jen schválený, dosud neexportovaný návrh
+  if (kind === 'unapprove') return tab === 'approved' || tab === 'all' ? 'approved' : null;
   if (tab === 'approved') return 'approved';
   return tab === 'pending' || tab === 'all' ? 'pending' : null;
+}
+
+/** Schválený, dosud neexportovaný návrh jde vrátit ke schválení (POST /proposals/unapprove – C5). */
+export function isUnapprovable(r) {
+  return r != null && r.status === 'approved' && !r.exported_at;
 }

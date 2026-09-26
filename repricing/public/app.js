@@ -126,7 +126,7 @@ function buildLayout() {
     themeIcon,
     themeLabel
   );
-  const userEl = h('div', { class: 'side-user' }, icon('user', { size: 16 }), h('span', { class: 'ellipsis' }, state.me?.user || ''));
+  const userEl = h('div', { class: 'side-user', dataset: { role: 'user-name' } }, icon('user', { size: 16 }), h('span', { class: 'ellipsis' }, state.me?.user || ''));
   const versionEl = h('div', { class: 'side-version' });
   const sidebar = h(
     'aside',
@@ -409,7 +409,9 @@ async function render() {
   }
 
   const L = ensureLayout();
+  // C9: jméno z přihlášení (jinak „admin“) – jen pro přehled, kdo schvaluje
   L.userEl.lastChild.textContent = state.me?.user || '';
+  L.userEl.title = state.me?.user ? 'Přihlášen jako ' + state.me.user + ' (jméno se zapisuje ke schválení a do auditu)' : '';
   toggleNav(false);
   L.actions.replaceChildren();
   L.sub.replaceChildren();

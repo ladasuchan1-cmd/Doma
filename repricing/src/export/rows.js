@@ -337,4 +337,4 @@ function exportRows(db, opts = {}) {
   return exportRowsDetailed(db, opts).rows;
 }
 
-module.exports = { exportRows, exportRowsDetailed, holdReason, HOLD_REASONS, PRODUCT_COLS, ROW_FIELDS, ROW_LABELS, LATEST_APPROVED_SQL, changePct, idList };
+module.exports = { exportRows, exportRowsDetailed, holdReason, lowestPrices, HOLD_REASONS, PRODUCT_COLS, ROW_FIELDS, ROW_LABELS, LATEST_APPROVED_SQL, changePct, idList };

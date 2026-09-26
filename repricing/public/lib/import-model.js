@@ -12,6 +12,7 @@ export const CANONICAL = {
     { key: 'mpn', label: 'Kód výrobce (MPN)' },
     { key: 'manufacturer', label: 'Výrobce / značka' },
     { key: 'category', label: 'Kategorie' },
+    { key: 'group_code', label: 'Skupina / model', help: 'Společný kód modelu pro velikosti a barvy jednoho kola (např. nadřazený kód v POHODĚ). Strategie pak může varianty sjednotit na jednu cenu.' },
     { key: 'supplier', label: 'Dodavatel' },
     { key: 'owner', label: 'Zodpovědná osoba' },
     { key: 'purchase_price', label: 'Nákupní cena (bez DPH)', type: 'number' },
@@ -117,6 +118,7 @@ export const STAT_LABELS = {
   updated: 'Aktualizováno',
   unchanged: 'Beze změny',
   deactivated: 'Deaktivováno',
+  skipped_unknown: 'Přeskočeno – neznámý kód',
   matched: 'Spárováno',
   unmatched: 'Nespárováno',
   ambiguous: 'Nejednoznačné',
@@ -228,7 +230,7 @@ export function curlExamples(origin, base = '/api/v1') {
     {
       id: 'products-csv',
       title: 'Katalog produktů z POHODY – CSV',
-      text: 'Pravidelný export skladových zásob (kód, název, nákupní a prodejní cena, sklad). deactivate_missing=1 deaktivuje produkty, které v souboru chybí.',
+      text: 'Pravidelný export skladových zásob (kód, název, nákupní a prodejní cena, sklad). deactivate_missing=1 deaktivuje produkty, které v souboru chybí; create_missing=0 jen aktualizuje existující produkty (neznámé kódy přeskočí).',
       code: [
         `curl -X POST "${api}/import/products?source=1&deactivate_missing=1" \\`,
         '  -H "Authorization: Bearer $CENOTVORBA_TOKEN" \\',
@@ -260,4 +262,18 @@ export function curlExamples(origin, base = '/api/v1') {
       ].join('\n'),
     },
   ];
+}
+
+/**
+ * Neznámé kódy z výsledku importu s „Jen aktualizovat existující produkty“ (stats.skipped_unknown, stats.unknown_codes –
+ * server vrací nejvýš prvních 50). Vrací null, když se nic nepřeskočilo.
+ * @param {object} stats
+ * @returns {{count: number, codes: string[], more: number}|null}
+ */
+export function unknownCodesInfo(stats) {
+  const n = Number(stats?.skipped_unknown) || 0;
+  const codes = Array.isArray(stats?.unknown_codes) ? stats.unknown_codes.map(String).filter(Boolean) : [];
+  if (!n && !codes.length) return null;
+  const total = Math.max(n, codes.length);
+  return { count: total, codes, more: Math.max(0, total - codes.length) };
 }

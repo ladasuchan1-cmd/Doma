@@ -1,4 +1,5 @@
-// Produkty – vyhledávání, rychlé filtry (facety), pokročilý filtr, řaditelná stránkovaná tabulka.
+// Produkty – vyhledávání, rychlé filtry (facety), pokročilý filtr, řaditelná stránkovaná tabulka
+// s volitelnými sloupci (libovolné pole z /fields včetně atributů; výběr v localStorage a v URL ?cols=).
 import { h, mount, debounce } from '../lib/dom.js';
 import { api, cachedGet, itemsOf, isAbort } from '../lib/api.js';
 import { buildHash } from '../lib/router.js';
@@ -7,8 +8,12 @@ import { DataTable } from '../lib/table.js';
 import { card, emptyState, positionBadge, changeEl, searchInput, checkbox } from '../lib/ui.js';
 import { filterBuilder } from '../lib/filter-builder.js';
 import { describeFilter, countConditions, isEmptyFilter, quickFiltersToSegment } from '../lib/filter-model.js';
-import { confirmDialog } from '../lib/modal.js';
-import { money, percent, int, index, count, statusLabel, POSITION_LABELS, POSITION_ORDER, toNum, round } from '../lib/format.js';
+import { confirmDialog, openModal } from '../lib/modal.js';
+import { money, percent, int, index, count, statusLabel, POSITION_LABELS, POSITION_ORDER, toNum, round, DASH, fold } from '../lib/format.js';
+import {
+  resolveCols, saveStoredCols, serializeCols, isDefaultCols, valueAt, fieldFormat, isNumericFormat, formatFieldValue, pickerGroups,
+  moveCol, toggleCol, DEFAULT_COLUMNS, REQUIRED_COLUMN, EXTRA_COLUMNS,
+} from '../lib/columns.js';
 import { finalPrice, finalChangePct, isManual } from '../lib/proposal-model.js';
 
 export const title = 'Produkty';
@@ -52,6 +57,8 @@ export async function show(root, ctx) {
     dir: q.dir === 'desc' ? 'desc' : 'asc',
     page: Math.max(1, Number(q.page) || 1),
     limit: Number(q.limit) || 50,
+    // sloupce: URL (sdílený odkaz) > localStorage > výchozí
+    cols: resolveCols({ url: q.cols }).cols,
   };
   ctx.setTitle('Produkty', '');
   // import katalogu = průvodce v režimu „Katalog produktů“ (výchozí režim jsou ceny konkurence – contract-9)
@@ -66,6 +73,7 @@ export async function show(root, ctx) {
   if (segRes.status === 'fulfilled') segments = itemsOf(segRes.value);
   if (fieldsRes.status === 'fulfilled') fields = fieldsRes.value?.fields || [];
   if (ctx.signal.aborted) return;
+  const fieldsMap = () => new Map([...fields, ...EXTRA_COLUMNS].map((f) => [f.key, f]));
 
   function queryParams() {
     return {
@@ -88,7 +96,7 @@ export async function show(root, ctx) {
 
   function syncUrl() {
     const p = queryParams();
-    ctx.setQuery({ ...p, sort: st.sort !== 'code' ? st.sort : null, dir: st.dir !== 'asc' ? st.dir : null, page: st.page > 1 ? st.page : null, limit: st.limit !== 50 ? st.limit : null, filter: p.filter });
+    ctx.setQuery({ ...p, sort: st.sort !== 'code' ? st.sort : null, dir: st.dir !== 'asc' ? st.dir : null, page: st.page > 1 ? st.page : null, limit: st.limit !== 50 ? st.limit : null, filter: p.filter, cols: isDefaultCols(st.cols) ? null : serializeCols(st.cols) });
   }
 
   function anyFilter() {
@@ -101,9 +109,10 @@ export async function show(root, ctx) {
     load();
   }
 
-  const columns = [
-    { key: 'code', label: 'Kód', sortable: true, hideSm: true, class: 'code-cell', render: (r) => h('span', { class: 'code-cell' }, r.code) },
-    {
+  // Sloupce s vlastním vykreslením (výchozí tabulka); ostatní pole z /fields se vykreslí obecně podle typu.
+  const BUILTIN = {
+    code: { key: 'code', label: 'Kód', sortable: true, hideSm: true, class: 'code-cell', render: (r) => h('span', { class: 'code-cell' }, r.code) },
+    name: {
       key: 'name',
       label: 'Název',
       sortable: true,
@@ -115,22 +124,22 @@ export async function show(root, ctx) {
         h('span', { class: 'cell-sub ellipsis', style: 'max-width:250px' }, h('span', { class: 'show-sm mono' }, r.code + ' · '), [r.manufacturer, r.category].filter(Boolean).join(' · ') + (r.active === 0 || r.active === false ? ' · neaktivní' : ''))
       ),
     },
-    { key: 'manufacturer', label: 'Výrobce', sortable: true, hideSm: true, hideLg: true },
-    { key: 'stock', label: 'Sklad', format: 'int', sortable: true },
-    { key: 'purchase_price', label: 'Nákup', format: 'money0', sortable: true, hideSm: true, title: 'Nákupní cena bez DPH' },
-    { key: 'price', label: 'Cena', format: 'money0', sortable: true, title: 'Prodejní cena s DPH' },
-    { key: 'margin_pct', label: 'Marže', format: 'percent', sortable: true, render: (r) => h('span', { class: r.margin_pct != null && r.margin_pct < 0 ? 'chg chg-down' : 'num' }, percent(r.margin_pct)) },
-    {
+    manufacturer: { key: 'manufacturer', label: 'Výrobce', sortable: true, hideSm: true, hideLg: true },
+    stock: { key: 'stock', label: 'Sklad', format: 'int', sortable: true },
+    purchase_price: { key: 'purchase_price', label: 'Nákup', format: 'money0', sortable: true, hideSm: true, title: 'Nákupní cena bez DPH' },
+    price: { key: 'price', label: 'Cena', format: 'money0', sortable: true, title: 'Prodejní cena s DPH' },
+    margin_pct: { key: 'margin_pct', label: 'Marže', format: 'percent', sortable: true, render: (r) => h('span', { class: r.margin_pct != null && r.margin_pct < 0 ? 'chg chg-down' : 'num' }, percent(r.margin_pct)) },
+    market_min: {
       key: 'market_min',
       label: 'Min. trh',
       format: 'money0',
       sortable: true,
       render: (r) => (r.market_min == null ? h('span', { class: 'muted' }, '–') : h('div', { class: 'cell-2', style: 'align-items:flex-end' }, h('span', { class: 'num' }, money(r.market_min, { decimals: 0 })), r.cheapest_competitor ? h('span', { class: 'cell-sub ellipsis', style: 'max-width:120px', title: r.cheapest_competitor + ' · ' + int(r.market_count) + ' konk.' }, r.cheapest_competitor) : null)),
     },
-    { key: 'price_index', label: 'Index', format: 'index', sortable: true, title: 'Naše cena / nejnižší cena trhu × 100', render: (r) => h('span', { class: r.price_index > 110 ? 'chg chg-down' : 'num' }, index(r.price_index)) },
-    { key: 'position', label: 'Pozice', sortable: true, render: (r) => positionBadge(r.position) },
-    { key: 'market_count', label: 'Konk.', format: 'int', sortable: true, hideLg: true, title: 'Počet započtených konkurentů' },
-    {
+    price_index: { key: 'price_index', label: 'Index', format: 'index', sortable: true, title: 'Naše cena / nejnižší cena trhu × 100', render: (r) => h('span', { class: r.price_index > 110 ? 'chg chg-down' : 'num' }, index(r.price_index)) },
+    position: { key: 'position', label: 'Pozice', sortable: true, render: (r) => positionBadge(r.position) },
+    market_count: { key: 'market_count', label: 'Konk.', format: 'int', sortable: true, hideLg: true, title: 'Počet započtených konkurentů' },
+    proposal: {
       key: 'proposal',
       label: 'Návrh',
       align: 'right',
@@ -147,10 +156,39 @@ export async function show(root, ctx) {
         return h('div', { class: 'cell-2', style: 'align-items:flex-end', title: tip }, h('span', { class: 'num strong nowrap' }, approved ? h('span', { class: 'chg-up', 'aria-label': 'schváleno' }, icon('check', { size: 12 }), ' ') : null, money(fp), manual ? h('span', { class: 'muted', 'aria-label': 'ruční cena' }, ' ✎') : null), changeEl(pct));
       },
     },
-  ];
+  };
+
+  /** Obecný sloupec pole z /fields: hodnota podle cesty (attrs.X), formát podle typu a jednotky, řazení na serveru. */
+  function genericColumn(key) {
+    const f = fieldsMap().get(key) || { key, label: key.startsWith('attrs.') ? key.slice(6) : key, type: 'string' };
+    const fmt = fieldFormat(f);
+    const numeric = isNumericFormat(fmt);
+    return {
+      key,
+      label: f.label,
+      title: f.label + (f.unit ? ' (' + f.unit + ')' : '') + ' – seřadit',
+      sortable: true,
+      sortKey: key,
+      defaultDesc: numeric,
+      align: numeric ? 'right' : null,
+      value: (r) => valueAt(r, key),
+      render: (r) => {
+        const txt = formatFieldValue(f, valueAt(r, key));
+        return h('span', { class: [numeric ? 'num' : null, txt === DASH ? 'muted' : null, fmt === 'text' ? 'cell-text' : null], title: fmt === 'text' && txt !== DASH ? String(valueAt(r, key)) : null }, txt);
+      },
+    };
+  }
+
+  function buildColumns() {
+    const known = fieldsMap();
+    return st.cols
+      // neznámé pole (atribut zmizel z dat) se přeskočí – když se pole nepodařilo načíst, zobrazí se obecně
+      .filter((k) => BUILTIN[k] || !fields.length || known.has(k))
+      .map((k) => BUILTIN[k] || genericColumn(k));
+  }
 
   const table = new DataTable({
-    columns,
+    columns: buildColumns(),
     pagination: true,
     page: st.page,
     limit: st.limit,
@@ -243,7 +281,11 @@ export async function show(root, ctx) {
         facetSelect(FACET_FILTERS[3]),
         statusSel,
         checkbox('Jen s návrhem', st.has_proposal, (v) => { st.has_proposal = v; st.page = 1; renderPills(); load(); }),
-        advBtn)
+        advBtn,
+        h('button', {
+          type: 'button', class: ['btn', isDefaultCols(st.cols) ? null : 'btn-soft'], dataset: { action: 'columns' }, title: 'Vybrat sloupce tabulky (i vlastní atributy z importu)',
+          onClick: () => openColumnPicker(),
+        }, icon('columns', { size: 16 }), h('span', null, 'Sloupce'), isDefaultCols(st.cols) ? null : h('span', { class: 'seg-count' }, String(st.cols.length))))
     );
     renderPills();
   }
@@ -279,6 +321,76 @@ export async function show(root, ctx) {
       if (!ok) return;
     }
     ctx.navigate(buildHash('/segmenty/novy', { filter }));
+  }
+
+  /** Použije nový výběr sloupců: tabulka, URL a localStorage (per prohlížeč). */
+  function applyColumns(cols) {
+    st.cols = cols;
+    saveStoredCols(cols);
+    table.setColumns(buildColumns());
+    syncUrl();
+    renderToolbar();
+  }
+
+  /**
+   * Výběr sloupců: vlevo zobrazené sloupce v pořadí (posun ↑/↓, odebrání), vpravo všechna pole z /fields
+   * po skupinách s hledáním (atributů z importu může být hodně).
+   */
+  function openColumnPicker() {
+    let draft = [...st.cols];
+    const known = fieldsMap();
+    const labelOf = (k) => known.get(k)?.label || (k.startsWith('attrs.') ? k.slice(6) : k);
+    const chosenHost = h('ol', { class: 'col-chosen', 'aria-label': 'Zobrazené sloupce v pořadí' });
+    const listHost = h('div', { class: 'col-groups' });
+    let needle = '';
+    const search = h('input', { type: 'search', class: 'input', placeholder: 'Hledat pole…', 'aria-label': 'Hledat pole', autocomplete: 'off', onInput: (e) => { needle = fold(e.target.value); renderList(); } });
+    const counter = h('span', { class: 'muted small' });
+    function renderChosen() {
+      counter.textContent = count(draft.length, 'sloupec', 'sloupce', 'sloupců');
+      mount(chosenHost, draft.map((k, i) => h(
+        'li',
+        { dataset: { chosen: k } },
+        h('span', { class: 'col-name ellipsis', title: k }, labelOf(k)),
+        h('span', { class: 'row-actions' },
+          h('button', { type: 'button', class: 'btn-icon', disabled: i === 0, 'aria-label': 'Posunout výš: ' + labelOf(k), onClick: () => { draft = moveCol(draft, k, -1); renderChosen(); } }, icon('chevron-up', { size: 14 })),
+          h('button', { type: 'button', class: 'btn-icon', disabled: i === draft.length - 1, 'aria-label': 'Posunout níž: ' + labelOf(k), onClick: () => { draft = moveCol(draft, k, 1); renderChosen(); } }, icon('chevron-down', { size: 14 })),
+          h('button', { type: 'button', class: 'btn-icon', disabled: k === REQUIRED_COLUMN, title: k === REQUIRED_COLUMN ? 'Název zůstává vždy' : null, 'aria-label': 'Skrýt sloupec ' + labelOf(k), onClick: () => { draft = toggleCol(draft, k, false); renderChosen(); renderList(); } }, icon('x', { size: 14 })))
+      )));
+    }
+    function renderList() {
+      const groups = pickerGroups(fields)
+        .map((g) => ({ ...g, fields: g.fields.filter((f) => !needle || fold(f.label).includes(needle) || fold(f.key).includes(needle)) }))
+        .filter((g) => g.fields.length);
+      mount(listHost, groups.length
+        ? groups.map((g) => h('fieldset', { class: 'col-group' }, h('legend', null, g.group), g.fields.map((f) => {
+          const input = h('input', {
+            type: 'checkbox', checked: draft.includes(f.key), disabled: f.key === REQUIRED_COLUMN, dataset: { col: f.key },
+            onChange: (e) => { draft = toggleCol(draft, f.key, e.target.checked); renderChosen(); },
+          });
+          return h('label', { class: 'check' }, input, h('span', null, f.label), f.key.startsWith('attrs.') || f.key === 'group_code' ? h('span', { class: 'check-help mono' }, f.key) : null);
+        })))
+        : h('p', { class: 'muted' }, fields.length ? 'Žádné pole neodpovídá hledání.' : 'Seznam polí se nepodařilo načíst.'));
+    }
+    renderChosen();
+    renderList();
+    const m = openModal({
+      title: 'Sloupce tabulky',
+      size: 'lg',
+      description: 'Vyberte, co chcete v tabulce vidět – i atributy z importu (N-kategorie, sezóna, imprese…). Podle každého sloupce jde řadit. Výběr si pamatuje tento prohlížeč a je i v adrese stránky (odkaz lze poslat kolegovi).',
+      body: h(
+        'div',
+        { class: 'col-picker' },
+        h('div', { class: 'stack-sm' }, h('div', { class: 'row-between' }, h('div', { class: 'form-subtitle', style: 'margin:0' }, 'Zobrazené'), counter), chosenHost),
+        h('div', { class: 'stack-sm' }, h('div', { class: 'form-subtitle', style: 'margin:0' }, 'Dostupná pole'), search, listHost)
+      ),
+      footer: [
+        h('button', { type: 'button', class: 'btn btn-ghost', dataset: { action: 'reset-columns' }, onClick: () => { draft = [...DEFAULT_COLUMNS]; renderChosen(); renderList(); } }, 'Výchozí sloupce'),
+        h('span', { class: 'toolbar-spacer' }),
+        h('button', { type: 'button', class: 'btn', onClick: () => m.close() }, 'Zrušit'),
+        h('button', { type: 'button', class: 'btn btn-primary', dataset: { action: 'apply-columns' }, onClick: () => { m.close(); applyColumns(draft); } }, 'Použít'),
+      ],
+      initialFocus: 'input[type=search]',
+    });
   }
 
   async function toggleAdvanced(force) {

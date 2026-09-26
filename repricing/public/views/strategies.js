@@ -1,4 +1,5 @@
-// Strategie – pořadí (šipky i přetažení → POST /strategies/reorder), zapnutí, předvolby, odkaz na simulaci.
+// Strategie – pořadí (šipky i přetažení → POST /strategies/reorder), zapnutí, předvolby, odkaz na simulaci
+// a „Simulovat celé přecenění“ (POST /runs {dry_run: true} – celá sada strategií, nic se nezapíše).
 import { h, mount } from '../lib/dom.js';
 import { api, cachedGet, itemsOf, isAbort, invalidate } from '../lib/api.js';
 import { buildHash } from '../lib/router.js';
@@ -6,8 +7,12 @@ import { icon } from '../lib/icons.js';
 import { card, emptyState, errorState, skeletonTable, switchEl, badge, callout, colorDot, button } from '../lib/ui.js';
 import { confirmDialog } from '../lib/modal.js';
 import { toast } from '../lib/toast.js';
-import { describeTargetShort, describeLimitsShort, describeConditionsShort, describeScheduleShort, scheduleState, mergeConfig } from '../lib/strategy-model.js';
-import { count, relTime } from '../lib/format.js';
+import { describeTargetShort, describeLimitsShort, describeConditionsShort, describeScheduleShort, describeGroupShort, scheduleState, mergeConfig } from '../lib/strategy-model.js';
+import { count, relTime, int, percent, money } from '../lib/format.js';
+import { runStatsView } from '../lib/run-stats.js';
+import { DataTable } from '../lib/table.js';
+import { explainList, actionBadge, priceMove } from '../lib/decision.js';
+import { changeEl, flagBadges, skeletonBlocks } from '../lib/ui.js';
 
 export const title = 'Strategie';
 
@@ -25,8 +30,10 @@ function strategyBody(s, patch = {}) {
 
 export async function show(root, ctx) {
   ctx.setTitle('Strategie', 'Jak se chovat vůči trhu – pro každý produkt platí první vhodná strategie shora');
-  ctx.setActions(h('a', { class: 'btn', href: '#/strategie/nova', dataset: { action: 'new-strategy' } }, icon('plus', { size: 16 }), h('span', { class: 'lbl' }, 'Nová strategie')));
+  const dryBtn = h('button', { type: 'button', class: 'btn', dataset: { action: 'dry-run' }, title: 'Spočítat, co by udělalo přecenění všech produktů podle aktuálního pořadí strategií – bez vzniku návrhů', onClick: () => dryRun() }, icon('eye', { size: 16 }), h('span', { class: 'lbl' }, 'Simulovat celé přecenění'));
+  ctx.setActions(dryBtn, h('a', { class: 'btn', href: '#/strategie/nova', dataset: { action: 'new-strategy' } }, icon('plus', { size: 16 }), h('span', { class: 'lbl' }, 'Nová strategie')));
 
+  const dryHost = h('div', { dataset: { role: 'dry-run' } });
   const listHost = h('div');
   const presetsHost = h('div');
   const coverageHost = h('div');
@@ -45,6 +52,7 @@ export async function show(root, ctx) {
       { class: 'stack' },
       callout(h('span', null, 'Pro každý produkt se použije ', h('b', null, 'první zapnutá strategie'), ' (shora), jejíž segment produkt obsahuje. Strategie bez segmentu platí pro všechny produkty – dejte ji proto na konec jako výchozí. Pořadí změníte šipkami nebo přetažením.'), 'info'),
       coverageHost,
+      dryHost,
       card({ title: 'Pořadí strategií', icon: 'sliders', flush: true, body: listHost, dataset: { card: 'strategies' } }),
       card({ title: 'Předvolby', icon: 'zap', subtitle: 'Hotové strategie pro typické situace cykloobchodu. Předvolba založí segment i strategii (vypnutou) – před zapnutím ji zkontrolujte a nasimulujte.', body: presetsHost })
     )
@@ -119,6 +127,7 @@ export async function show(root, ctx) {
     const cond = describeConditionsShort(cfg.conditions, fieldsMap);
     const sch = describeScheduleShort(cfg.schedule);
     const limits = describeLimitsShort(cfg);
+    const grp = describeGroupShort(cfg);
     return h(
       'div',
       { class: 'strategy-meta' },
@@ -130,7 +139,8 @@ export async function show(root, ctx) {
       h('span', { class: 'meta-item', title: 'Cíl ceny' }, icon('target', { size: 13 }), describeTargetShort(cfg)),
       cond ? h('span', { class: 'meta-item', dataset: { meta: 'conditions' }, title: 'Doplňující podmínky' }, icon('filter', { size: 13 }), 'Podmínky: ' + cond) : null,
       sch ? h('span', { class: 'meta-item', dataset: { meta: 'schedule' }, title: 'Časové okno' }, icon('clock', { size: 13 }), 'Platnost: ' + sch) : null,
-      limits ? h('span', { class: 'meta-item', title: 'Limity' }, icon('lock', { size: 13 }), limits) : null
+      limits ? h('span', { class: 'meta-item', title: 'Limity' }, icon('lock', { size: 13 }), limits) : null,
+      grp ? h('span', { class: 'meta-item', dataset: { meta: 'group' }, title: 'Varianty modelu (velikosti, barvy) mají jednu cenu' }, icon('layers', { size: 13 }), grp) : null
     );
   }
 
@@ -244,7 +254,8 @@ export async function show(root, ctx) {
       h('li', null, icon('layers', { size: 13 }), h('span', null, p.segment ? 'Segment „' + p.segment.name + '“' : 'Všechny produkty')),
       h('li', null, icon('target', { size: 13 }), h('span', null, describeTargetShort(cfg))),
       cond ? h('li', null, icon('filter', { size: 13 }), h('span', null, 'Podmínky: ' + cond)) : null,
-      sch ? h('li', null, icon('clock', { size: 13 }), h('span', null, 'Platnost: ' + sch)) : null
+      sch ? h('li', null, icon('clock', { size: 13 }), h('span', null, 'Platnost: ' + sch)) : null,
+      describeGroupShort(cfg) ? h('li', null, icon('layers', { size: 13 }), h('span', null, describeGroupShort(cfg))) : null
     );
   }
 
@@ -306,6 +317,69 @@ export async function show(root, ctx) {
     } catch {
       mount(coverageHost);
     }
+  }
+
+  // ------------------------------------------------ simulace celého přecenění (C2)
+  async function dryRun() {
+    dryBtn.disabled = true;
+    dryBtn.classList.add('is-busy');
+    mount(dryHost, card({ title: 'Simulace celého přecenění', icon: 'eye', body: skeletonBlocks(4, 70) }));
+    let res;
+    try {
+      res = await api.post('/runs', { dry_run: true }, { signal: ctx.signal });
+    } catch (e) {
+      if (!isAbort(e)) mount(dryHost, card({ title: 'Simulace celého přecenění', icon: 'eye', body: errorState(e, () => dryRun()) }));
+      return;
+    } finally {
+      dryBtn.disabled = false;
+      dryBtn.classList.remove('is-busy');
+    }
+    renderDryRun(res || {});
+    dryHost.scrollIntoView?.({ behavior: 'smooth', block: 'start' });
+  }
+
+  function renderDryRun(res) {
+    const stats = res.stats || {};
+    const sample = Array.isArray(res.sample) ? res.sample : [];
+    const names = Object.fromEntries(strategies.map((s) => [String(s.id), s.name]));
+    const rows = sample.map((d, i) => ({ ...d, _key: i }));
+    const table = new DataTable({
+      columns: [
+        {
+          key: 'product', label: 'Produkt', sortKey: 'code', value: (r) => r.product?.code || r.product_id,
+          render: (r) => h('div', { class: 'cell-2' }, h('a', { href: '#/produkty/' + encodeURIComponent(r.product?.id ?? r.product_id), class: 'cell-name', style: 'max-width:240px', title: r.product?.name || '' }, r.product?.name || 'Produkt #' + r.product_id), h('span', { class: 'cell-sub ellipsis', style: 'max-width:240px' }, h('span', { class: 'mono' }, r.product?.code || ''), [r.product?.manufacturer, r.product?.category].filter(Boolean).map((x) => ' · ' + x).join(''))),
+        },
+        { key: 'strategy', label: 'Strategie', hideSm: true, value: (r) => names[String(r.strategy_id)] || '', render: (r) => h('span', { class: 'small ellipsis', style: 'max-width:180px;display:inline-block' }, names[String(r.strategy_id)] || (r.strategy_id != null ? 'Strategie #' + r.strategy_id : '–')) },
+        { key: 'action', label: 'Výsledek', hideLg: true, render: (r) => actionBadge(r) },
+        { key: 'new_price', label: 'Cena', align: 'right', sortable: true, value: (r) => r.new_price, render: (r) => (r.action === 'change' ? priceMove(r.old_price, r.new_price) : h('span', { class: 'num' }, money(r.old_price))) },
+        { key: 'change_pct', label: 'Změna', align: 'right', sortable: true, defaultDesc: true, value: (r) => (r.change_pct == null ? null : Math.abs(r.change_pct)), render: (r) => (r.change_pct != null ? changeEl(r.change_pct) : h('span', { class: 'muted' }, '–')) },
+        { key: 'margin_after', label: 'Marže před → po', align: 'right', hideSm: true, sortable: true, value: (r) => r.margin_after, render: (r) => h('span', { class: 'num' }, h('span', { class: 'muted' }, percent(r.margin_before)), ' → ', h('span', { class: r.margin_after != null && r.margin_after < 0 ? 'chg chg-down' : 'strong' }, percent(r.margin_after))) },
+        { key: 'flags', label: 'Příznaky', render: (r) => flagBadges(r.flags) },
+      ],
+      rowKey: '_key',
+      clientSort: true,
+      expandable: (r) => explainList(r.explain),
+      caption: 'Největší změny simulace přecenění',
+      empty: () => emptyState({ title: 'Přecenění by nezměnilo žádnou cenu', compact: true }),
+    });
+    table.setData(rows);
+    mount(
+      dryHost,
+      card({
+        title: 'Simulace celého přecenění',
+        icon: 'eye',
+        subtitle: 'Všechny aktivní produkty podle aktuálního pořadí zapnutých strategií. Nic se neuložilo a nevznikly žádné návrhy.',
+        dataset: { card: 'dry-run' },
+        actions: [button('Zavřít', { size: 'sm', variant: 'ghost', icon: 'x', onClick: () => mount(dryHost) })],
+        body: h(
+          'div',
+          { class: 'stack' },
+          runStatsView(stats, { simulate: true, strategyNames: names }),
+          h('div', { class: 'row-between' }, h('div', { class: 'form-subtitle', style: 'margin:0' }, 'Největší změny' + (sample.length ? ' (' + int(sample.length) + (Number(stats.changes) > sample.length ? ' z ' + int(stats.changes) : '') + ')' : '')), h('button', { type: 'button', class: 'btn btn-sm btn-primary', onClick: () => ctx.runPricing() }, icon('play', { size: 14 }), h('span', null, 'Spustit přecenění'))),
+          h('div', { class: 'card' }, table.el)
+        ),
+      })
+    );
   }
 
   ctx.onChanged(() => loadList());

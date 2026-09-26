@@ -28,6 +28,8 @@ export function runStatsView(stats, o = {}) {
     o.simulate ? null : kpi({ label: 'Čeká na schválení', value: int(s.pending) }),
     kpi({ label: 'Autom. schváleno', value: int(s.auto_approved) }),
     s.no_strategy ? kpi({ label: 'Bez strategie', value: int(s.no_strategy), tone: 'warning' }) : null,
+    // C2: kontextová simulace strategie – produkty segmentu, které rozhodla strategie dřív v pořadí
+    s.claimed_by_earlier != null ? kpi({ label: 'Zabráno dřívějšími', value: int(s.claimed_by_earlier), sub: 'produkty převezme strategie dřív v pořadí', title: 'Produkty segmentu, o kterých v přecenění rozhodne strategie s vyšší prioritou – do výsledku se nepočítají.' }) : null,
     // contract-1: běh nahrazuje otevřené návrhy (i schválené, neexportované) – manažer musí vidět kolik
     !o.simulate && s.superseded != null
       ? kpi({

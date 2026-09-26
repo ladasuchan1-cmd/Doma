@@ -129,7 +129,9 @@ export async function show(root, ctx) {
       Array.isArray(strategy?.config_errors) && strategy.config_errors.length
         ? callout(h('div', null, h('b', null, 'Uložená konfigurace je neplatná – přecenění strategii přeskakuje:'), h('ul', { class: 'validation-list' }, strategy.config_errors.map((e) => h('li', null, e)))), 'danger')
         : null,
-      summaryText, validationEl, orderEl, h('div', { class: 'sticky-actions' }, saveBtn, simBtn, delBtn), h('p', { class: 'field-help' }, 'Simulace spočítá dopad na aktuálních datech bez uložení a bez vzniku návrhů. Hodnotí strategii samostatně – pořadí strategií ignoruje.'),
+      summaryText, validationEl, orderEl, h('div', { class: 'sticky-actions' }, saveBtn, simBtn, delBtn), h('p', { class: 'field-help' }, isNew
+        ? 'Simulace spočítá dopad na aktuálních datech bez uložení a bez vzniku návrhů. Nová (neuložená) strategie se hodnotí samostatně – pořadí strategií ignoruje.'
+        : 'Simulace spočítá dopad na aktuálních datech bez uložení a bez vzniku návrhů – s neuloženými úpravami, v pořadí s ostatními zapnutými strategiemi (jako přecenění).'),
     ],
     dataset: { card: 'summary' },
   });
@@ -267,8 +269,12 @@ export async function show(root, ctx) {
     mount(simHost, card({ title: 'Simulace', icon: 'eye', body: skeletonBlocks(4, 70) }));
     simHost.scrollIntoView({ behavior: 'smooth', block: 'start' });
     let res;
+    // C2: uložená strategie se simuluje v kontextu celé sady zapnutých strategií (strategy_id + upravená konfigurace)
+    // – produkty, které převezme strategie dřív v pořadí, se nezapočítají. Nová strategie zatím nemá místo v pořadí.
+    const body = { config: model.config, segment_id: model.segment_id, limit: 200 };
+    if (!isNew) body.strategy_id = Number(ctx.params.id);
     try {
-      res = await api.post('/simulate', { config: model.config, segment_id: model.segment_id, limit: 200 }, { signal: ctx.signal });
+      res = await api.post('/simulate', body, { signal: ctx.signal });
     } catch (e) {
       if (!isAbort(e)) mount(simHost, card({ title: 'Simulace', icon: 'eye', body: errorState(e, () => simulate()) }));
       simBtn.disabled = false;
@@ -281,10 +287,25 @@ export async function show(root, ctx) {
     // API může rozhodnutí obohatit o product {code,name} nebo ploché code/name; jinak názvy dohledáme
     const missing = decisions.filter((d) => !d.product && !d.code).map((d) => d.product_id).filter((x) => x != null);
     const products = await resolveProducts([...new Set(missing)]);
-    renderSimulation(res?.stats || {}, decisions, products, Array.isArray(res?.errors) ? res.errors : []);
+    renderSimulation(res?.stats || {}, decisions, products, Array.isArray(res?.errors) ? res.errors : [], res?.context === true);
   }
 
-  function renderSimulation(stats, decisions, products, simErrors = []) {
+  /** Vysvětlení kontextové simulace (C2): počítá s pořadím, produkty dřívějších strategií se nezapočítají. */
+  function contextNote(stats) {
+    const claimed = Number(stats.claimed_by_earlier) || 0;
+    const { list } = preceding();
+    return callout(
+      h(
+        'div',
+        { class: 'stack-sm' },
+        h('span', null, h('b', null, 'Simulace počítá s pořadím strategií jako skutečné přecenění. '), 'Produkty segmentu, které převezme strategie dřív v pořadí' + (list.length ? ' (' : ''), list.slice(0, 4).map((x, i) => [i ? ', ' : '', strategyLink(x)]), list.length > 4 ? ' a další' : '', list.length ? ')' : '', ', se do výsledku nepočítají.', model.enabled ? '' : ' Strategie je vypnutá – simulace ji vložila na její místo v pořadí, jako by byla zapnutá.'),
+        h('span', { class: 'strong', dataset: { role: 'claimed' } }, 'Produkty zabrané dřívějšími strategiemi: ' + int(claimed))
+      ),
+      claimed > 0 && Number(stats.products) === 0 ? 'warning' : 'info'
+    );
+  }
+
+  function renderSimulation(stats, decisions, products, simErrors = [], context = false) {
     let filter = 'change';
     const rows = decisions.map((d, i) => ({ ...d, _key: i, _p: d.product || (d.code ? { code: d.code, name: d.name, manufacturer: d.manufacturer } : products.get(String(d.product_id))) || null }));
     const table = new DataTable({
@@ -315,13 +336,13 @@ export async function show(root, ctx) {
       card({
         title: 'Simulace' + (model.segment_id != null ? ' – segment „' + (segNameOf(model.segment_id) || model.segment_id) + '“' : ' – všechny produkty'),
         icon: 'eye',
-        subtitle: 'Výsledek na aktuálních datech, nic se neuložilo. Strategie hodnocená samostatně (bez ohledu na pořadí). Zobrazeno prvních ' + int(rows.length) + ' rozhodnutí.',
+        subtitle: 'Výsledek na aktuálních datech, nic se neuložilo. ' + (context ? 'Strategie hodnocená v pořadí s ostatními zapnutými strategiemi.' : 'Strategie hodnocená samostatně (bez ohledu na pořadí).') + ' Zobrazeno prvních ' + int(rows.length) + ' rozhodnutí.',
         dataset: { card: 'simulation' },
         body: h(
           'div',
           { class: 'stack' },
           simErrors.length ? callout(h('ul', { class: 'validation-list' }, simErrors.map((e) => h('li', null, typeof e === 'string' ? e : e.message || JSON.stringify(e)))), 'danger') : null,
-          h('div', { dataset: { role: 'simulation-note' } }, simulationNote()),
+          h('div', { dataset: { role: 'simulation-note' } }, context ? contextNote(stats) : simulationNote()),
           runStatsView(stats, { simulate: true }),
           changes.length ? h('div', null, h('div', { class: 'form-subtitle' }, 'Rozložení změn ceny (%)'), histogram(changes, { ariaLabel: 'Histogram změn ceny v procentech' })) : null,
           h('div', { class: 'row-between' }, h('div', { class: 'form-subtitle', style: 'margin:0' }, 'Rozhodnutí'), segmented(SIM_FILTERS, filter, (v) => { filter = v; apply(); }, { label: 'Zobrazit rozhodnutí', class: 'seg-sm' })),

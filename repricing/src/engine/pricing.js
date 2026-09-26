@@ -47,6 +47,8 @@ const FLAG_LABELS = Object.freeze({
   big_change: 'velká změna',
   fallback: 'použit záložní postup',
   rounding_skipped: 'bez zaokrouhlení (mezi limity není cenový bod)',
+  group_aligned: 'sjednoceno ve skupině',
+  group_conflict: 'skupinu nelze sjednotit (limity)',
 });
 
 /** České popisky důvodů (reason) rozhodnutí. */
@@ -68,6 +70,7 @@ const REASON_LABELS = Object.freeze({
   no_cost: 'chybí nákupní cena',
   no_price: 'chybí aktuální cena',
   no_strategy: 'žádná strategie',
+  rejected_before: 'stejná cena byla nedávno zamítnuta',
 });
 
 // ---------------------------------------------------------------------------------------------
@@ -307,6 +310,16 @@ function computePrice(product, offers, strategy, ctx = {}) {
       `Vyřazeno nabídek: ${n} – ${Object.entries(counts)
         .map(([r, c]) => `${EXCLUDE_REASONS[r] || r} (${c})`)
         .join(', ')}`
+    );
+  }
+  if (cfg.competitors.in_stock_only && cfg.competitors.max_delivery_days != null) {
+    // C7: „skladem“ = i nabídky, které dodají do N dní
+    const late = market.offers.filter((o) => o.in_stock === 0 || o.in_stock === false).length;
+    const days = cfg.competitors.max_delivery_days;
+    say(
+      'market',
+      `Dostupnost: kromě nabídek skladem se počítají i nabídky s dodáním do ${formatNum(days)} ${plural(days, 'dne', 'dnů', 'dnů')}` +
+        (late ? ` (${late} ${plural(late, 'nabídka není skladem, ale dodá', 'nabídky nejsou skladem, ale dodají', 'nabídek není skladem, ale dodají')} včas)` : '')
     );
   }
   if (cur != null && d.rank_before != null) say('market', `Naše cena ${fm(cur)} je ${d.rank_before}. v pořadí z ${market.count + 1} prodejců`);

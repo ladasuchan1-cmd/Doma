@@ -46,6 +46,12 @@ const CANONICAL = {
     { key: 'category', label: 'Kategorie', type: 'string' },
     { key: 'supplier', label: 'Dodavatel', type: 'string' },
     { key: 'owner', label: 'Zodpovědná osoba', type: 'string' },
+    {
+      key: 'group_code',
+      label: 'Skupina / model',
+      type: 'code',
+      help: 'Společný kód velikostí / barev jednoho modelu (nadřazený kód). Strategie s volbou „sjednotit ve skupině“ jim dá stejnou cenu.',
+    },
     { key: 'purchase_price', label: 'Nákupní cena (bez DPH)', type: 'number' },
     { key: 'price', label: 'Prodejní cena (s DPH)', type: 'number' },
     { key: 'vat_rate', label: 'Sazba DPH %', type: 'vat' },
@@ -133,6 +139,8 @@ const ALIASES = {
     sales_30: ['sales30', 'sales30d', 'sales30days', 'prodej30', 'prodej30d', 'prodej30dni', 'prodeje30', 'prodeje30d', 'prodeje30dni', 'prodano30', 'prodano30dni', 'sold30', 'sold30d', 'units30', 'prodejzamesic', 'monthlysales'],
     sales_90: ['sales90', 'sales90d', 'sales90days', 'prodej90', 'prodej90d', 'prodej90dni', 'prodeje90', 'prodeje90d', 'prodeje90dni', 'prodano90', 'prodano90dni', 'sold90', 'sold90d', 'units90', 'quarterlysales'],
     active: ['active', 'aktivni', 'isactive', 'enabled', 'zobrazovat', 'visible', 'publikovano', 'published'],
+    // kód modelu / nadřazené karty (velikosti a barvy jednoho kola); `parent.code` = kód rodiče u rozložených variant
+    group_code: ['groupcode', 'model', 'modelcode', 'nadrazenykod', 'parentcode', 'groupid', 'itemgroupid'],
   },
   offers: {
     competitor: [

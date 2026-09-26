@@ -293,6 +293,9 @@ export const FLAG_LABELS = {
   big_manual_change: 'Velká ruční změna',
   manual_carried: 'Přenesená ruční cena',
   previously_rejected: 'Dříve zamítnuto',
+  // skupiny produktů (velikosti / barvy jednoho modelu – strategie config.group.align)
+  group_aligned: 'Sjednoceno ve skupině',
+  group_conflict: 'Skupinu nelze sjednotit (limity)',
 };
 
 export const FLAG_HELP = {
@@ -314,6 +317,8 @@ export const FLAG_HELP = {
   big_manual_change: 'Ruční cena se od výchozí ceny liší víc, než je obvyklé (překlep?) – potvrzeno při uložení.',
   manual_carried: 'Ruční cena se přenesla ze staršího návrhu – nový návrh čeká na schválení.',
   previously_rejected: 'Stejnou cenu někdo v posledních dnech zamítl – návrh se automaticky neschválil.',
+  group_aligned: 'Cena je sjednocená s ostatními variantami stejného modelu (Skupina / model) podle nastavení strategie.',
+  group_conflict: 'Varianty modelu nejde sjednotit – limity variant (min. marže, MOC, min./max. cena) se nepřekrývají. Každá varianta má svou cenu.',
 };
 
 export const FLAG_SEVERITY = {
@@ -335,6 +340,8 @@ export const FLAG_SEVERITY = {
   big_manual_change: 'warning',
   manual_carried: 'info',
   previously_rejected: 'warning',
+  group_aligned: 'info',
+  group_conflict: 'warning',
 };
 
 export function flagLabel(f) {
@@ -363,6 +370,7 @@ export const REASON_LABELS = {
   invalid_config: 'Chybná konfigurace strategie',
   invalid_target: 'Neplatná cílová cena',
   invalid_vat: 'Neplatná sazba DPH',
+  rejected_before: 'Stejná cena byla nedávno zamítnuta',
   // vyhodnocení použitelnosti strategie (tried[].code, simulace)
   not_applicable: 'Strategie se neuplatní',
   conditions: 'Nesplňuje podmínky strategie',
@@ -512,6 +520,15 @@ export const STEP_LABELS = {
   threshold: 'Práh změny',
   approval: 'Schválení',
   result: 'Výsledek',
+  // sjednocení cen ve skupině (velikosti / barvy) a paměť zamítnutých cen
+  group: 'Skupina',
+  group_align: 'Skupina',
+  group_aligned: 'Skupina',
+  group_conflict: 'Skupina',
+  rejected: 'Dříve zamítnuto',
+  rejected_before: 'Dříve zamítnuto',
+  reject_memory: 'Dříve zamítnuto',
+  memory: 'Dříve zamítnuto',
 };
 
 export function stepLabel(s) {
@@ -525,6 +542,7 @@ const DETAIL_KEYS = {
   status: 'stav', error: 'chyba', price_updates: 'aktualizace cen', update_current_price: 'přepsat aktuální cenu', ip: 'IP',
   changes: 'změny', import_id: 'import', source_id: 'zdroj', product_id: 'produkt', stats: 'statistika', skipped: 'přeskočeno',
   duration_ms: 'trvání (ms)', unknown_codes: 'neznámé kódy', marked: 'označeno', url: 'URL', key: 'klíč', ids: 'ID',
+  skipped_unknown: 'přeskočeno (neznámý kód)', held: 'zadrženo', mismatched: 'nesouhlasí cena', redownload: 'znovu staženo',
 };
 const DETAIL_VALUES = { approved: 'schválené', all: 'vše', true: 'ano', false: 'ne' };
 

@@ -2,7 +2,9 @@
 // API: přihlášení, odhlášení, informace o uživateli, změna hesla, API tokeny a health check.
 //
 //   GET    /api/v1/health             public  → {ok, version, time}
-//   POST   /api/v1/auth/login         public  {password} → {ok: true} + cookie ct_session (429 po 10 chybách / 15 min / IP)
+//   POST   /api/v1/auth/login         public  {password, name?} → {ok: true} + cookie ct_session (429 po 10 chybách / 15 min / IP)
+//                                             name = volitelné jméno (1–64 znaků) – uloží se do session a použije jako
+//                                             ctx.user (decided_by návrhů, aktér v auditu); jen označení, ne ověření identity
 //   POST   /api/v1/auth/logout        public  → {ok: true} + smazání cookie
 //   GET    /api/v1/auth/me            any     → {user, scopes, via, token?, password_from_env}
 //   POST   /api/v1/settings/password  admin   {current, new} → {ok: true} (+ nová cookie, staré session neplatí)
@@ -70,6 +72,9 @@ function register(router, deps = {}) {
       const body = bodyObject(ctx);
       const password = body.password;
       if (typeof password !== 'string' || password === '') throw new HttpError(400, 'Zadejte heslo.');
+      // jméno je jen označení (kdo schválil / změnil) – heslo je společné, identitu neověřuje
+      const who = auth.normalizeUserName(body.name);
+      if (who.error) throw new HttpError(400, who.error, { field: 'name' });
       const ok = await auth.verifyPassword(ctx.db, ctx.config, password);
       if (!ok) {
         const remaining = limiter.fail(ctx.ip, ctx.now);
@@ -81,8 +86,8 @@ function register(router, deps = {}) {
         throw new HttpError(401, 'Nesprávné heslo.', { remaining_attempts: remaining });
       }
       limiter.reset(ctx.ip);
-      auth.issueSession(ctx, { now: ctx.now });
-      ctx.user = auth.SESSION_USER;
+      const issued = auth.issueSession(ctx, { now: ctx.now, user: who.name });
+      ctx.user = issued.user;
       try {
         ctx.audit({ action: 'auth.login', detail: { ip: ctx.ip } });
       } catch {
@@ -134,7 +139,7 @@ function register(router, deps = {}) {
       }
       auth.setPassword(ctx.db, next, ctx.config);
       // všechny session jsou teď neplatné – aktuálnímu uživateli (session) vydáme novou
-      if (ctx.via === 'session') auth.issueSession(ctx, { now: ctx.now });
+      if (ctx.via === 'session') auth.issueSession(ctx, { now: ctx.now, user: ctx.user });
       ctx.audit({ action: 'auth.password_change', entity: 'settings' });
       return { ok: true };
     },

@@ -256,7 +256,7 @@ function validateOptions(o, kind, errors) {
     if (!Number.isFinite(n) || n < 0) errors.push({ field: `options.${key}`, message: 'options.max_age_days musí být nezáporné číslo (dny).' });
     else o[key] = n;
   }
-  for (const key of ['deactivate_missing', 'deactivateMissing', 'force_deactivate', 'forceDeactivate']) {
+  for (const key of ['deactivate_missing', 'deactivateMissing', 'force_deactivate', 'forceDeactivate', 'create_missing', 'createMissing']) {
     if (o[key] === undefined) continue;
     const v = o[key];
     if (typeof v === 'boolean') continue;

@@ -20,6 +20,9 @@
 //    (superseded) – exportovaly by cenu spočítanou ze staré báze (money-2/3/4). Výjimka: nová cena = cena návrhu.
 //  - deactivate_missing, který by vypnul víc než polovinu aktivních produktů, se neprovede bez force_deactivate
 //    (ochrana proti chybně rozpoznanému souboru – data-5)
+//  - createMissing = false („jen aktualizovat“, např. metriky z Disiva: kód + imprese): neznámé kódy se nezakládají,
+//    jen se spočítají (stats.skipped_unknown) a prvních 50 se vrátí (stats.unknown_codes)
+//  - group_code = skupina / model (velikosti a barvy jednoho kola) – strategie s group.align je sjednotí
 
 const { tx, nowIso, getSettings, parseJson } = require('../db');
 const { codeKey, eanKey, mpnKey } = require('../util/keys');
@@ -36,8 +39,10 @@ const BOOL_FIELDS = ['active', 'locked'];
 // sloupce porovnávané pro rozlišení updated / unchanged
 const COMPARE = [
   'code', 'ean', 'ean_key', 'mpn', 'mpn_key', 'name', 'manufacturer', 'category', 'supplier', 'owner', 'purchase_price', 'price', 'vat_rate', 'msrp', 'stock',
-  'sales_30', 'sales_90', 'active', 'locked', 'locked_until', 'min_price', 'max_price', 'note',
+  'sales_30', 'sales_90', 'active', 'locked', 'locked_until', 'min_price', 'max_price', 'note', 'group_code',
 ];
+// stats.unknown_codes – nejvýše tolik neznámých kódů (import „jen aktualizovat“)
+const MAX_UNKNOWN_CODES = 50;
 const LABELS = {
   purchase_price: 'Nákupní cena', price: 'Prodejní cena', msrp: 'MOC', stock: 'Sklad', sales_30: 'Prodeje 30 dní', sales_90: 'Prodeje 90 dní',
   min_price: 'Minimální cena', max_price: 'Maximální cena', vat_rate: 'Sazba DPH', active: 'Aktivní', locked: 'Zamčeno', locked_until: 'Zamčeno do',
@@ -79,6 +84,7 @@ function normalizeRecord(rec) {
   if (rec.note !== undefined) set.note = normalizeText(rec.note, false);
   if (rec.ean !== undefined) set.ean = normalizeCode(rec.ean);
   if (rec.mpn !== undefined) set.mpn = normalizeCode(rec.mpn);
+  if (rec.group_code !== undefined) set.group_code = normalizeCode(rec.group_code);
   for (const f of NUMBER_FIELDS) {
     if (rec[f] === undefined) continue;
     const n = toNum(rec[f]);
@@ -111,16 +117,22 @@ function normalizeRecord(rec) {
  * Importuje katalog.
  * @param {import('node:sqlite').DatabaseSync} db
  * @param {object[]} records kanonické záznamy (applyMapping nebo přímo z kódu)
- * @param {{deactivateMissing?: boolean, forceDeactivate?: boolean, sourceId?: number|null, now?: Date|string, importId?: number|null,
- *          rowNumbers?: number[], onError?: Function}} [opts]
- *   rowNumbers = čísla řádků zdroje pro hlášení chyb (výchozí index + 1); onError = interní (runImport)
+ * @param {{deactivateMissing?: boolean, forceDeactivate?: boolean, createMissing?: boolean, sourceId?: number|null, now?: Date|string,
+ *          importId?: number|null, rowNumbers?: number[], onError?: Function}} [opts]
+ *   rowNumbers = čísla řádků zdroje pro hlášení chyb (výchozí index + 1); onError = interní (runImport);
+ *   createMissing = false → neznámé kódy se nezakládají (stats.skipped_unknown, stats.unknown_codes – jen v tomto režimu)
  * @returns {{received: number, created: number, updated: number, unchanged: number, deactivated: number, superseded: number,
- *   errors: {row: number|null, message: string}[]}}
+ *   errors: {row: number|null, message: string}[], skipped_unknown?: number, unknown_codes?: string[]}}
  */
 function importProducts(db, records, opts = {}) {
   const list = Array.isArray(records) ? records : [];
   const now = nowIso(opts.now);
   const stats = { received: list.length, created: 0, updated: 0, unchanged: 0, deactivated: 0, superseded: 0, errors: [] };
+  const createMissing = opts.createMissing !== false;
+  if (!createMissing) {
+    stats.skipped_unknown = 0;
+    stats.unknown_codes = [];
+  }
   const errs = errorCollector(stats.errors, opts.onError);
   const settings = getSettings(db);
   const vatDefault = Number.isFinite(Number(settings.vat_rate_default)) && settings.vat_rate_default !== null ? Number(settings.vat_rate_default) : 21;
@@ -134,17 +146,18 @@ function importProducts(db, records, opts = {}) {
 
     const insert = db.prepare(
       `INSERT INTO products (code, code_key, ean, ean_key, mpn, mpn_key, name, manufacturer, category, supplier, owner, purchase_price, price,
-         vat_rate, msrp, stock, sales_30, sales_90, attrs, active, locked, locked_until, min_price, max_price, note, price_changed_at, created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+         vat_rate, msrp, stock, sales_30, sales_90, attrs, active, locked, locked_until, min_price, max_price, note, group_code, price_changed_at, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
     );
     const update = db.prepare(
       `UPDATE products SET code = ?, ean = ?, ean_key = ?, mpn = ?, mpn_key = ?, name = ?, manufacturer = ?, category = ?, supplier = ?, owner = ?,
          purchase_price = ?, price = ?, vat_rate = ?, msrp = ?, stock = ?, sales_30 = ?, sales_90 = ?, attrs = ?, active = ?, locked = ?, locked_until = ?,
-         min_price = ?, max_price = ?, note = ?, price_changed_at = ?, updated_at = ?
+         min_price = ?, max_price = ?, note = ?, group_code = ?, price_changed_at = ?, updated_at = ?
        WHERE id = ?`
     );
     const history = db.prepare("INSERT INTO price_history (product_id, price, source, ref_id, at) VALUES (?, ?, 'import', ?, ?)");
     const seen = new Set();
+    const unknownSeen = new Set(); // neznámé kódy (createMissing = false)
     const outcome = new Map(); // id → created | updated | unchanged (kvůli duplicitním řádkům)
     const orig = new Map(); // id → řádek produktu PŘED importem (historie cen a zneplatnění návrhů se řídí výsledkem)
 
@@ -178,15 +191,26 @@ function importProducts(db, records, opts = {}) {
         errs.add(row, 'Chybí kód produktu');
         continue;
       }
+      const cur = byKey.get(n.key);
+      if (!cur && !createMissing) {
+        // import „jen aktualizovat“ – neznámý kód se nezakládá (duplicitní řádek téhož kódu se počítá jednou);
+        // varování k polím takového řádku se nehlásí – řádek se vůbec nezpracovává
+        if (!unknownSeen.has(n.key)) {
+          unknownSeen.add(n.key);
+          stats.skipped_unknown++;
+          if (stats.unknown_codes.length < MAX_UNKNOWN_CODES) stats.unknown_codes.push(n.code);
+        }
+        continue;
+      }
       for (const w of n.warnings) errs.add(row, w, { warning: true });
       dupWarn(n.key, row);
-      const cur = byKey.get(n.key);
       const next = cur
         ? { ...cur }
         : {
             id: null, code: n.code, code_key: n.key, ean: null, ean_key: null, mpn: null, mpn_key: null, name: null, manufacturer: null, category: null,
             supplier: null, owner: null, purchase_price: null, price: null, vat_rate: null, msrp: null, stock: null, sales_30: null, sales_90: null,
-            attrs: '{}', active: 1, locked: 0, locked_until: null, min_price: null, max_price: null, note: null, price_changed_at: null, created_at: now, updated_at: now,
+            attrs: '{}', active: 1, locked: 0, locked_until: null, min_price: null, max_price: null, note: null, group_code: null, price_changed_at: null,
+            created_at: now, updated_at: now,
           };
       next.code = n.code;
       for (const [k, v] of Object.entries(n.set)) next[k] = v;
@@ -222,7 +246,7 @@ function importProducts(db, records, opts = {}) {
         const res = insert.run(
           next.code, next.code_key, next.ean, next.ean_key, next.mpn, next.mpn_key, next.name, next.manufacturer, next.category, next.supplier, next.owner,
           next.purchase_price, next.price, next.vat_rate, next.msrp, next.stock, next.sales_30, next.sales_90, next.attrs, next.active, next.locked,
-          next.locked_until, next.min_price, next.max_price, next.note, null, now, now
+          next.locked_until, next.min_price, next.max_price, next.note, next.group_code ?? null, null, now, now
         );
         next.id = Number(res.lastInsertRowid);
         stats.created++;
@@ -240,7 +264,7 @@ function importProducts(db, records, opts = {}) {
           update.run(
             next.code, next.ean, next.ean_key, next.mpn, next.mpn_key, next.name, next.manufacturer, next.category, next.supplier, next.owner,
             next.purchase_price, next.price, next.vat_rate, next.msrp, next.stock, next.sales_30, next.sales_90, next.attrs, next.active, next.locked,
-            next.locked_until, next.min_price, next.max_price, next.note, next.price_changed_at, now, next.id
+            next.locked_until, next.min_price, next.max_price, next.note, next.group_code ?? null, next.price_changed_at, now, next.id
           );
           // duplicitní řádek téhož kódu v jednom importu se počítá jen jednou (unchanged → updated při změně)
           const prev = outcome.get(next.id);

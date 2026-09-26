@@ -243,6 +243,7 @@ const FIELDS = Object.freeze([
   f('category', 'Kategorie', 'string', G_PRODUCT),
   f('supplier', 'Dodavatel', 'string', G_PRODUCT),
   f('owner', 'Zodpovědná osoba', 'string', G_PRODUCT),
+  f('group_code', 'Skupina / model', 'string', G_PRODUCT),
   f('active', 'Aktivní', 'boolean', G_PRODUCT),
   f('locked', 'Zamčeno (příznak)', 'boolean', G_PRODUCT),
   f('lock_active', 'Zámek platí', 'boolean', G_PRODUCT),

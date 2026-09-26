@@ -3,21 +3,27 @@
 //  - loadContext: nastavení, segmenty (zkompilované filtry), zapnuté strategie (seřazené), konkurenti
 //  - evaluateProduct: výběr strategie (segment, podmínky, časové okno, propadnutí „next“) + computePrice
 //  - runPricing: hromadné načtení, vyhodnocení všech aktivních produktů, zápis běhu a návrhů v jedné transakci
-//  - simulate: „co kdyby“ pro jednu ad-hoc strategii bez zápisu
+//  - simulate: „co kdyby“ pro jednu ad-hoc strategii bez zápisu, nebo (strategy_id) upravená strategie v kontextu
+//    celé sady zapnutých strategií
 //  - explainProduct / latestProposal: detail produktu v UI
+//  - cenové skupiny (groups.js) a paměť zamítnutí (reject_memory_days) se uplatní po vyhodnocení jednotlivých produktů
 
 const { tx, nowIso, parseJson, json, getSettings } = require('../db');
 const { net, round } = require('../util/num');
 const { compileFilter, isEmptyFilter } = require('./filter');
 const { productView, scheduleActive, describeSchedule, toDate } = require('./metrics');
-const { computePrice } = require('./pricing');
+const { computePrice, formatMoney } = require('./pricing');
 const { normalizeConfig } = require('./presets');
 const { MANUAL_FLAGS, CENT } = require('../util/proposals');
+const { alignGroups, groupKey } = require('./groups');
 
 // Jak dlouho si běh pamatuje zamítnutí: stejnou (±0,5 %) cenu, kterou člověk v posledních N dnech zamítl, znovu
 // automaticky neschválí (vznikne jako čekající s příznakem previously_rejected).
 const REJECT_MEMORY_DAYS = 7;
 const REJECT_SAME_PCT = 0.5;
+// Paměť zamítnutí (nastavení reject_memory_days, C1): nejnovější zamítnutý návrh produktu z posledních N dní se stejnou
+// cenou (rozdíl < 0,5 Kč) → návrh se znovu nevytváří, rozhodnutí je „beze změny“ s důvodem rejected_before.
+const REJECT_SAME_ABS = 0.5;
 
 const MISSING_TEXT = {
   no_market: 'chybí trh (málo použitelných nabídek konkurence)',
@@ -331,6 +337,104 @@ function addDecision(stats, decision, product, settings, strategy) {
 }
 
 // ---------------------------------------------------------------------------------------------
+// Paměť zamítnutí (C1) a cenové skupiny (C3)
+
+function toDays(v) {
+  const n = Number(v);
+  return Number.isFinite(n) && n > 0 ? n : 0;
+}
+
+/**
+ * Nejnovější zamítnutý návrh (podle decided_at) z posledních `days` dní pro každý produkt.
+ * @returns {Map<number, {price: number|null, decided_at: string}>}
+ */
+function loadRejectMemory(db, productIds, now, days) {
+  const out = new Map();
+  if (!(days > 0) || !productIds.length) return out;
+  const since = nowIso(new Date(toDate(now).getTime() - days * 86400000));
+  const stmt = db.prepare(
+    `SELECT product_id, COALESCE(manual_price, new_price) AS price, decided_at FROM proposals
+     WHERE status = 'rejected' AND decided_at >= ? AND product_id IN (SELECT value FROM json_each(?))
+     ORDER BY decided_at, id`
+  );
+  for (let i = 0; i < productIds.length; i += 20000) {
+    for (const r of stmt.iterate(since, JSON.stringify(productIds.slice(i, i + 20000)))) {
+      out.set(r.product_id, { price: r.price, decided_at: r.decided_at }); // seřazeno → poslední = nejnovější
+    }
+  }
+  return out;
+}
+
+function formatDateCs(iso) {
+  const t = Date.parse(iso);
+  if (!Number.isFinite(t)) return String(iso);
+  return new Date(t).toLocaleDateString('cs-CZ', { timeZone: 'Europe/Prague', day: 'numeric', month: 'numeric', year: 'numeric' });
+}
+
+/**
+ * Změny na cenu, kterou člověk nedávno zamítl, převede na „beze změny“ (reason rejected_before). Mutuje rozhodnutí.
+ * @param {Array<{product, decision}>} items
+ * @param {Map} memory výsledek loadRejectMemory
+ * @param {number} days
+ * @returns {number} počet převedených rozhodnutí
+ */
+function applyRejectMemory(items, memory, days) {
+  if (!memory.size) return 0;
+  let n = 0;
+  for (const it of items) {
+    const d = it.decision;
+    if (!d || d.action !== 'change' || d.new_price == null) continue;
+    const r = memory.get(it.product.id);
+    if (!r || r.price == null || Math.abs(r.price - d.new_price) >= REJECT_SAME_ABS) continue;
+    const price = d.new_price;
+    d.action = 'no_change';
+    d.reason = 'rejected_before';
+    d.new_price = d.old_price;
+    d.rank_after = d.rank_before;
+    d.margin_after = d.margin_before;
+    d.change_abs = d.old_price != null ? 0 : null;
+    d.change_pct = d.old_price != null ? 0 : null;
+    d.auto_approve = false;
+    d.flags = (d.flags || []).filter((f) => f !== 'below_cost' && f !== 'big_change');
+    d.explain = (d.explain || []).filter((x) => x.step !== 'approval');
+    d.explain.push({
+      step: 'rejected',
+      text: `Stejnou cenu ${formatMoney(price)} někdo ${formatDateCs(r.decided_at)} zamítl (paměť zamítnutí ${days} ${days === 1 ? 'den' : days < 5 ? 'dny' : 'dní'}) → návrh se znovu nevytváří, cena zůstává ${formatMoney(d.old_price)}`,
+    });
+    n++;
+  }
+  return n;
+}
+
+/** Sjednocuje některá strategie ceny ve skupinách? */
+function anyGroupAlign(strategies) {
+  return (strategies || []).some((st) => st.config && st.config.group && st.config.group.align && st.config.group.align !== 'off');
+}
+
+/**
+ * Doplní k vybraným produktům aktivní členy jejich cenových skupin (cena člena závisí na ostatních – přecenění
+ * jedné velikosti musí vidět celou skupinu, jinak by se skupina rozjela).
+ * @returns {number[]}
+ */
+function withGroupMembers(db, productIds) {
+  const ids = [...new Set(productIds.map(Number).filter(Number.isInteger))];
+  const keys = new Set();
+  for (const r of db.prepare('SELECT group_code FROM products WHERE group_code IS NOT NULL AND id IN (SELECT value FROM json_each(?))').all(JSON.stringify(ids))) {
+    const k = groupKey(r);
+    if (k) keys.add(k);
+  }
+  if (!keys.size) return ids;
+  const set = new Set(ids);
+  for (const r of db.prepare('SELECT id, group_code FROM products WHERE active = 1 AND group_code IS NOT NULL').iterate()) {
+    if (!set.has(r.id) && keys.has(groupKey(r))) {
+      set.add(r.id);
+      ids.push(r.id);
+    }
+  }
+  return ids;
+}
+
+// ---------------------------------------------------------------------------------------------
 // Běh přecenění
 
 const INSERT_PROPOSAL = `INSERT INTO proposals (run_id, product_id, strategy_id, segment_id, old_price, new_price, target_price,
@@ -360,19 +464,27 @@ function runPricing(db, opts = {}) {
   const evaluate = () => {
     let t = performance.now();
     const ctx = loadContext(db, { now });
-    const products = loadProducts(db, { productIds });
-    const offers = loadOffers(db, productIds);
+    // výběr produktů se rozšíří o členy jejich cenových skupin (jen když některá strategie ceny ve skupinách sjednocuje)
+    const ids = productIds != null && anyGroupAlign(ctx.strategies) ? withGroupMembers(db, productIds) : productIds;
+    const products = loadProducts(db, { productIds: ids });
+    const offers = loadOffers(db, ids);
     timing.load = Math.round(performance.now() - t);
     t = performance.now();
     const stats = emptyStats();
     const results = [];
     for (const p of products) {
       const res = evaluateProduct(ctx, p, offers.get(p.id) || []);
+      results.push({ product: p, decision: res.decision, strategy: res.strategy, fell: res.tried.some((x) => x.result === 'fallthrough') });
+    }
+    // cenové skupiny (C3) a paměť zamítnutí (C1) – až po vyhodnocení všech produktů
+    stats.groups = alignGroups(results, { settings: ctx.settings });
+    const days = toDays(ctx.settings.reject_memory_days);
+    applyRejectMemory(results, loadRejectMemory(db, products.map((p) => p.id), now, days), days); // → no_change_reasons.rejected_before
+    for (const r of results) {
       stats.products += 1;
-      if (res.tried.some((t) => t.result === 'fallthrough')) stats.fallthrough += 1;
-      if (!res.decision) stats.no_strategy += 1;
-      else addDecision(stats, res.decision, p, ctx.settings, res.strategy);
-      results.push({ product: p, decision: res.decision });
+      if (r.fell) stats.fallthrough += 1;
+      if (!r.decision) stats.no_strategy += 1;
+      else addDecision(stats, r.decision, r.product, ctx.settings, r.strategy);
     }
     stats.margin_impact_abs = round(stats.margin_impact_abs, 2);
     timing.evaluate = Math.round(performance.now() - t);
@@ -568,49 +680,8 @@ function runPricing(db, opts = {}) {
 // ---------------------------------------------------------------------------------------------
 // Simulace
 
-/**
- * Simulace ad-hoc strategie nad jejím segmentem (ostatní strategie se ignorují), bez zápisu.
- * @param {import('node:sqlite').DatabaseSync} db
- * @param {{config: object, segment_id?: number|null, filter?: object|null, limit?: number, now?: Date|string}} opts
- * @returns {{stats: object, decisions: object[], truncated: {changes: boolean, skips: boolean, changes_total: number,
- *   skips_total: number}, errors: string[]}} decisions = nejvýše `limit` změn + nejvýše `limit` přeskočených
- */
-function simulate(db, opts = {}) {
-  const now = toDate(opts.now);
-  const limit = Math.max(0, Math.min(5000, Number.isFinite(Number(opts.limit)) ? Math.floor(Number(opts.limit)) : 200));
-  const stats = { ...emptyStats(), avg_change_pct: null, avg_margin_before: null, avg_margin_after: null };
-  const errors = [];
-
-  const strategy = prepareStrategy({ id: null, name: opts.name || 'Simulace', segment_id: null, config: opts.config });
-  errors.push(...strategy.errors);
-
-  let scope = null;
-  let scopeName = null;
-  if (opts.segment_id != null && opts.segment_id !== '') {
-    const row = db.prepare('SELECT id, name, filter FROM segments WHERE id = ?').get(Number(opts.segment_id));
-    if (!row) errors.push(`Segment ${opts.segment_id} neexistuje`);
-    else {
-      const seg = compileSegment(row);
-      if (seg.error) errors.push(`Segment „${seg.name}“: ${seg.error}`);
-      scope = seg.match;
-      scopeName = seg.name;
-    }
-  } else if (opts.filter != null && !isEmptyFilter(opts.filter)) {
-    try {
-      scope = compileFilter(opts.filter);
-    } catch (e) {
-      errors.push(e.message);
-    }
-  }
-  if (errors.length) return { stats, decisions: [], errors };
-
-  // Rozsah simulace = pseudo-segment; strategie se tak vyhodnotí jen pro produkty v rozsahu.
-  const SCOPE_ID = -1;
-  const scopeSeg = { id: SCOPE_ID, name: scopeName || 'Všechny produkty', filter: null, match: scope || (() => true), error: null };
-  strategy.segment_id = SCOPE_ID;
-  const ctx = { now, settings: getSettings(db), segments: [scopeSeg], segmentById: new Map([[SCOPE_ID, scopeSeg]]), strategies: [strategy] };
-  const products = loadProducts(db);
-  const offers = loadOffers(db);
+/** Souhrn rozhodnutí simulace: statistiky + seznam změn a přeskočených (každé do `limit`). */
+function reportDecisions(entries, stats, limit, settings, withSegment) {
   const changes = [];
   const skips = [];
   let changesTotal = 0;
@@ -620,24 +691,9 @@ function simulate(db, opts = {}) {
   let cntMb = 0;
   let sumMa = 0;
   let cntMa = 0;
-  for (const p of products) {
-    const list = offers.get(p.id) || [];
-    const res = evaluateProduct(ctx, p, list);
-    if (!res.segmentIds.includes(SCOPE_ID)) continue;
-    stats.products += 1;
-    let decision = res.decision;
-    if (!decision) {
-      const t = res.tried[0];
-      if (t && t.result === 'fallthrough' && res.lastFallthrough) {
-        decision = res.lastFallthrough;
-        stats.fallthrough += 1;
-      } else {
-        stats.skipped[t ? t.code : 'not_applicable'] = (stats.skipped[t ? t.code : 'not_applicable'] || 0) + 1;
-        continue;
-      }
-    }
-    addDecision(stats, decision, p, ctx.settings, null);
-    const withProduct = { ...decision, segment_id: opts.segment_id != null && opts.segment_id !== '' ? Number(opts.segment_id) : null, code: p.code, name: p.name, manufacturer: p.manufacturer };
+  for (const { product: p, decision } of entries) {
+    addDecision(stats, decision, p, settings, null);
+    const withProduct = { ...decision, ...(withSegment !== undefined ? { segment_id: withSegment } : {}), code: p.code, name: p.name, manufacturer: p.manufacturer };
     if (decision.action === 'change') {
       if (decision.change_pct != null) sumPct += decision.change_pct;
       if (decision.margin_before != null) {
@@ -660,16 +716,158 @@ function simulate(db, opts = {}) {
   stats.avg_margin_before = cntMb ? round(sumMb / cntMb, 2) : null;
   stats.avg_margin_after = cntMa ? round(sumMa / cntMa, 2) : null;
   stats.margin_impact_abs = round(stats.margin_impact_abs, 2);
-  stats.segment = scopeName;
   delete stats.by_strategy;
   // Změny i přeskočené mají každé vlastní limit – dřív se přeskočené při ≥ limit změnách celé odřízly a filtr
   // „Přeskočené“ v UI hlásil „nic se nepřeskočilo“, přestože statistika ukazovala desítky (contract-6).
   return {
-    stats,
     decisions: [...changes, ...skips],
     truncated: { changes: changesTotal > changes.length, skips: skipsTotal > skips.length, changes_total: changesTotal, skips_total: skipsTotal },
-    errors,
   };
+}
+
+/**
+ * Simulace strategie bez zápisu.
+ *  - bez `strategy_id` (context: false): ad-hoc strategie nad svým rozsahem (segment_id / filter), ostatní strategie
+ *    se ignorují;
+ *  - se `strategy_id` (context: true, C2): vyhodnotí se CELÁ sada zapnutých strategií v pořadí priority, v níž má
+ *    zvolená strategie nahrazený config (a segment_id, je-li zadán). Vypnutá strategie se vloží na místo své priority
+ *    (případně `priority`). Hlásí jen produkty, o kterých rozhodla zvolená strategie; stats.claimed_by_earlier = produkty
+ *    jejího segmentu, o kterých rozhodla dřívější strategie, stats.fallthrough = produkty, u kterých strategii chyběl
+ *    základ ceny (rozhodla pozdější), stats.skipped.conditions / schedule = nesplněné podmínky / mimo časové okno.
+ * Cenové skupiny (group.align) se v obou režimech sjednotí stejně jako při přecenění.
+ * @param {import('node:sqlite').DatabaseSync} db
+ * @param {{config?: object, segment_id?: number|null, filter?: object|null, limit?: number, now?: Date|string, name?: string,
+ *   strategy_id?: number|null, priority?: number|null}} opts
+ * @returns {{stats: object, decisions: object[], truncated: {changes: boolean, skips: boolean, changes_total: number,
+ *   skips_total: number}, errors: string[], context: boolean}} decisions = nejvýše `limit` změn + nejvýše `limit` přeskočených
+ */
+function simulate(db, opts = {}) {
+  const now = toDate(opts.now);
+  const limit = Math.max(0, Math.min(5000, Number.isFinite(Number(opts.limit)) ? Math.floor(Number(opts.limit)) : 200));
+  const stats = { ...emptyStats(), avg_change_pct: null, avg_margin_before: null, avg_margin_after: null };
+  const errors = [];
+  if (opts.strategy_id != null && opts.strategy_id !== '') return simulateInContext(db, opts, { now, limit, stats, errors });
+
+  const strategy = prepareStrategy({ id: null, name: opts.name || 'Simulace', segment_id: null, config: opts.config });
+  errors.push(...strategy.errors);
+
+  let scope = null;
+  let scopeName = null;
+  if (opts.segment_id != null && opts.segment_id !== '') {
+    const row = db.prepare('SELECT id, name, filter FROM segments WHERE id = ?').get(Number(opts.segment_id));
+    if (!row) errors.push(`Segment ${opts.segment_id} neexistuje`);
+    else {
+      const seg = compileSegment(row);
+      if (seg.error) errors.push(`Segment „${seg.name}“: ${seg.error}`);
+      scope = seg.match;
+      scopeName = seg.name;
+    }
+  } else if (opts.filter != null && !isEmptyFilter(opts.filter)) {
+    try {
+      scope = compileFilter(opts.filter);
+    } catch (e) {
+      errors.push(e.message);
+    }
+  }
+  if (errors.length) return { stats, decisions: [], errors, context: false };
+
+  // Rozsah simulace = pseudo-segment; strategie se tak vyhodnotí jen pro produkty v rozsahu.
+  const SCOPE_ID = -1;
+  const scopeSeg = { id: SCOPE_ID, name: scopeName || 'Všechny produkty', filter: null, match: scope || (() => true), error: null };
+  strategy.segment_id = SCOPE_ID;
+  const ctx = { now, settings: getSettings(db), segments: [scopeSeg], segmentById: new Map([[SCOPE_ID, scopeSeg]]), strategies: [strategy] };
+  const products = loadProducts(db);
+  const offers = loadOffers(db);
+  const entries = [];
+  for (const p of products) {
+    const list = offers.get(p.id) || [];
+    const res = evaluateProduct(ctx, p, list);
+    if (!res.segmentIds.includes(SCOPE_ID)) continue;
+    stats.products += 1;
+    let decision = res.decision;
+    if (!decision) {
+      const t = res.tried[0];
+      if (t && t.result === 'fallthrough' && res.lastFallthrough) {
+        decision = res.lastFallthrough;
+        stats.fallthrough += 1;
+      } else {
+        stats.skipped[t ? t.code : 'not_applicable'] = (stats.skipped[t ? t.code : 'not_applicable'] || 0) + 1;
+        continue;
+      }
+    }
+    entries.push({ product: p, decision, strategy: res.strategy });
+  }
+  stats.groups = alignGroups(entries, { settings: ctx.settings });
+  const rep = reportDecisions(entries, stats, limit, ctx.settings, opts.segment_id != null && opts.segment_id !== '' ? Number(opts.segment_id) : null);
+  stats.segment = scopeName;
+  return { stats, decisions: rep.decisions, truncated: rep.truncated, errors, context: false };
+}
+
+/** Simulace upravené strategie v kontextu celé sady zapnutých strategií (viz simulate). */
+function simulateInContext(db, opts, { now, limit, stats, errors }) {
+  const id = Number(opts.strategy_id);
+  const row = Number.isSafeInteger(id) && id > 0 ? db.prepare('SELECT id, name, description, segment_id, priority, enabled, config FROM strategies WHERE id = ?').get(id) : null;
+  if (!row) return { stats, decisions: [], errors: [`Strategie ${opts.strategy_id} neexistuje`], context: true };
+  const ctx = loadContext(db, { now });
+  const segmentId = opts.segment_id !== undefined ? (opts.segment_id === null || opts.segment_id === '' ? null : Number(opts.segment_id)) : row.segment_id ?? null;
+  if (segmentId != null) {
+    const seg = ctx.segmentById.get(segmentId);
+    if (!seg) errors.push(`Segment ${segmentId} neexistuje`);
+    else if (seg.error) errors.push(`Segment „${seg.name}“: ${seg.error}`);
+  }
+  const priority = opts.priority != null && opts.priority !== '' && Number.isFinite(Number(opts.priority)) ? Number(opts.priority) : row.priority;
+  const st = prepareStrategy({
+    id: row.id,
+    name: opts.name || row.name,
+    description: row.description,
+    segment_id: segmentId,
+    priority,
+    enabled: 1,
+    config: opts.config !== undefined && opts.config !== null ? opts.config : row.config,
+  });
+  errors.push(...st.errors);
+  if (errors.length) return { stats, decisions: [], errors, context: true };
+
+  // nahradit / vložit strategii na místo podle (priority, id)
+  const list = ctx.strategies.filter((x) => x.id !== row.id);
+  let at = list.findIndex((x) => x.priority > priority || (x.priority === priority && x.id > row.id));
+  if (at < 0) at = list.length;
+  list.splice(at, 0, st);
+  ctx.strategies = list;
+
+  const products = loadProducts(db);
+  const offers = loadOffers(db);
+  const results = [];
+  for (const p of products) {
+    const res = evaluateProduct(ctx, p, offers.get(p.id) || []);
+    results.push({ product: p, decision: res.decision, strategy: res.strategy, res });
+  }
+  const groups = alignGroups(results, { settings: ctx.settings });
+  const entries = [];
+  let claimed = 0;
+  for (const r of results) {
+    if (r.strategy === st) {
+      stats.products += 1;
+      entries.push(r);
+      continue;
+    }
+    if (segmentId != null && !r.res.segmentIds.includes(segmentId)) continue;
+    stats.products += 1;
+    const t = r.res.tried.find((x) => x.strategy_id === row.id);
+    if (!t) {
+      claimed += 1; // strategie se k produktu vůbec nedostala – rozhodla dřívější
+      continue;
+    }
+    if (t.result === 'fallthrough') stats.fallthrough += 1;
+    else stats.skipped[t.code] = (stats.skipped[t.code] || 0) + 1;
+  }
+  const rep = reportDecisions(entries, stats, limit, ctx.settings);
+  // stats.products = produkty segmentu strategie; evaluated = rozhodla simulovaná strategie
+  stats.claimed_by_earlier = claimed;
+  stats.groups = groups;
+  stats.segment = segmentId != null ? ctx.segmentById.get(segmentId)?.name ?? null : 'Všechny produkty';
+  stats.strategy = st.name;
+  return { stats, decisions: rep.decisions, truncated: rep.truncated, errors: [], context: true };
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -677,14 +875,29 @@ function simulate(db, opts = {}) {
 
 /**
  * Vysvětlení aktuálního rozhodnutí cenotvorby pro jeden produkt (i neaktivní).
+ * Aktivní produkt v cenové skupině se vyhodnotí spolu s ostatními aktivními členy skupiny (sjednocení ceny) a uplatní
+ * se i paměť zamítnutí – vysvětlení odpovídá tomu, co by udělalo přecenění.
  * @returns {{view, segments: Array<{id, name}>, strategy: object|null, decision: object|null, tried: object[]}|null}
  */
 function explainProduct(db, productId, opts = {}) {
   const [product] = loadProducts(db, { productIds: [productId], activeOnly: false });
   if (!product) return null;
   const ctx = loadContext(db, { now: opts.now });
-  const offers = loadOffers(db, [product.id]).get(product.id) || [];
-  const res = evaluateProduct(ctx, product, offers);
+  const isActive = product.active === 1 || product.active === true;
+  const ids = isActive && groupKey(product) && anyGroupAlign(ctx.strategies) ? withGroupMembers(db, [product.id]) : [product.id];
+  const members = ids.length > 1 ? loadProducts(db, { productIds: ids }) : [product];
+  const offersMap = loadOffers(db, ids);
+  let res = null;
+  const items = [];
+  for (const p of members) {
+    const r = evaluateProduct(ctx, p, offersMap.get(p.id) || []);
+    if (p.id === product.id) res = r;
+    items.push({ product: p, decision: r.decision, strategy: r.strategy });
+  }
+  if (!res) res = evaluateProduct(ctx, product, offersMap.get(product.id) || []);
+  if (items.length > 1) alignGroups(items, { settings: ctx.settings });
+  const days = toDays(ctx.settings.reject_memory_days);
+  if (res.decision && isActive) applyRejectMemory([{ product, decision: res.decision }], loadRejectMemory(db, [product.id], ctx.now, days), days);
   const segments = res.segmentIds.map((id) => ({ id, name: ctx.segmentById.get(id)?.name ?? null }));
   const st = res.strategy;
   return {
@@ -708,6 +921,8 @@ module.exports = {
   evaluateProduct,
   runPricing,
   simulate,
+  applyRejectMemory,
+  loadRejectMemory,
   explainProduct,
   latestProposal,
   prepareStrategy,

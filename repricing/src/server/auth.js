@@ -8,6 +8,7 @@
 //   - Formát hashe: 'scrypt$N$r$p$<salt base64url>$<hash base64url>'.
 // Session
 //   - cookie 'ct_session' = base64url(JSON {u, exp, pv}) + '.' + base64url(HMAC-SHA256(secret, payload)),
+//     u = jméno zadané při přihlášení (C9, jen označení pro decided_by / audit – heslo je společné), jinak 'admin',
 //     exp = unix čas v ms, platnost 14 dní (klouzavě obnovováno), HttpOnly, SameSite=Strict, Secure na HTTPS.
 //   - pv = „verze hesla“ (HMAC z hashe hesla) → změna hesla zneplatní všechny starší session.
 //   - tajemství: CENOTVORBA_SECRET (config.secret), jinak settings '_secret' (vygenerováno při prvním startu).
@@ -316,13 +317,36 @@ function appendSetCookie(res, cookie) {
   res.setHeader('Set-Cookie', list);
 }
 
-/** Vytvoří session pro přihlášeného uživatele a nastaví cookie do odpovědi. */
-function issueSession(ctx, { now } = {}) {
+/**
+ * Jméno pro přihlášení (C9 – jen označení, kdo co schválil / změnil; NENÍ to ověření identity – heslo je společné).
+ * Ořezané, 1–64 znaků, bez řídicích znaků; „auto“ (značka automatického schválení) a „token:…“ (API tokeny) jsou
+ * vyhrazené. Chybějící / prázdné jméno → null (použije se „admin“).
+ * @returns {{name: string|null, error: string|null}}
+ */
+function normalizeUserName(v) {
+  if (v === undefined || v === null) return { name: null, error: null };
+  if (typeof v !== 'string') return { name: null, error: 'Jméno musí být text.' };
+  const s = v.trim();
+  if (!s) return { name: null, error: null };
+  if (s.length > 64) return { name: null, error: 'Jméno může mít nejvýše 64 znaků.' };
+  // řídicí znaky (C0, DEL, C1) a oddělovače řádků/odstavců
+  if (/[\u0000-\u001f\u007f-\u009f\u2028\u2029]/.test(s)) return { name: null, error: 'Jméno nesmí obsahovat řídicí znaky ani konce řádků.' };
+  if (s.toLowerCase() === 'auto' || /^token:/i.test(s)) return { name: null, error: 'Jméno „auto“ a jména začínající „token:“ jsou vyhrazená – zvolte jiné.' };
+  return { name: s, error: null };
+}
+
+/**
+ * Vytvoří session pro přihlášeného uživatele a nastaví cookie do odpovědi.
+ * @param {object} ctx
+ * @param {{now?: Date|number|string, user?: string|null}} [opts] user = jméno ze session / přihlášení (výchozí „admin“)
+ */
+function issueSession(ctx, { now, user } = {}) {
   const secret = getSecret(ctx.db, ctx.config);
   const exp = toMs(now) + SESSION_TTL_MS;
-  const value = signSession({ u: SESSION_USER, exp, pv: passwordVersion(ctx.db, ctx.config) }, secret);
+  const u = typeof user === 'string' && user ? user : SESSION_USER;
+  const value = signSession({ u, exp, pv: passwordVersion(ctx.db, ctx.config) }, secret);
   appendSetCookie(ctx.res, sessionCookie(value, { secure: isSecureRequest(ctx.req, ctx.config) }));
-  return { user: SESSION_USER, exp };
+  return { user: u, exp };
 }
 
 /** Smaže session cookie v prohlížeči. */
@@ -450,7 +474,7 @@ function authenticate(ctx) {
     ctx.authFailure = 'invalid_session';
     return null;
   }
-  return { user: payload.u, scopes: [...SCOPES], via: 'session', session: { exp: payload.exp } };
+  return { user: payload.u || SESSION_USER, scopes: [...SCOPES], via: 'session', session: { exp: payload.exp } };
 }
 
 /** Má sada rozsahů požadovaný rozsah? ('admin' zahrnuje vše). */
@@ -557,6 +581,7 @@ module.exports = {
   SESSION_COOKIE,
   SESSION_TTL_MS,
   SESSION_USER,
+  normalizeUserName,
   SCOPES,
   AUTH_LEVELS,
   CSRF_VALUE,

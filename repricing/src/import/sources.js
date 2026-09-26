@@ -26,6 +26,12 @@ function boolOpt(v) {
   return v === true || v === 1 || v === '1' || v === 'true' || v === 'yes' || v === 'ano';
 }
 
+/** Zakládat neznámé produkty? Chybějící hodnota = ano; ne jen při výslovném false / 0 / „ne“. */
+function createOpt(v) {
+  if (v === undefined || v === null || v === '') return true;
+  return !(v === false || v === 0 || ['0', 'false', 'no', 'ne', 'off'].includes(String(v).trim().toLowerCase()));
+}
+
 /** Volby importu z API / zdroje (snake_case i camelCase). */
 function importOptions(kind, options = {}) {
   const o = options && typeof options === 'object' ? options : {};
@@ -34,6 +40,8 @@ function importOptions(kind, options = {}) {
       deactivateMissing: boolOpt(o.deactivateMissing ?? o.deactivate_missing),
       // vypnout i víc než polovinu katalogu najednou (jinak se deaktivace přeskočí jako podezřelá)
       forceDeactivate: boolOpt(o.forceDeactivate ?? o.force_deactivate),
+      // false = „jen aktualizovat existující produkty“ (neznámé kódy se nezakládají); výchozí true
+      createMissing: createOpt(o.createMissing ?? o.create_missing),
     };
   }
   const maxAge = o.maxAgeDays ?? o.max_age_days;
@@ -142,7 +150,7 @@ function emptyStats(kind) {
  * @param {import('node:sqlite').DatabaseSync} db
  * @param {{kind: 'products'|'offers', input: object|Buffer|string, mapping?: object|string, options?: object,
  *          sourceId?: number|null, origin?: string, dryRun?: boolean, now?: Date|string}} params
- *   options: products {deactivate_missing}, offers {replace: false|'competitors'|'all', max_age_days}
+ *   options: products {deactivate_missing, force_deactivate, create_missing (výchozí true)}, offers {replace: false|'competitors'|'all', max_age_days}
  * @returns {{import_id: number|null, stats: object, preview?: object[], format: string, itemPath: string|null}}
  */
 function runImport(db, params = {}) {
@@ -431,7 +439,8 @@ function summaryMessage(kind, stats) {
   const n = (v) => Number(v || 0).toLocaleString('cs-CZ');
   const errs = Array.isArray(stats.errors) ? stats.errors.filter((e) => !e.warning).length : 0;
   if (kind === 'products') {
-    return `Přijato ${n(stats.received)}, nových ${n(stats.created)}, změněno ${n(stats.updated)}, beze změny ${n(stats.unchanged)}, deaktivováno ${n(stats.deactivated)}, chyb ${n(errs)}`;
+    const unknown = stats.skipped_unknown ? `, neznámých kódů přeskočeno ${n(stats.skipped_unknown)}` : '';
+    return `Přijato ${n(stats.received)}, nových ${n(stats.created)}, změněno ${n(stats.updated)}, beze změny ${n(stats.unchanged)}, deaktivováno ${n(stats.deactivated)}${unknown}, chyb ${n(errs)}`;
   }
   return `Přijato ${n(stats.received)}, spárováno ${n(stats.matched)}, nespárováno ${n(stats.unmatched + stats.ambiguous)}, nových ${n(stats.created)}, změněno ${n(stats.updated)}, zastaralých ${n(stats.stale)}, odstraněno ${n(stats.removed)}, chyb ${n(errs)}`;
 }

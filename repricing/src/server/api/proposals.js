@@ -3,7 +3,10 @@
 //
 //   GET   /api/v1/proposals          read   ?status (pending|approved|rejected|exported|superseded|all, i čárkou oddělený
 //                                           seznam; výchozí pending), run (id | latest), strategy (id | none),
-//                                           segment (id | none), direction (up|down), flag, q, manufacturer, product (id),
+//                                           segment (id | none – segment ROZHODUJÍCÍ strategie), direction (up|down), flag, q,
+//                                           manufacturer, owner, category, supplier (přesná shoda bez ohledu na velikost písmen
+//                                           a diakritiku), product_segment (id segmentu, do kterého produkt patří – kterýkoli),
+//                                           filter (Filter JSON nad pohledem produktu, SPEC §6.4; neplatný → 400), product (id),
 //                                           sort (výchozí abs_change_pct desc), dir, page, limit (max 500)
 //                                    → {items: [návrh + product{…} + strategy_name + segment_name + flags[] + explain[]
 //                                        + final_price + final_change_pct + final_margin_pct + cheapest_competitor],
@@ -12,6 +15,8 @@
 //   POST  /api/v1/proposals/approve  admin  {ids: [] | all: true, filter: {…stejné parametry…}, expect?: {count, max_id},
 //                                            include_flagged?: bool} → {updated, skipped_locked, skipped_inactive, skipped_flagged}
 //   POST  /api/v1/proposals/reject   admin  totéž → {updated}
+//   POST  /api/v1/proposals/unapprove admin {ids | all: true, filter?, expect?} → {updated} – schválené a neexportované
+//                                           návrhy zpět do „pending“ (decided_* a údaj o vydání se smažou)
 //   PATCH /api/v1/proposals/:id      admin  {manual_price: číslo > 0 | null, confirm?: true} → návrh (tvar položky seznamu)
 //
 // Rozhodnutí:
@@ -34,6 +39,7 @@
 const { tx, nowIso, parseJson, getSettings } = require('../../db');
 const { round, marginPct, net } = require('../../util/num');
 const { BLOCKING_FLAGS } = require('../../engine/pricing');
+const { isEmptyFilter } = require('../../engine/filter');
 const { MANUAL_FLAGS, CENT } = require('../../util/proposals');
 const { isLockActive, pragueParts, parseDateTime } = require('../../engine/metrics');
 const { HttpError, intParam, paging } = require('../http');
@@ -88,7 +94,7 @@ const FROM = `FROM proposals pr
   LEFT JOIN strategies s ON s.id = pr.strategy_id
   LEFT JOIN segments g ON g.id = pr.segment_id`;
 
-const FILTER_KEYS = ['status', 'run', 'strategy', 'segment', 'direction', 'flag', 'q', 'manufacturer', 'product'];
+const FILTER_KEYS = ['status', 'run', 'strategy', 'segment', 'direction', 'flag', 'q', 'manufacturer', 'owner', 'category', 'supplier', 'product_segment', 'filter', 'product'];
 
 function str(v) {
   if (v == null) return null;
@@ -101,7 +107,8 @@ function str(v) {
  * Normalizuje filtr návrhů (z query nebo z body.filter) a ověří hodnoty.
  * @param {object} src
  * @param {{defaultStatus?: string|null}} [opts]
- * @returns {{statuses: string[]|null, run, strategy, segment, direction, flag, q, manufacturer, product}}
+ * @returns {{statuses: string[]|null, run, strategy, segment, direction, flag, q, manufacturer, owner, category, supplier,
+ *   product_segment, filter, match, product}}
  */
 function normalizeFilter(src = {}, { defaultStatus = 'pending' } = {}) {
   if (!V.isPlainObject(src)) throw new HttpError(400, 'Filtr návrhů musí být objekt.');
@@ -127,7 +134,14 @@ function normalizeFilter(src = {}, { defaultStatus = 'pending' } = {}) {
   if (flag != null && !/^[a-z0-9_]{1,64}$/i.test(flag)) throw new HttpError(400, 'Neplatný příznak v parametru „flag“.');
   f.flag = flag;
   f.q = str(src.q);
-  f.manufacturer = str(src.manufacturer);
+  for (const k of ['manufacturer', 'owner', 'category', 'supplier']) f[k] = str(src[k]);
+  const ps = str(src.product_segment);
+  f.product_segment = ps == null ? null : V.queryId(ps, 'product_segment');
+  // filtr nad pohledem produktu (JSON text z query nebo objekt z těla) – neplatný → 400
+  const raw = Array.isArray(src.filter) ? src.filter[src.filter.length - 1] : src.filter;
+  const parsed = V.parseFilterInput(raw === '' ? null : raw, 'filter');
+  f.filter = parsed.filter;
+  f.match = parsed.filter && !isEmptyFilter(parsed.filter) ? parsed.match : null;
   const product = str(src.product);
   f.product = product == null ? null : V.queryId(product, 'product');
   return f;
@@ -166,10 +180,19 @@ function whereOf(db, f, cache) {
     where.push('pr.product_id = ?');
     args.push(f.product);
   }
-  if (f.q != null || f.manufacturer != null) {
-    // hledání bez diakritiky → přes cache pohledů (stejná logika jako GET /products)
+  if (f.q != null || f.manufacturer != null || f.owner != null || f.category != null || f.supplier != null || f.product_segment != null || f.match) {
+    // hledání bez diakritiky, segment produktu a filtr nad pohledem → přes cache pohledů (stejná logika jako GET /products)
     const c = cache || V.getCache(db);
-    const idx = V.matchProducts(c, { status: 'all', q: f.q, manufacturer: f.manufacturer });
+    const idx = V.matchProducts(c, {
+      status: 'all',
+      q: f.q,
+      manufacturer: f.manufacturer,
+      owner: f.owner,
+      category: f.category,
+      supplier: f.supplier,
+      segment: f.product_segment,
+      match: f.match || null,
+    });
     where.push('pr.product_id IN (SELECT value FROM json_each(?))');
     args.push(JSON.stringify(idx.map((i) => c.views[i].id)));
   }
@@ -341,8 +364,9 @@ function summaryCounts(db, up, down) {
  * @returns {{updated: number, skipped_locked?: number, skipped_inactive?: number, skipped_flagged?: number, ids: number[]}}
  */
 function decide(db, body, action, actor) {
-  const allowed = action === 'approve' ? ['pending'] : ['pending', 'approved'];
-  const target = action === 'approve' ? 'approved' : 'rejected';
+  // unapprove (C5): schválený a dosud neexportovaný návrh zpět ke schválení
+  const allowed = action === 'approve' ? ['pending'] : action === 'unapprove' ? ['approved'] : ['pending', 'approved'];
+  const target = action === 'approve' ? 'approved' : action === 'unapprove' ? 'pending' : 'rejected';
   const all = body.all === true || body.all === 1 || body.all === '1' || body.all === 'true';
   let candidates;
   let skippedFlagged = 0;
@@ -417,12 +441,21 @@ function decide(db, body, action, actor) {
       ids.push(r.id);
     }
     let updated = 0;
-    const upd = db.prepare(
-      `UPDATE proposals SET status = ?, decided_at = ?, decided_by = ?
-       WHERE id IN (SELECT value FROM json_each(?)) AND status IN (${allowed.map(() => '?').join(', ')})`
-    );
+    // zrušení schválení: rozhodnutí i údaj o vydání (served_*) se smažou – admin návrh nesmí převzít, dokud ho někdo
+    // znovu neschválí (potvrzení převzetí podle kódu ho pak neoznačí)
+    const upd =
+      action === 'unapprove'
+        ? db.prepare(
+            `UPDATE proposals SET status = ?, decided_at = NULL, decided_by = NULL, served_price = NULL, served_at = NULL
+             WHERE id IN (SELECT value FROM json_each(?)) AND status IN (${allowed.map(() => '?').join(', ')}) AND exported_at IS NULL`
+          )
+        : db.prepare(
+            `UPDATE proposals SET status = ?, decided_at = ?, decided_by = ?
+             WHERE id IN (SELECT value FROM json_each(?)) AND status IN (${allowed.map(() => '?').join(', ')})`
+          );
     for (let i = 0; i < ids.length; i += 5000) {
-      updated += Number(upd.run(target, now, actor, JSON.stringify(ids.slice(i, i + 5000)), ...allowed).changes);
+      const chunk = JSON.stringify(ids.slice(i, i + 5000));
+      updated += Number((action === 'unapprove' ? upd.run(target, chunk, ...allowed) : upd.run(target, now, actor, chunk, ...allowed)).changes);
     }
     return withSkips({ updated, ids, skipped_locked: skippedLocked, skipped_inactive: skippedInactive });
   });
@@ -480,7 +513,7 @@ module.exports = {
       { auth: 'read' }
     );
 
-    for (const action of ['approve', 'reject']) {
+    for (const action of ['approve', 'reject', 'unapprove']) {
       router.post(
         `/api/v1/proposals/${action}`,
         (ctx) => {

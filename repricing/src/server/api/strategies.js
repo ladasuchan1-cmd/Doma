@@ -10,8 +10,12 @@
 //   GET    /api/v1/strategies/presets        read   → {items: STRATEGY_PRESETS}
 //   POST   /api/v1/strategies/presets/:key   admin  → {strategy, segment|null, segment_created, warning|null} (201) – strategie
 //                                                   vzniká VYPNUTÁ; cílená se zařadí před záchytnou strategii pro všechny produkty
-//   POST   /api/v1/simulate                  read   {config, segment_id?, filter?, limit?} → simulate() {stats, decisions, truncated, errors}
-//                                                   (decisions = až `limit` změn + až `limit` přeskočených)
+//   POST   /api/v1/simulate                  read   {config, segment_id?, filter?, limit?} → simulate() {stats, decisions, truncated, errors,
+//                                                   context: false} (decisions = až `limit` změn + až `limit` přeskočených)
+//                                                   {strategy_id, config?, segment_id?, priority?, limit?} → simulace v kontextu celé
+//                                                   sady zapnutých strategií (upravený config nahradí uložený; vypnutá strategie se vloží
+//                                                   na místo své priority) – jen produkty, o kterých rozhodla tato strategie;
+//                                                   context: true, stats.claimed_by_earlier = produkty segmentu zabrané dřívější strategií
 //
 // strategie = {id, name, description, segment_id, segment_name, priority, enabled (bool), config (normalizovaný),
 //              config_errors: string[], created_at, updated_at}
@@ -178,19 +182,24 @@ function applyPreset(ctx, key) {
 function runSimulation(ctx) {
   const db = ctx.db;
   const body = V.bodyObject(ctx);
-  const config = checkConfig(body.config);
-  const segmentId = body.segment_id === undefined ? null : V.numberInput(body.segment_id, 'Segment', { nullable: true, integer: true, positive: true });
+  // strategy_id → simulace v kontextu celé sady strategií (C2); config je volitelný (chybí = uložený config strategie)
+  const strategyId = body.strategy_id === undefined || body.strategy_id === null || body.strategy_id === '' ? null : V.numberInput(body.strategy_id, 'Strategie (strategy_id)', { integer: true, positive: true });
+  if (strategyId != null && !db.prepare('SELECT 1 FROM strategies WHERE id = ?').get(strategyId)) throw new HttpError(400, `Strategie ${strategyId} neexistuje.`);
+  const config = strategyId != null && (body.config === undefined || body.config === null) ? undefined : checkConfig(body.config);
+  const segmentId = body.segment_id === undefined ? (strategyId != null ? undefined : null) : V.numberInput(body.segment_id, 'Segment', { nullable: true, integer: true, positive: true });
   if (segmentId != null && !db.prepare('SELECT 1 FROM segments WHERE id = ?').get(segmentId)) throw new HttpError(400, `Segment ${segmentId} neexistuje.`);
   let filter = null;
-  if (segmentId == null && body.filter != null && body.filter !== '') filter = V.parseFilterInput(body.filter).filter;
+  if (strategyId == null && segmentId == null && body.filter != null && body.filter !== '') filter = V.parseFilterInput(body.filter).filter;
+  const priority = strategyId != null && body.priority !== undefined && body.priority !== null ? V.numberInput(body.priority, 'Priorita', { integer: true, min: -1000000, max: 1000000 }) : undefined;
   const limit = body.limit === undefined || body.limit === null ? 200 : V.numberInput(body.limit, 'Limit', { integer: true, min: 1, max: 1000 });
-  const res = simulate(db, { config, segment_id: segmentId, filter, limit, name: typeof body.name === 'string' ? body.name : undefined });
+  const res = simulate(db, { config, segment_id: segmentId, filter, limit, name: typeof body.name === 'string' ? body.name : undefined, strategy_id: strategyId, priority });
   if (res.errors && res.errors.length) throw new HttpError(400, `Simulaci nelze spustit: ${res.errors.join('; ')}`, res.errors);
   return {
     stats: res.stats,
     decisions: res.decisions.map((d) => ({ ...d, product: { id: d.product_id, code: d.code ?? null, name: d.name ?? null, manufacturer: d.manufacturer ?? null } })),
     truncated: res.truncated,
     errors: [],
+    context: res.context === true,
   };
 }
 

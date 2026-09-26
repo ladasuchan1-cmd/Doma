@@ -2,7 +2,7 @@
 // validace, klientské zaokrouhlení (náhled, SPEC §6.6) a lidsky čitelné shrnutí.
 // Čistý modul bez DOM.
 
-import { money, number, NBSP } from './format.js';
+import { money, number, NBSP, plural } from './format.js';
 import { describeFilter, isEmptyFilter, validateFilter } from './filter-model.js';
 
 /**
@@ -21,7 +21,7 @@ export const DEFAULT_CONFIG = Object.freeze({
   competitors: {
     include: [], exclude: [], include_tags: [], exclude_tags: [],
     in_stock_only: true, include_shipping: false, max_age_days: null, outlier_pct: null, min_competitors: 1,
-    exclude_keywords: [],
+    exclude_keywords: [], max_delivery_days: null,
   },
   fallback: { mode: 'next', markup_pct: null, offset_pct: 0 },
   limits: {
@@ -38,6 +38,7 @@ export const DEFAULT_CONFIG = Object.freeze({
   },
   stock: { zero_stock: 'reprice' },
   approval: { auto: false, auto_max_change_pct: 5 },
+  group: { align: 'off' },
 });
 
 export const WEEKDAYS = [
@@ -131,6 +132,17 @@ export const ZERO_STOCK_MODES = [
   { value: 'msrp', label: 'Nastavit MOC' },
 ];
 
+/**
+ * Sjednocení ceny variant jednoho modelu (velikosti / barvy se stejnou „Skupinou / modelem“ – products.group_code).
+ * Engine po individuálních rozhodnutích srovná varianty, o kterých rozhodla tato strategie, na jednu cenu.
+ */
+export const GROUP_ALIGN_MODES = [
+  { value: 'off', label: 'Nesjednocovat', short: '', help: 'Každá varianta (velikost, barva) dostane svou vlastní cenu.' },
+  { value: 'max', label: 'Nejvyšší cena ve skupině', short: 'nejvyšší', help: 'Všechny varianty dostanou nejvyšší z cen, které strategie pro varianty spočítala – nejbezpečnější pro marži.' },
+  { value: 'min', label: 'Nejnižší cena ve skupině', short: 'nejnižší', help: 'Všechny varianty dostanou nejnižší z vypočtených cen – nejagresivnější vůči konkurenci.' },
+  { value: 'median', label: 'Medián skupiny', short: 'medián', help: 'Všechny varianty dostanou prostřední z vypočtených cen (jedna extrémní varianta cenu neovlivní).' },
+];
+
 export const ROUNDING_MODES = [
   { value: 'ending', label: 'Cenové konce (…9, …90, …990)' },
   { value: 'integer', label: 'Na celé koruny' },
@@ -190,6 +202,8 @@ export const HELP = {
   'schedule.valid_to': 'Strategie platí do tohoto okamžiku (např. konec akce). Prázdné = bez konce.',
   'schedule.weekdays': 'Jen ve vybrané dny. Nic nevybráno = každý den.',
   'schedule.hours': 'Jen v tomto rozmezí hodin (např. 18–24). Prázdné = celý den. Mimo okno produkt převezme další strategie.',
+  'competitors.max_delivery_days': 'S volbou „Jen nabídky skladem“ se započítá i nabídka, která skladem není, ale konkurent ji dodá nejvýše do tolika dní (např. 3 = „do 3 dnů“). Prázdné = jen nabídky skladem.',
+  'group.align': 'Varianty jednoho modelu (velikosti, barvy – stejná „Skupina / model“ v katalogu) dostanou jednu společnou cenu, spočítanou z cen, které strategie vyšla pro jednotlivé varianty. Sjednocují se jen varianty, o kterých rozhodla tato strategie; zamčené a přeskočené varianty drží svou cenu. Společná cena respektuje limity všech variant (min. marže, MOC, min./max. cena) – když se limity nepřekrývají, ceny se nesjednotí a návrhy dostanou příznak „Skupinu nelze sjednotit“.',
   conditions: 'Podmínky navíc k segmentu – strategie se použije jen na produkty, které je splní (např. sklad > 0, marže ≥ 15 %). Jinak produkt převezme další strategie.',
 };
 
@@ -218,6 +232,9 @@ export function mergeConfig(cfg) {
   // null v sekci podmínek / okna = „bez omezení“ (engine ho normalizuje stejně)
   if (!isPlain(out.conditions)) out.conditions = {};
   if (!isPlain(out.schedule)) out.schedule = clone(DEFAULT_CONFIG.schedule);
+  // sjednocení skupiny: {align} (krátký zápis 'max' → {align: 'max'})
+  if (typeof out.group === 'string') out.group = { align: out.group };
+  else if (!isPlain(out.group)) out.group = clone(DEFAULT_CONFIG.group);
   return out;
 }
 
@@ -342,6 +359,10 @@ export function validateConfig(cfg) {
   if (!(Number.isInteger(comp.min_competitors) && comp.min_competitors >= 1)) errors.push('Minimální počet konkurentů musí být celé číslo ≥ 1.');
   if (comp.outlier_pct != null && !(comp.outlier_pct > 0 && comp.outlier_pct < 100)) errors.push('Práh podezřele nízké ceny musí být mezi 0 a 100 %.');
   if (comp.max_age_days != null && !(comp.max_age_days > 0)) errors.push('Stáří cen musí být kladné číslo dní.');
+  if (comp.max_delivery_days != null && !(typeof comp.max_delivery_days === 'number' && Number.isFinite(comp.max_delivery_days) && comp.max_delivery_days >= 0 && comp.max_delivery_days <= 365)) errors.push('Dodání do X dnů musí být 0 až 365 dní nebo prázdné.');
+  if (comp.max_delivery_days != null && !comp.in_stock_only) warnings.push('„Započítat i dodání do X dnů“ platí jen se zapnutou volbou „Jen nabídky skladem“ – bez ní se počítají všechny nabídky.');
+  const align = c.group && typeof c.group === 'object' ? c.group.align : c.group;
+  if (!GROUP_ALIGN_MODES.some((g) => g.value === align)) errors.push('Neznámý režim sjednocení skupiny „' + align + '“ (povoleno: nesjednocovat, nejvyšší, nejnižší, medián).');
   const r = c.rounding;
   if (r.mode === 'ending') {
     const bands = Array.isArray(r.bands) ? r.bands : [];
@@ -500,7 +521,10 @@ function listCz(arr) {
 
 function marketSentence(c) {
   const parts = [];
-  parts.push(c.in_stock_only ? 'jen nabídky skladem' : 'všechny nabídky včetně nedostupných');
+  const dd = c.max_delivery_days;
+  parts.push(c.in_stock_only
+    ? (dd != null && Number.isFinite(Number(dd)) ? 'nabídky skladem nebo s dodáním do ' + dd + NBSP + plural(Number(dd), 'dne', 'dnů', 'dnů') : 'jen nabídky skladem')
+    : 'všechny nabídky včetně nedostupných');
   parts.push(c.include_shipping ? 'včetně dopravy' : 'bez dopravy');
   if (c.max_age_days != null) parts.push('ne starší než ' + c.max_age_days + NBSP + 'dní');
   if (c.outlier_pct != null) parts.push('bez nabídek o víc než ' + pctTxt(c.outlier_pct) + ' pod mediánem');
@@ -599,6 +623,14 @@ function conditionsSentence(cond, fieldsMap) {
   return 'Navíc jen pro produkty, kde ' + describeFilter(cond, fieldsMap) + '.';
 }
 
+function groupSentence(g) {
+  const align = g && typeof g === 'object' ? g.align : null;
+  const m = GROUP_ALIGN_MODES.find((x) => x.value === align);
+  if (!m || align === 'off') return '';
+  const what = align === 'max' ? 'nejvyšší' : align === 'min' ? 'nejnižší' : 'prostřední (medián)';
+  return 'Varianty jednoho modelu (velikosti, barvy) sjednotí na ' + what + ' z jejich cen.';
+}
+
 function approvalSentence(a) {
   if (a.auto) {
     return a.auto_max_change_pct != null
@@ -628,8 +660,17 @@ export function describeStrategy(cfg, ctx = {}) {
   sentences.push(roundingSentence(c.rounding));
   const st = stockSentence(c.stock);
   if (st) sentences.push(st);
+  const gs = groupSentence(c.group);
+  if (gs) sentences.push(gs);
   sentences.push(approvalSentence(c.approval));
   return sentences.join(' ');
+}
+
+/** Krátký popis sjednocení skupiny do seznamu strategií („Skupina: nejvyšší cena“), '' = vypnuto. */
+export function describeGroupShort(cfg) {
+  const align = mergeConfig(cfg).group.align;
+  const m = GROUP_ALIGN_MODES.find((x) => x.value === align);
+  return m && align !== 'off' ? 'Skupina: ' + m.short + (align === 'median' ? '' : ' cena') : '';
 }
 
 /** Krátké shrnutí limitů pro seznam strategií. */

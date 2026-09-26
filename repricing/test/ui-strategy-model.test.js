@@ -13,7 +13,8 @@ test('DEFAULT_CONFIG odpovídá SPEC §6.5 a enginu (podrobné srovnání v ui-s
   const m = await load();
   const d = m.DEFAULT_CONFIG;
   assert.strictEqual(d.target.mode, 'undercut_min');
-  assert.deepStrictEqual(d.competitors, { include: [], exclude: [], include_tags: [], exclude_tags: [], in_stock_only: true, include_shipping: false, max_age_days: null, outlier_pct: null, min_competitors: 1, exclude_keywords: [] });
+  assert.deepStrictEqual(d.competitors, { include: [], exclude: [], include_tags: [], exclude_tags: [], in_stock_only: true, include_shipping: false, max_age_days: null, outlier_pct: null, min_competitors: 1, exclude_keywords: [], max_delivery_days: null });
+  assert.deepStrictEqual(d.group, { align: 'off' }, 'C3: sjednocení skupiny je ve výchozím stavu vypnuté');
   assert.deepStrictEqual(d.fallback, { mode: 'next', markup_pct: null, offset_pct: 0 });
   assert.deepStrictEqual(d.conditions, {});
   assert.deepStrictEqual(d.schedule, { valid_from: null, valid_to: null, weekdays: [], hours: null });

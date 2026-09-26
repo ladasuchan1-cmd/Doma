@@ -1079,7 +1079,7 @@ async function handleRequest(app, req, res) {
     delete ctx.queryAll.token;
     authModule.requireScope(ctx, route.auth);
     if (auth) authModule.checkCsrf(ctx);
-    if (authModule.shouldRenewSession(auth, ctx.now)) authModule.issueSession(ctx, { now: ctx.now });
+    if (authModule.shouldRenewSession(auth, ctx.now)) authModule.issueSession(ctx, { now: ctx.now, user: auth.user });
 
     // 2) tělo
     const maxMb = route.opts.maxBodyMb ?? (route.auth === 'public' ? Math.min(1, config.maxBodyMb) : config.maxBodyMb);

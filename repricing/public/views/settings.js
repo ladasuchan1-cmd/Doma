@@ -237,7 +237,13 @@ export async function show(root, ctx) {
               field({ label: 'Měna', control: h('input', { class: 'input', value: get(draft, 'currency') || 'CZK', readonly: true }), help: 'Všechny ceny jsou v CZK.' }),
               numField('vat_rate_default', 'Výchozí sazba DPH', { suffix: '%', min: 0, max: 99, help: 'Pro produkty bez sazby DPH v katalogu.' }),
               numField('offer_max_age_days', 'Max. stáří cen konkurence', { suffix: 'dní', int: true, min: 1, help: 'Starší ceny se v cenotvorbě ignorují.' }),
-              numField('retention_days', 'Uchovávat historii', { suffix: 'dní', int: true, min: 7, help: 'Starší historie cen, auditu a zamítnuté návrhy se mažou.' })
+              numField('retention_days', 'Uchovávat historii', { suffix: 'dní', int: true, min: 7, help: 'Starší historie cen, auditu a zamítnuté návrhy se mažou.' }),
+              numField('retention_superseded_days', 'Uchovávat nahrazené návrhy', { suffix: 'dní', int: true, min: 1, max: 36500, help: 'Návrhy, které nahradilo novější přecenění, jsou jen historie – mažou se dřív (nejvýše po době „Uchovávat historii“).' })
+            ),
+            h('h3', { class: 'form-subtitle' }, 'Návrhy cen'),
+            h('div', { class: 'form-grid' },
+              // C1: paměť zamítnutých cen – stejná cena se po zamítnutí nějakou dobu znovu nenavrhne
+              numField('reject_memory_days', 'Pamatovat zamítnuté ceny', { suffix: 'dní', int: true, min: 0, max: 365, help: 'Když někdo návrh zamítne, stejná cena se po tuto dobu znovu nenavrhne – přecenění produkt vyhodnotí jako „beze změny“ (stejná cena byla nedávno zamítnuta). Jiná cena se navrhne normálně. 0 = vypnuto.' })
             ),
             h('div', { class: 'form-grid form-grid-2', style: 'margin-top:8px' },
               boolField('purchase_includes_vat', 'Nákupní ceny v importu jsou s DPH', 'Standard POHODY je bez DPH. Zapněte, pokud váš export obsahuje nákupní ceny s DPH – přepočtou se.'),
@@ -266,6 +272,8 @@ export async function show(root, ctx) {
               textField('export.pohoda.price_level', 'Cenová hladina', { placeholder: 'prázdné = prodejní cena', help: 'Zkratka cenové hladiny v POHODĚ, pokud se nemá měnit základní prodejní cena.' }),
               selField('export.pohoda.encoding', 'Kódování XML', [{ value: 'windows-1250', label: 'Windows-1250 (doporučeno)' }, { value: 'utf-8', label: 'UTF-8' }], 'Výchozí kódování souboru pro import do POHODY.')
             ),
+            h('div', { style: 'margin-top:8px', dataset: { field: 'price-level-vat' } },
+              boolField('export.pohoda.price_level_includes_vat', 'Ceny cenové hladiny jsou s DPH', 'Platí jen s vyplněnou cenovou hladinou. Vypnuto = do POHODY se pošle cena bez DPH (přepočtená sazbou produktu) – pro hladiny, které POHODA vede bez DPH. Základní prodejní cena se posílá vždy s DPH.')),
             h('h3', { class: 'form-subtitle' }, 'Webhook do adminu'),
             h('div', { class: 'form-grid form-grid-2' },
               textField('export.webhook.url', 'URL webhooku', { type: 'url', mono: true, placeholder: 'https://admin.example.cz/hooks/ceny' }),

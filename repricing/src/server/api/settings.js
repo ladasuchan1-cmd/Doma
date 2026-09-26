@@ -106,6 +106,7 @@ const SCHEMA = {
   },
   retention_days: num({ min: 0, max: 36500, integer: true }),
   retention_superseded_days: num({ min: 1, max: 36500, integer: true }),
+  reject_memory_days: num({ min: 0, max: 365, integer: true }),
 };
 
 const LABELS = {
@@ -116,6 +117,7 @@ const LABELS = {
   metrics_in_stock_only: 'Metriky jen z nabídek skladem',
   retention_days: 'Doba uchování dat (dny)',
   retention_superseded_days: 'Doba uchování nahrazených návrhů (dny)',
+  reject_memory_days: 'Paměť zamítnutých cen (dny)',
 };
 
 /** Projde (sloučený) objekt podle schématu; neznámé klíče v těle hlásí zvlášť. */

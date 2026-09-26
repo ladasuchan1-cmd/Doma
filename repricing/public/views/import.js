@@ -11,7 +11,7 @@ import {
 import { openModal, confirmDialog } from '../lib/modal.js';
 import { toast } from '../lib/toast.js';
 import {
-  CANONICAL, buildMapping, missingRequired, hasMatchKey, statsList, curlExamples, deactivateMissingConfirm,
+  CANONICAL, buildMapping, missingRequired, hasMatchKey, statsList, curlExamples, deactivateMissingConfirm, unknownCodesInfo,
 } from '../lib/import-model.js';
 import {
   int, bytes, dateTime, relTime, duration, KIND_LABELS, ORIGIN_LABELS, truncate, count, parseInputNumber,
@@ -44,11 +44,25 @@ function statsGrid(stats, kind) {
   return h(
     'div',
     { class: 'stack-sm' },
-    h('div', { class: 'stat-grid' }, list.map((st) => h('div', { class: ['stat', tone(st)] }, h('div', { class: 'stat-label' }, st.label), h('div', { class: 'stat-value' }, int(st.value))))),
+    h('div', { class: 'stat-grid' }, list.map((st) => h('div', { class: ['stat', tone(st)], dataset: { stat: st.key } }, h('div', { class: 'stat-label' }, st.label), h('div', { class: 'stat-value' }, int(st.value))))),
+    kind === 'products' ? unknownCodesList(stats) : null,
     errorsList(stats?.errors),
     kind === 'offers' && stats?.unmatched
       ? callout(h('span', null, count(stats.unmatched, 'nabídka se nespárovala', 'nabídky se nespárovaly', 'nabídek se nespárovalo') + ' s katalogem. ', h('a', { href: '#/konkurence?tab=unmatched' }, 'Spárovat ručně →')), 'warning')
       : null
+  );
+}
+
+/** C6: kódy, které import „jen aktualizovat“ přeskočil (v katalogu nejsou) – server posílá prvních 50. */
+function unknownCodesList(stats) {
+  const info = unknownCodesInfo(stats);
+  if (!info) return null;
+  return h(
+    'details',
+    { class: 'disclosure', dataset: { role: 'unknown-codes' } },
+    h('summary', null, icon('chevron-right', { size: 14 }), 'Neznámé kódy – nezaloženo ' + count(info.count, 'produkt', 'produkty', 'produktů')),
+    h('p', { class: 'field-help' }, 'Tyto kódy v katalogu nejsou a import je podle volby „Jen aktualizovat existující produkty“ přeskočil.' + (info.more ? ' Zobrazeno prvních ' + int(info.codes.length) + '.' : '')),
+    info.codes.length ? h('p', { class: 'mono small unknown-codes' }, info.codes.join(', ') + (info.more ? ' … a další ' + int(info.more) : '')) : null
   );
 }
 
@@ -79,6 +93,7 @@ export async function show(root, ctx) {
     attrs: 'all',
     replace: '',
     deactivate_missing: false,
+    update_only: false,
     result: null,
     dryResult: null,
     dryWithDeactivate: false,
@@ -95,6 +110,8 @@ export async function show(root, ctx) {
     if (dry) q.dry_run = 1;
     if (wz.kind === 'offers' && wz.replace) q.replace = wz.replace;
     if (wz.kind === 'products' && wz.deactivate_missing) q.deactivate_missing = 1;
+    // C6: jen aktualizovat existující produkty – neznámé kódy se nezaloží (stats.skipped_unknown, unknown_codes)
+    if (wz.kind === 'products' && wz.update_only) q.create_missing = 0;
     return q;
   }
 
@@ -214,6 +231,7 @@ export async function show(root, ctx) {
         h('div', { class: 'field' }, checkbox('Ceny v souboru jsou bez DPH', wz.price_net, (v) => { wz.price_net = v; refreshPreview(); }), h('span', { class: 'field-help' }, 'Přepočítají se na ceny s DPH podle sazby produktu.')),
       ]
       : [
+        h('div', { class: 'field' }, checkbox('Jen aktualizovat existující produkty (nezakládat nové)', wz.update_only, (v) => { wz.update_only = v; }, { class: 'check-update-only' }), h('span', { class: 'field-help' }, 'Produkty s kódem, který v katalogu není, se přeskočí a vypíšou – např. export cen z adminu obsahuje i zboží, které nechcete přeceňovat.')),
         h('div', { class: 'field' }, checkbox('Deaktivovat produkty, které v souboru chybí', wz.deactivate_missing, (v) => { wz.deactivate_missing = v; }), h('span', { class: 'field-help' }, 'Použijte jen u úplného exportu katalogu.')),
         h('div', { class: 'field' }, checkbox('Nenamapované sloupce uložit jako atributy', wz.attrs !== 'none', (v) => { wz.attrs = v ? 'all' : 'none'; refreshPreview(); }), h('span', { class: 'field-help' }, 'Atributy lze použít v segmentech (např. attrs.N).')),
       ];
@@ -398,7 +416,9 @@ export async function show(root, ctx) {
             const btn = e.currentTarget;
             btn.disabled = true;
             try {
-              const options = wz.kind === 'offers' ? (wz.replace ? { replace: wz.replace } : {}) : wz.deactivate_missing ? { deactivate_missing: true } : {};
+              const options = wz.kind === 'offers'
+                ? (wz.replace ? { replace: wz.replace } : {})
+                : { ...(wz.deactivate_missing ? { deactivate_missing: true } : {}), ...(wz.update_only ? { create_missing: false } : {}) };
               const s = await api.post('/sources', { name: nameIn.value.trim(), kind: wz.kind, url: urlIn.value.trim() || null, method: 'GET', headers: {}, mapping: mapping(), options, interval_minutes: Number(intSel.value) || 0, enabled: true });
               toast('Zdroj uložen' + (s?.id ? ' (ID ' + s.id + ')' : ''), { type: 'success' });
               m.close();
@@ -499,7 +519,7 @@ export async function show(root, ctx) {
         h('div', { class: 'form-grid form-grid-2' }, field({ label: 'URL', control: urlIn, help: 'Prázdné = data posíláte přes API (POST /import/…?source=ID) nebo nahráním souboru.' }), field({ label: 'Metoda', control: methodSel })),
         h('div', { class: 'form-grid form-grid-2' }, field({ label: 'Interval stahování', control: intSel }), h('div', { class: 'field' }, enabledSw)),
         field({ label: 'HTTP hlavičky (JSON)', control: headersTa, help: 'Např. {"Authorization": "Bearer …"} pro chráněný feed.' }),
-        h('details', { class: 'disclosure' }, h('summary', null, icon('chevron-right', { size: 14 }), 'Pokročilé: mapování a volby (JSON)'), h('div', { class: 'stack-sm', style: 'margin-top:8px' }, field({ label: 'Mapování', control: mappingTa, help: '{"fields": {"ean": "EAN", "price": "Cena"}, "defaults": {"competitor": "…"}, "csv": {"decimal": ","}, "item_path": "…"}' }), field({ label: 'Volby', control: optionsTa, help: 'Nabídky: {"replace": "competitors"}; katalog: {"deactivate_missing": true}' }))),
+        h('details', { class: 'disclosure' }, h('summary', null, icon('chevron-right', { size: 14 }), 'Pokročilé: mapování a volby (JSON)'), h('div', { class: 'stack-sm', style: 'margin-top:8px' }, field({ label: 'Mapování', control: mappingTa, help: '{"fields": {"ean": "EAN", "price": "Cena"}, "defaults": {"competitor": "…"}, "csv": {"decimal": ","}, "item_path": "…"}' }), field({ label: 'Volby', control: optionsTa, help: 'Nabídky: {"replace": "competitors"}; katalog: {"deactivate_missing": true} nebo {"create_missing": false} (jen aktualizovat existující produkty)' }))),
         err
       ),
       footer: [
@@ -634,7 +654,7 @@ export async function show(root, ctx) {
         key: 'stats', label: 'Výsledek',
         render: (i) => {
           if (i.error) return h('span', { class: 'small chg-down', title: i.error }, truncate(i.error, 70));
-          const s = statsList(i.stats).filter((x) => ['received', 'matched', 'unmatched', 'created', 'updated', 'errors'].includes(x.key) && x.value);
+          const s = statsList(i.stats).filter((x) => ['received', 'matched', 'unmatched', 'created', 'updated', 'skipped_unknown', 'errors'].includes(x.key) && x.value);
           return h('span', { class: 'small' }, s.map((x) => x.label.toLowerCase() + ' ' + int(x.value)).join(' · ') || '–');
         },
       },

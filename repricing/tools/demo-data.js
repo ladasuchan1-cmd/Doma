@@ -54,6 +54,16 @@ function roundEnding(v) {
   return Math.floor(v / 1000) * 1000 + 990;
 }
 
+/** „Topstone Carbon“ → „TOPSTONE-CARBON“, „Áspero“ → „ASPERO“ (kód skupiny bez diakritiky). */
+function slug(s) {
+  return String(s)
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toUpperCase()
+    .replace(/[^A-Z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '');
+}
+
 function ean13(rand) {
   let digits = '859';
   for (let i = 0; i < 9; i++) digits += Math.floor(rand() * 10);
@@ -84,6 +94,8 @@ function generateDemo({ products: count = 600, seed = 42, now = new Date() } = {
     const msrp = roundEnding(Math.exp(between(logMin, logMax)));
     const variants = isBike ? SIZES.slice(0, 2 + Math.floor(rand() * 4)) : [null];
     const color = pick(COLORS);
+    // cenová skupina: velikosti jednoho modelu kola (značka-model-rok) – strategie s group.align jim dá jednu cenu
+    const groupCode = isBike ? `${slug(brand).slice(0, 3)}-${slug(model)}-${year}` : null;
     for (const size of variants) {
       if (products.length >= count) break;
       n += 1;
@@ -101,6 +113,7 @@ function generateDemo({ products: count = 600, seed = 42, now = new Date() } = {
         name: `${brand} ${model}${isBike ? ` ${year}` : ''}${size ? ` vel. ${size}` : ''}${isBike ? ` (${color})` : ''}`,
         manufacturer: brand,
         category: cat.name,
+        group_code: groupCode,
         supplier: SUPPLIERS[brand] || 'Ostatní',
         owner: OWNERS[CATEGORIES.indexOf(cat) % OWNERS.length],
         purchase_price: purchase,

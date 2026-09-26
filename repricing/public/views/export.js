@@ -1,4 +1,5 @@
-// Export – feedy pro admin (URL s tokenem), stažení souborů, odeslání webhookem, dokumentace potvrzení (ack), historie.
+// Export – feedy pro admin (URL s tokenem), stažení souborů, odeslání webhookem, dokumentace potvrzení (ack), historie
+// s opětovným stažením doručených změn (GET /exports/:id/changes.json|xml|csv – C8).
 import { h, mount } from '../lib/dom.js';
 import { api, apiUrl, itemsOf, isAbort, basePath, bindDownload } from '../lib/api.js';
 import { icon } from '../lib/icons.js';
@@ -107,23 +108,24 @@ export async function show(root, ctx) {
       'div',
       { class: 'stack' },
       h('ol', { class: 'validation-list' },
-        h('li', null, 'Admin stáhne ', h('code', null, 'GET /api/v1/export/changes.json'), ' (nebo feed ', h('code', null, '/feed/changes.json?token=…'), ').'),
+        h('li', null, 'Admin stáhne ', h('code', null, 'GET /feed/changes.json?token=…'), ' (nebo ', h('code', null, 'GET /api/v1/export/changes.json'), ' s hlavičkou Authorization).'),
         h('li', null, 'Každá položka má ', h('code', null, 'proposal_id'), ', ', h('code', null, 'code'), ' a ', h('code', null, 'price'), ' (s DPH).'),
-        h('li', null, 'Po úspěšném uložení cen admin zavolá ', h('code', null, 'POST /api/v1/export/ack'), ' s ID návrhů nebo kódy produktů.'),
-        h('li', null, 'Cenotvorba je označí jako exportované a (dle nastavení) přepíše aktuální cenu produktu.')
+        h('li', null, 'Po úspěšném uložení cen admin zavolá ', h('code', null, 'POST /api/v1/export/ack'), ' s položkami ', h('code', null, '{proposal_id, price}'), ' (nebo ', h('code', null, '{code, price}'), ') – cenou, kterou opravdu nasadil.'),
+        h('li', null, 'Cenotvorba je označí jako exportované a (dle nastavení) přepíše aktuální cenu produktu. Nesouhlasí-li cena, nic se neoznačí a položka je v odpovědi v ', h('code', null, 'mismatched'), '.')
       ),
       codeBlock([
-        `curl "${origin}/api/v1/export/changes.json" -H "Authorization: Bearer $CENOTVORBA_TOKEN"`,
+        `curl "${origin}/feed/changes.json?token=$CENOTVORBA_TOKEN"`,
         '',
         `curl -X POST "${origin}/api/v1/export/ack" \\`,
         '  -H "Authorization: Bearer $CENOTVORBA_TOKEN" -H "Content-Type: application/json" \\',
-        '  --data-binary \'{"proposal_ids": [1201, 1202, 1203]}\'',
+        '  --data-binary \'{"items": [{"proposal_id": 1201, "price": 52990}, {"proposal_id": 1202, "price": 1290}]}\'',
         '',
-        '# nebo podle kódů produktů',
+        '# nebo podle kódů produktů (kód + nasazená cena)',
         `curl -X POST "${origin}/api/v1/export/ack" -H "Authorization: Bearer $CENOTVORBA_TOKEN" \\`,
-        '  -H "Content-Type: application/json" --data-binary \'{"codes": ["TRK-MAR7GEN3-M", "SHI-DEOXT"]}\'',
+        '  -H "Content-Type: application/json" --data-binary \'{"items": [{"code": "TRK-MAR7GEN3-M", "price": 20990}]}\'',
       ].join('\n'), { title: 'Příklad' }),
-      h('p', { class: 'muted small' }, 'Odpověď: {"export_id": 12, "count": 3}. Potvrdit lze jen schválené návrhy; jiné se ignorují.')
+      h('p', { class: 'muted small' }, 'Odpověď: {"export_id": 12, "count": 2, "unknown_codes": [], "mismatched": [], …}. Potvrdit lze jen schválené návrhy; jiné se ignorují. Ack je bezpečné poslat znovu – už označené se podruhé nezapočítají.'),
+      callout(h('span', null, h('b', null, 'Parametr mark=1 není bezpečný pro opakování: '), 'stažením se změny rovnou označí jako exportované – když se odpověď cestou ztratí, další stažení je už neobsahuje. Stejná data pak stáhnete znovu z historie níže (', h('i', null, 'Znovu stáhnout'), ', ', h('code', null, 'GET /api/v1/exports/{id}/changes.json'), '), případně srovnejte ceny celým ceníkem ', h('code', null, '/feed/prices.json'), '. Kompletní návod pro programátora adminu je v ', h('code', null, 'docs/ADMIN-API.md'), '.'), 'warning')
     ),
   });
 
@@ -135,6 +137,15 @@ export async function show(root, ctx) {
       { key: 'count', label: 'Položek', format: 'int', sortable: true },
       { key: 'status', label: 'Stav', render: (e) => jobStatusBadge(e.status) },
       { key: 'detail', label: 'Detail', hideSm: true, render: (e) => h('span', { class: 'small muted', title: typeof e.detail === 'object' && e.detail ? JSON.stringify(e.detail, null, 1) : e.detail || '' }, truncate(detailText(e.detail), 80)) },
+      {
+        // C8: doručené změny exportu jde stáhnout znovu (ztracená odpověď u mark=1, kontrola, co admin dostal)
+        key: 'redownload',
+        label: 'Znovu stáhnout',
+        title: 'Stáhnout znovu přesně ty změny (a ceny), které tento export doručil',
+        render: (e) => (e.redownload
+          ? h('span', { class: 'btn-group', dataset: { redownload: e.id } }, ['json', 'xml', 'csv'].map((f) => bindDownload(h('a', { class: 'btn btn-xs', href: apiUrl('/exports/' + encodeURIComponent(e.id) + '/changes.' + f), download: '', title: 'Změny exportu #' + e.id + ' jako ' + f.toUpperCase(), dataset: { format: f } }, f.toUpperCase()))))
+          : h('span', { class: 'muted' }, '–')),
+      },
     ],
     clientSort: true,
     sort: { key: 'created_at', dir: 'desc' },
