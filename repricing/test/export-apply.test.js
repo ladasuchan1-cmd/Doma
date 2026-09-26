@@ -57,8 +57,8 @@ test('markExported: jen schválené návrhy → exported, cena produktu, histori
 
   // opakované označení: nic dalšího, žádný nový řádek logu
   const again = markExported(db, [s.pA, s.pB], { kind: 'feed', now: h.NOW });
-  assert.deepEqual(again, { export_id: null, count: 0, proposal_ids: [], price_updates: 0 });
-  assert.deepEqual(markExported(db, [], {}), { export_id: null, count: 0, proposal_ids: [], price_updates: 0 });
+  assert.deepEqual(again, { export_id: null, count: 0, proposal_ids: [], price_updates: 0, skipped: [] });
+  assert.deepEqual(markExported(db, [], {}), { export_id: null, count: 0, proposal_ids: [], price_updates: 0, skipped: [] });
   assert.equal(exportsLog(db).length, 1);
   // po exportu už návrh v exportRows není; nová cena se promítne do nejnižší ceny za 30 dní
   assert.deepEqual(exportRows(db, { now: h.NOW }).map((r) => r.proposal_id), []);
@@ -225,7 +225,7 @@ test('ackExport: potvrzení podle kódů i id návrhů', () => {
   const r2 = ackExport(db, { proposal_ids: [s.pB], now: h.NOW });
   assert.equal(r2.count, 1);
   assert.equal(status(db, s.pB).status, 'exported');
-  assert.deepEqual(ackExport(db, {}), { export_id: null, count: 0, proposal_ids: [], price_updates: 0, unknown_codes: [] });
+  assert.deepEqual(ackExport(db, {}), { export_id: null, count: 0, proposal_ids: [], price_updates: 0, skipped: [], unknown_codes: [], mismatched: [] });
 });
 
 test('pushChanges: úspěch označí export, chyba se zapíše do logu a nic neoznačí', async () => {

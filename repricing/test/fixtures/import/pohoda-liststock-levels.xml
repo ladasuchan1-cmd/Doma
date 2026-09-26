@@ -1,0 +1,55 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<rsp:responsePack version="2.0" id="002" state="ok" xmlns:rsp="http://www.stormware.cz/schema/version_2/response.xsd" xmlns:lStk="http://www.stormware.cz/schema/version_2/list_stock.xsd" xmlns:stk="http://www.stormware.cz/schema/version_2/stock.xsd" xmlns:typ="http://www.stormware.cz/schema/version_2/type.xsd">
+  <rsp:responsePackItem version="2.0" id="li1" state="ok">
+    <lStk:listStock version="2.0">
+      <lStk:stock version="2.0">
+        <stk:stockHeader>
+          <stk:id>1</stk:id>
+          <stk:EAN>8590000000011</stk:EAN>
+          <stk:code>KOLO-001</stk:code>
+          <stk:name>Kolo Trail</stk:name>
+          <stk:sellingRateVAT>high</stk:sellingRateVAT>
+          <stk:purchasingPrice payVAT="false">9000</stk:purchasingPrice>
+          <stk:sellingPrice payVAT="true">15990</stk:sellingPrice>
+          <stk:count>3</stk:count>
+        </stk:stockHeader>
+        <stk:stockPriceItem>
+          <stk:stockPrice>
+            <typ:id>2</typ:id>
+            <typ:ids>Dealer</typ:ids>
+            <typ:price>13000</typ:price>
+          </stk:stockPrice>
+          <stk:stockPrice>
+            <typ:id>3</typ:id>
+            <typ:ids>VO</typ:ids>
+            <typ:price>12000</typ:price>
+          </stk:stockPrice>
+        </stk:stockPriceItem>
+      </lStk:stock>
+      <lStk:stock version="2.0">
+        <stk:stockHeader>
+          <stk:id>2</stk:id>
+          <stk:EAN>8590000000028</stk:EAN>
+          <stk:code>PLAST-002</stk:code>
+          <stk:name>Plášť</stk:name>
+          <stk:sellingRateVAT>high</stk:sellingRateVAT>
+          <stk:purchasingPrice payVAT="true">605</stk:purchasingPrice>
+          <stk:sellingPrice payVAT="false">676.86</stk:sellingPrice>
+          <stk:count>10</stk:count>
+        </stk:stockHeader>
+        <stk:stockPriceItem>
+          <stk:stockPrice>
+            <typ:id>2</typ:id>
+            <typ:ids>Dealer</typ:ids>
+            <typ:price>700</typ:price>
+          </stk:stockPrice>
+          <stk:stockPrice>
+            <typ:id>3</typ:id>
+            <typ:ids>VO</typ:ids>
+            <typ:price>650</typ:price>
+          </stk:stockPrice>
+        </stk:stockPriceItem>
+      </lStk:stock>
+    </lStk:listStock>
+  </rsp:responsePackItem>
+</rsp:responsePack>

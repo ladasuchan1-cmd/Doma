@@ -11,7 +11,7 @@ import {
 import { openModal, confirmDialog } from '../lib/modal.js';
 import { toast } from '../lib/toast.js';
 import {
-  CANONICAL, buildMapping, missingRequired, hasMatchKey, statsList, curlExamples,
+  CANONICAL, buildMapping, missingRequired, hasMatchKey, statsList, curlExamples, deactivateMissingConfirm,
 } from '../lib/import-model.js';
 import {
   int, bytes, dateTime, relTime, duration, KIND_LABELS, ORIGIN_LABELS, truncate, count, parseInputNumber,
@@ -81,6 +81,7 @@ export async function show(root, ctx) {
     deactivate_missing: false,
     result: null,
     dryResult: null,
+    dryWithDeactivate: false,
     busy: false,
   };
   const wizardHost = h('div', { class: 'stack' });
@@ -127,7 +128,7 @@ export async function show(root, ctx) {
       toast('Soubor je větší než 300 MB – pošlete ho raději přes API nebo URL zdroj.', { type: 'error' });
       return;
     }
-    Object.assign(wz, { file, preview: null, previewError: null, fields: {}, defaults: {}, result: null, dryResult: null, item_path: '', format: 'auto', csv: { delimiter: '', decimal: '', encoding: '', header_row: '' } });
+    Object.assign(wz, { file, preview: null, previewError: null, fields: {}, defaults: {}, result: null, dryResult: null, dryWithDeactivate: false, item_path: '', format: 'auto', csv: { delimiter: '', decimal: '', encoding: '', header_row: '' } });
     runPreview(false);
   }
 
@@ -339,12 +340,27 @@ export async function show(root, ctx) {
       const ok = await confirmDialog({ title: 'Nahradit všechny nabídky', message: 'Všechny nabídky konkurence, které nejsou v tomto souboru, se smažou. Pokračovat?', confirmLabel: 'Nahradit', danger: true });
       if (!ok) return;
     }
+    // Deaktivace chybějících produktů je stejně destruktivní jako „nahradit všechny nabídky“ – vždy potvrdit,
+    // s počtem ze zkušebního importu (contract-8).
+    if (!dry && wz.kind === 'products' && wz.deactivate_missing) {
+      let activeTotal = null;
+      try {
+        activeTotal = (await api.get('/products', { limit: 1 }, { signal: ctx.signal, silent: true }))?.total ?? null;
+      } catch {
+        /* počet je jen doplňující informace */
+      }
+      const ok = await confirmDialog(deactivateMissingConfirm(wz.dryResult, { dryWithDeactivate: wz.dryWithDeactivate, activeTotal }));
+      if (!ok) return;
+    }
     wz.busy = true;
     renderWizard();
     try {
       const res = await api.upload('/import/' + wz.kind, wz.file, importQuery(dry), { signal: ctx.signal });
-      if (dry) wz.dryResult = res;
-      else {
+      if (dry) {
+        wz.dryResult = res;
+        // počet „Deaktivováno“ ze zkušebního importu platí jen pro stejnou volbu
+        wz.dryWithDeactivate = wz.kind === 'products' && wz.deactivate_missing;
+      } else {
         wz.result = res;
         invalidate();
         ctx.notifyChanged('import');
@@ -378,7 +394,9 @@ export async function show(root, ctx) {
           type: 'button', class: 'btn btn-primary', dataset: { action: 'save-source' },
           onClick: async (e) => {
             if (!nameIn.value.trim()) { nameIn.focus(); return; }
-            e.currentTarget.disabled = true;
+            // tlačítko si uložit hned: po await je e.currentTarget null a obnovení by spadlo (tlačítko by zůstalo vypnuté)
+            const btn = e.currentTarget;
+            btn.disabled = true;
             try {
               const options = wz.kind === 'offers' ? (wz.replace ? { replace: wz.replace } : {}) : wz.deactivate_missing ? { deactivate_missing: true } : {};
               const s = await api.post('/sources', { name: nameIn.value.trim(), kind: wz.kind, url: urlIn.value.trim() || null, method: 'GET', headers: {}, mapping: mapping(), options, interval_minutes: Number(intSel.value) || 0, enabled: true });
@@ -386,7 +404,9 @@ export async function show(root, ctx) {
               m.close();
               sourcesDirty = true;
             } catch {
-              e.currentTarget.disabled = false;
+              /* chyba je v toastu – formulář zůstává otevřený k opravě */
+            } finally {
+              btn.disabled = false;
             }
           },
         }, 'Uložit zdroj'),
@@ -503,7 +523,10 @@ export async function show(root, ctx) {
               nameIn.focus();
               return;
             }
-            e.currentTarget.disabled = true;
+            // tlačítko si uložit před await (pak je e.currentTarget null) – po chybě serveru ho musíme znovu zapnout
+            const btn = e.currentTarget;
+            btn.disabled = true;
+            err.textContent = '';
             const body = { name: nameIn.value.trim(), kind: kindSel.value, url: urlIn.value.trim() || null, method: methodSel.value, headers, mapping: mp, options: opts, interval_minutes: Number(intSel.value) || 0, enabled: enabledSw.querySelector('[role=switch]').getAttribute('aria-checked') === 'true' };
             try {
               if (src) await api.put('/sources/' + encodeURIComponent(src.id), body);
@@ -511,8 +534,11 @@ export async function show(root, ctx) {
               toast('Zdroj uložen', { type: 'success' });
               m.close();
               loadSources();
-            } catch {
-              e.currentTarget.disabled = false;
+            } catch (ex) {
+              // chyba validace (např. URL bez http/https) – ukázat i ve formuláři, uživatel ji opraví a uloží znovu
+              err.textContent = ex?.message || '';
+            } finally {
+              btn.disabled = false;
             }
           },
         }, 'Uložit'),

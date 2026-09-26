@@ -29,7 +29,8 @@ test('API návrhy cen', async (t) => {
   await t.test('seznam: tvar položky a souhrn', async () => {
     const r = await s.get('/api/v1/proposals');
     assert.equal(r.status, 200);
-    assert.deepEqual(Object.keys(r.json).sort(), ['items', 'limit', 'page', 'summary', 'total']);
+    assert.deepEqual(Object.keys(r.json).sort(), ['flagged', 'items', 'limit', 'max_id', 'page', 'summary', 'total']);
+    assert.equal(r.json.max_id, Math.max(...r.json.items.map((x) => x.id)));
     assert.ok(r.json.total >= 3);
     const it = r.json.items[0];
     for (const k of ['id', 'run_id', 'product_id', 'strategy_id', 'segment_id', 'old_price', 'new_price', 'change_pct', 'margin_before', 'margin_after', 'status', 'manual_price', 'flags', 'explain', 'product', 'strategy_name', 'segment_name', 'final_price', 'cheapest_competitor']) {
@@ -159,16 +160,16 @@ test('API návrhy cen', async (t) => {
   });
 
   await t.test('approve all s filtrem, zamčené produkty se neschválí', async () => {
-    // zamknout P4 → schválení podle filtru ho vynechá
-    await s.patch(`/api/v1/products/${P.P4}`, { locked: true });
-    let r = await s.post('/api/v1/proposals/approve', { all: true, filter: { segment: String(seed.segments.lezaky) } });
+    // zámek přímo v DB (starší data – PATCH zámku by otevřený návrh rovnou zneplatnil) → schválení podle filtru ho vynechá
+    app.db.prepare('UPDATE products SET locked = 1 WHERE id = ?').run(P.P4);
+    let r = await s.post('/api/v1/proposals/approve', { all: true, include_flagged: true, filter: { segment: String(seed.segments.lezaky) } });
     assert.equal(r.status, 200);
     assert.equal(r.json.updated, 1); // P2
     assert.equal(r.json.skipped_locked, 1); // P4
     const x = await byCode();
     assert.equal(x.P2.status, 'approved');
     assert.equal(x.P4.status, 'pending');
-    await s.patch(`/api/v1/products/${P.P4}`, { locked: false });
+    app.db.prepare('UPDATE products SET locked = 0 WHERE id = ?').run(P.P4);
     // reject all s filtrem stavu approved → jen schválené
     r = await s.post('/api/v1/proposals/reject', { all: true, filter: { status: 'approved', q: 'aspero' } });
     assert.equal(r.json.updated, 1);
@@ -176,10 +177,15 @@ test('API návrhy cen', async (t) => {
     // approve all s filtrem stavu approved → nic (schvalují se jen čekající)
     r = await s.post('/api/v1/proposals/approve', { all: true, filter: { status: 'approved' } });
     assert.equal(r.json.updated, 0);
-    // approve all bez filtru → všechny čekající
-    const pending = (await s.get('/api/v1/proposals')).json.total;
-    r = await s.post('/api/v1/proposals/approve', { all: true });
-    assert.equal(r.json.updated, pending);
+    // approve all bez filtru → všechny čekající bez rizikových příznaků; rizikové až s include_flagged
+    const list = (await s.get('/api/v1/proposals')).json;
+    const pending = list.total;
+    r = await s.post('/api/v1/proposals/approve', { all: true, expect: { count: pending, max_id: list.max_id } });
+    assert.equal(r.status, 200, r.text);
+    assert.equal(r.json.skipped_flagged, list.flagged);
+    assert.equal(r.json.updated + r.json.skipped_flagged, pending);
+    r = await s.post('/api/v1/proposals/approve', { all: true, include_flagged: true });
+    assert.equal(r.json.updated, list.flagged);
     assert.equal((await s.get('/api/v1/proposals')).json.total, 0);
   });
 
@@ -207,12 +213,20 @@ test('API návrhy cen', async (t) => {
   await t.test('nový běh nahradí otevřené návrhy (superseded) a seznam produktů to vidí', async () => {
     const before = await s.get('/api/v1/products?has_proposal=1');
     assert.ok(before.json.total >= 1);
+    // trh se pohnul → jiné ceny (stejný návrh by běh jen ponechal – viz engine-run testy)
+    app.db.prepare('UPDATE offers SET price = price - 300').run();
     const r = await s.post('/api/v1/runs', {});
     assert.equal(r.status, 200);
     const sup = await s.get('/api/v1/proposals?status=superseded');
     assert.ok(sup.json.total >= 1);
     const after = await s.get('/api/v1/products?has_proposal=1');
-    assert.ok(after.json.items.every((x) => x.proposal.status === 'pending'));
+    assert.ok(after.json.total >= 1);
+    // otevřené návrhy patří k novému běhu: nové čekají, beze změny ceny zůstal ponechaný (i s lidským schválením)
+    const open = (await s.get('/api/v1/proposals?status=pending,approved&limit=500')).json.items;
+    assert.ok(open.length >= 1);
+    assert.ok(open.every((x) => x.run_id === r.json.run_id), JSON.stringify(open.map((x) => [x.run_id, x.status])));
+    assert.ok(open.every((x) => x.status === 'pending' || x.decided_by === 'admin'));
+    assert.ok(after.json.items.every((x) => open.some((o) => o.id === x.proposal.id)));
   });
 });
 

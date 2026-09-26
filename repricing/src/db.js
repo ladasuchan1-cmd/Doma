@@ -259,6 +259,13 @@ const MIGRATIONS = [
   );
   CREATE INDEX audit_at ON audit(at);
   `,
+  // v2 – „doručeno“: cena a čas, kdy byl schválený návrh naposledy vydán (feed / export / ceník bez označení).
+  // Potvrzení převzetí (POST /export/ack) podle kódů pak označí přesně to, co admin dostal – ne novější návrh,
+  // který mezitím vznikl (přecenění mezi stažením a potvrzením) a který admin nikdy neviděl.
+  `
+  ALTER TABLE proposals ADD COLUMN served_price REAL;
+  ALTER TABLE proposals ADD COLUMN served_at TEXT;
+  `,
 ];
 
 const DEFAULT_SETTINGS = {
@@ -274,7 +281,8 @@ const DEFAULT_SETTINGS = {
     // Po exportu/ack přepsat products.price novou cenou a zapsat do historie.
     update_current_price: true,
     xml: { root: 'prices', item: 'item', fields: ['code', 'ean', 'name', 'price', 'old_price', 'vat_rate', 'currency', 'changed_at'] },
-    pohoda: { ico: '', application: 'Cenotvorba', filter_by: 'code', price_level: '', encoding: 'windows-1250' },
+    // price_level_includes_vat: ceny zvolené cenové hladiny v POHODĚ jsou s DPH (true) / bez DPH (false)
+    pohoda: { ico: '', application: 'Cenotvorba', filter_by: 'code', price_level: '', price_level_includes_vat: true, encoding: 'windows-1250' },
     webhook: { url: '', format: 'json', headers: {}, auto_push: false, timeout_ms: 20000 },
   },
   schedule: {
@@ -286,6 +294,8 @@ const DEFAULT_SETTINGS = {
     auto_push_after_run: false,
   },
   retention_days: 180,
+  // Nahrazené (superseded) návrhy jsou jen historie – mažou se dřív (nejvýše retention_days).
+  retention_superseded_days: 14,
 };
 
 function nowIso(d) {
@@ -347,9 +357,30 @@ function migrate(db) {
  * @returns {import('node:sqlite').DatabaseSync}
  */
 function openDb(file = ':memory:') {
-  if (file !== ':memory:') fs.mkdirSync(path.dirname(path.resolve(file)), { recursive: true });
-  const db = new DatabaseSync(file);
-  if (file !== ':memory:') db.exec('PRAGMA journal_mode = WAL');
+  let db;
+  try {
+    if (file !== ':memory:') fs.mkdirSync(path.dirname(path.resolve(file)), { recursive: true });
+    db = new DatabaseSync(file);
+    // první zápisová operace ověří i právo zápisu do adresáře (WAL, -shm)
+    if (file !== ':memory:') db.exec('PRAGMA user_version');
+  } catch (e) {
+    // „unable to open database file“ bez cesty nic neřekne – typicky bind mount v Dockeru s právy roota (ops-12)
+    if (file === ':memory:') throw e;
+    const abs = path.resolve(file);
+    const uid = typeof process.getuid === 'function' ? process.getuid() : null;
+    const err = new Error(
+      `Nelze otevřít databázi ${abs}${uid != null ? ` (uživatel uid ${uid})` : ''}: ${e.message} – zkontrolujte, že adresář ${path.dirname(abs)} existuje ` +
+        `a je zapisovatelný (v Dockeru s připojeným adresářem např. „chown 1000:1000 ${path.dirname(abs)}“ nebo docker run --user).`
+    );
+    err.code = e.code || 'DB_OPEN_FAILED';
+    err.cause = e;
+    throw err;
+  }
+  if (file !== ':memory:') {
+    db.exec('PRAGMA journal_mode = WAL');
+    // WAL po velké transakci (import, přecenění, úklid) se na disku zkrátí na nejvýše 64 MB (ops-5)
+    db.exec('PRAGMA journal_size_limit = 67108864');
+  }
   db.exec('PRAGMA foreign_keys = ON');
   db.exec('PRAGMA busy_timeout = 5000');
   db.exec('PRAGMA synchronous = NORMAL');

@@ -43,3 +43,91 @@ export function finalMargin(r, defaultVat = 21) {
 export function isManual(r) {
   return r != null && r.manual_price != null && r.manual_price !== '';
 }
+
+/** Otevřený návrh = čeká na schválení nebo je schválený a ještě neexportovaný. */
+export function isOpen(r) {
+  return r != null && (r.status === 'pending' || r.status === 'approved');
+}
+
+/**
+ * Schválený (neexportovaný) návrh, o jehož schválení může přepočet produktu připravit (contract-1). Přecenění
+ * (SPEC §3.6) ponechá otevřený návrh jen tehdy, když vyjde stejná cena; jinak ho nahradí („Nahrazeno“) novým
+ * návrhem – ruční cena se do něj přenese, ale schválení se ztratí a návrh znovu čeká. Čekající návrh (i s ruční
+ * cenou) tedy o nic nepřijde, schválený ano. Vrací takový návrh, jinak null.
+ * @param {object[]} proposals návrhy produktu (GET /products/:id → proposals)
+ */
+export function proposalAtRisk(proposals) {
+  const list = Array.isArray(proposals) ? proposals : [];
+  return list.find((p) => isOpen(p) && p.status === 'approved') || null;
+}
+
+// ------------------------------------------------------------------ výchozí cena návrhu (contract-2)
+
+const CENT = 0.005;
+
+/** Aktuální cena produktu u řádku návrhu (GET /proposals → product.price). */
+export function currentPrice(r) {
+  return toNum(r?.product?.price ?? r?.current_price);
+}
+
+/**
+ * Otevřený návrh vznikl při jiné ceně produktu, než je teď (import katalogu z POHODY, ruční změna ceny).
+ * Jeho old_price a změna v % pak neodpovídají tomu, co schválení opravdu udělá.
+ * @param {object} r návrh
+ * @param {number|null} [current] aktuální cena produktu (výchozí product.price z API)
+ * @returns {{from: number, to: number, taken: boolean}|null} from = cena při vzniku návrhu, to = aktuální cena,
+ *   taken = aktuální cena už odpovídá ceně k exportu (admin ji převzal) – jinak null
+ */
+export function basePriceChange(r, current = currentPrice(r)) {
+  if (!isOpen(r)) return null;
+  const from = toNum(r.old_price);
+  const to = toNum(current);
+  if (from == null || to == null || Math.abs(to - from) < CENT) return null;
+  const fp = finalPrice(r);
+  return { from, to, taken: fp != null && Math.abs(fp - to) < CENT };
+}
+
+/** Výchozí cena pro zobrazení změny: aktuální cena produktu, když se od návrhu změnila, jinak old_price. */
+export function basePrice(r, current) {
+  const ch = basePriceChange(r, current === undefined ? currentPrice(r) : current);
+  return ch ? ch.to : toNum(r.old_price);
+}
+
+/** Změna v % (a Kč), kterou schválení opravdu udělá – proti aktuální ceně, když se od návrhu změnila. */
+export function displayChange(r, current) {
+  const ch = basePriceChange(r, current === undefined ? currentPrice(r) : current);
+  const fp = finalPrice(r);
+  if (!ch) {
+    const old = toNum(r.old_price);
+    return { pct: finalChangePct(r), abs: fp != null && old != null ? round(fp - old, 2) : toNum(r.change_abs) };
+  }
+  return { pct: fp != null && ch.to ? round(((fp - ch.to) / ch.to) * 100, 2) : null, abs: fp != null ? round(fp - ch.to, 2) : null };
+}
+
+/** Návrhy (otevřené), které vznikly při jiné ceně produktu a ještě nebyly převzaty. */
+export function staleProposals(rows) {
+  return (Array.isArray(rows) ? rows : []).filter((r) => {
+    const ch = basePriceChange(r);
+    return ch && !ch.taken;
+  });
+}
+
+// ------------------------------------------------------------------ rozhodování (contract-10)
+
+/** Řádek lze vybrat k hromadné akci: čekající (schválit/zamítnout) i schválený neexportovaný (zamítnout). */
+export function isSelectableProposal(r) {
+  return isOpen(r);
+}
+
+/**
+ * Stav, na který se omezí hromadné „… vše dle filtru“: schvalovat jde jen čekající; zamítat čekající,
+ * na záložce Schváleno schválené (API zamítne i schválené, dokud nejsou exportované).
+ * @param {'approve'|'reject'} kind
+ * @param {string} tab aktuální filtr stavu (pending | approved | all | …)
+ * @returns {'pending'|'approved'|null} null = na této záložce hromadná akce nedává smysl
+ */
+export function bulkStatus(kind, tab) {
+  if (kind === 'approve') return tab === 'pending' || tab === 'all' ? 'pending' : null;
+  if (tab === 'approved') return 'approved';
+  return tab === 'pending' || tab === 'all' ? 'pending' : null;
+}

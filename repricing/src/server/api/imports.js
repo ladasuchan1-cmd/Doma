@@ -6,7 +6,8 @@
 //   POST /api/v1/import/offers    import       surové tělo + ?source=ID, mapping=JSON, replace=competitors|all,
 //                                              max_age_days=N, dry_run=1, filename=
 //        → {ok, import_id, kind, dry_run, source_id, format, item_path, stats[, preview, fields]}
-//   POST /api/v1/import/products  import       surové tělo + ?source=ID, mapping=JSON, deactivate_missing=1, dry_run=1, filename=
+//   POST /api/v1/import/products  import       surové tělo + ?source=ID, mapping=JSON, deactivate_missing=1, force_deactivate=1,
+//                                              dry_run=1, filename= (force_deactivate = dovolit vypnout i víc než polovinu katalogu)
 //        → totéž (stats katalogu)
 //   GET  /api/v1/imports          read|import  ?kind, status, source, origin, page, limit (výchozí 100, max 500)
 //        → {items: [{id, source_id, source_name, kind, format, origin, started_at, finished_at, duration_ms, status, stats, error}], total, page, limit}
@@ -294,9 +295,15 @@ function importOptions(kind, source, q) {
       delete o.maxAgeDays;
       o.max_age_days = parseMaxAge(q.max_age_days);
     }
-  } else if (q.deactivate_missing !== undefined) {
-    delete o.deactivateMissing;
-    o.deactivate_missing = boolValue(q.deactivate_missing);
+  } else {
+    if (q.deactivate_missing !== undefined) {
+      delete o.deactivateMissing;
+      o.deactivate_missing = boolValue(q.deactivate_missing);
+    }
+    if (q.force_deactivate !== undefined) {
+      delete o.forceDeactivate;
+      o.force_deactivate = boolValue(q.force_deactivate);
+    }
   }
   return o;
 }

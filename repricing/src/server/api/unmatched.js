@@ -102,7 +102,8 @@ function listUnmatched(ctx) {
   }
 
   const sortKey = ctx.query.sort ? String(ctx.query.sort).trim() : 'last_seen_at';
-  if (!SORTS[sortKey]) throw new HttpError(400, `Neznámé řazení „${sortKey}“ (povoleno: ${Object.keys(SORTS).join(', ')}).`, { field: 'sort' });
+  // Object.hasOwn: zděděné vlastnosti (constructor, toString…) nejsou povolená řazení (security-5)
+  if (!Object.hasOwn(SORTS, sortKey)) throw new HttpError(400, `Neznámé řazení „${sortKey}“ (povoleno: ${Object.keys(SORTS).join(', ')}).`, { field: 'sort' });
   const dirRaw = ctx.query.dir ? String(ctx.query.dir).trim().toLowerCase() : sortKey === 'name' || sortKey === 'competitor' ? 'asc' : 'desc';
   if (dirRaw !== 'asc' && dirRaw !== 'desc') throw new HttpError(400, 'Parametr „dir“ musí být asc nebo desc.', { field: 'dir' });
   const dir = dirRaw.toUpperCase();

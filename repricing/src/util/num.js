@@ -3,8 +3,17 @@
 
 /**
  * Převede „12 990 Kč“, „12.990,-“, „12,990.00“, „1234.00 CZK“, „12 990,50“, 12990 → číslo.
+ *
+ * Heuristika bez vynuceného oddělovače (jediný oddělovač v čísle):
+ *  - „12.990“ (tečka + přesně 3 číslice) = tisíce (české exporty) – jen pokud dotThousands !== false; XML a JSON
+ *    (xsd:double) mají tečku vždy desetinnou, tam se volá s dotThousands: false („1299.000“ = 1299, ne 1 299 000),
+ *  - „1,234“ = tisíce – jen pokud commaThousands !== false; český CSV (oddělovač „;“) má čárku vždy desetinnou
+ *    („123,456“ = 123,456 – nákupní ceny přepočtené z EUR mívají 3 desetinná místa),
+ *  - skupina tisíců nikdy nezačíná nulou: „0,125“ = 0,125 a „0.999“ = 0,999.
+ * Měna: „Kč“ a „CZK“ se odstraní; jiná měna (EUR, €, $, USD) = null – cenu v cizí měně nelze tiše brát jako Kč.
  * @param {*} v vstup
- * @param {{decimal?: ','|'.'}} [opts] vynucený desetinný oddělovač (jinak heuristika)
+ * @param {{decimal?: ','|'.', dotThousands?: boolean, commaThousands?: boolean}} [opts] decimal = vynucený desetinný
+ *   oddělovač (jinak heuristika)
  * @returns {number|null}
  */
 function parseNumber(v, opts = {}) {
@@ -18,11 +27,12 @@ function parseNumber(v, opts = {}) {
     negative = true;
     s = s.slice(1, -1);
   }
-  // odstranit měnu, mezery (vč. NBSP a úzkých mezer), apostrofy, koncové ",-" / ".-"
+  // odstranit měnu Kč/CZK, mezery (vč. NBSP a úzkých mezer), apostrofy, koncové ",-" / ".-";
+  // EUR / € / $ / USD se neodstraňují → hodnota v cizí měně není číslo (money-13)
   s = s
     .replace(/[   \s']/g, '')
-    .replace(/(kč|czk|eur|€|\$|usd|%|,-|\.-|–|—)$/gi, '')
-    .replace(/^(kč|czk|eur|€|\$|usd)/gi, '')
+    .replace(/(kč|czk|%|,-|\.-|–|—)$/gi, '')
+    .replace(/^(kč|czk)/gi, '')
     .replace(/,-$|\.-$/, '');
   if (s.startsWith('-')) {
     negative = !negative;
@@ -45,10 +55,12 @@ function parseNumber(v, opts = {}) {
     const sep = lastComma >= 0 ? ',' : '.';
     const count = s.split(sep).length - 1;
     const after = s.length - s.lastIndexOf(sep) - 1;
+    const intPart = s.slice(0, s.indexOf(sep));
     // „12,5“ / „12.50“ = desetinné; „12.990“ / „1,234,567“ = tisíce (víc oddělovačů nebo přesně 3 číslice)
     if (count > 1) dec = null; // všechny jsou oddělovače tisíců
-    else if (after === 3 && sep === '.' ) dec = null; // „12.990“ – v CZ exportech tisíce
-    else if (after === 3 && sep === ',' && /^\d{1,3},\d{3}$/.test(s)) dec = null; // „1,234“ – tisíce
+    else if (/^0/.test(intPart)) dec = sep; // „0,125“ / „0.999“ – skupina tisíců nezačíná nulou
+    else if (after === 3 && sep === '.' && opts.dotThousands !== false) dec = null; // „12.990“ – v CZ exportech tisíce
+    else if (after === 3 && sep === ',' && opts.commaThousands !== false && /^\d{1,3},\d{3}$/.test(s)) dec = null; // „1,234“ – tisíce
     else dec = sep;
   }
   let normalized;
@@ -56,7 +68,8 @@ function parseNumber(v, opts = {}) {
     const thousands = dec === ',' ? '.' : ',';
     const parts = s.split(thousands).join('');
     const idx = parts.lastIndexOf(dec);
-    normalized = parts.slice(0, idx).split(dec).join('') + '.' + parts.slice(idx + 1);
+    // bez desetinného oddělovače je číslo celé („12990“ s vynucenou čárkou) – dřív z něj vznikalo 1299.1299
+    normalized = idx < 0 ? parts : parts.slice(0, idx).split(dec).join('') + '.' + parts.slice(idx + 1);
   } else {
     normalized = s.replace(/[.,]/g, '');
   }

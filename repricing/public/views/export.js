@@ -3,12 +3,12 @@ import { h, mount } from '../lib/dom.js';
 import { api, apiUrl, itemsOf, isAbort, basePath, bindDownload } from '../lib/api.js';
 import { icon } from '../lib/icons.js';
 import { DataTable } from '../lib/table.js';
-import { card, kpi, emptyState, callout, codeBlock, copyField, jobStatusBadge, checkbox, select, field, dl, button, changeEl } from '../lib/ui.js';
+import { card, kpi, emptyState, callout, codeBlock, copyField, jobStatusBadge, checkbox, select, field, dl, button, changeEl, badge } from '../lib/ui.js';
 import { confirmDialog } from '../lib/modal.js';
 import { toast } from '../lib/toast.js';
-import { int, dateTime, relTime, EXPORT_KIND_LABELS, count, truncate, duration, detailText } from '../lib/format.js';
+import { int, money, dateTime, relTime, EXPORT_KIND_LABELS, count, truncate, duration, detailText } from '../lib/format.js';
 import { priceMove } from '../lib/decision.js';
-import { finalPrice, finalChangePct } from '../lib/proposal-model.js';
+import { finalPrice, basePrice, basePriceChange, displayChange } from '../lib/proposal-model.js';
 
 export const title = 'Export';
 
@@ -18,6 +18,7 @@ export async function show(root, ctx) {
   const feedBase = origin + '/feed/';
   let settings = null;
   let approved = null;
+  let pushBtn = null;
 
   const approvedHost = h('div');
   const webhookHost = h('div');
@@ -175,7 +176,12 @@ export async function show(root, ctx) {
             'li',
             { dataset: { proposalId: r.id } },
             h('div', { class: 'export-preview-name' }, h('a', { href: '#/produkty/' + encodeURIComponent(r.product_id), title: p.name || '' }, p.name || p.code || '#' + r.product_id), h('span', { class: 'mono muted small' }, p.code || '')),
-            h('div', { class: 'export-preview-price' }, priceMove(r.old_price, finalPrice(r)), changeEl(finalChangePct(r)))
+            // contract-2: když se cena produktu od návrhu změnila, ukázat změnu proti aktuální ceně a označit
+            (() => {
+              const ch = basePriceChange(r);
+              return h('div', { class: 'export-preview-price' }, priceMove(basePrice(r), finalPrice(r)), changeEl(displayChange(r).pct),
+                ch && !ch.taken ? badge('cena se změnila', 'warning', 'Cena produktu se od návrhu změnila: ' + money(ch.from) + ' → ' + money(ch.to) + '. Návrh vychází ze staré ceny – doporučujeme produkt přecenit.') : null);
+            })()
           );
         }),
         approved > rows.length ? h('li', { class: 'muted small' }, '… a další ' + count(approved - rows.length, 'změna', 'změny', 'změn')) : null
@@ -196,9 +202,22 @@ export async function show(root, ctx) {
         ),
       })
     );
+    updatePushBtn();
+  }
+
+  /** contract-17: bez URL webhooku nebo bez schválených změn není co odeslat – tlačítko vypnout a říct proč. */
+  function updatePushBtn() {
+    if (!pushBtn) return;
+    const url = settings?.export?.webhook?.url;
+    pushBtn.disabled = !url || approved === 0;
+    pushBtn.title = !url ? 'Nejdřív nastavte URL webhooku' : approved === 0 ? 'Nic k odeslání – žádné schválené změny' : 'Odeslat schválené změny na ' + url;
   }
 
   async function push(btn) {
+    if (approved === 0) {
+      toast('Nic k odeslání – žádné schválené změny', { type: 'info' });
+      return;
+    }
     const ok = await confirmDialog({ title: 'Odeslat schválené změny', message: 'Odeslat ' + (approved ? count(approved, 'schválenou změnu', 'schválené změny', 'schválených změn') : 'schválené změny') + ' na ' + settings.export.webhook.url + '? Po úspěchu se označí jako exportované.', confirmLabel: 'Odeslat' });
     if (!ok) return;
     btn.disabled = true;
@@ -206,18 +225,28 @@ export async function show(root, ctx) {
     const resultHost = webhookHost.querySelector('[data-role="push-result"]');
     try {
       const r = await api.post('/export/push', {});
-      const good = r && r.ok !== false;
-      toast(good ? 'Odesláno: ' + count(r?.count ?? 0, 'změna', 'změny', 'změn') : 'Webhook selhal (HTTP ' + (r?.status ?? '?') + ')', { type: good ? 'success' : 'error' });
+      const held = Array.isArray(r?.held) ? r.held.length : 0;
+      const heldText = held ? count(held, 'schválená změna zadržena', 'schválené změny zadrženy', 'schválených změn zadrženo') + ' kontrolou před exportem' : null;
+      // contract-17: server nic neposlal (žádné schválené změny) – to není úspěšné odeslání
+      const nothing = r && r.ok !== false && (r.skipped === 'no_changes' || (!r.count && r.status == null));
+      const good = r && r.ok !== false && !nothing;
+      if (nothing) toast('Nic se neodeslalo – žádné schválené změny k odeslání' + (heldText ? ' (' + heldText + ')' : ''), { type: held ? 'warning' : 'info' });
+      else toast(good ? 'Odesláno: ' + count(r?.count ?? 0, 'změna', 'změny', 'změn') + (heldText ? ' · ' + heldText : '') : 'Webhook selhal (HTTP ' + (r?.status ?? '?') + ')', { type: good ? (held ? 'warning' : 'success') : 'error' });
       if (resultHost) {
-        mount(resultHost, callout(h('div', null, dl([['Výsledek', good ? 'OK' : 'Chyba'], ['HTTP status', String(r?.status ?? '–')], ['Doba', duration(r?.duration_ms)], ['Odesláno', int(r?.count)], r?.export_id ? ['Export', '#' + r.export_id] : null, r?.body ? ['Odpověď', h('code', { class: 'small' }, truncate(String(r.body), 300))] : null])), good ? 'success' : 'danger'));
+        mount(
+          resultHost,
+          nothing
+            ? callout(h('div', null, dl([['Výsledek', 'Nic se neodeslalo – žádné schválené změny'], heldText ? ['Zadrženo', heldText] : null])), held ? 'warning' : 'info')
+            : callout(h('div', null, dl([['Výsledek', good ? 'OK' : 'Chyba'], ['HTTP status', String(r?.status ?? '–')], ['Doba', duration(r?.duration_ms)], ['Odesláno', int(r?.count)], heldText ? ['Zadrženo', heldText] : null, r?.export_id ? ['Export', '#' + r.export_id] : null, r?.body ? ['Odpověď', h('code', { class: 'small' }, truncate(String(r.body), 300))] : null])), good ? 'success' : 'danger')
+        );
       }
-      ctx.notifyChanged('export');
+      if (!nothing) ctx.notifyChanged('export');
     } catch {
       /* toast */
     }
-    btn.disabled = false;
     btn.classList.remove('is-busy');
-    loadApproved();
+    btn.disabled = false;
+    await loadApproved();
     loadLog();
   }
 
@@ -234,8 +263,9 @@ export async function show(root, ctx) {
       pohodaEnc.value = enc;
       updatePohoda();
     }
-    const pushBtn = button('Odeslat schválené změny', { icon: 'send', variant: 'primary', disabled: !wh.url, dataset: { action: 'push' } });
+    pushBtn = button('Odeslat schválené změny', { icon: 'send', variant: 'primary', disabled: !wh.url, dataset: { action: 'push' } });
     pushBtn.addEventListener('click', () => push(pushBtn));
+    updatePushBtn();
     mount(
       webhookHost,
       card({

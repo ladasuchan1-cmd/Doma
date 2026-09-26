@@ -15,7 +15,7 @@ dokumentace mServeru. Níže uvedené příklady byly ověřeny `xmllint --schem
 | Filtr podle EAN | POHODA **odmítne aktualizaci, pokud filtru odpovídá více zásob** („Pro daný filtr bylo nalezeno více jak 1 záznam“). EAN v POHODĚ není unikátní → doporučujeme filtr podle kódu. |
 | Cena | `stk:stockHeader/stk:sellingPrice payVAT="true"` = prodejní cena **s DPH**. Bez atributu je cena bez DPH! Hodnota `xsd:double` – desetinná tečka, bez oddělovačů tisíců. |
 | Vedlejší efekt | Od verze 13100 změna prodejní ceny přes XML nastaví na zásobě „fixaci prodejní ceny“. |
-| Cenové hladiny | Oficiálně přes samostatnou agendu `dis:discount` (discount.xsd, od verze 13400): `dis:discountStockItem/dis:stockItem/typ:stockItem/typ:ids` = kód zásoby, `dis:discounts/dis:discountsItem/dis:filter/dis:priceLevel/typ:ids` = kód cenové hladiny, `dis:price` = cena. Zda je `dis:price` s DPH, řídí nastavení hladiny (`calculation`). |
+| Cenové hladiny | Oficiálně přes samostatnou agendu `dis:discount` (discount.xsd, od verze 13400): `dis:discountStockItem/dis:stockItem/typ:stockItem/typ:ids` = kód zásoby, `dis:discounts/dis:discountsItem/dis:filter/dis:priceLevel/typ:ids` = kód cenové hladiny, `dis:price` = cena. Zda je `dis:price` s DPH, řídí nastavení hladiny (`calculation`) – v Cenotvorbě tomu odpovídá nastavení `export.pohoda.price_level_includes_vat` (výchozí `true` = posílá se cena s DPH; `false` = cena bez DPH podle sazby produktu). |
 | Namespaces | `dat` `http://www.stormware.cz/schema/version_2/data.xsd`, `stk` `…/stock.xsd`, `ftr` `…/filter.xsd`, `typ` `…/type.xsd`, `dis` `…/discount.xsd` |
 
 ## (a) Aktualizace prodejní ceny podle kódu
@@ -119,6 +119,21 @@ existuje `producedDetails/id`. Varování (např. 603 „Hodnota prvku musela b�
 Cenotvorba takový export načte jako „katalog“ (XML, cesta položek `responsePack.responsePackItem.listStock.stock`, prefixy
 jmenných prostorů se odstraňují, pole se napárují automaticky – `code`, `EAN`, `name`, `purchasingPrice`, `sellingPrice`,
 `count`, `producer`).
+
+Co Cenotvorba při importu z POHODY hlídá:
+
+- **Základ DPH podle `@payVAT` u každé karty.** `stk:sellingPrice payVAT="false"` = cena bez DPH → převede se na cenu
+  s DPH podle `stk:sellingRateVAT` karty; `stk:purchasingPrice payVAT="true"` = nákupní cena s DPH → převede se na cenu
+  bez DPH. Bez atributu platí výchozí předpoklad (prodejní s DPH, nákupní bez DPH, případně nastavení „Nákupní ceny
+  s DPH“). Údaj karty má přednost před globálním nastavením.
+- **Cenové hladiny karty (`stk:stockPriceItem/stk:stockPrice`) se nečtou jako prodejní cena.** Cenou produktu je vždy
+  `stk:stockHeader/stk:sellingPrice`; hladiny (Dealer, VO…) skončí jen v atributech a nerozkládají se na řádky.
+- **Přírůstkový export s jedinou změněnou kartou** (`ftr:lastChanges`) se načte jako jedna karta – ne jako její
+  cenové hladiny nebo parametry.
+- **Stejný kód ve více skladech** – varování „Kód … je v importu N×“, platí poslední řádek a do historie cen se zapíše
+  jen výsledná cena (omezte export filtrem na sklad e-shopu).
+- Deaktivace chybějících (`deactivate_missing`) se neprovede, pokud by vypnula víc než polovinu katalogu (typicky
+  omylem nahraný přírůstkový export) – vědomě ji povolí `force_deactivate=1`.
 
 ## Ověření schématem (vývoj)
 XSD nejsou součástí repozitáře (licence Stormware). Stáhněte `https://www.stormware.cz/xml/schema/all_schema_ver2.zip`,

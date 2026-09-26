@@ -796,7 +796,22 @@ function safeReviver(key, value) {
   return key === '__proto__' ? undefined : value;
 }
 
-function parseJsonBody(buf, ct) {
+// Výchozí limit JSON těla parsovaného do ctx.body (config.maxJsonMb) – hluboko pod limity V8 (security-1).
+const DEFAULT_JSON_LIMIT = 32 * 1024 * 1024;
+
+function jsonTooLarge(limit) {
+  return new HttpError(
+    413,
+    `JSON v těle požadavku je příliš velký (limit ${Math.round((limit / 1024 / 1024) * 10) / 10} MB). Velká data posílejte jako import (POST /api/v1/import/…).`,
+    { limit_bytes: limit },
+    { headers: { Connection: 'close' } }
+  );
+}
+
+function parseJsonBody(buf, ct, limit = DEFAULT_JSON_LIMIT) {
+  // Kontrola PŘED dekódováním a JSON.parse: JSON.parse pole se stovkami milionů prvků shodí celý proces
+  // nezachytitelnou chybou V8 („Fatal JavaScript invalid size error“) – try/catch ho nezachrání.
+  if (buf.length > limit) throw jsonTooLarge(limit);
   const text = decodeText(buf, ct);
   try {
     return JSON.parse(text, safeReviver);
@@ -805,8 +820,9 @@ function parseJsonBody(buf, ct) {
   }
 }
 
-/** Připojí k ctx líně parsované ctx.body a ctx.bodyType. */
-function attachBody(ctx) {
+/** Připojí k ctx líně parsované ctx.body a ctx.bodyType. opts.jsonLimit = max. bajtů JSON těla. */
+function attachBody(ctx, opts = {}) {
+  const jsonLimit = opts.jsonLimit > 0 ? opts.jsonLimit : DEFAULT_JSON_LIMIT;
   const ct = parseContentType(ctx.req.headers['content-type']);
   ctx.contentType = ct.type;
   const buf = ctx.rawBody;
@@ -829,8 +845,9 @@ function attachBody(ctx) {
       case 'empty':
         return {};
       case 'json':
-        return parseJsonBody(buf, ct);
+        return parseJsonBody(buf, ct, jsonLimit);
       case 'sniff-json': {
+        if (buf.length > jsonLimit) throw jsonTooLarge(jsonLimit);
         const text = decodeText(buf, ct);
         try {
           return JSON.parse(text, safeReviver);
@@ -914,7 +931,8 @@ async function handleError(ctx, err) {
     }
     return;
   }
-  const httpErr = toHttpError(err, { exposeInternal: !!ctx.user });
+  // Text interní chyby (např. hláška SQLite) jen pro správce – ne pro tokeny read/import/export (security-5).
+  const httpErr = toHttpError(err, { exposeInternal: !!ctx.user && Array.isArray(ctx.scopes) && ctx.scopes.includes('admin') });
   if (httpErr.status >= 500) {
     log.error(`${req.method} ${ctx.path} → ${httpErr.status}: ${err && err.message}`, { stack: err && err.stack, ip: ctx.ip, user: ctx.user });
   } else {
@@ -941,7 +959,7 @@ async function handleError(ctx, err) {
  * @returns {Function & {router, config, db, apiModules}}
  */
 function createApp({ db, config = {}, log = defaultLog, router, setup, api = true, deps = {}, clock } = {}) {
-  const cfg = { maxBodyMb: 300, publicDir: null, trustProxy: false, ...config };
+  const cfg = { maxBodyMb: 300, maxJsonMb: 32, publicDir: null, trustProxy: false, ...config };
   const r = router || createRouter({ log });
   let apiModules = null;
   if (api) apiModules = require('./api').registerRoutes(r, { db, config: cfg, log, ...deps });
@@ -1065,11 +1083,15 @@ async function handleRequest(app, req, res) {
 
     // 2) tělo
     const maxMb = route.opts.maxBodyMb ?? (route.auth === 'public' ? Math.min(1, config.maxBodyMb) : config.maxBodyMb);
-    const limitBytes = Math.max(0, Math.floor(Number(maxMb) * 1024 * 1024));
+    let limitBytes = Math.max(0, Math.floor(Number(maxMb) * 1024 * 1024));
+    const jsonLimit = Math.floor(Number(config.maxJsonMb ?? 32) * 1024 * 1024);
+    // Běžná JSON API (bez vlastního limitu – ne importy souborů): tělo ani jeho dekomprese nesmí přesáhnout limit JSON
+    // (security-1 – jinak by se stovky MB načetly/rozbalily do paměti jen proto, aby je JSON.parse odmítl).
+    if (route.opts.maxBodyMb == null && isJsonType(parseContentType(req.headers['content-type']).type)) limitBytes = Math.min(limitBytes, jsonLimit);
     let body = await readBody(req, limitBytes);
     body = await decodeContentEncoding(req, body, limitBytes);
     ctx.rawBody = body;
-    attachBody(ctx);
+    attachBody(ctx, { jsonLimit });
 
     // 3) handler
     const result = await route.handler(ctx);

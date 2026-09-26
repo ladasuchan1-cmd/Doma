@@ -186,17 +186,26 @@ test('runPricing: nový běh označí starší pending + approved (neexportovan�
   assert.strictEqual(props[0].status, 'approved');
 });
 
-test('runPricing: druhý běh nahradí návrhy prvního běhu', () => {
-  const { db } = baseDb();
+test('runPricing: druhý běh se stejným výsledkem návrhy ponechá (přesune do nového běhu), změněný trh je nahradí', () => {
+  // ops-1: stejné rozhodnutí = stejný návrh; neduplikuje se a zachová stav (i lidské schválení)
+  const { db, p2, vm } = baseDb();
   insStrategy(db, 'S1', cfg(S1CFG), { priority: 10 });
   const r1 = RUN().runPricing(db, { now: NOW });
   const r2 = RUN().runPricing(db, { now: NOW });
   assert.notStrictEqual(r1.run_id, r2.run_id);
-  const first = proposalsOf(db, r1.run_id);
-  assert.strictEqual(first.length, 2);
-  assert.ok(first.every((p) => p.status === 'superseded'), JSON.stringify(first.map((p) => p.status)));
+  assert.strictEqual(proposalsOf(db, r1.run_id).length, 0, 'ponechané návrhy patří k novému běhu');
   const second = proposalsOf(db, r2.run_id);
   assert.deepStrictEqual(second.map((p) => p.status), ['approved', 'pending']);
+  assert.strictEqual(r2.stats.kept, 2);
+  assert.strictEqual(r2.stats.superseded, 0);
+  assert.strictEqual(db.prepare('SELECT COUNT(*) AS c FROM proposals').get().c, 2, 'žádné kopie');
+  // trh u P2 se pohnul (VeloMarket zdražil) → jiné rozhodnutí → starý návrh superseded
+  db.prepare('UPDATE offers SET price = 34990 WHERE product_id = ? AND competitor_id = ?').run(p2, vm);
+  const r3 = RUN().runPricing(db, { now: NOW });
+  assert.strictEqual(r3.stats.superseded, 1);
+  assert.strictEqual(r3.stats.kept, 1);
+  const old = second.find((p) => p.product_id === p2);
+  assert.strictEqual(statusOf(db, old.id), 'superseded');
 });
 
 test('runPricing: superseded platí i pro vyhodnocený produkt, u kterého nový běh nenavrhl změnu', () => {
@@ -213,14 +222,20 @@ test('runPricing: superseded platí i pro vyhodnocený produkt, u kterého nový
   assert.strictEqual(statusOf(db, pend), 'superseded');
 });
 
-test('runPricing: neaktivní produkt se nevyhodnocuje a jeho návrhy zůstávají', () => {
-  const { db, p4 } = baseDb();
+test('runPricing: neaktivní produkt se nevyhodnocuje; úplný běh jeho otevřené návrhy zneplatní (money-4)', () => {
+  const { db, p4, p1 } = baseDb();
   insStrategy(db, 'S1', cfg(S1CFG));
   const old = insRun(db);
   const pend = insProposal(db, old, p4, 'pending');
+  const appr = insProposal(db, old, p4, 'approved', { decided_by: 'auto', decided_at: daysAgo(2) });
+  // běh omezený na jiné produkty neaktivní produkty neřeší
+  RUN().runPricing(db, { now: NOW, productIds: [p1] });
+  assert.strictEqual(statusOf(db, pend), 'pending');
   const res = RUN().runPricing(db, { now: NOW });
   assert.ok(!proposalsOf(db, res.run_id).some((p) => p.product_id === p4));
-  assert.strictEqual(statusOf(db, pend), 'pending');
+  // po reaktivaci produktu se tak nevyexportuje starý schválený návrh spočítaný z dávno neplatného trhu
+  assert.strictEqual(statusOf(db, pend), 'superseded');
+  assert.strictEqual(statusOf(db, appr), 'superseded');
 });
 
 test('runPricing: productIds omezí běh na vybrané produkty', () => {
@@ -607,7 +622,10 @@ test('simulate: segment_id, bez filtru = všechny aktivní, limit', () => {
   assert.strictEqual(r2.stats.changes, 2);
   assert.strictEqual(r2.decisions.length, 3); // 2 změny + 1 skip
   const r3 = RUN().simulate(db, { config: cfg(S1CFG), now: NOW, limit: 1 });
-  assert.ok(r3.decisions.length <= 1);
+  // limit platí zvlášť pro změny a pro přeskočené (contract-6): 1 změna + 1 přeskočená
+  assert.strictEqual(r3.decisions.filter((d) => d.action === 'change').length, 1);
+  assert.ok(r3.decisions.filter((d) => d.action === 'skip').length <= 1);
+  assert.strictEqual(r3.truncated.changes, true);
   assert.strictEqual(count(db, 'SELECT count(*) c FROM runs'), 0);
 });
 

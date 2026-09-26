@@ -73,6 +73,8 @@ test('perf: runPricing 30 000 produktů × 8 konkurentů < 5 s', { timeout: 1200
   const t1 = performance.now();
   const res2 = runPricing(db, { now: NOW });
   const ms2 = performance.now() - t1;
-  assert.equal(res2.stats.superseded, res.stats.changes);
+  // stejná data → návrhy se ponechají (ops-1), nic se nekopíruje
+  assert.equal(res2.stats.kept + res2.stats.superseded, res.stats.changes);
+  assert.equal(db.prepare('SELECT COUNT(*) c FROM proposals').get().c, res.stats.changes);
   assert.ok(ms2 < 5000, `druhý běh trval ${Math.round(ms2)} ms`);
 });

@@ -1,6 +1,8 @@
 // Model importu – kanonická pole (SPEC §3.1, §3.3), sestavení mapování, typ souboru,
 // popisky statistik a ukázky volání API (curl). Čistý modul bez DOM.
 
+import { int, count } from './format.js';
+
 /** Kanonická pole podle druhu importu. required = povinné (lze nahradit výchozí hodnotou). */
 export const CANONICAL = {
   products: [
@@ -135,6 +137,39 @@ export function statsList(stats) {
     out.push({ key, label: STAT_LABELS[key], value: Array.isArray(v) ? v.length : v });
   }
   return out;
+}
+
+/**
+ * Potvrzení ostrého importu katalogu s volbou „Deaktivovat produkty, které v souboru chybí“ (contract-8).
+ * Soubor s částí katalogu by jedním klikem deaktivoval skoro všechny produkty (vypadnou z přecenění, seznamů
+ * i exportu a zpět je vrátí jen další úplný import) – proto vždy danger potvrzení, pokud možno s počtem ze zkušebního
+ * importu (jen když zkušební import proběhl se stejnou volbou, jinak by počet 0 mátl).
+ * @param {{stats?: {deactivated?: number, received?: number}}|null} dryResult výsledek zkušebního importu
+ * @param {{dryWithDeactivate?: boolean, activeTotal?: number|null}} [o] dryWithDeactivate = zkušební import běžel s deaktivací;
+ *   activeTotal = počet aktivních produktů (pro „z N“)
+ * @returns {{title: string, message: string, confirmLabel: string, danger: boolean}}
+ */
+export function deactivateMissingConfirm(dryResult, o = {}) {
+  const n = o.dryWithDeactivate && dryResult?.stats ? Number(dryResult.stats.deactivated) : NaN;
+  const total = Number(o.activeTotal);
+  // server může deaktivaci odmítnout (např. víc než polovina katalogu) – hlášku ze zkušebního importu zopakovat
+  const notes = o.dryWithDeactivate && Array.isArray(dryResult?.stats?.errors)
+    ? dryResult.stats.errors.map((e) => (typeof e === 'string' ? e : e?.message)).filter((m) => m && /deaktivac/i.test(m))
+    : [];
+  let message;
+  if (Number.isFinite(n) && n === 0 && notes.length) {
+    return { title: 'Deaktivovat chybějící produkty', message: 'Zkušební import: ' + notes.join(' ') + ' Ostatní změny katalogu se naimportují. Pokračovat?', confirmLabel: 'Importovat', danger: false };
+  }
+  if (Number.isFinite(n)) {
+    message = 'Podle zkušebního importu se deaktivuje ' + count(n, 'produkt', 'produkty', 'produktů') +
+      (Number.isFinite(total) && total > 0 ? ' z ' + int(total) + ' aktivních' : '') +
+      ', které v souboru chybí. Vypadnou z přecenění, seznamů i exportu; zpět je aktivuje jen další úplný import katalogu. Pokračovat?';
+  } else {
+    message = 'Všechny aktivní produkty' + (Number.isFinite(total) && total > 0 ? ' (nyní ' + int(total) + ')' : '') +
+      ', které v souboru chybí, se deaktivují – vypadnou z přecenění, seznamů i exportu. Použijte jen u úplného exportu katalogu; ' +
+      'počet ověříte zkušebním importem. Pokračovat?';
+  }
+  return { title: 'Deaktivovat chybějící produkty', message, confirmLabel: 'Importovat a deaktivovat', danger: true };
 }
 
 /** Ukázky volání API pro posílání dat (curl). */

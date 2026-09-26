@@ -218,6 +218,11 @@ export async function show(root, ctx) {
       dirty = false;
       dirtyBadge.hidden = true;
       toast('Segment uložen' + (res?.count != null ? ' – ' + count(res.count, 'produkt', 'produkty', 'produktů') : ''), { type: 'success' });
+      // contract-20: nový název hned do titulku a drobečkové navigace
+      if (!isNew) {
+        const nm = res?.name ?? body.name;
+        ctx.setTitle(nm, h('span', null, h('a', { href: '#/segmenty' }, 'Segmenty'), ' / ' + nm));
+      }
       if (isNew && res?.id) ctx.navigate('#/segmenty/' + res.id, { replace: true });
     } catch {
       /* toast */

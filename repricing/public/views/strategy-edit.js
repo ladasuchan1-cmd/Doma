@@ -4,7 +4,7 @@ import { api, cachedGet, itemsOf, isAbort, invalidate } from '../lib/api.js';
 import { icon } from '../lib/icons.js';
 import { card, field, switchEl, emptyState, errorState, skeletonBlocks, badge, callout, numberInput, segmented, changeEl } from '../lib/ui.js';
 import { strategyForm } from '../lib/strategy-form.js';
-import { describeStrategy, validateConfig, mergeConfig } from '../lib/strategy-model.js';
+import { describeStrategy, validateConfig, mergeConfig, precedingStrategies } from '../lib/strategy-model.js';
 import { runStatsView } from '../lib/run-stats.js';
 import { histogram } from '../lib/charts.js';
 import { DataTable } from '../lib/table.js';
@@ -30,15 +30,18 @@ export async function show(root, ctx) {
   let strategy;
   let segments = [];
   let competitors = [];
+  let allStrategies = []; // pořadí strategií – simulace ho ignoruje, UI na to upozorní (contract-5)
   try {
-    const [s, segs, comps] = await Promise.all([
+    const [s, segs, comps, strs] = await Promise.all([
       isNew ? Promise.resolve(null) : api.get('/strategies/' + encodeURIComponent(ctx.params.id), null, { signal: ctx.signal, silent: true }),
       cachedGet('/segments', null, 5000).catch(() => ({ items: [] })),
       cachedGet('/competitors', null, 30000).catch(() => ({ items: [] })),
+      cachedGet('/strategies', null, 5000).catch(() => ({ items: [] })),
     ]);
     strategy = s;
     segments = itemsOf(segs);
     competitors = itemsOf(comps);
+    allStrategies = itemsOf(strs);
   } catch (e) {
     if (isAbort(e)) return;
     if (e.status === 404) {
@@ -111,6 +114,7 @@ export async function show(root, ctx) {
   // ------------------------------------------------ shrnutí + akce
   const summaryText = h('p', { class: 'summary-text', 'aria-live': 'polite' });
   const validationEl = h('div');
+  const orderEl = h('div', { dataset: { role: 'order-warning' } });
   const dirtyBadge = badge('Neuloženo', 'warning');
   const saveBtn = h('button', { type: 'button', class: 'btn btn-primary', dataset: { action: 'save-strategy' }, onClick: () => save() }, icon('check', { size: 16 }), h('span', null, 'Uložit'));
   const simBtn = h('button', { type: 'button', class: 'btn', dataset: { action: 'simulate' }, onClick: () => simulate() }, icon('eye', { size: 16 }), h('span', null, 'Simulovat'));
@@ -125,7 +129,7 @@ export async function show(root, ctx) {
       Array.isArray(strategy?.config_errors) && strategy.config_errors.length
         ? callout(h('div', null, h('b', null, 'Uložená konfigurace je neplatná – přecenění strategii přeskakuje:'), h('ul', { class: 'validation-list' }, strategy.config_errors.map((e) => h('li', null, e)))), 'danger')
         : null,
-      summaryText, validationEl, h('div', { class: 'sticky-actions' }, saveBtn, simBtn, delBtn), h('p', { class: 'field-help' }, 'Simulace spočítá dopad na aktuálních datech bez uložení a bez vzniku návrhů.'),
+      summaryText, validationEl, orderEl, h('div', { class: 'sticky-actions' }, saveBtn, simBtn, delBtn), h('p', { class: 'field-help' }, 'Simulace spočítá dopad na aktuálních datech bez uložení a bez vzniku návrhů. Hodnotí strategii samostatně – pořadí strategií ignoruje.'),
     ],
     dataset: { card: 'summary' },
   });
@@ -134,6 +138,35 @@ export async function show(root, ctx) {
 
   function segNameOf(id) {
     return segments.find((s) => String(s.id) === String(id))?.name || null;
+  }
+
+  /** Zapnuté strategie před touto (v pořadí priority) – pro upozornění u simulace (contract-5). */
+  function preceding() {
+    return precedingStrategies(allStrategies, { id: isNew ? null : ctx.params.id, priority: model.priority });
+  }
+
+  function strategyLink(s) {
+    return h('a', { href: '#/strategie/' + encodeURIComponent(s.id) }, s.name || '#' + s.id);
+  }
+
+  /**
+   * Vysvětlení, co simulace (ne)počítá. Simulace (SPEC §6.8, POST /simulate) hodnotí strategii samostatně na celém
+   * segmentu – produkty, které v ostrém přecenění převezme strategie dřív v pořadí, započítá taky. Bez tohoto
+   * upozornění by „Dopad na marži“ vypadal jako skutečný efekt (contract-5).
+   */
+  function simulationNote() {
+    const { list, catchAll } = preceding();
+    const parts = [h('b', null, 'Simulace hodnotí tuto strategii samostatně a ostatní strategie ignoruje. ')];
+    if (list.length) {
+      parts.push('Produkty, které v přecenění převezme strategie dřív v pořadí (', list.slice(0, 4).map((s, i) => [i ? ', ' : '', strategyLink(s)]), list.length > 4 ? ' a další' : '', '), jsou započítané také – skutečný dopad bude menší.');
+    } else {
+      parts.push('Před touto strategií není žádná zapnutá strategie, dopad odpovídá přecenění (pokud se pořadí nezmění).');
+    }
+    if (catchAll) {
+      parts.push(' ', h('b', null, 'Strategie „' + (catchAll.name || '#' + catchAll.id) + '“ je dřív v pořadí a platí pro všechny produkty bez podmínek – v přecenění převezme skoro všechny produkty a tato strategie se téměř neuplatní. '), 'Přesuňte ji v seznamu strategií před ni.');
+    }
+    if (!model.enabled) parts.push(' Strategie je vypnutá – v přecenění se nepoužije vůbec.');
+    return callout(h('span', null, parts), catchAll || !model.enabled ? 'warning' : 'info');
   }
 
   function changed() {
@@ -153,6 +186,11 @@ export async function show(root, ctx) {
       v.warnings.length ? callout(h('ul', { class: 'validation-list' }, v.warnings.map((w) => h('li', null, w))), 'warning') : null
     );
     saveBtn.disabled = errors.length > 0;
+    // výchozí strategie pro všechny produkty dřív v pořadí = tato strategie se téměř neuplatní (contract-5)
+    const { catchAll } = preceding();
+    mount(orderEl, catchAll && model.enabled
+      ? callout(h('span', null, 'Dřív v pořadí je strategie ', strategyLink(catchAll), ' pro všechny produkty bez podmínek – převezme skoro všechny produkty a tato strategie se téměř neuplatní. Upravte pořadí v ', h('a', { href: '#/strategie' }, 'seznamu strategií'), '.'), 'warning')
+      : null);
     return errors;
   }
 
@@ -178,6 +216,11 @@ export async function show(root, ctx) {
       dirty = false;
       refresh();
       toast('Strategie uložena', { type: 'success' });
+      // contract-20: přejmenování se musí projevit v titulku a drobečkové navigaci hned (ne až po obnovení)
+      if (!isNew) {
+        const nm = res?.name ?? body.name;
+        ctx.setTitle(nm, h('span', null, h('a', { href: '#/strategie' }, 'Strategie'), ' / ' + nm));
+      }
       if (isNew && res?.id) ctx.navigate('#/strategie/' + res.id, { replace: true });
     } catch {
       /* toast s chybami ze serveru */
@@ -272,12 +315,13 @@ export async function show(root, ctx) {
       card({
         title: 'Simulace' + (model.segment_id != null ? ' – segment „' + (segNameOf(model.segment_id) || model.segment_id) + '“' : ' – všechny produkty'),
         icon: 'eye',
-        subtitle: 'Výsledek na aktuálních datech, nic se neuložilo. Zobrazeno prvních ' + int(rows.length) + ' rozhodnutí.',
+        subtitle: 'Výsledek na aktuálních datech, nic se neuložilo. Strategie hodnocená samostatně (bez ohledu na pořadí). Zobrazeno prvních ' + int(rows.length) + ' rozhodnutí.',
         dataset: { card: 'simulation' },
         body: h(
           'div',
           { class: 'stack' },
           simErrors.length ? callout(h('ul', { class: 'validation-list' }, simErrors.map((e) => h('li', null, typeof e === 'string' ? e : e.message || JSON.stringify(e)))), 'danger') : null,
+          h('div', { dataset: { role: 'simulation-note' } }, simulationNote()),
           runStatsView(stats, { simulate: true }),
           changes.length ? h('div', null, h('div', { class: 'form-subtitle' }, 'Rozložení změn ceny (%)'), histogram(changes, { ariaLabel: 'Histogram změn ceny v procentech' })) : null,
           h('div', { class: 'row-between' }, h('div', { class: 'form-subtitle', style: 'margin:0' }, 'Rozhodnutí'), segmented(SIM_FILTERS, filter, (v) => { filter = v; apply(); }, { label: 'Zobrazit rozhodnutí', class: 'seg-sm' })),

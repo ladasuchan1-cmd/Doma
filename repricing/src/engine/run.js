@@ -12,6 +12,12 @@ const { compileFilter, isEmptyFilter } = require('./filter');
 const { productView, scheduleActive, describeSchedule, toDate } = require('./metrics');
 const { computePrice } = require('./pricing');
 const { normalizeConfig } = require('./presets');
+const { MANUAL_FLAGS, CENT } = require('../util/proposals');
+
+// Jak dlouho si běh pamatuje zamítnutí: stejnou (±0,5 %) cenu, kterou člověk v posledních N dnech zamítl, znovu
+// automaticky neschválí (vznikne jako čekající s příznakem previously_rejected).
+const REJECT_MEMORY_DAYS = 7;
+const REJECT_SAME_PCT = 0.5;
 
 const MISSING_TEXT = {
   no_market: 'chybí trh (málo použitelných nabídek konkurence)',
@@ -329,8 +335,8 @@ function addDecision(stats, decision, product, settings, strategy) {
 
 const INSERT_PROPOSAL = `INSERT INTO proposals (run_id, product_id, strategy_id, segment_id, old_price, new_price, target_price,
   reference_price, market_min, competitor_count, rank_before, rank_after, margin_before, margin_after, change_abs, change_pct,
-  status, flags, explain, created_at, decided_at, decided_by)
-  VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
+  status, flags, explain, created_at, decided_at, decided_by, manual_price)
+  VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
 
 const n = (v) => (v === undefined || (typeof v === 'number' && !Number.isFinite(v)) ? null : v);
 
@@ -386,16 +392,137 @@ function runPricing(db, opts = {}) {
       const { stats, results, products } = evaluate();
       const tw = performance.now();
 
-      // Starší čekající a schválené (neexportované) návrhy všech vyhodnocených produktů → superseded
-      const sup = db
-        .prepare("UPDATE proposals SET status = 'superseded' WHERE status IN ('pending', 'approved') AND run_id <> ? AND product_id IN (SELECT value FROM json_each(?))")
-        .run(runId, JSON.stringify(products.map((p) => p.id)));
-      stats.superseded = Number(sup.changes);
+      // Otevřené (čekající / schválené, neexportované) návrhy vyhodnocených produktů. Běh je dříve všechny nahradil
+      // (superseded) – tím ale zahodil lidská rozhodnutí (ruční schválení, ruční cenu) a každým během vložil kopii
+      // téhož návrhu (růst tabulky). Nově (SPEC §3.6, ops-1 / money-8 / ops-5):
+      //  - stejný návrh (stejná nová i výchozí cena, kompatibilní stav) se PONECHÁ – jen se přesune do tohoto běhu
+      //    (run_id + aktuální vysvětlení a metriky trhu); stav, ruční cena a rozhodnutí zůstávají,
+      //  - otevřený návrh s ruční cenou (lidské přebití) se nezahodí: nový návrh ji převezme a čeká na schválení
+      //    (příznak manual_carried); když běh změnu nenavrhne, návrh s ruční cenou zůstane otevřený,
+      //  - cenu, kterou člověk v posledních 7 dnech zamítl, běh znovu automaticky neschválí (previously_rejected),
+      //  - ostatní otevřené návrhy → superseded (jako dřív).
+      const evaluatedIds = products.map((p) => p.id);
+      const openByProduct = new Map();
+      const rejectedByProduct = new Map();
+      for (let i = 0; i < evaluatedIds.length; i += 20000) {
+        const chunk = JSON.stringify(evaluatedIds.slice(i, i + 20000));
+        for (const r of db
+          .prepare(
+            `SELECT id, product_id, status, old_price, new_price, manual_price, decided_by, flags FROM proposals
+             WHERE status IN ('pending', 'approved') AND run_id <> ? AND product_id IN (SELECT value FROM json_each(?)) ORDER BY id`
+          )
+          .iterate(runId, chunk)) {
+          openByProduct.set(r.product_id, r); // nejnovější otevřený návrh produktu
+        }
+        const since = nowIso(new Date(now.getTime() - REJECT_MEMORY_DAYS * 86400000));
+        for (const r of db
+          .prepare(
+            `SELECT product_id, COALESCE(manual_price, new_price) AS price FROM proposals
+             WHERE status = 'rejected' AND decided_at >= ? AND product_id IN (SELECT value FROM json_each(?))`
+          )
+          .iterate(since, chunk)) {
+          const list = rejectedByProduct.get(r.product_id);
+          if (list) list.push(r.price);
+          else rejectedByProduct.set(r.product_id, [r.price]);
+        }
+      }
+      const same = (a, b) => (a == null || b == null ? a == null && b == null : Math.abs(a - b) < CENT);
+      const keepIds = [];
+      const keepProposal = db.prepare(
+        `UPDATE proposals SET run_id = ?, strategy_id = ?, segment_id = ?, target_price = ?, reference_price = ?, market_min = ?,
+           competitor_count = ?, rank_before = ?, rank_after = ?, margin_before = ?, margin_after = ?, change_abs = ?, change_pct = ?,
+           flags = ?, explain = ?
+         WHERE id = ?`
+      );
+      const plan = []; // {product, decision, status, manual, flags}
+      stats.kept = 0;
+      stats.held_by_human = 0;
+      for (const { product, decision } of results) {
+        const open = openByProduct.get(product.id) || null;
+        const change = decision && decision.action === 'change';
+        const human = open && (open.manual_price != null || (open.status === 'approved' && open.decided_by != null && open.decided_by !== 'auto'));
+        if (!change) {
+          // běh změnu nenavrhl: ruční cenu (lidské přebití) nezahazovat
+          if (open && open.manual_price != null) keepIds.push(open.id);
+          continue;
+        }
+        const auto = decision.auto_approve === true;
+        const flags = [...(decision.flags || [])];
+        if (open && same(open.new_price, decision.new_price) && same(open.old_price, decision.old_price)) {
+          // stejný návrh: ponechat, pokud stav odpovídá (lidské rozhodnutí vždy; automatické jen při stejném auto-schválení)
+          const compatible = human || open.status === (auto ? 'approved' : 'pending');
+          if (compatible) {
+            const openFlags = parseJson(open.flags, []) || [];
+            const manualFlags = openFlags.filter((f) => MANUAL_FLAGS.includes(f) || f === 'manual_carried' || f === 'previously_rejected');
+            keepProposal.run(
+              runId, n(decision.strategy_id), n(decision.segment_id), n(decision.target_price), n(decision.reference_price),
+              n(decision.market?.min ?? null), n(decision.market?.count ?? null), n(decision.rank_before), n(decision.rank_after),
+              n(decision.margin_before), n(decision.margin_after), n(decision.change_abs), n(decision.change_pct),
+              json([...new Set([...flags, ...manualFlags])]), json(decision.explain || []), open.id
+            );
+            keepIds.push(open.id);
+            stats.kept += 1;
+            continue;
+          }
+        }
+        let status = auto ? 'approved' : 'pending';
+        let manual = null;
+        if (open && open.manual_price != null) {
+          // ruční cena se přenese do nového návrhu, ten ale čeká na nové schválení
+          manual = open.manual_price;
+          status = 'pending';
+          const openFlags = parseJson(open.flags, []) || [];
+          for (const f of openFlags) if (MANUAL_FLAGS.includes(f) && !flags.includes(f)) flags.push(f);
+          flags.push('manual_carried');
+          stats.held_by_human += 1;
+        } else if (auto) {
+          const tol = Math.max(CENT, (Math.abs(decision.new_price) * REJECT_SAME_PCT) / 100);
+          const rejected = rejectedByProduct.get(product.id) || [];
+          if (rejected.some((p) => p != null && Math.abs(p - decision.new_price) <= tol)) {
+            status = 'pending';
+            flags.push('previously_rejected');
+            stats.held_by_human += 1;
+          }
+        }
+        plan.push({ product, decision, status, manual, flags });
+      }
+      if (stats.held_by_human) {
+        // statistiky auto/pending odpovídají skutečně uloženým stavům
+        const heldAuto = plan.filter((x) => x.decision.auto_approve === true && x.status === 'pending').length;
+        stats.auto_approved -= heldAuto;
+        stats.pending += heldAuto;
+      }
+
+      // ostatní otevřené návrhy vyhodnocených produktů → superseded
+      const keepSet = JSON.stringify(keepIds);
+      let supCount = 0;
+      for (let i = 0; i < evaluatedIds.length; i += 20000) {
+        supCount += Number(
+          db
+            .prepare(
+              `UPDATE proposals SET status = 'superseded' WHERE status IN ('pending', 'approved') AND run_id <> ?
+               AND product_id IN (SELECT value FROM json_each(?)) AND id NOT IN (SELECT value FROM json_each(?))`
+            )
+            .run(runId, JSON.stringify(evaluatedIds.slice(i, i + 20000)), keepSet).changes
+        );
+      }
+      // Úplný běh: otevřené návrhy NEAKTIVNÍCH produktů (běh je nevyhodnocuje) → superseded, aby se po opětovné
+      // aktivaci produktu nevyexportoval starý návrh spočítaný z dávno neplatného trhu (money-4).
+      if (productIds == null) {
+        supCount += Number(
+          db
+            .prepare(
+              `UPDATE proposals SET status = 'superseded' WHERE status IN ('pending', 'approved')
+               AND product_id IN (SELECT id FROM products WHERE active = 0)`
+            )
+            .run().changes
+        );
+      }
+      stats.superseded = supCount;
 
       const ins = db.prepare(INSERT_PROPOSAL);
-      for (const { product, decision } of results) {
-        if (!decision || decision.action !== 'change') continue;
-        const auto = decision.auto_approve === true;
+      for (const { product, decision, status, manual, flags } of plan) {
+        const auto = status === 'approved';
         ins.run(
           runId,
           product.id,
@@ -413,12 +540,13 @@ function runPricing(db, opts = {}) {
           n(decision.margin_after),
           n(decision.change_abs),
           n(decision.change_pct),
-          auto ? 'approved' : 'pending',
-          json(decision.flags || []),
+          status,
+          json(flags),
           json(decision.explain || []),
           ts,
           auto ? ts : null,
-          auto ? 'auto' : null
+          auto ? 'auto' : null,
+          manual
         );
       }
       timing.write = Math.round(performance.now() - tw);
@@ -444,7 +572,8 @@ function runPricing(db, opts = {}) {
  * Simulace ad-hoc strategie nad jejím segmentem (ostatní strategie se ignorují), bez zápisu.
  * @param {import('node:sqlite').DatabaseSync} db
  * @param {{config: object, segment_id?: number|null, filter?: object|null, limit?: number, now?: Date|string}} opts
- * @returns {{stats: object, decisions: object[], errors: string[]}}
+ * @returns {{stats: object, decisions: object[], truncated: {changes: boolean, skips: boolean, changes_total: number,
+ *   skips_total: number}, errors: string[]}} decisions = nejvýše `limit` změn + nejvýše `limit` přeskočených
  */
 function simulate(db, opts = {}) {
   const now = toDate(opts.now);
@@ -484,6 +613,8 @@ function simulate(db, opts = {}) {
   const offers = loadOffers(db);
   const changes = [];
   const skips = [];
+  let changesTotal = 0;
+  let skipsTotal = 0;
   let sumPct = 0;
   let sumMb = 0;
   let cntMb = 0;
@@ -517,8 +648,12 @@ function simulate(db, opts = {}) {
         sumMa += decision.margin_after;
         cntMa += 1;
       }
+      changesTotal += 1;
       if (changes.length < limit) changes.push(withProduct);
-    } else if (decision.action === 'skip' && skips.length < limit) skips.push(withProduct);
+    } else if (decision.action === 'skip') {
+      skipsTotal += 1;
+      if (skips.length < limit) skips.push(withProduct);
+    }
   }
   const withPct = stats.up + stats.down;
   stats.avg_change_pct = withPct ? round(sumPct / withPct, 2) : null;
@@ -527,7 +662,14 @@ function simulate(db, opts = {}) {
   stats.margin_impact_abs = round(stats.margin_impact_abs, 2);
   stats.segment = scopeName;
   delete stats.by_strategy;
-  return { stats, decisions: [...changes, ...skips].slice(0, limit), errors };
+  // Změny i přeskočené mají každé vlastní limit – dřív se přeskočené při ≥ limit změnách celé odřízly a filtr
+  // „Přeskočené“ v UI hlásil „nic se nepřeskočilo“, přestože statistika ukazovala desítky (contract-6).
+  return {
+    stats,
+    decisions: [...changes, ...skips],
+    truncated: { changes: changesTotal > changes.length, skips: skipsTotal > skips.length, changes_total: changesTotal, skips_total: skipsTotal },
+    errors,
+  };
 }
 
 // ---------------------------------------------------------------------------------------------

@@ -11,12 +11,23 @@
 //    zaznamenané změně se do historie nejdřív doplní dosavadní cena (util/price-history.js – Omnibus lowest_30d).
 //  - nastavení purchase_includes_vat → nákupní cena se převede na cenu bez DPH (DPH záznamu / produktu / výchozí)
 //  - price_is_net (mapping.price_net) → price, msrp, min_price, max_price se převedou na ceny s DPH
+//  - záznam může nést vlastní základ DPH (POHODA @payVAT u sellingPrice / purchasingPrice – money-10):
+//    price_net_fields = pole, která jsou v tomto záznamu BEZ DPH (→ převod na s DPH), purchase_is_gross = nákupní cena
+//    je S DPH (→ převod na bez DPH); má přednost před globálním nastavením
+//  - stejný kód vícekrát v jednom importu (POHODA: jedna karta ve více skladech) → varování, platí poslední řádek;
+//    do historie cen jde jen VÝSLEDNÁ cena importu (porovnaná s cenou před importem), ne každé mezikolo (data-11)
+//  - změna vstupů ceny (cena, nákupní cena, DPH, min./max., zámek, deaktivace) zneplatní otevřené návrhy produktu
+//    (superseded) – exportovaly by cenu spočítanou ze staré báze (money-2/3/4). Výjimka: nová cena = cena návrhu.
+//  - deactivate_missing, který by vypnul víc než polovinu aktivních produktů, se neprovede bez force_deactivate
+//    (ochrana proti chybně rozpoznanému souboru – data-5)
 
 const { tx, nowIso, getSettings, parseJson } = require('../db');
 const { codeKey, eanKey, mpnKey } = require('../util/keys');
 const { parseNumber, round } = require('../util/num');
 const { normalizeCode, normalizeText, parseBool, parseVat, parseDate, errorCollector } = require('./mapping');
 const { ensurePriceBaseline } = require('../util/price-history');
+const { supersedeOpen } = require('../util/proposals');
+const { isLockActive } = require('../engine/metrics');
 
 const TEXT_FIELDS = ['name', 'manufacturer', 'category', 'supplier', 'owner'];
 const NUMBER_FIELDS = ['purchase_price', 'price', 'msrp', 'stock', 'sales_30', 'sales_90', 'min_price', 'max_price'];
@@ -92,22 +103,24 @@ function normalizeRecord(rec) {
     else set.locked_until = d;
   }
   const attrs = rec.attrs !== undefined ? parseAttrs(rec.attrs) : null;
-  return { code, key, set, attrs, warnings, priceIsNet: rec.price_is_net === true };
+  const netFields = Array.isArray(rec.price_net_fields) ? rec.price_net_fields.filter((f) => GROSS_FIELDS.includes(f)) : [];
+  return { code, key, set, attrs, warnings, priceIsNet: rec.price_is_net === true, netFields, purchaseIsGross: rec.purchase_is_gross };
 }
 
 /**
  * Importuje katalog.
  * @param {import('node:sqlite').DatabaseSync} db
  * @param {object[]} records kanonické záznamy (applyMapping nebo přímo z kódu)
- * @param {{deactivateMissing?: boolean, sourceId?: number|null, now?: Date|string, importId?: number|null,
+ * @param {{deactivateMissing?: boolean, forceDeactivate?: boolean, sourceId?: number|null, now?: Date|string, importId?: number|null,
  *          rowNumbers?: number[], onError?: Function}} [opts]
  *   rowNumbers = čísla řádků zdroje pro hlášení chyb (výchozí index + 1); onError = interní (runImport)
- * @returns {{received: number, created: number, updated: number, unchanged: number, deactivated: number, errors: {row: number|null, message: string}[]}}
+ * @returns {{received: number, created: number, updated: number, unchanged: number, deactivated: number, superseded: number,
+ *   errors: {row: number|null, message: string}[]}}
  */
 function importProducts(db, records, opts = {}) {
   const list = Array.isArray(records) ? records : [];
   const now = nowIso(opts.now);
-  const stats = { received: list.length, created: 0, updated: 0, unchanged: 0, deactivated: 0, errors: [] };
+  const stats = { received: list.length, created: 0, updated: 0, unchanged: 0, deactivated: 0, superseded: 0, errors: [] };
   const errs = errorCollector(stats.errors, opts.onError);
   const settings = getSettings(db);
   const vatDefault = Number.isFinite(Number(settings.vat_rate_default)) && settings.vat_rate_default !== null ? Number(settings.vat_rate_default) : 21;
@@ -133,6 +146,25 @@ function importProducts(db, records, opts = {}) {
     const history = db.prepare("INSERT INTO price_history (product_id, price, source, ref_id, at) VALUES (?, ?, 'import', ?, ?)");
     const seen = new Set();
     const outcome = new Map(); // id → created | updated | unchanged (kvůli duplicitním řádkům)
+    const orig = new Map(); // id → řádek produktu PŘED importem (historie cen a zneplatnění návrhů se řídí výsledkem)
+
+    // duplicitní kódy v jednom importu – varování (POHODA: stejná karta ve více skladech; varianty se stejným kódem)
+    const dupRows = new Map();
+    for (let i = 0; i < list.length; i++) {
+      const r = list[i];
+      const k = r && typeof r === 'object' ? codeKey(normalizeCode(r.code)) : null;
+      if (!k) continue;
+      const arr = dupRows.get(k);
+      if (arr) arr.push(rowOf(i));
+      else dupRows.set(k, [rowOf(i)]);
+    }
+    // varování se přidá u posledního výskytu (chyby tak zůstanou v pořadí řádků)
+    const dupWarn = (key, row) => {
+      const rows = dupRows.get(key);
+      if (!rows || rows.length < 2 || rows[rows.length - 1] !== row) return;
+      const shown = rows.slice(0, 10).join(', ') + (rows.length > 10 ? ', …' : '');
+      errs.add(row, `Kód ${key} je v importu ${rows.length}× (řádky ${shown}) – použit poslední řádek.`, { warning: true });
+    };
 
     for (let i = 0; i < list.length; i++) {
       const rec = list[i];
@@ -147,6 +179,7 @@ function importProducts(db, records, opts = {}) {
         continue;
       }
       for (const w of n.warnings) errs.add(row, w, { warning: true });
+      dupWarn(n.key, row);
       const cur = byKey.get(n.key);
       const next = cur
         ? { ...cur }
@@ -161,8 +194,14 @@ function importProducts(db, records, opts = {}) {
       if (n.set.mpn !== undefined) next.mpn_key = mpnKey(next.mpn);
       if (cur && opts.deactivateMissing && n.set.active === undefined) next.active = 1; // znovu v katalogu → aktivní
       const vat = next.vat_rate ?? vatDefault;
-      if (purchaseInclVat && n.set.purchase_price != null) next.purchase_price = round(n.set.purchase_price / (1 + vat / 100), 4);
-      if (n.priceIsNet) for (const f of GROSS_FIELDS) if (n.set[f] != null) next[f] = round(n.set[f] * (1 + vat / 100), 2);
+      // základ DPH nákupní ceny: údaj záznamu (POHODA purchasingPrice@payVAT) má přednost před nastavením
+      const purchaseGross = n.purchaseIsGross === true || (n.purchaseIsGross !== false && purchaseInclVat);
+      if (purchaseGross && n.set.purchase_price != null) next.purchase_price = round(n.set.purchase_price / (1 + vat / 100), 4);
+      for (const f of GROSS_FIELDS) {
+        if (n.set[f] != null && (n.priceIsNet || n.netFields.includes(f))) next[f] = round(n.set[f] * (1 + vat / 100), 2);
+      }
+      // stav před importem (produkt založený tímto importem – duplicitní řádek – do porovnání nepatří)
+      if (cur && cur.id != null && !orig.has(cur.id) && outcome.get(cur.id) !== 'created') orig.set(cur.id, { ...cur });
 
       // attrs – sloučení
       let attrsChanged = false;
@@ -191,12 +230,12 @@ function importProducts(db, records, opts = {}) {
         let changed = attrsChanged;
         if (!changed) for (const c of COMPARE) if (!same(cur[c], next[c])) { changed = true; break; }
         if (changed) {
-          if (cur.price != null && next.price != null && !same(cur.price, next.price)) {
-            // první změna ceny: nejdřív dosavadní cenu (Omnibus lowest_30d ji jinak ztratí) – viz util/price-history.js
-            ensurePriceBaseline(db, cur);
-            history.run(next.id, next.price, refId, now);
-            next.price_changed_at = now;
-          }
+          // Změna ceny se měří proti ceně PŘED importem (duplicitní řádky téhož kódu nesmí „přepínat“ cenu a pokaždé
+          // posunout price_changed_at); záznam do historie se zapíše až po importu – jen výsledná cena.
+          const before = orig.get(next.id);
+          if (!before) next.price_changed_at = cur.price_changed_at; // založen tímto importem – první cena není změna
+          else if (before.price != null && next.price != null && !same(before.price, next.price)) next.price_changed_at = now;
+          else next.price_changed_at = before.price_changed_at;
           next.updated_at = now;
           update.run(
             next.code, next.ean, next.ean_key, next.mpn, next.mpn_key, next.name, next.manufacturer, next.category, next.supplier, next.owner,
@@ -223,20 +262,57 @@ function importProducts(db, records, opts = {}) {
       seen.add(next.id);
     }
 
+    // historie cen: jen výsledná cena importu oproti ceně před importem (jeden záznam na produkt)
+    const toSupersede = new Set();
+    const keepPrice = new Map();
+    for (const [id, before] of orig) {
+      const after = byKey.get(before.code_key);
+      if (!after) continue;
+      // duplicitní řádky, které se vrátily na původní hodnoty → ve výsledku beze změny
+      if (outcome.get(id) === 'updated' && COMPARE.every((c) => same(before[c], after[c])) && (before.attrs ?? '{}') === (after.attrs ?? '{}')) {
+        stats.updated--;
+        stats.unchanged++;
+        outcome.set(id, 'unchanged');
+      }
+      if (before.price != null && after.price != null && !same(before.price, after.price)) {
+        // první změna ceny: nejdřív dosavadní cenu (Omnibus lowest_30d ji jinak ztratí) – viz util/price-history.js
+        ensurePriceBaseline(db, before);
+        history.run(id, after.price, refId, now);
+      }
+      // změněné vstupy ceny → otevřené návrhy jsou zastaralé
+      const inputs = ['purchase_price', 'vat_rate', 'min_price', 'max_price'].some((f) => !same(before[f], after[f]));
+      const deact = before.active && !after.active;
+      const locked = isLockActive(after, now) && !isLockActive(before, now);
+      if (inputs || deact || locked) toSupersede.add(id);
+      else if (!same(before.price, after.price)) keepPrice.set(id, after.price);
+    }
+
     if (opts.deactivateMissing) {
       if (seen.size === 0) {
         errs.add(null, 'Import neobsahuje žádný platný produkt – deaktivace chybějících produktů byla přeskočena.');
       } else {
-        const deactivate = db.prepare('UPDATE products SET active = 0, updated_at = ? WHERE id = ?');
-        for (const p of byKey.values()) {
-          if (p.active && !seen.has(p.id)) {
+        const missing = [...byKey.values()].filter((p) => p.active && !seen.has(p.id));
+        const active = [...byKey.values()].filter((p) => p.active).length;
+        if (missing.length > 1 && missing.length * 2 > active && !opts.forceDeactivate) {
+          // Víc než polovina katalogu najednou = spíš chybně rozpoznaný soubor (jiné pole záznamů, jediný záznam…)
+          errs.add(
+            null,
+            `Deaktivace chybějících produktů byla přeskočena: import by vypnul ${missing.length} z ${active} aktivních produktů. ` +
+              'Pokud je to záměr, zopakujte import s volbou force_deactivate.'
+          );
+        } else {
+          const deactivate = db.prepare('UPDATE products SET active = 0, updated_at = ? WHERE id = ?');
+          for (const p of missing) {
             deactivate.run(now, p.id);
             p.active = 0;
             stats.deactivated++;
+            toSupersede.add(p.id); // deaktivovaný produkt: návrh se po opětovné aktivaci nesmí „vynořit“ (money-4)
+            keepPrice.delete(p.id);
           }
         }
       }
     }
+    stats.superseded = supersedeOpen(db, toSupersede) + supersedeOpen(db, keepPrice.keys(), { keepPrice });
   });
   errs.finish();
   return stats;

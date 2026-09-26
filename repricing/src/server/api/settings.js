@@ -70,6 +70,7 @@ const SCHEMA = {
       application: text({ max: 100 }),
       filter_by: oneOf('code', 'ean'),
       price_level: text({ max: 50 }),
+      price_level_includes_vat: isBool,
       encoding: oneOf('windows-1250', 'utf-8'),
     },
     webhook: {
@@ -104,6 +105,7 @@ const SCHEMA = {
     auto_push_after_run: isBool,
   },
   retention_days: num({ min: 0, max: 36500, integer: true }),
+  retention_superseded_days: num({ min: 1, max: 36500, integer: true }),
 };
 
 const LABELS = {
@@ -113,6 +115,7 @@ const LABELS = {
   offer_max_age_days: 'Maximální stáří nabídek (dny)',
   metrics_in_stock_only: 'Metriky jen z nabídek skladem',
   retention_days: 'Doba uchování dat (dny)',
+  retention_superseded_days: 'Doba uchování nahrazených návrhů (dny)',
 };
 
 /** Projde (sloučený) objekt podle schématu; neznámé klíče v těle hlásí zvlášť. */

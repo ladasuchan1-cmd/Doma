@@ -5,7 +5,17 @@
 //        vat_rate, currency, changed_at, strategy (název|null), segment (název|null), lowest_30d}
 //
 // Rozhodnutí (konzervativní výklad SPEC):
-//  - Exportují se jen AKTIVNÍ produkty. Schválený návrh neaktivního produktu zůstane „approved“ a do exportu nejde.
+//  - Exportují se jen AKTIVNÍ produkty. Deaktivace produktu (import katalogu) jeho otevřené návrhy zneplatní
+//    (superseded), takže se po opětovné aktivaci nevynoří starý návrh (money-4).
+//  - Schválený návrh se těsně před exportem ještě ověří proti AKTUÁLNÍMU stavu produktu (holdReason). Když neprojde,
+//    ZADRŽÍ se (vrací se v `held` s důvodem, zůstává „approved“ a nic se neoznačí):
+//      locked        – produkt je zamčený (zámek = ruční přebití, cenu neměnit), i když byl návrh schválen dřív,
+//      price_changed – aktuální cena produktu se od výpočtu návrhu změnila (import katalogu, ruční cena) a není to
+//                      ani cena samotného návrhu (tu admin už převzal) → návrh vychází ze staré báze, je třeba přecenit,
+//      below_min / above_max – cena je mimo ruční min./max. cenu produktu,
+//      below_cost    – cena bez DPH je pod aktuální nákupní cenou.
+//    below_* / above_max nevadí, když návrh s tímto příznakem schválil člověk (decided_by ≠ 'auto') – vědomé rozhodnutí.
+//    V úplném ceníku (scope 'all') se místo zadrženého návrhu použije aktuální cena produktu.
 //  - Z návrhů se bere jen NEJNOVĚJŠÍ schválený (neexportovaný) návrh produktu (nejvyšší id). Filtr `ids` se použije
 //    až potom – starší schválený návrh téhož produktu se tak nikdy nevyexportuje, i kdyby o něj volající požádal.
 //    Schválený návrh, po kterém už byl vyexportován NOVĚJŠÍ návrh téhož produktu, je zastaralý a také se nepoužije
@@ -16,8 +26,10 @@
 //    minimum z (a) záznamů price_history v okně [now − 30 dní, now], (b) posledního záznamu PŘED začátkem okna
 //    (ta cena ještě na začátku okna platila) a (c) aktuální ceny produktu. Novou (exportovanou) cenu nezahrnuje.
 
-const { getSettings, nowIso } = require('../db');
-const { round } = require('../util/num');
+const { getSettings, nowIso, parseJson } = require('../db');
+const { round, net } = require('../util/num');
+const { isLockActive } = require('../engine/metrics');
+const { CENT } = require('../util/proposals');
 
 /** Pořadí a názvy polí řádku exportu (i výchozí sloupce CSV/JSON). */
 const ROW_FIELDS = [
@@ -126,7 +138,42 @@ function lowestPrices(db, now, productIds = null) {
 }
 
 const PRODUCT_COLS = `p.id AS product_id, p.code, p.ean, p.name, p.manufacturer, p.price AS current_price, p.vat_rate,
-  p.price_changed_at, p.code_key`;
+  p.price_changed_at, p.code_key, p.purchase_price, p.min_price, p.max_price, p.locked, p.locked_until`;
+
+/** České popisy důvodů zadržení schváleného návrhu (viz holdReason). */
+const HOLD_REASONS = {
+  locked: 'cena produktu je zamčená',
+  price_changed: 'aktuální cena produktu se od výpočtu návrhu změnila – spusťte přecenění',
+  below_min: 'cena je pod minimální cenou produktu',
+  above_max: 'cena je nad maximální cenou produktu',
+  below_cost: 'cena bez DPH je pod nákupní cenou',
+};
+
+const differs = (a, b) => (a == null || b == null ? (a == null) !== (b == null) : Math.abs(a - b) >= CENT);
+
+/**
+ * Smí schválený návrh ven? Kontrola proti AKTUÁLNÍMU stavu produktu (obrana do hloubky – zneplatnění při změně
+ * vstupů řeší import / PATCH produktu, tohle chrání i data, která tam nevznikla, např. starší databáze).
+ * @param {object} product řádek s PRODUCT_COLS (current_price, purchase_price, min_price, max_price, vat_rate, locked, locked_until)
+ * @param {object} proposal {old_price, new_price, manual_price, flags (JSON|pole), decided_by}
+ * @param {{now?: Date|string, vatDefault?: number}} [ctx]
+ * @returns {string|null} důvod zadržení (klíč HOLD_REASONS) nebo null
+ */
+function holdReason(product, proposal, ctx = {}) {
+  if (isLockActive(product, ctx.now || new Date())) return 'locked';
+  const final = proposal.manual_price ?? proposal.new_price;
+  const cur = product.current_price;
+  // Cena produktu se změnila od výpočtu návrhu. Výjimka: aktuální cena JE cenou návrhu (admin ji už převzal).
+  if (differs(proposal.old_price, cur) && differs(final, cur)) return 'price_changed';
+  const flags = Array.isArray(proposal.flags) ? proposal.flags : parseJson(proposal.flags, []) || [];
+  const human = proposal.decided_by != null && proposal.decided_by !== 'auto';
+  const knowingly = (...f) => human && f.some((x) => flags.includes(x));
+  if (product.min_price != null && final < product.min_price - CENT && !knowingly('below_min')) return 'below_min';
+  if (product.max_price != null && final > product.max_price + CENT && !knowingly('above_max')) return 'above_max';
+  const vat = product.vat_rate ?? ctx.vatDefault ?? 21;
+  if (product.purchase_price > 0 && net(final, vat) < product.purchase_price - CENT && !knowingly('below_cost', 'manual_below_cost')) return 'below_cost';
+  return null;
+}
 
 /**
  * SQL podmínka „návrh `pr` je nejnovější schválený návrh svého produktu a žádný novější návrh téhož produktu
@@ -149,7 +196,7 @@ function latestApproved(db, productIds) {
   const rows = db
     .prepare(
       `SELECT pr.id AS proposal_id, pr.product_id, pr.old_price, pr.new_price, pr.manual_price, pr.change_pct,
-              pr.created_at, pr.decided_at, s.name AS strategy_name, g.name AS segment_name
+              pr.created_at, pr.decided_at, pr.decided_by, pr.flags, s.name AS strategy_name, g.name AS segment_name
        FROM proposals pr
        JOIN products p ON p.id = pr.product_id AND p.active = 1
        LEFT JOIN strategies s ON s.id = pr.strategy_id
@@ -207,15 +254,15 @@ function buildRow(product, proposal, ctx) {
 }
 
 /**
- * Řádky exportu cen.
+ * Řádky exportu cen + zadržené návrhy.
  * @param {import('node:sqlite').DatabaseSync} db
  * @param {{scope?: 'approved'|'all', ids?: number[], productIds?: number[], now?: Date|string}} [opts]
  *   scope 'approved' (výchozí) = nejnovější schválený neexportovaný návrh každého aktivního produktu;
  *   scope 'all' = úplný ceník všech aktivních produktů (cena ze schváleného návrhu, jinak aktuální cena).
  *   ids = id návrhů (jen pro scope 'approved'), productIds = omezení na produkty.
- * @returns {Array<object>} řádky seřazené podle kódu
+ * @returns {{rows: object[], held: Array<{proposal_id, product_id, code, price, reason, message}>}} řádky seřazené podle kódu
  */
-function exportRows(db, opts = {}) {
+function exportRowsDetailed(db, opts = {}) {
   const scope = opts.scope ?? 'approved';
   if (scope !== 'approved' && scope !== 'all') throw new Error(`Neplatný rozsah exportu „${scope}“ (povoleno: approved, all)`);
   const now = toDate(opts.now);
@@ -226,25 +273,43 @@ function exportRows(db, opts = {}) {
     currency: settings.currency || 'CZK',
     vatDefault: settings.vat_rate_default ?? null,
     lowest: null,
+    now,
   };
 
   const proposals = latestApproved(db, productIds);
   const out = [];
+  const held = [];
+  // Návrh, který kontrolou neprojde, se zadrží (viz holdReason) – vrací null.
+  const checked = (product, proposal) => {
+    const reason = holdReason(product, proposal, ctx);
+    if (!reason) return proposal;
+    held.push({
+      proposal_id: proposal.proposal_id,
+      product_id: product.product_id,
+      code: product.code,
+      price: money(proposal.manual_price ?? proposal.new_price),
+      reason,
+      message: HOLD_REASONS[reason],
+    });
+    return null;
+  };
 
   if (scope === 'approved') {
-    if (!proposals.size) return out;
+    if (!proposals.size) return { rows: out, held };
     const idSet = ids ? new Set(ids) : null;
     const wanted = [...proposals.values()].filter((p) => !idSet || idSet.has(p.proposal_id));
-    if (!wanted.length) return out;
+    if (!wanted.length) return { rows: out, held };
     ctx.lowest = lowestPrices(db, now, wanted.map((p) => p.product_id));
     const products = db
       .prepare(`SELECT ${PRODUCT_COLS} FROM products p WHERE p.active = 1 AND p.id IN (SELECT value FROM json_each(?)) ORDER BY p.code_key`)
       .all(JSON.stringify(wanted.map((p) => p.product_id)));
     for (const product of products) {
-      const row = buildRow(product, proposals.get(product.product_id), ctx);
+      const proposal = checked(product, proposals.get(product.product_id));
+      if (!proposal) continue;
+      const row = buildRow(product, proposal, ctx);
       if (row) out.push(row);
     }
-    return out;
+    return { rows: out, held };
   }
 
   ctx.lowest = lowestPrices(db, now, productIds);
@@ -255,12 +320,21 @@ function exportRows(db, opts = {}) {
     params.push(JSON.stringify(productIds));
   }
   for (const product of db.prepare(`SELECT ${PRODUCT_COLS} FROM products p WHERE ${where} ORDER BY p.code_key`).all(...params)) {
-    const proposal = proposals.get(product.product_id) || null;
-    // Návrh s neplatnou cenou (např. ruční cena 0) v úplném ceníku nahradí aktuální cena produktu.
+    const found = proposals.get(product.product_id) || null;
+    const proposal = found ? checked(product, found) : null;
+    // Návrh s neplatnou cenou (např. ruční cena 0) nebo zadržený návrh v úplném ceníku nahradí aktuální cena produktu.
     const row = (proposal && buildRow(product, proposal, ctx)) || buildRow(product, null, ctx);
     if (row) out.push(row);
   }
-  return out;
+  return { rows: out, held };
 }
 
-module.exports = { exportRows, ROW_FIELDS, ROW_LABELS, LATEST_APPROVED_SQL, changePct, idList };
+/**
+ * Řádky exportu cen (bez zadržených návrhů) – viz exportRowsDetailed.
+ * @returns {Array<object>} řádky seřazené podle kódu
+ */
+function exportRows(db, opts = {}) {
+  return exportRowsDetailed(db, opts).rows;
+}
+
+module.exports = { exportRows, exportRowsDetailed, holdReason, HOLD_REASONS, PRODUCT_COLS, ROW_FIELDS, ROW_LABELS, LATEST_APPROVED_SQL, changePct, idList };

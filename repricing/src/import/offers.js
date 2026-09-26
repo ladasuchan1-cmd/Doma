@@ -3,12 +3,15 @@
 // nespárované nabídky, režimy nahrazení a ruční párování (matchUnmatched).
 //
 // Párování (v tomto pořadí):
-//   1. code → products.code_key
-//   2. ean  → products.ean_key, 3. mpn → products.mpn_key
-//      – více produktů se stejným EAN/MPN: přednost má jediný aktivní; jinak MPN může EAN zúžit (průnik);
-//        jinak nejednoznačné (důvod `ambiguous`)
-//   4. product_aliases pro druhy code, ean, mpn, ext, name (v tomto pořadí); u každého druhu má přednost alias
-//      konkrétního konkurenta před obecným (competitor_id = 0). Alias (ruční rozhodnutí) spáruje i nejednoznačný EAN.
+//   0. ruční alias KONKRÉTNÍHO konkurenta (code, ean, mpn, ext, name) – lidské rozhodnutí má přednost před
+//      automatickými klíči (data-3, data-6)
+//   1. code → products.code_key; odporuje-li mu EAN (jednoznačně jiný produkt) nebo bez EAN MPN, řádek se nespáruje
+//      (důvod `conflict`, oba kandidáti v raw._candidates) – ITEM_ID konkurenta se může shodovat s naším kódem (data-3)
+//   2. ean  → products.ean_key (i více EAN v jedné položce „EAN1|EAN2“ – data-14), 3. mpn → products.mpn_key
+//      – více produktů se stejným EAN: přednost má jediný aktivní; jinak MPN může EAN zúžit (průnik);
+//        jinak nejednoznačné (důvod `ambiguous`). Víc produktů se stejným MPN = vždy nejednoznačné (data-6).
+//      – MPN se nepoužije, když nabídka nese platný EAN a kandidát má v katalogu JINÝ EAN (jiná velikost/barva – data-6)
+//   4. obecné aliasy (competitor_id = 0) pro druhy code, ean, mpn, ext, name. Alias spáruje i nejednoznačný EAN.
 // Nespárované → unmatched_offers (match_key = první z ean:<k>, mpn:<k>, code:<k>, ext:<k>, name:<fold(název)>),
 // seen_count se zvýší jednou za import. raw = kanonický záznam (+ `_reason`, `_candidates`) pro pozdější spárování.
 
@@ -21,6 +24,7 @@ const DAY_MS = 86400000;
 const FUTURE_TOLERANCE_MS = 5 * 60 * 1000;
 const BULK_THRESHOLD = 2000; // od kolika záznamů se načítají celé tabulky do paměti místo dotazů po jednom
 const PAIR = 1048576; // klíč dvojice = product_id * 2^20 + competitor_id
+const SAME_SCAN_MS = 60 * 60 * 1000; // zjištění do 1 h od sebe = jeden sken (duplicity → nejnižší cena)
 const ALIAS_KINDS = ['code', 'ean', 'mpn', 'ext', 'name'];
 
 /** Klíč ID poskytovatele (ext) – jako náš kód: velká písmena, bez mezer. */
@@ -76,9 +80,19 @@ function normalizeOffer(rec, nowIsoStr, nowMs, warnings) {
     name: normalizeText(rec.name, true),
     price: round(price, 2),
   };
+  // více EAN v jedné položce (Zboží dovoluje opakovaný <EAN>) → „EAN1|EAN2“ – každý zvlášť (data-14)
+  const eans = [];
+  if (o.ean != null) {
+    const parts = /[|,;\s]/.test(o.ean) && !eanKey(o.ean) ? o.ean.split(/[|,;\s]+/) : [o.ean];
+    for (const part of parts) {
+      const k = eanKey(part);
+      if (k && !eans.includes(k)) eans.push(k);
+    }
+  }
   o.keys = {
     code: codeKey(o.code),
-    ean: eanKey(o.ean),
+    ean: eans[0] || null,
+    eans,
     mpn: mpnKey(o.mpn),
     ext: extKey(o.ext_id),
     name: nameMatchKey(o.name),
@@ -172,7 +186,7 @@ function productLookup(db, bulk) {
       else map.set(k, [cur, id]);
     };
     for (const p of db.prepare('SELECT id, code_key, ean_key, mpn_key, active, vat_rate FROM products').iterate()) {
-      info.set(p.id, { active: p.active, vat_rate: p.vat_rate });
+      info.set(p.id, { active: p.active, vat_rate: p.vat_rate, ean_key: p.ean_key });
       byCode.set(p.code_key, p.id);
       add(byEan, p.ean_key, p.id);
       add(byMpn, p.mpn_key, p.id);
@@ -185,10 +199,10 @@ function productLookup(db, bulk) {
       mpn: (k) => arr(byMpn.get(k)),
     };
   }
-  const qCode = db.prepare('SELECT id, active, vat_rate FROM products WHERE code_key = ?');
-  const qEan = db.prepare('SELECT id, active, vat_rate FROM products WHERE ean_key = ?');
-  const qMpn = db.prepare('SELECT id, active, vat_rate FROM products WHERE mpn_key = ?');
-  const qId = db.prepare('SELECT id, active, vat_rate FROM products WHERE id = ?');
+  const qCode = db.prepare('SELECT id, active, vat_rate, ean_key FROM products WHERE code_key = ?');
+  const qEan = db.prepare('SELECT id, active, vat_rate, ean_key FROM products WHERE ean_key = ?');
+  const qMpn = db.prepare('SELECT id, active, vat_rate, ean_key FROM products WHERE mpn_key = ?');
+  const qId = db.prepare('SELECT id, active, vat_rate, ean_key FROM products WHERE id = ?');
   const memo = new Map();
   const cached = (tag, k, fn) => {
     const mk = tag + '\u0001' + k;
@@ -196,14 +210,14 @@ function productLookup(db, bulk) {
     return memo.get(mk);
   };
   const remember = (rows) => {
-    for (const r of rows) info.set(r.id, { active: r.active, vat_rate: r.vat_rate });
+    for (const r of rows) info.set(r.id, { active: r.active, vat_rate: r.vat_rate, ean_key: r.ean_key });
     return rows.map((r) => r.id);
   };
   return {
     info: (id) => {
       if (!info.has(id)) {
         const r = qId.get(id);
-        if (r) info.set(id, { active: r.active, vat_rate: r.vat_rate });
+        if (r) info.set(id, { active: r.active, vat_rate: r.vat_rate, ean_key: r.ean_key });
       }
       return info.get(id);
     },
@@ -228,7 +242,9 @@ function preferActive(ids, lookup) {
  * @param {import('node:sqlite').DatabaseSync} db
  * @param {object[]} records kanonické záznamy nabídek
  * @param {{replace?: false|'competitors'|'all', sourceId?: number|null, now?: Date|string, maxAgeDays?: number,
- *          rowNumbers?: number[], onError?: Function, productId?: number}} [opts]
+ *          rowNumbers?: number[], onError?: Function, productId?: number, failedCompetitors?: Iterable<string>,
+ *          failedUnknown?: number}} [opts] failedCompetitors / failedUnknown = konkurenti řádků, které neprošly mapováním
+ *          (runImport) – u nich se při replace nic nemaže
  *   maxAgeDays = nabídky zjištěné před více než N dny se ignorují (stale); productId = interní (matchUnmatched –
  *   všechny záznamy patří k tomuto produktu)
  * @returns {{received, matched, unmatched, ambiguous, created, updated, unchanged, stale, duplicates, removed, competitors_created, errors}}
@@ -275,12 +291,17 @@ function importOffers(db, records, opts = {}) {
     const presentCompetitors = new Set();
     let valid = 0;
 
+    const failedInPass = new Set();
+    let failedUnknownInPass = 0;
     for (let i = 0; i < list.length; i++) {
       const row = rowOf(i);
       const warnings = [];
       const { offer: o, error } = normalizeOffer(list[i], nowStr, nowMs, warnings);
       if (error) {
         errs.add(row, error);
+        const ck = list[i] && typeof list[i] === 'object' ? nameKey(normalizeText(list[i].competitor, true)) : null;
+        if (ck) failedInPass.add(ck);
+        else failedUnknownInPass++;
         continue;
       }
       for (const w of warnings) errs.add(row, w, { warning: true });
@@ -296,52 +317,96 @@ function importOffers(db, records, opts = {}) {
       // párování
       let pid = null;
       let candidates = null;
+      let reason = null;
       if (opts.productId != null) pid = Number(opts.productId);
       else {
         const k = o.keys;
-        if (k.code) pid = lookup.code(k.code);
-        if (pid == null) {
-          const eIds = k.ean ? preferActive(lookup.ean(k.ean), lookup) : [];
-          const mIds = k.mpn ? preferActive(lookup.mpn(k.mpn), lookup) : [];
-          if (eIds.length === 1) pid = eIds[0];
-          else if (eIds.length > 1) {
-            const inter = mIds.filter((id) => eIds.includes(id));
-            if (inter.length === 1) pid = inter[0];
-            else candidates = eIds;
-          } else if (mIds.length === 1) pid = mIds[0];
-          else if (mIds.length > 1) candidates = mIds;
-        }
-        if (pid == null) {
+        const aliasOf = (competitorId) => {
           for (const kind of ALIAS_KINDS) {
-            const vk = k[kind];
-            if (!vk) continue;
-            const hit = aliases.get(`${kind}\u0001${vk}\u0001${cid}`) ?? aliases.get(`${kind}\u0001${vk}\u00010`);
-            if (hit !== undefined) {
-              pid = hit;
-              break;
+            const list = kind === 'ean' ? k.eans : [k[kind]];
+            for (const vk of list) {
+              if (!vk) continue;
+              const hit = aliases.get(`${kind}\u0001${vk}\u0001${competitorId}`);
+              if (hit !== undefined) return hit;
             }
+          }
+          return null;
+        };
+        // 0. ruční alias konkrétního konkurenta
+        pid = aliasOf(cid);
+        if (pid == null) {
+          // EAN (i více EAN): jednoznačný produkt / víc kandidátů
+          const eSet = new Set();
+          for (const e of k.eans) for (const id of lookup.ean(e)) eSet.add(id);
+          const eIds = preferActive([...eSet], lookup);
+          if (k.code) {
+            const cId = lookup.code(k.code);
+            if (cId != null) {
+              // kód odporuje EAN (nebo bez EAN MPN) → nepárovat, nejde rozhodnout, který klíč platí
+              const mUnique = !k.eans.length && k.mpn ? lookup.mpn(k.mpn) : [];
+              const other = eIds.length === 1 && eIds[0] !== cId ? eIds[0] : mUnique.length === 1 && mUnique[0] !== cId ? mUnique[0] : null;
+              if (other != null) {
+                candidates = [cId, other];
+                reason = 'conflict';
+              } else pid = cId;
+            }
+          }
+          if (pid == null && !reason) {
+            const mRaw = k.mpn ? lookup.mpn(k.mpn) : [];
+            // MPN nepoužít pro kandidáta, který má v katalogu jiný EAN, než nese nabídka (jiná varianta)
+            const mIds = k.eans.length ? mRaw.filter((id) => {
+              const ek = lookup.info(id)?.ean_key;
+              return !ek || k.eans.includes(ek);
+            }) : mRaw;
+            if (eIds.length === 1) pid = eIds[0];
+            else if (eIds.length > 1) {
+              const inter = mIds.filter((id) => eIds.includes(id));
+              if (inter.length === 1) pid = inter[0];
+              else candidates = eIds;
+            } else if (mIds.length === 1) pid = mIds[0];
+            else if (mIds.length > 1) candidates = mIds;
+            if (pid == null && !candidates && mRaw.length && !mIds.length) reason = 'ean_mismatch';
+          }
+        }
+        // 4. obecné aliasy (i pro nejednoznačný EAN / konflikt klíčů – ruční rozhodnutí)
+        if (pid == null) {
+          const hit = aliasOf(0);
+          if (hit != null) {
+            pid = hit;
+            candidates = null;
+            reason = null;
           }
         }
       }
 
       if (pid == null) {
         const mk = matchKeyOf(o);
-        if (candidates) stats.ambiguous++;
+        if (candidates && reason !== 'conflict') stats.ambiguous++;
         else stats.unmatched++;
         const uk = `${cid}\u0001${mk}`;
         const prev = unmatchedBest.get(uk);
-        if (!prev || o.price < prev.o.price) unmatchedBest.set(uk, { o, cid, mk, reason: candidates ? 'ambiguous' : 'not_found', candidates });
+        if (!prev || o.price < prev.o.price) unmatchedBest.set(uk, { o, cid, mk, reason: reason || (candidates ? 'ambiguous' : 'not_found'), candidates });
         continue;
       }
       stats.matched++;
+      // příliš staré zjištění se zahodí PŘED výběrem mezi duplicitami (jinak by starý řádek „vyhrál“ a čerstvý by se
+      // zahodil spolu s ním – data-8)
+      if (maxAgeMs != null && Date.parse(o.observed_at) < nowMs - maxAgeMs) {
+        stats.stale++;
+        continue;
+      }
       const pk = pid * PAIR + cid;
       const prev = best.get(pk);
       if (prev) {
         stats.duplicates++;
-        // ponechat nejnižší cenu; při shodě ceny dostupnější (skladem) a novější nabídku
+        // Různé časy zjištění (historie, ranní a večerní sken) → platí NOVĚJŠÍ. Jen u stejného (± 1 h) zjištění
+        // (víc nabídek jednoho obchodu v jednom skenu) nejnižší cena; při shodě ceny dostupnější a novější (data-8).
+        const dt = Date.parse(o.observed_at) - Date.parse(prev.o.observed_at);
         const better =
-          o.price < prev.o.price ||
-          (o.price === prev.o.price && ((o.in_stock === 1 && prev.o.in_stock !== 1) || (o.in_stock === prev.o.in_stock && o.observed_at > prev.o.observed_at)));
+          Math.abs(dt) > SAME_SCAN_MS
+            ? dt > 0
+            : o.price < prev.o.price ||
+              (o.price === prev.o.price && ((o.in_stock === 1 && prev.o.in_stock !== 1) || (o.in_stock === prev.o.in_stock && o.observed_at > prev.o.observed_at)));
         if (better) best.set(pk, { o, pid, cid });
       } else best.set(pk, { o, pid, cid });
     }
@@ -384,10 +449,6 @@ function importOffers(db, records, opts = {}) {
     for (const [pk, { o, pid, cid }] of best) {
       present.add(pk);
       const cur = bulk ? existingAll.get(pk) : getOffer.get(pid, cid);
-      if (maxAgeMs != null && Date.parse(o.observed_at) < nowMs - maxAgeMs) {
-        stats.stale++;
-        continue;
-      }
       if (cur && o.observed_at < cur.observed_at) {
         stats.stale++;
         continue;
@@ -452,9 +513,17 @@ function importOffers(db, records, opts = {}) {
     }
 
     // ------------------------------------------------------------ 4. nahrazení (smazání chybějících nabídek)
+    // Chybné řádky (neplatná cena…) nesou nabídky, které se nenaimportovaly – jejich „chybějící“ nabídky se nesmí
+    // smazat (data-9). Konkurent chybného řádku je známý z mapování (failedCompetitors) nebo z 1. průchodu.
+    const failedKeys = new Set([...(opts.failedCompetitors || [])].map((n) => nameKey(n)).filter(Boolean));
+    for (const k of failedInPass) failedKeys.add(k);
+    const failedCids = new Set([...failedKeys].map((k) => competitors.get(k)).filter((id) => id !== undefined));
+    const unknownFailed = Number(opts.failedUnknown) > 0 || failedUnknownInPass > 0;
     if (replace) {
       if (valid === 0) {
         errs.add(null, 'Import neobsahuje žádnou platnou nabídku – mazání chybějících nabídek (replace) bylo přeskočeno.');
+      } else if (unknownFailed || (replace === 'all' && failedKeys.size)) {
+        errs.add(null, 'Import obsahuje chybné řádky bez určitelného konkurenta – mazání chybějících nabídek (replace) bylo přeskočeno, aby se nesmazaly platné nabídky.');
       } else {
         const del = db.prepare('DELETE FROM offers WHERE product_id = ? AND competitor_id = ?');
         const toDelete = [];
@@ -465,7 +534,11 @@ function importOffers(db, records, opts = {}) {
         } else {
           const q = db.prepare('SELECT product_id, competitor_id FROM offers WHERE competitor_id = ?');
           for (const cid of presentCompetitors) {
+            if (failedCids.has(cid)) continue; // konkurent s chybnými řádky – nic nemazat
             for (const r of q.iterate(cid)) if (!present.has(r.product_id * PAIR + r.competitor_id)) toDelete.push(r);
+          }
+          if (failedCids.size) {
+            errs.add(null, `Mazání chybějících nabídek (replace) bylo přeskočeno u ${failedCids.size} konkurentů s chybnými řádky.`, { warning: true });
           }
         }
         for (const r of toDelete) stats.removed += Number(del.run(r.product_id, r.competitor_id).changes);
@@ -494,8 +567,10 @@ function matchUnmatched(db, unmatchedId, productId, opts = {}) {
     const p = db.prepare('SELECT id FROM products WHERE id = ?').get(Number(productId));
     if (!p) throw new ImportError('Produkt nebyl nalezen.', { status: 404, code: 'NOT_FOUND' });
     const raw = parseJson(u.raw, null) || {};
+    const eanRaw = u.ean ?? raw.ean;
     const ids = {
-      ean: eanKey(u.ean ?? raw.ean),
+      // více EAN („A|B“) → první platný
+      ean: eanKey(eanRaw) || (eanRaw != null ? String(eanRaw).split(/[|,;\s]+/).map(eanKey).find(Boolean) || null : null),
       mpn: mpnKey(u.mpn ?? raw.mpn),
       ext: extKey(u.ext_id ?? raw.ext_id),
       code: codeKey(u.code ?? raw.code),

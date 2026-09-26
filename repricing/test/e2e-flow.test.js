@@ -161,7 +161,7 @@ describe('E2E: import → strategie → přecenění → schválení → export 
     const r = await s.call('POST', '/api/v1/import/products', { as: T.imp, body: example('katalog.csv'), type: 'text/csv' });
     assert.equal(r.status, 200, r.text);
     assert.equal(r.data.format, 'csv');
-    assert.deepEqual({ ...r.data.stats, errors: hardErrors(r.data.stats) }, { received: 40, created: 40, updated: 0, unchanged: 0, deactivated: 0, errors: [] });
+    assert.deepEqual({ ...r.data.stats, errors: hardErrors(r.data.stats) }, { received: 40, created: 40, updated: 0, unchanged: 0, deactivated: 0, superseded: 0, errors: [] });
 
     // stejný katalog v kódování windows-1250 (export z Pohody/Excelu); „²“ v cp1250 není → nahrazeno „2“
     const text = example('katalog.csv').toString('utf8').replace(/^\uFEFF/, '').replace(/²/g, '2');
@@ -366,6 +366,11 @@ describe('E2E: import → strategie → přecenění → schválení → export 
     const expectedAged = [...S.products.values()].filter((p) => ['N7', 'N8'].includes(p.attrs.N)).length;
     assert.equal(agedSeg.count, expectedAged);
     S.presetId = pr.data.strategy.id;
+    // předvolba vzniká vypnutá (contract-4) – po kontrole ji zapneme
+    assert.equal(pr.data.strategy.enabled, false);
+    const en = await s.call('PUT', `/api/v1/strategies/${S.presetId}`, { json: { enabled: true } });
+    assert.equal(en.status, 200, en.text);
+    assert.equal(en.data.enabled, true);
 
     // b) vlastní segment + strategie s podmínkami a cílem „2. místo“, fallback next (min. 3 konkurenti)
     const seg = await s.call('POST', '/api/v1/segments', {
@@ -545,7 +550,10 @@ describe('E2E: import → strategie → přecenění → schválení → export 
     assert.equal(mp.status, 200, mp.text);
     assert.equal(mp.data.manual_price, manualPrice);
     assert.equal(mp.data.final_price, manualPrice);
-    assert.equal(mp.data.status, 'approved');
+    // úprava ceny schváleného návrhu ho vrací ke schválení (money-7) – upravená cena nejde ven bez druhého pohledu
+    assert.equal(mp.data.status, 'pending');
+    const reap = await s.call('POST', '/api/v1/proposals/approve', { json: { ids: [manual.id] } });
+    assert.equal(reap.data.updated, 1);
     const badMp = await s.call('PATCH', `/api/v1/proposals/${manual.id}`, { json: { manual_price: -5 } });
     assertCzech400(badMp, 'záporná ruční cena');
 
@@ -860,7 +868,7 @@ describe('E2E: import → strategie → přecenění → schválení → export 
   test('8b. druhé přecenění: superseded, zámek produktu, ruční cena produktu, nové návrhy vychází z exportovaných cen', async () => {
     const pendBefore = await s.call('GET', '/api/v1/proposals?status=pending&sort=id&limit=500', { as: T.read });
     assert.ok(pendBefore.data.total >= 2);
-    // jeden čekající návrh schválíme (neexportovaný schválený návrh nový běh také nahradí)
+    // jeden čekající návrh schválíme – nový běh se stejným výsledkem ho ponechá i se schválením (ops-1)
     const keepApproved = pendBefore.data.items[0];
     assert.equal((await s.call('POST', '/api/v1/proposals/approve', { json: { ids: [keepApproved.id] } })).data.updated, 1);
     // zámek produktu s čekajícím návrhem → nový běh ho přeskočí (locked)
@@ -868,6 +876,9 @@ describe('E2E: import → strategie → přecenění → schválení → export 
     const lk = await s.call('PATCH', `/api/v1/products/${lockedP.product_id}`, { json: { locked: true, note: 'Akční cena – nesahat' } });
     assert.equal(lk.status, 200, lk.text);
     assert.equal(lk.data.lock_active, true);
+    // zámek otevřený návrh rovnou zneplatní (money-1) – schválený by jinak odešel do exportu
+    const lockedNow = await s.call('GET', `/api/v1/proposals?status=all&product=${lockedP.product_id}`, { as: T.read });
+    assert.equal(lockedNow.data.items.find((p) => p.id === lockedP.id).status, 'superseded');
     // ruční změna ceny produktu (price → historie 'manual')
     const manualP = [...S.products.values()].find((p) => !S.exportedPrices.has(p.code) && p.id !== lockedP.product_id && p.price > 1000);
     const manualPrice = manualP.price + 100;
@@ -880,11 +891,18 @@ describe('E2E: import → strategie → přecenění → schválení → export 
     const run2 = await s.call('POST', '/api/v1/runs', { json: {} });
     assert.equal(run2.status, 200, run2.text);
     assert.equal(run2.data.stats.skipped.locked, 1, JSON.stringify(run2.data.stats.skipped));
-    assert.ok(run2.data.stats.superseded >= pendBefore.data.total - 1);
+    assert.ok(run2.data.stats.superseded + run2.data.stats.kept >= pendBefore.data.total - 2, JSON.stringify(run2.data.stats));
 
     const old = await s.call('GET', `/api/v1/proposals?status=superseded&run=${S.runId}&limit=500`, { as: T.read });
-    assert.ok(old.data.items.some((p) => p.id === keepApproved.id), 'schválený neexportovaný návrh je nahrazen');
     assert.ok(old.data.items.every((p) => p.run_id === S.runId));
+    // schválený návrh se stejnou cenou zůstal schválený a patří k novému běhu (lidské rozhodnutí se nezahodí)
+    const kept = await s.call('GET', `/api/v1/proposals?status=all&product=${keepApproved.product_id}`, { as: T.read });
+    const keptItem = kept.data.items.find((p) => p.id === keepApproved.id);
+    if (keptItem.status !== 'superseded') {
+      assert.equal(keptItem.status, 'approved');
+      assert.equal(keptItem.decided_by, 'admin');
+      assert.equal(keptItem.run_id, run2.data.run_id);
+    }
     // zamčený produkt byl vyhodnocen (skip locked) → jeho starý návrh je nahrazen a nový nevznikl
     const lockedProp = await s.call('GET', `/api/v1/proposals?status=all&product=${lockedP.product_id}`, { as: T.read });
     assert.equal(lockedProp.data.items.find((p) => p.id === lockedP.id).status, 'superseded');
@@ -911,11 +929,13 @@ describe('E2E: import → strategie → přecenění → schválení → export 
     );
     S.runId = run2.data.run_id;
     // zámek po vytvoření návrhu = ruční přebití → návrh nejde schválit (skipped_locked)
-    const fresh = cur.data.items[0];
+    const fresh = cur.data.items.find((p) => p.status === 'pending');
     assert.equal((await s.call('PATCH', `/api/v1/products/${fresh.product_id}`, { json: { locked_until: new Date(Date.now() + DAY_MS).toISOString() } })).status, 200);
     const apLocked = await s.call('POST', '/api/v1/proposals/approve', { json: { ids: [fresh.id] } });
     assert.equal(apLocked.data.updated, 0);
-    assert.equal(apLocked.data.skipped_locked, 1);
+    // zámek návrh zneplatnil hned (money-1), schvalovat už není co
+    const freshNow = await s.call('GET', `/api/v1/proposals?status=all&product=${fresh.product_id}`, { as: T.read });
+    assert.equal(freshNow.data.items.find((p) => p.id === fresh.id).status, 'superseded');
     // zámky zpět
     for (const id of [lockedP.product_id, fresh.product_id]) {
       const u = await s.call('PATCH', `/api/v1/products/${id}`, { json: { locked: false, locked_until: null } });
@@ -935,7 +955,7 @@ describe('E2E: import → strategie → přecenění → schválení → export 
     assert.equal(pos.cheapest + pos.middle + pos.most_expensive + pos.no_data, 40);
     assert.equal(pos.no_data, db.products.without_market);
     assert.ok(db.price_index.vs_min > 0);
-    assert.equal(db.proposals.approved, 0);
+    assert.equal(db.proposals.approved, (await s.call('GET', '/api/v1/proposals?status=approved', { as: T.read })).data.total);
     assert.equal(db.proposals.exported_7d, S.exportedCount);
     const pendingNow = (await s.call('GET', '/api/v1/proposals?status=pending', { as: T.read })).data.total;
     assert.equal(db.proposals.pending, pendingNow);

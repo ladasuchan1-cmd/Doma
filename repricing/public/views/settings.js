@@ -15,7 +15,9 @@ import { dateTime, relTime, SCOPE_LABELS, parseInputNumber, detailText } from '.
 
 export const title = 'Nastavení';
 
-const XML_FIELDS = ['code', 'ean', 'name', 'manufacturer', 'price', 'old_price', 'change_pct', 'vat_rate', 'currency', 'changed_at', 'proposal_id', 'product_id'];
+// Pole řádku exportu, která jde dát do XML šablony – musí pokrývat ROW_FIELDS serveru (src/export/rows.js),
+// jinak by je UI (chipsInput s allowNew: false) nedovolilo přidat; shodu hlídá test/ui-settings.test.js (contract-16).
+export const XML_FIELDS = ['code', 'ean', 'name', 'manufacturer', 'price', 'old_price', 'change_pct', 'vat_rate', 'currency', 'changed_at', 'proposal_id', 'product_id', 'strategy', 'segment', 'lowest_30d'];
 const SCOPE_HELP = {
   read: 'čtení dat (přehledy, produkty, návrhy)',
   import: 'posílání katalogu a cen konkurence',
@@ -53,24 +55,44 @@ export async function show(root, ctx) {
   let original = null;
   let draft = null;
   let removedHeaders = new Set();
+  // Neplatná číselná pole (cesta → {input, label}). Dokud nějaké je, nastavení se neuloží – dřív se neplatná hodnota
+  // tiše zahodila a „Nastavení uloženo“ tvrdilo opak (contract-13).
+  const invalid = new Map();
   const saveBar = h('div', { class: 'bulkbar', hidden: true, role: 'region', 'aria-label': 'Neuložené změny' });
 
   function markDirty() {
-    const dirty = JSON.stringify(draft) !== JSON.stringify(original) || removedHeaders.size > 0;
+    const dirty = JSON.stringify(draft) !== JSON.stringify(original) || removedHeaders.size > 0 || invalid.size > 0;
     saveBar.hidden = !dirty;
+  }
+
+  /** Povolený rozsah pole jako text („celé číslo, alespoň 1“). */
+  function ruleText(opts) {
+    const parts = [opts.int ? 'celé číslo' : 'číslo'];
+    if (opts.min != null && opts.max != null) parts.push('od ' + opts.min + ' do ' + opts.max);
+    else if (opts.min != null) parts.push('alespoň ' + opts.min);
+    else if (opts.max != null) parts.push('nejvýše ' + opts.max);
+    if (opts.nullable) parts.push('nebo prázdné');
+    return parts.join(', ');
   }
 
   function numField(path, label, opts = {}) {
     const inp = numberInput(get(draft, path), { placeholder: opts.placeholder || '' });
+    const rule = ruleText(opts);
+    const err = h('div', { class: 'field-error', role: 'alert', hidden: true }, 'Neplatná hodnota – povoleno: ' + rule + '. Neuloží se.');
     inp.addEventListener('input', () => {
       const v = parseInputNumber(inp.value);
       const bad = Number.isNaN(v) || (v == null && !opts.nullable) || (opts.int && v != null && !Number.isInteger(v)) || (opts.min != null && v != null && v < opts.min) || (opts.max != null && v != null && v > opts.max);
       inp.classList.toggle('is-invalid', Boolean(bad));
-      if (bad) return;
-      set(draft, path, v);
+      inp.setAttribute('aria-invalid', bad ? 'true' : 'false');
+      err.hidden = !bad;
+      if (bad) invalid.set(path, { input: inp, label });
+      else {
+        invalid.delete(path);
+        set(draft, path, v);
+      }
       markDirty();
     });
-    return field({ label, control: withSuffix(inp, opts.suffix), input: inp, help: opts.help });
+    return field({ label, control: h('div', null, withSuffix(inp, opts.suffix), err), input: inp, help: [opts.help, 'Povoleno: ' + rule + '.'].filter(Boolean).join(' ') });
   }
   function boolField(path, label, help) {
     const sw = switchEl({ checked: Boolean(get(draft, path)), label, onChange: (v) => { set(draft, path, v); markDirty(); } });
@@ -105,23 +127,16 @@ export async function show(root, ctx) {
 
   function headersEditor() {
     const host = h('div', { class: 'stack-sm' });
+    // Řádky se překreslují jen při přidání/odebrání hlavičky. Úpravy názvu a hodnoty mění draft na místě – dřív
+    // „change“ překreslil všechny řádky, Tab z názvu tak zničil právě fokusované pole hodnoty a psaný text se
+    // ztratil (contract-14).
     const render = () => {
       const hdrs = get(draft, 'export.webhook.headers') || {};
-      const rows = Object.entries(hdrs).map(([k, v]) => {
+      const rows = Object.entries(hdrs).map(([k0, v]) => {
+        let k = k0; // aktuální název hlavičky (přejmenování ho mění bez překreslení)
         const kIn = h('input', { class: 'input input-mono', value: k, 'aria-label': 'Název hlavičky' });
         const vIn = h('input', { class: 'input input-mono', value: v ?? '', 'aria-label': 'Hodnota hlavičky ' + k });
-        const commit = () => {
-          const cur = { ...(get(draft, 'export.webhook.headers') || {}) };
-          delete cur[k];
-          if (kIn.value.trim()) cur[kIn.value.trim()] = vIn.value;
-          if (kIn.value.trim() !== k) removedHeaders.add(k);
-          set(draft, 'export.webhook.headers', cur);
-          markDirty();
-          render();
-        };
-        kIn.addEventListener('change', commit);
-        vIn.addEventListener('change', commit);
-        return h('div', { class: 'row', style: 'flex-wrap:nowrap' }, kIn, vIn, h('button', {
+        const delBtn = h('button', {
           type: 'button', class: 'btn-icon', 'aria-label': 'Odebrat hlavičku ' + k,
           onClick: () => {
             const cur = { ...(get(draft, 'export.webhook.headers') || {}) };
@@ -131,7 +146,38 @@ export async function show(root, ctx) {
             markDirty();
             render();
           },
-        }, icon('trash', { size: 15 })));
+        }, icon('trash', { size: 15 }));
+        kIn.addEventListener('change', () => {
+          const nk = kIn.value.trim();
+          if (nk === k) return;
+          const cur = get(draft, 'export.webhook.headers') || {};
+          if (!nk || Object.prototype.hasOwnProperty.call(cur, nk)) {
+            // prázdný nebo duplicitní název by hlavičku tiše smazal / sloučil – vrátit původní
+            kIn.value = k;
+            toast(nk ? 'Hlavička „' + nk + '“ už existuje.' : 'Název hlavičky nesmí být prázdný – hlavičku odeberete ikonou koše.', { type: 'warning' });
+            return;
+          }
+          // přejmenovat se zachováním pořadí hlaviček
+          const next = {};
+          for (const [kk, vv] of Object.entries(cur)) {
+            if (kk === k) next[nk] = vIn.value;
+            else next[kk] = vv;
+          }
+          removedHeaders.add(k);
+          removedHeaders.delete(nk);
+          set(draft, 'export.webhook.headers', next);
+          k = nk;
+          vIn.setAttribute('aria-label', 'Hodnota hlavičky ' + k);
+          delBtn.setAttribute('aria-label', 'Odebrat hlavičku ' + k);
+          markDirty();
+        });
+        vIn.addEventListener('input', () => {
+          const cur = { ...(get(draft, 'export.webhook.headers') || {}) };
+          cur[k] = vIn.value;
+          set(draft, 'export.webhook.headers', cur);
+          markDirty();
+        });
+        return h('div', { class: 'row', style: 'flex-wrap:nowrap' }, kIn, vIn, delBtn);
       });
       mount(host, rows.length ? rows : h('p', { class: 'muted small', style: 'margin:0' }, 'Žádné vlastní hlavičky.'), h('div', null, h('button', {
         type: 'button', class: 'btn btn-sm',
@@ -155,7 +201,7 @@ export async function show(root, ctx) {
   function xmlPreview() {
     const tpl = get(draft, 'export.xml') || {};
     const fields = Array.isArray(tpl.fields) ? tpl.fields : Object.keys(tpl.fields || {});
-    const sample = { code: 'TRK-MAR7GEN3-M', ean: '8592842012345', name: 'Trek Marlin 7 Gen 3, M', manufacturer: 'Trek', price: 20990, old_price: 21990, change_pct: -4.55, vat_rate: 21, currency: 'CZK', changed_at: '2026-09-25T08:00:00Z', proposal_id: 1201, product_id: 7 };
+    const sample = { code: 'TRK-MAR7GEN3-M', ean: '8592842012345', name: 'Trek Marlin 7 Gen 3, M', manufacturer: 'Trek', price: 20990, old_price: 21990, change_pct: -4.55, vat_rate: 21, currency: 'CZK', changed_at: '2026-09-25T08:00:00Z', proposal_id: 1201, product_id: 7, strategy: 'Výchozí – medián trhu', segment: 'Klíčové značky', lowest_30d: 20990 };
     const root = tpl.root || 'prices';
     const item = tpl.item || 'item';
     const lines = ['<?xml version="1.0" encoding="UTF-8"?>', `<${root} generated="…" count="1" currency="CZK">`, `  <${item}>`, ...fields.map((f) => `    <${f}>${sample[f] ?? ''}</${f}>`), `  </${item}>`, `</${root}>`];
@@ -165,6 +211,7 @@ export async function show(root, ctx) {
   function generalPanel() {
     const host = h('div', { class: 'stack' });
     const render = () => {
+      invalid.clear(); // pole se vykreslí znovu z draftu – staré neplatné vstupy zanikly
       const xmlPrev = h('div');
       const updXml = () => mount(xmlPrev, codeBlock(xmlPreview(), { title: 'Náhled XML feedu' }));
       const xmlFields = chipsInput({
@@ -209,7 +256,7 @@ export async function show(root, ctx) {
             ),
             h('h3', { class: 'form-subtitle' }, 'XML feed'),
             h('div', { class: 'form-grid' }, rootIn, itemIn),
-            h('div', { style: 'margin-top:14px' }, field({ label: 'Pole v položce (v tomto pořadí)', control: xmlFields.el, input: xmlFields.input })),
+            h('div', { style: 'margin-top:14px' }, field({ label: 'Pole v položce (v tomto pořadí)', control: xmlFields.el, input: xmlFields.input, help: 'lowest_30d = nejnižší naše cena za posledních 30 dní (pro zobrazení slevy podle zákona), strategy / segment = název strategie a segmentu návrhu.' })),
             h('div', { style: 'margin-top:12px' }, xmlPrev),
             h('h3', { class: 'form-subtitle' }, 'POHODA XML'),
             h('div', { class: 'form-grid' },
@@ -234,12 +281,16 @@ export async function show(root, ctx) {
           title: 'Plánování',
           icon: 'clock',
           dataset: { card: 'schedule' },
-          body: h('div', { class: 'form-grid form-grid-2' },
-            selField('schedule.run_interval_minutes', 'Automatické přecenění', RUN_INTERVALS, 'Pravidelné přecenění všech produktů. Návrhy čekají na schválení (kromě automaticky schvalovaných).'),
-            h('div', null,
-              boolField('schedule.run_after_import', 'Přecenit po importu cen konkurence', 'Po každém úspěšném importu nabídek (API, URL zdroj) se spustí přecenění.'),
-              autoPushField())
-          ),
+          body: [
+            h('div', { class: 'form-grid form-grid-2' },
+              selField('schedule.run_interval_minutes', 'Automatické přecenění', RUN_INTERVALS, 'Pravidelné přecenění všech produktů. Návrhy čekají na schválení (kromě automaticky schvalovaných).'),
+              h('div', null,
+                boolField('schedule.run_after_import', 'Přecenit po importu cen konkurence', 'Po každém úspěšném importu nabídek (API, URL zdroj) se spustí přecenění.'),
+                autoPushField())
+            ),
+            // contract-1: plánované běhy tiše nahrazují i schválené neexportované návrhy (a ruční ceny)
+            h('div', { style: 'margin-top:12px', dataset: { role: 'schedule-warning' } }, callout(h('span', null, h('b', null, 'Každé přecenění (i plánované a po importu) nahradí otevřené návrhy, u kterých vyjde jiná cena – i schválené, dosud neexportované; jejich schválení se ztratí (ruční ceny se přenesou, ale čekají na nové schválení). '), 'Schválené změny proto dostaňte do adminu dřív, než proběhne další přecenění: zapněte automatické odeslání webhookem, nebo nechte admin stahovat feed ', h('code', null, 'changes'), ' častěji, než běží přecenění.'), 'warning')),
+          ],
         })
       );
     };
@@ -248,6 +299,13 @@ export async function show(root, ctx) {
   }
 
   async function saveSettings() {
+    if (invalid.size) {
+      // neplatnou hodnotu neukládat potichu – říct, co opravit (contract-13)
+      const first = [...invalid.values()][0];
+      toast('Opravte zvýrazněná pole: ' + [...invalid.values()].map((x) => x.label).join(', ') + '. Nastavení se neuložilo.', { type: 'error' });
+      first.input.focus();
+      return;
+    }
     const body = JSON.parse(JSON.stringify(draft));
     delete body.currency;
     // Deep-merge na serveru neumí mazat klíče – odebrané hlavičky posíláme jako null.
@@ -275,7 +333,7 @@ export async function show(root, ctx) {
   mount(
     saveBar,
     h('span', { class: 'strong' }, 'Máte neuložené změny nastavení'),
-    h('button', { type: 'button', class: 'btn btn-sm btn-ghost', onClick: () => { draft = JSON.parse(JSON.stringify(original)); removedHeaders = new Set(); markDirty(); general.render(); } }, 'Zahodit'),
+    h('button', { type: 'button', class: 'btn btn-sm btn-ghost', onClick: () => { draft = JSON.parse(JSON.stringify(original)); removedHeaders = new Set(); invalid.clear(); general.render(); markDirty(); } }, 'Zahodit'),
     h('button', { type: 'button', class: 'btn btn-sm btn-primary', dataset: { action: 'save-settings' }, onClick: () => saveSettings() }, 'Uložit nastavení')
   );
 
@@ -391,6 +449,15 @@ export async function show(root, ctx) {
 
   // =============================================================== heslo
   function passwordPanel() {
+    // Heslo z proměnné prostředí nejde v aplikaci změnit (server vrací 409) – místo formuláře vysvětlení (contract-19)
+    if (ctx.me?.password_from_env) {
+      return card({
+        title: 'Změna hesla',
+        icon: 'lock',
+        dataset: { card: 'password' },
+        body: callout(h('span', null, 'Heslo je nastavené proměnnou prostředí ', h('code', null, 'CENOTVORBA_PASSWORD'), ' – v aplikaci ho změnit nelze. Změňte ji na serveru a aplikaci restartujte.'), 'info'),
+      });
+    }
     const cur = h('input', { type: 'password', class: 'input', autocomplete: 'current-password' });
     const n1 = h('input', { type: 'password', class: 'input', autocomplete: 'new-password', minlength: 8 });
     const n2 = h('input', { type: 'password', class: 'input', autocomplete: 'new-password' });

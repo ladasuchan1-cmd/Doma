@@ -142,8 +142,12 @@ test('runImport: chyby mapování a importu se slučují podle řádku (max. 100
   assert.match(r2.stats.errors[0].message, /deaktivace/);
   assert.equal(r2.stats.deactivated, 0);
   assert.match(r2.stats.errors[99].message, /dalších 402 /);
-  const r3 = runImport(db, { kind: 'products', input: { text: bad + '\nP1;5\n' }, options: { deactivate_missing: true }, now: T1 });
-  assert.equal(r3.stats.deactivated, 74, 'jediný platný řádek P1 → ostatní produkty z prvního importu se deaktivují');
+  // jediný platný řádek by vypnul 74 z 75 produktů → bez force_deactivate se deaktivace přeskočí (data-5)
+  const r3a = runImport(db, { kind: 'products', input: { text: bad + '\nP1;5\n' }, options: { deactivate_missing: true }, now: T1 });
+  assert.equal(r3a.stats.deactivated, 0);
+  assert.match(r3a.stats.errors[0].message, /vypnul 74 z 75/);
+  const r3 = runImport(db, { kind: 'products', input: { text: bad + '\nP1;5\n' }, options: { deactivate_missing: true, force_deactivate: true }, now: T1 });
+  assert.equal(r3.stats.deactivated, 74, 'jediný platný řádek P1 + force_deactivate → ostatní produkty se deaktivují');
 });
 
 test('previewImport: formát, hlavičky, navržené mapování, ukázka, chyby', () => {
@@ -333,7 +337,9 @@ test('dueSources: zapnuté, s URL, interval > 0, poslední běh starší než in
   );
   assert.equal(due[0].name, 'nikdy');
   assert.equal(typeof due[0].mapping, 'string', 'řádky tabulky sources beze změny');
-  assert.deepEqual(dueSources(db, new Date('2026-09-25T10:00:00Z')).map((s) => s.id), [due1]);
+  assert.deepEqual(dueSources(db, new Date('2026-09-25T11:00:00Z')).map((s) => s.id), [due1]);
+  // čas posledního běhu víc než hodinu v budoucnosti = posun hodin serveru → zdroj je splatný (ops-10)
+  assert.ok(dueSources(db, new Date('2026-09-25T09:00:00Z')).some((s) => s.name === 'čerstvý'));
 });
 
 test('runImport: už rozparsované tělo API ({items} / pole kanonických nabídek) přes input.records i jako JSON text', () => {

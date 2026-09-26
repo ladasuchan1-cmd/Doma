@@ -67,7 +67,8 @@ Read the schema in `src/db.js` – it is authoritative for column names.
 separators · `nameKey(s)` folded competitor name (no scheme/www) · `fold(s)` lower-case without diacritics.
 
 ### src/util/num.js
-`parseNumber(v, {decimal?})` (CZ/EN formats, currency, `,-`, `%`), `round(n, d=2)`, `net(gross, vat)`,
+`parseNumber(v, {decimal?, dotThousands?, commaThousands?})` (CZ/EN formats, `Kč`/`CZK`, `,-`, `%`; a foreign currency
+– EUR, €, $, USD – returns null; a group starting with 0 is never thousands), `round(n, d=2)`, `net(gross, vat)`,
 `gross(net, vat)`, `marginPct(priceGross, purchaseNet, vat)`, `markupPct(...)`, `median(arr)`, `mean(arr)`.
 
 ## 3. Domain
@@ -115,14 +116,43 @@ named competitor missing, no MSRP / no cost for msrp / cost_plus modes) and its 
 
 ### 3.6 Run & Proposal – tables `runs`, `proposals`
 A run evaluates all active products. Only decisions with a price change are stored as proposals
-(`pending`, or `approved` when auto-approved). A new run marks all older `pending` and `approved` (not exported)
-proposals of every evaluated product as `superseded`. Statuses: `pending | approved | rejected | exported | superseded`.
+(`pending`, or `approved` when auto-approved). Statuses: `pending | approved | rejected | exported | superseded`.
 The price to export = `manual_price ?? new_price`.
+
+Open proposals (`pending` / `approved`, not exported) of evaluated products on a new run (human decisions are kept –
+ops-1, money-8, ops-5):
+- **same decision** (same `new_price` and `old_price`) and a compatible state (a human decision – manual approval or
+  `manual_price` – always; an automatic one only when the auto-approval outcome is the same) → the proposal is **kept**:
+  moved to the new run (`run_id`, explain, market metrics, flags updated), status / `manual_price` / `decided_*` unchanged
+  (stats `kept`). No duplicate row is inserted.
+- an open proposal with `manual_price` and a different new decision → the new proposal carries the `manual_price`, is
+  always `pending` and gets flag `manual_carried`; when the run proposes no change, the manual-price proposal stays open.
+- a price a human **rejected** in the last 7 days (±0.5 %) is never auto-approved again: inserted as `pending` with flag
+  `previously_rejected` (stats `held_by_human` counts both cases).
+- everything else → `superseded` (as before). A full run (no `productIds`) also supersedes open proposals of
+  **inactive** products (money-4).
+
+Outside runs, open proposals are superseded when their inputs change (money-1/2/3/4): a new active lock, a change of
+`price` (unless the new price equals the proposal's export price – the admin already applied it), `purchase_price`,
+`vat_rate`, `min_price`, `max_price`, or deactivation – in `PATCH /products/:id` and in the catalog import.
 
 ### 3.7 Export
 Exporting approved proposals (feed pull + ack, webhook push, POHODA XML download with mark) → status `exported`,
 `exported_at`, `export_id`; if setting `export.update_current_price` → `products.price` := exported price,
 `price_changed_at`, and a `price_history` row (`source='export'`).
+
+The price written is the **delivered** one (money-5/6, ops-4): marking takes the delivered prices of the rows; a proposal
+whose `manual_price ?? new_price` changed since delivery is not marked (`skipped: changed_since_delivery`) and is sent
+again. Every non-marking delivery (feed, export, price list, POHODA XML) remembers `served_price` / `served_at` on the
+proposal; an ack by code marks the last **served** proposal (even if a later run superseded it – then `products.price` is
+updated only when nothing else changed it meanwhile) and never a newer proposal the admin has not seen.
+
+Before export every approved proposal is re-checked against the current product (`rows.holdReason`, money-1/2/3) and
+**held back** (not exported, not marked, reported as `held`) when: the product lock is active; the product price changed
+since the proposal was computed (and is not the proposal's own price); the price is below `min_price` / above `max_price`;
+the net price is below `purchase_price`. The last three are allowed when a human approved a proposal carrying the
+matching flag (`below_min`, `above_max`, `below_cost` / `manual_below_cost`). In the full price list (`scope=all`) a held
+proposal is replaced by the current price.
 
 ---------------------------------------------------------------------------------------------------------
 
@@ -187,16 +217,27 @@ Exporting approved proposals (feed pull + ack, webhook push, POHODA XML download
 - `input`: `{buffer?: Buffer, text?: string, contentType?, filename?}`; uses `decodeBuffer`/`detectFormat`.
 - `mapping.format` (`auto` default), `mapping.item_path`, `mapping.offers_path`, `mapping.csv {delimiter, decimal,
   encoding, header_row}`, `mapping.xlsx {sheet}`, `mapping.encoding`.
-- JSON: records = the array at `item_path` (dot path), or root if it is an array, or the first array-valued property
-  found breadth-first (e.g. `{items:[…]}`, `{data:{offers:[…]}}`); a single object → one record.
-- XML: `streamRecords` with `item_path` or `detectItemPath`.
+- JSON: records = the array at `item_path` (dot path), or root if it is an array, or the best array of objects found
+  breadth-first: a well-known name (`items`, `products`, `offers`, `data`, `records`, `results`…) wins, then the largest;
+  service arrays (`errors`, `warnings`, `messages`, `meta`, `categories`…) are skipped (data-5); a single object → one
+  record. JSON text over 128 MB is rejected (`JSON_TOO_LARGE`, security-2).
+- XML: `streamRecords` with `item_path` or `detectItemPath` (a document with a single item whose child repeats – one
+  SHOPITEM with 2 PARAM, one POHODA card with price levels – returns the item, data-2).
+- gzip / ZIP entries are inflated to at most 256 MB (`MAX_ENTRY_BYTES`); a ZIP with more than one data file is rejected
+  (`ZIP_MULTIPLE`, data-15).
+- For `kind=offers` only context keys of the envelope are inherited by every record (JSON root primitives, XML root
+  attributes): competitor/shop/seller…, dates, currency – never match keys like `code`, `id`, `ean` (data-4).
 - CSV/XLSX: rows as objects keyed by header.
 - **Flattening**: every record becomes a flat object with dot-path keys (`offers.offer.@shop`, `PRICE_VAT`,
   `PARAM.Barva` for Heureka-style `PARAM{PARAM_NAME,VAL}` pairs). Arrays of primitives are joined with `|`.
-- **Nested offers**: if `offers_path` is set (or auto: the record has exactly one array of objects whose objects
-  contain a price-like field), each element of that array becomes its own row inheriting the parent's fields;
-  child keys are exposed both as `<offers_path>.<key>` and as bare `<key>` (child wins on conflict).
-- `headers` = union of flat keys (first 1000 records) in first-seen order.
+- **Nested offers**: if `offers_path` is set (or auto: exactly one path, over ALL records, of arrays of objects whose
+  objects contain a price-like field – for offers also a single object named like an offer, `<OFFERS><OFFER>`, data-9),
+  each element becomes its own row inheriting the parent's fields; child keys are exposed both as `<offers_path>.<key>`
+  and as bare `<key>` (child wins on conflict). Catalog variants need a code-like key (not a bare `id`), and POHODA price
+  levels (`stockPriceItem/stockPrice`) are never exploded (data-1). A variant's own code (sku/code) overrides the
+  parent's code key (the parent code stays under `parent.<key>`, data-11).
+- `headers` = union of flat keys of all records (at most 5000 distinct keys) in first-seen order (data-13).
+- result also carries `delimiter` (CSV) and `context` (keys inherited from the envelope).
 
 ### mapping.js
 - `CANONICAL = {products: [...fields], offers: [...fields]}` with Czech labels.
@@ -215,39 +256,59 @@ Exporting approved proposals (feed pull + ack, webhook push, POHODA XML download
   observed_at: observed_at, date, datum, timestamp, scraped_at, updated_at; sales_30/sales_90: prodej_30, sales_30d…
 - `applyMapping(flatRecord, mapping, kind, ctx) → {value: object|null, errors: string[]}` – builds a canonical record:
   `mapping.fields[canonical] = sourceKey` (explicit wins; otherwise suggestions), `mapping.defaults[canonical] = constant`,
-  coercion: numbers via `parseNumber(v, {decimal: mapping.csv?.decimal})`; `vat_rate` "21 %" → 21;
+  coercion: numbers via `parseNumber(v, {decimal: mapping.csv?.decimal, dotThousands, commaThousands})` – XML/JSON:
+  a dot is always decimal (`1299.000` = 1299); CSV with `;`: a comma is always decimal (`123,456` = 123.456); attrs use
+  the same rules (money-11, data-10). `price` gets `[sale_price, price]` when a sale-price column exists (Google
+  `g:sale_price`, data-7); repeated shipping values pick the CZ one (else the lowest); shipping `zdarma` = 0 (data-16);
+  `vat_rate` "21 %" → 21;
   `availability` → `{in_stock, delivery_days}` (see `normalizeAvailability`); `observed_at` → ISO (accepts ISO, `d.m.yyyy[ H:mm]`,
   unix seconds/ms); texts trimmed, empty → null. For `products`, all **unmapped** keys go to `attrs` (numbers parsed
   when the whole value is numeric) unless `mapping.attrs === 'none'`; `mapping.attrs` may also be an array of keys to keep.
   `mapping.price_net = true` → offer/our prices are net and must be converted to gross with vat (product's or default).
+  Per record, a sibling `<source key>.@payVAT` (POHODA `stk:sellingPrice payVAT="false"`, `stk:purchasingPrice
+  payVAT="true"`) sets `price_net_fields` / `purchase_is_gross`, which win over the global setting (money-10).
+  Offers `code` aliases are only unambiguous names (code, kod, nas_kod…); generic item ids (ITEM_ID, SKU…) map to
+  `ext_id` – except in feeds with nested offers (price-monitoring export of OUR items), where they are our code (data-3).
+  `compileMapping` reports explicitly mapped columns missing from the input: a warning each; for CSV/XLSX a missing
+  required/match column fails the import (`MAPPING_COLUMN_MISSING`, data-12).
 - `normalizeAvailability(v) → {in_stock: 1|0|null, delivery_days: number|null}`:
   true/"1"/"ano"/"yes"/"skladem"/"in stock"/"instock"/"in_stock"/"available"/"na skladě" → in_stock 1, days 0;
   false/"0"(as a word only when the field is boolean-like)/"ne"/"no"/"není skladem"/"vyprodáno"/"out of stock"/
   "outofstock"/"na dotaz"/"nedostupné"/"preorder"/"předobjednávka" → 0; a number (or "do 3 dnů"/"3 dny") = delivery days
   → in_stock = (days ≤ 0 ? 1 : 0), delivery_days = days. Heureka `DELIVERY_DATE` 0 = skladem.
-  Field `stock_qty` > 0 → in_stock 1.
+  Field `stock_qty` > 0 → in_stock 1. „Skladem 0 ks“, „u dodavatele“, „předprodej“ → 0 (data-16). Values are cut to
+  200 characters and the day patterns are linear (no ReDoS on long digit runs – security-3).
 
 ### products.js
 `importProducts(db, records (canonical), {deactivateMissing?=false, sourceId?, now?}) → stats`
 - upsert by `code_key`; update only fields present (non-undefined) in the record; merge `attrs` (new keys overwrite,
   others kept); `purchase_includes_vat` setting → divide purchase_price by (1+vat/100).
-- if `price` changed vs stored → `price_history` row (`source='import'`) and `price_changed_at`.
-- `deactivateMissing` → products not in this import get `active=0` (and reactivated when present again).
-- stats `{received, created, updated, unchanged, deactivated, errors: [{row, message}]}` (max 100 error entries).
+- if `price` changed vs stored → `price_history` row (`source='import'`) and `price_changed_at` – measured on the FINAL
+  value of the import (duplicate code rows → one warning per code, last row wins, at most one history row – data-11).
+- `deactivateMissing` → products not in this import get `active=0` (and reactivated when present again). If that would
+  deactivate more than half of the active products, it is skipped with a general error unless `forceDeactivate`
+  (`force_deactivate`) is set (data-5).
+- changed price inputs supersede open proposals (see §3.6); stats `superseded`.
+- stats `{received, created, updated, unchanged, deactivated, superseded, errors: [{row, message}]}` (max 100 error entries).
 
 ### offers.js
 `importOffers(db, records (canonical), {replace?: false|'competitors'|'all', sourceId?, now?, maxAgeDays?}) → stats`
 - competitor: find/create by `nameKey`.
-- matching order: `code` → products.code_key; `ean` → products.ean_key; `mpn` → products.mpn_key; then
-  `product_aliases` (kind code/ean/mpn/ext/name with competitor-specific alias preferred over competitor_id=0).
-  Multiple products with the same ean/mpn → ambiguous → treat as unmatched (reason `ambiguous`).
+- matching order: competitor-specific `product_aliases` (a human decision wins, data-3/6); `code` → products.code_key
+  unless a unique EAN (or, without EAN, MPN) points to a different product → unmatched reason `conflict` (data-3);
+  `ean` → products.ean_key (several EANs `A|B` each tried, data-14); `mpn` → products.mpn_key (placeholder MPNs
+  „N/A“, „0“, „x“ are no key; an MPN candidate whose catalog EAN differs from the offer's EAN is skipped – reason
+  `ean_mismatch`; several MPN hits are always ambiguous, data-6); then generic aliases (competitor_id=0).
+  Multiple products with the same ean → the single active one, else ambiguous → unmatched (reason `ambiguous`).
 - unmatched → upsert `unmatched_offers` (`match_key` = first of `ean:<k>`, `mpn:<k>`, `code:<k>`, `ext:<id>`,
   `name:<fold(name)>`), increment `seen_count`.
 - matched → upsert `offers`; if price or in_stock changed (or new) → `offer_history` row; keep `prev_price`/`changed_at`.
-  Several rows for the same product×competitor in one import → keep the lowest price (log `duplicates` count).
+  `maxAgeDays` is applied per row BEFORE de-duplication. Several rows for the same product×competitor in one import →
+  the NEWER observation wins when they are more than 1 h apart, otherwise the lowest price (log `duplicates`, data-8).
   `observed_at` older than the stored one → ignored (stats `stale`).
 - `replace='competitors'` → for competitors present in this import, delete their offers not present in it;
-  `'all'` → delete all offers not present.
+  `'all'` → delete all offers not present. Competitors with failed rows (also rows that failed mapping, passed as
+  `failedCompetitors`) are skipped; a failed row without a known competitor skips the replace entirely (data-9).
 - validation: price must be > 0 and finite, else error row.
 - stats `{received, matched, unmatched, ambiguous, created, updated, unchanged, stale, duplicates, removed, competitors_created, errors}`.
 - `matchUnmatched(db, unmatchedId, productId, {kind?})` → creates alias from the stored identifiers
@@ -259,9 +320,13 @@ Exporting approved proposals (feed pull + ack, webhook push, POHODA XML download
   inside one `tx`. `dryRun` → no writes except nothing (no import row), returns `preview` (first 20 canonical records) + stats of mapping errors.
 - `previewImport({input, mapping, kind}) → {format, itemPath, headers, suggested: mapping.fields, sample: flat[0..9], canonical: [0..9], errors}`
 - `fetchSource(source) → {buffer, contentType}` – `fetch` with method, headers (JSON), 60 s timeout (AbortSignal),
-  max 500 MB, follows redirects; non-2xx → error with status.
-- `runSource(db, sourceId, {origin='schedule'|'manual'}) → result` – fetch + runImport + update `sources.last_*`.
-- `dueSources(db, now) → source[]` (enabled, url set, interval > 0, last_run_at older than interval).
+  max 500 MB, follows at most 5 redirects manually; a redirect to another origin drops the source's own headers and
+  Authorization (security-4); non-2xx → error with status.
+- `runSource(db, sourceId, {origin='schedule'|'manual'}) → result` – writes `last_run_at` + `last_status='running'`
+  BEFORE the fetch (a crash counts as an attempt, ops-2), fetch + runImport + update `sources.last_*`. The same source
+  never runs twice concurrently (`{ok:false, busy:true}`, API 409, ops-6).
+- `dueSources(db, now) → source[]` (enabled, url set, interval > 0, last_run_at older than interval; a `last_run_at`
+  more than 1 h in the future – clock skew – counts as never run, ops-10).
 
 ### index.js – re-exports the above.
 
@@ -431,7 +496,8 @@ Explanation example texts (Czech): „Nejnižší cena trhu: 12 490 Kč (VeloMar
   by_strategy: {[strategy_id]: {name, products, changes, up, down}}, margin_impact_abs}`
   (`margin_impact_abs` = Σ (net new − net old) over changes, per unit). Writes `runs` + `proposals` + supersedes in one `tx`.
   Loads offers in bulk (one query joined with competitors), not per product.
-- `simulate(db, {config, segment_id?|filter?, limit=200, now?}) → {stats, decisions (first `limit` changes/skips)}` – no writes.
+- `simulate(db, {config, segment_id?|filter?, limit=200, now?}) → {stats, decisions (up to `limit` changes + up to `limit`
+  skips), truncated: {changes, skips, changes_total, skips_total}}` – no writes (contract-6).
 - `explainProduct(db, productId, {now?}) → {view, segments: [{id,name}], strategy, decision}`.
 - `latestProposal(db, productId)`.
 
@@ -450,7 +516,8 @@ Explanation example texts (Czech): „Nejnižší cena trhu: 12 490 Kč (VeloMar
 ## 7. Export (`src/export/*`)
 
 ### rows.js
-`exportRows(db, {scope: 'approved'|'all', ids?, productIds?}) → Row[]` where
+`exportRows(db, {scope: 'approved'|'all', ids?, productIds?}) → Row[]`; `exportRowsDetailed(...) → {rows, held}` (held =
+approved proposals failing `holdReason`, see §3.7) where
 `Row = {proposal_id|null, product_id, code, ean, name, manufacturer, price (to export), old_price, change_pct, vat_rate, currency, changed_at,
 strategy (name|null), segment (name|null), lowest_30d}` – `lowest_30d` = lowest of our prices in the 30 days before now
 (price_history + current price; EU Omnibus / CZ §12a „nejnižší cena za posledních 30 dní“ needed when a discount is announced).
@@ -469,6 +536,8 @@ unique per export, e.g. `cenotvorba-<yyyymmdd>-<export id or random>`, `applicat
 `dat:dataPackItem` (unique `id`, e.g. `CT-000001`) per row: without `price_level` → `stk:stock` → `stk:actionType/stk:update/ftr:filter/ftr:code|ftr:EAN`
 + `stk:stockHeader/stk:sellingPrice payVAT="true"`; with `price_level` → `dis:discount` agenda (`dis:discountStockItem/dis:stockItem/typ:stockItem/typ:ids|typ:EAN`,
 `dis:discounts/dis:discountsItem/dis:filter/dis:priceLevel/typ:ids`, `dis:price`). Numbers as plain decimals with a dot.
+`dis:price` is the gross price unless `price_level_includes_vat === false` (setting `export.pohoda.price_level_includes_vat`,
+default true) – then `price / (1 + vat_rate/100)` rounded to 2 decimals (money-12).
 **Default encoding windows-1250** (declaration `encoding="Windows-1250"` + bytes via `encodeWindows1250`); `utf-8` optional.
 Rows without the filter key (no code / no EAN) are skipped and reported. Also export `toPohodaXmlString` (same, returns the string before encoding) for tests.
 When env `POHODA_XSD_DIR` is set, tests validate the output with `xmllint --schema $POHODA_XSD_DIR/data.xsd`.
@@ -483,8 +552,11 @@ manufacturer, segment, strategy, old, new, change %, margin before/after, market
 „Souhrn“ (counts by status/strategy).
 
 ### apply.js
-`markExported(db, proposalIds, {kind, target, actor, now?}) → {export_id, count}` – creates `exports` row, sets proposals
-`exported`, applies `update_current_price` (see §3.7), audit. Only proposals currently `approved` are affected.
+`markExported(db, proposalIds, {kind, target, actor, now?, delivered?, served?}) → {export_id, count, skipped}` – creates
+`exports` row, sets proposals `exported`, applies `update_current_price` with the DELIVERED price (see §3.7), audit.
+Only proposals currently `approved` are affected (plus `served` ids that a run superseded after delivery); locked
+products and proposals failing `holdReason` are skipped.
+`ackExport(db, {items?: [{code|proposal_id, price}], proposal_ids?, codes?}) → {…, unknown_codes, mismatched}`.
 `logExport(db, {kind, target, count, status, detail})`.
 `exportChanges(db, {format, mark, actor}) → {body, contentType, export_id?, count}` convenience used by API/feeds.
 
@@ -493,6 +565,7 @@ manufacturer, segment, strategy, old, new, change %, margin before/after, market
 ### config.js
 `loadConfig(env=process.env) → {port (PORT|CENOTVORBA_PORT, default 8080), host ('0.0.0.0'), dbFile (CENOTVORBA_DB, default
 './data/cenotvorba.db'), password (CENOTVORBA_PASSWORD), secret (CENOTVORBA_SECRET), maxBodyMb (default 300),
+maxJsonMb (CENOTVORBA_MAX_JSON_MB, default 32 – JSON bodies parsed by the API; larger → 413 before JSON.parse, security-1),
 publicDir, trustProxy (bool), schedulerEnabled (default true; CENOTVORBA_SCHEDULER=0 disables)}`.
 
 ### server/http.js – tiny framework
@@ -521,10 +594,15 @@ Security headers: `Content-Security-Policy: default-src 'self'; img-src 'self' d
 ### server/scheduler.js
 `startScheduler({db, config, log}) → {stop()}` – every 60 s (and 5 s after start): run `dueSources` sequentially
 (`runSource`), then if `schedule.run_after_import` and some offers import succeeded → `runPricing(trigger:'schedule')`;
-if `schedule.run_interval_minutes > 0` and last run (runs table) older → run; after a scheduled run, if
-`schedule.auto_push_after_run` and webhook url set → push approved changes (`pushWebhook` + `markExported` on success).
-Never overlaps (mutex); errors logged, never crash the process. Also daily retention cleanup: delete `superseded`/`rejected`
-proposals and `offer_history`/`audit`/`imports` older than `retention_days`.
+if `schedule.run_interval_minutes > 0` and last run (runs table) older → run; otherwise when the validity of some enabled
+strategy's time window (`config.schedule`) changed since the last run → run with reason `window` (ops-9). Run / import
+times more than 1 h in the future (clock skew) are ignored (ops-10). After a scheduled run, if
+`schedule.auto_push_after_run` and webhook url set → push approved changes (`pushWebhook` + `markExported` with the
+delivered prices on success). Never overlaps (mutex); errors logged, never crash the process. Also daily retention
+cleanup (in batches of 10 000): `rejected` proposals and `offer_history`/`audit`/`imports` older than `retention_days`,
+`superseded` proposals older than `retention_superseded_days` (default 14, at most `retention_days`), `unmatched_offers`
+not seen for 30 days (ops-5, ops-11). At server start `imports` / `runs` / sources left `running` by a crash are marked
+as interrupted (ops-2).
 
 ### API endpoints (all JSON unless stated; prefix `/api/v1`; list endpoints return `{items, total, page, limit}`)
 
@@ -547,24 +625,24 @@ proposals and `offer_history`/`audit`/`imports` older than `retention_days`.
 | GET/POST `/strategies`, GET/PUT/DELETE `/strategies/:id` | read/admin | `{name, description, segment_id, priority, enabled, config}` | strategy (config normalized; invalid → 400 with errors) |
 | POST `/strategies/reorder` | admin | `{ids: [..]}` | priorities set to 10,20,30… |
 | GET `/strategies/presets` | read | | `{items: STRATEGY_PRESETS}` |
-| POST `/strategies/presets/:key` | admin | | creates segment (if any) + strategy from preset |
-| POST `/simulate` | read | `{config, segment_id?, filter?, limit?}` | `simulate()` result |
+| POST `/strategies/presets/:key` | admin | | creates segment (if any) + strategy from preset – always **disabled**; a targeted preset is placed before an enabled catch-all strategy (no segment, no conditions) → `{strategy, segment, segment_created, warning}` (contract-4) |
+| POST `/simulate` | read | `{config, segment_id?, filter?, limit?}` | `simulate()` result (`decisions`, `truncated`) |
 | POST `/runs` | admin | `{product_ids?}` | `{run_id, stats}` |
 | GET `/runs`, GET `/runs/:id` | read | | runs with parsed stats |
-| GET `/proposals` | read | query: `status` (default `pending`; `all`), `run`, `strategy`, `segment`, `direction` up/down, `flag`, `q`, `manufacturer`, `sort` (default `abs_change_pct` desc), `page`, `limit` | `{items: [proposal + product {code,name,manufacturer,category,stock,purchase_price} + strategy_name + segment_name + flags[] + explain[]], total, page, limit, summary: {pending, approved, exported_today, up, down}}` |
-| POST `/proposals/approve` | admin | `{ids?: [], all?: bool (+ same filter query fields in body.filter)}` | `{updated}` (only `pending` ones) |
+| GET `/proposals` | read | query: `status` (default `pending`; `all`), `run`, `strategy`, `segment`, `direction` up/down, `flag`, `q`, `manufacturer`, `sort` (default `abs_change_pct` desc; own keys only), `page`, `limit` | `{items: [proposal + product {code,name,manufacturer,category,stock,purchase_price} + strategy_name + segment_name + flags[] + explain[]], total, page, limit, max_id, flagged, summary: {pending, approved, exported_today, up, down}}` |
+| POST `/proposals/approve` | admin | `{ids?: [], all?: bool (+ same filter query fields in body.filter), expect?: {count, max_id}, include_flagged?: bool}` | `{updated, skipped_locked, skipped_inactive, skipped_flagged}` (only `pending` ones; `all` with `expect` not matching the current selection → 409 `PROPOSALS_CHANGED`; `all` skips proposals with risky flags – BLOCKING_FLAGS, manual price outside limits, previously_rejected – unless `include_flagged`; money-9) |
 | POST `/proposals/reject` | admin | same | `{updated}` |
-| PATCH `/proposals/:id` | admin | `{manual_price}` (null clears) | proposal (status stays; if pending it may be approved later) |
+| PATCH `/proposals/:id` | admin | `{manual_price, confirm?}` (null clears) | proposal; a risky manual price (net below purchase, outside product min/max, > 50 % change) without `confirm: true` → 409 `MANUAL_PRICE_CONFIRM` with `details.reasons`; stored with flags `manual`, `manual_below_cost`, `below_min`, `above_max`, `big_manual_change`; editing an `approved` proposal returns it to `pending`; locked product → 409 (money-7) |
 | POST `/import/preview` | import | raw body (any format) + query `kind`, `mapping` (JSON string) or `source` id | `previewImport` result |
 | POST `/import/offers` | import | raw body + query `source`/`mapping`, `replace`, `dry_run` | `{import_id, stats}` ; also accepts `application/json` body `{items:[canonical offers]}` or an array |
-| POST `/import/products` | import | raw body + query `source`/`mapping`, `deactivate_missing`, `dry_run` | `{import_id, stats}` |
+| POST `/import/products` | import | raw body + query `source`/`mapping`, `deactivate_missing`, `force_deactivate`, `dry_run` | `{import_id, stats}` |
 | GET `/imports` | read | | import log (latest 100) |
 | GET/POST `/sources`, GET/PUT/DELETE `/sources/:id`, POST `/sources/:id/run` | read/admin | `{name, kind, url, method, headers, mapping, options, interval_minutes, enabled}` | source / run result |
 | GET `/unmatched` | read | query `competitor`, `q`, page | `{items, total}` |
 | POST `/unmatched/:id/match` | admin | `{product_id}` | `{ok}` |
 | DELETE `/unmatched/:id` | admin | | `{ok}` |
-| GET `/export/changes.(json|xml|csv)` | export | query `mark=1` | body in format; header `X-Export-Id` when marked |
-| POST `/export/ack` | export | `{proposal_ids?: [], codes?: []}` | `{export_id, count}` |
+| GET `/export/changes.(json|xml|csv)` | export | query `mark=1` | body in format; header `X-Export-Id` when marked, `X-Export-Held` = held proposals |
+| POST `/export/ack` | export | `{items?: [{code|proposal_id, price}], proposal_ids?: [], codes?: []}` (items with the applied price recommended) | `{export_id, count, proposal_ids, unknown_codes, mismatched, skipped}` |
 | GET `/export/pohoda.xml` | export | query `scope` approved/all, `mark=1`, `encoding` | POHODA XML (attachment) |
 | GET `/export/proposals.xlsx` | read | same filters as `/proposals` | XLSX attachment |
 | GET `/export/pricelist.(json|xml|csv|xlsx)` | export | | full price list (`scope=all`) |

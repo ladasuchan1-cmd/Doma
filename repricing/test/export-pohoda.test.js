@@ -201,3 +201,18 @@ test('validace XSD (xmllint) když je nastaveno POHODA_XSD_DIR', (t) => {
     fs.rmSync(tmp, { recursive: true, force: true });
   }
 });
+
+test('money-12: cenová hladina bez DPH – do dis:price jde cena bez DPH podle sazby řádku', () => {
+  const rows = [
+    { code: 'K1', price: 12100, vat_rate: 21, proposal_id: 1, product_id: 1 },
+    { code: 'K2', price: 1120, vat_rate: 12, proposal_id: 2, product_id: 2 },
+  ];
+  const withVat = buildPohodaXml(rows, { price_level: 'Eshop' }).xml;
+  assert.match(withVat, /<dis:price>12100<\/dis:price>/);
+  const net = buildPohodaXml(rows, { price_level: 'Eshop', price_level_includes_vat: false }).xml;
+  assert.match(net, /<dis:price>10000<\/dis:price>/);
+  assert.match(net, /<dis:price>1000<\/dis:price>/);
+  // bez hladiny (stk:sellingPrice payVAT="true") se volba neuplatní
+  const plain = buildPohodaXml(rows, { price_level_includes_vat: false }).xml;
+  assert.match(plain, /<stk:sellingPrice payVAT="true">12100<\/stk:sellingPrice>/);
+});

@@ -5,10 +5,10 @@ import { api, onUnauthorized, isAbort, invalidate } from './lib/api.js';
 import { parseHash, matchRoute, buildHash, queryString } from './lib/router.js';
 import { icon, brandMark } from './lib/icons.js';
 import { toast } from './lib/toast.js';
-import { openModal, confirmDialog } from './lib/modal.js';
+import { openModal, confirmDialog, closeAllModals } from './lib/modal.js';
 import { button, emptyState, skeletonBlocks, skeletonTable, errorState } from './lib/ui.js';
-import { runStatsView } from './lib/run-stats.js';
-import { int } from './lib/format.js';
+import { runStatsView, supersedeWarning } from './lib/run-stats.js';
+import { int, count } from './lib/format.js';
 
 const NAV = [
   { section: 'Cenotvorba' },
@@ -52,6 +52,7 @@ const state = {
   renderSeq: 0,
   current: null,
   badgeTimer: null,
+  confirmingRun: false,
 };
 
 const appEl = document.getElementById('app');
@@ -221,15 +222,43 @@ export function notifyChanged(what = 'data') {
   refreshBadge();
 }
 
+/** Počet schválených, dosud neexportovaných návrhů (null = nepodařilo se zjistit). */
+async function approvedCount() {
+  try {
+    const r = await api.get('/proposals', { status: 'approved', limit: 1 }, { silent: true });
+    return r?.summary?.approved ?? r?.total ?? null;
+  } catch {
+    return null;
+  }
+}
+
 export async function runPricing(opts = {}) {
-  const ok = opts.skipConfirm || (await confirmDialog({
-    title: 'Spustit přecenění',
-    message: opts.productIds
-      ? 'Přepočítá návrh ceny pro vybrané produkty podle aktuálních strategií.'
-      : 'Přepočítá návrhy cen pro všechny aktivní produkty podle zapnutých strategií. Dosud nevyřízené návrhy nahradí nové.',
-    confirmLabel: 'Spustit přecenění',
-  }));
-  if (!ok) return null;
+  if (!opts.skipConfirm) {
+    if (state.confirmingRun) return null; // dvojklik během zjišťování počtu neotevře dva dialogy
+    state.confirmingRun = true;
+    let ok = false;
+    try {
+      // contract-1: přecenění nahradí i SCHVÁLENÉ neexportované návrhy (a jejich ruční ceny) – říct to výslovně s počtem
+      const warn = opts.productIds ? null : supersedeWarning(await approvedCount());
+      ok = await confirmDialog({
+        title: 'Spustit přecenění',
+        message: h(
+          'div',
+          null,
+          h('p', null, (opts.productIds
+            ? 'Přepočítá návrh ceny pro vybrané produkty podle aktuálních strategií.'
+            : 'Přepočítá návrhy cen pro všechny aktivní produkty podle zapnutých strategií.') +
+            ' Otevřené návrhy, u kterých vyjde jiná cena, nahradí nové – i schválené, dosud neexportované (ruční ceny se přenesou, ale čekají na nové schválení).'),
+          warn ? h('div', { class: 'callout callout-warning', dataset: { role: 'supersede-warning' } }, icon('alert', { size: 16 }), h('div', { class: 'callout-body' }, warn)) : null
+        ),
+        confirmLabel: warn ? 'Přesto přecenit' : 'Spustit přecenění',
+        danger: Boolean(warn),
+      });
+    } finally {
+      state.confirmingRun = false;
+    }
+    if (!ok) return null;
+  }
   const btn = state.layout?.runBtn;
   if (btn) {
     btn.disabled = true;
@@ -241,7 +270,8 @@ export async function runPricing(opts = {}) {
     t.close();
     notifyChanged('run');
     if (opts.quiet) {
-      toast('Přecenění dokončeno', { type: 'success' });
+      const sup = Number(res?.stats?.superseded) || 0;
+      toast('Přecenění dokončeno' + (sup ? ' · ' + count(sup, 'starší návrh nahrazen', 'starší návrhy nahrazeny', 'starších návrhů nahrazeno') : ''), { type: 'success' });
       return res;
     }
     const m = openModal({
@@ -305,6 +335,8 @@ onUnauthorized(() => {
 });
 
 function runCleanups() {
+  // dialogy opouštěné stránky zavřít (jinak by zůstaly nad novou stránkou a dál jednaly – contract-15)
+  closeAllModals('nav');
   if (state.controller) state.controller.abort();
   for (const fn of state.cleanups.splice(0)) {
     try {

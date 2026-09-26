@@ -325,7 +325,7 @@ describe('API importu', () => {
     );
     assert.equal(count(s.db, "SELECT COUNT(*) AS n FROM competitors WHERE name = 'DryShop.cz'"), 0);
     // dry run katalogu
-    const p = await s.call('POST', '/api/v1/import/products?dry_run=true&deactivate_missing=1', { as: tImport, json: [{ code: 'NOVY-1', name: 'Nový' }] });
+    const p = await s.call('POST', '/api/v1/import/products?dry_run=true&deactivate_missing=1&force_deactivate=1', { as: tImport, json: [{ code: 'NOVY-1', name: 'Nový' }] });
     assert.equal(p.status, 200, p.text);
     assert.equal(p.data.stats.created, 1);
     assert.ok(p.data.stats.deactivated > 0);
@@ -405,7 +405,12 @@ describe('API importu', () => {
 
   it('deactivate_missing deaktivuje chybějící produkty a úplný import je vrátí', async () => {
     const all = count(s.db, 'SELECT COUNT(*) AS n FROM products');
+    // jediný produkt by vypnul skoro celý katalog → bez force_deactivate se deaktivace přeskočí (data-5)
     let r = await s.call('POST', '/api/v1/import/products?deactivate_missing=1', { as: tImport, json: [{ code: 'SRA-00007', name: 'SRAM XTR kliky' }] });
+    assert.equal(r.status, 200, r.text);
+    assert.equal(r.data.stats.deactivated, 0);
+    assert.ok(r.data.stats.errors.some((e) => /force_deactivate/.test(e.message)));
+    r = await s.call('POST', '/api/v1/import/products?deactivate_missing=1&force_deactivate=1', { as: tImport, json: [{ code: 'SRA-00007', name: 'SRAM XTR kliky' }] });
     assert.equal(r.status, 200, r.text);
     assert.equal(r.data.stats.deactivated, all - 1);
     assert.equal(count(s.db, 'SELECT COUNT(*) AS n FROM products WHERE active = 1'), 1);

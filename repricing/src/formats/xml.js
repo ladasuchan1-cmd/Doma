@@ -537,7 +537,8 @@ const KNOWN_ITEM_NAMES = new Set(
  * Kandidát = opakuje se (≥ 2×) a je „záznamový“ (má potomky nebo atributy). Pokud je kandidát uvnitř jiného
  * kandidáta, vyhrává vnější (PARAM uvnitř SHOPITEM, offer uvnitř product → záznamem je SHOPITEM / product).
  * Mezi zbylými rozhoduje počet opakování, při shodě hlubší cesta.
- * Když se nic neopakuje, vrátí nejmělčí element se známým názvem položky (SHOPITEM, item, product…), jinak null.
+ * Když se opakuje jen prvek vnořený v jediném elementu se známým názvem položky (1 SHOPITEM + 2 PARAM), vrátí toho
+ * předka. Když se nic neopakuje, vrátí nejhlubší element se známým názvem položky (SHOPITEM, item, product…), jinak null.
  * @param {string|Buffer} str
  * @param {{keepNs?: boolean, sampleSize?: number}} [opts]
  * @returns {string|null}
@@ -584,17 +585,36 @@ function detectItemPath(str, opts = {}) {
     if (!(e instanceof XmlError)) throw e;
     // vadný dokument – rozhodneme z toho, co se stihlo načíst (chybu nahlásí až samotné čtení)
   }
+  const known = (path) => KNOWN_ITEM_NAMES.has(localName(path.slice(path.lastIndexOf('.') + 1)).toLowerCase());
   const cands = [...stats.values()].filter((st) => st.max >= 2 && st.recordLike);
   const alive = cands.filter((d) => !cands.some((a) => a !== d && d.path.startsWith(a.path + '.')));
   if (alive.length) {
     alive.sort((a, b) => b.max - a.max || b.depth - a.depth || a.order - b.order);
-    return alive[0].path;
+    const top = alive[0];
+    // Dokument s JEDINOU položkou (API push jednoho produktu, přírůstkový export POHODY s jednou změněnou kartou):
+    // opakuje se jen vnořený prvek (PARAM, g:shipping, stk:stockPrice…) – záznamem je ale jeho předek se známým názvem
+    // položky, který se vyskytuje jednou (data-2). Bereme nejhlubšího takového předka.
+    // „offer“ je sice známý název položky (plochý seznam nabídek), ale pod jedinou položkou (SHOPITEM s <OFFERS>)
+    // jde o vnořené nabídky té položky
+    const topName = localName(top.path.slice(top.path.lastIndexOf('.') + 1)).toLowerCase();
+    if (!known(top.path) || topName === 'offer') {
+      let anc = null;
+      for (let p = top.parent; p; p = stats.get(p)?.parent ?? null) {
+        const st = stats.get(p);
+        if (st && st.depth > 0 && st.max === 1 && known(p) && localName(p.slice(p.lastIndexOf('.') + 1)).toLowerCase() !== 'offer') {
+          anc = p;
+          break;
+        }
+      }
+      if (anc) return anc;
+    }
+    return top.path;
   }
+  // nic se neopakuje: nejhlubší element se známým názvem položky („stock“ uvnitř „responsePackItem“ – data-2)
   let best = null;
   for (const st of stats.values()) {
     if (st.depth === 0) continue;
-    const ln = st.path.slice(st.path.lastIndexOf('.') + 1);
-    if (KNOWN_ITEM_NAMES.has(localName(ln).toLowerCase()) && (!best || st.depth < best.depth)) best = st;
+    if (known(st.path) && (!best || st.depth > best.depth || (st.depth === best.depth && st.order < best.order))) best = st;
   }
   return best ? best.path : null;
 }

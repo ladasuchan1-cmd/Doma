@@ -16,8 +16,9 @@
 const { tx, nowIso, getSettings, parseJson } = require('../../db');
 const { round } = require('../../util/num');
 const { ensurePriceBaseline } = require('../../util/price-history');
+const { supersedeOpen } = require('../../util/proposals');
 const { loadProducts, loadOffers, explainProduct } = require('../../engine/run');
-const { productView, parseDateTime } = require('../../engine/metrics');
+const { productView, parseDateTime, isLockActive } = require('../../engine/metrics');
 const { buildMarket, prepareFilter, EXCLUDE_REASONS } = require('../../engine/market');
 const { HttpError, intParam, paging, queryBool } = require('../http');
 const V = require('./_views');
@@ -197,6 +198,15 @@ function patchProduct(ctx) {
 
   const changes = {};
   for (const [k, v] of Object.entries(next)) if (cur[k] !== v) changes[k] = { from: cur[k] ?? null, to: v };
+  // Otevřené návrhy (pending/approved) počítané z dosavadních údajů jsou po změně zastaralé (money-1/2/3):
+  //  - nový platný zámek = ruční přebití („cenu neměnit“) → schválený návrh už nesmí odejít do exportu,
+  //  - změna ceny → návrh by vrátil ruční cenu zpět a vykazoval změnu od staré ceny (výjimka: nová cena JE cenou návrhu),
+  //  - změna ruční min./max. ceny → návrh mohl vzniknout mimo nové meze.
+  // Zneplatníme je ve stejné transakci; nový návrh spočítá další přecenění.
+  const merged = { ...cur, ...next };
+  const lockNow = isLockActive(merged, now) && !isLockActive(cur, now);
+  const limitsChanged = 'min_price' in changes || 'max_price' in changes;
+  let superseded = 0;
   if (Object.keys(changes).length) {
     const write = () =>
       tx(db, () => {
@@ -207,6 +217,8 @@ function patchProduct(ctx) {
           ensurePriceBaseline(db, cur);
           db.prepare("INSERT INTO price_history (product_id, price, source, ref_id, at) VALUES (?, ?, 'manual', NULL, ?)").run(id, next.price, now);
         }
+        if (lockNow || limitsChanged) superseded = supersedeOpen(db, [id]);
+        else if (priceChanged) superseded = supersedeOpen(db, [id], { keepPrice: new Map([[id, next.price]]) });
       });
     if (priceChanged) {
       // změna ceny mění i statistiky konkurentů → celá přestavba cache
@@ -216,7 +228,8 @@ function patchProduct(ctx) {
       // zámek / limity / poznámka → přepočet jen tohoto pohledu v cache
       V.writeAndRefresh(db, [id], write);
     }
-    ctx.audit({ action: 'product.update', entity: 'product', entity_id: id, detail: { code: cur.code, changes } });
+    if (superseded) V.invalidate(db, 'proposals');
+    ctx.audit({ action: 'product.update', entity: 'product', entity_id: id, detail: { code: cur.code, changes, superseded_proposals: superseded || undefined } });
   }
   return singleView(db, id);
 }

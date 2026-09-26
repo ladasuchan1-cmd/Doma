@@ -26,6 +26,9 @@ export function combobox(input, o) {
   let activeIdx = -1;
   let seq = 0;
   let open = false;
+  // Dotaz, ke kterému patří aktuální `items`. Když se vstup mezitím změnil (debounce 120 ms ještě neproběhl
+  // nebo asynchronní zdroj ještě neodpověděl), jsou položky zastaralé a Enter z nich nesmí nic vybrat.
+  let itemsQ = null;
 
   function close() {
     open = false;
@@ -33,6 +36,25 @@ export function combobox(input, o) {
     input.setAttribute('aria-expanded', 'false');
     input.removeAttribute('aria-activedescendant');
     activeIdx = -1;
+  }
+
+  /** Žádná položka není zvýrazněná (prázdný nebo zastaralý seznam) → Enter nechá hodnotu na volajícím. */
+  function unhighlight() {
+    activeIdx = -1;
+    input.removeAttribute('aria-activedescendant');
+    for (const li of list.children) {
+      li.classList.remove('is-active');
+      if (li.getAttribute('role') === 'option') li.setAttribute('aria-selected', 'false');
+    }
+  }
+
+  /** Nové položky pro dotaz q: vykreslit a zvýraznit první (u prázdného seznamu nic – dřív zůstal starý index). */
+  function setItems(q, out) {
+    items = Array.isArray(out) ? out.slice(0, 50) : [];
+    itemsQ = q;
+    renderList(false);
+    if (items.length) highlight(0);
+    else unhighlight();
   }
 
   function highlight(i) {
@@ -96,7 +118,11 @@ export function combobox(input, o) {
     }
     const my = ++seq;
     const res = o.source(q);
-    if (res && typeof res.then === 'function') renderList(true);
+    if (res && typeof res.then === 'function') {
+      // během načítání nesmí Enter vybrat položku z předchozího seznamu
+      renderList(true);
+      unhighlight();
+    }
     let out;
     try {
       out = await res;
@@ -104,11 +130,43 @@ export function combobox(input, o) {
       out = [];
     }
     if (my !== seq || document.activeElement !== input) return;
-    items = Array.isArray(out) ? out.slice(0, 50) : [];
-    renderList(false);
-    if (items.length) highlight(0);
+    setItems(q, out);
   };
   const runDebounced = debounce(run, o.delay ?? 120);
+
+  /**
+   * Enter těsně po psaní (před doběhnutím debounce): seznam patří ke staršímu dotazu. Synchronní zdroj
+   * přefiltrujeme hned (stejný výsledek, jako kdyby uživatel psal pomalu), asynchronní jen zneplatníme –
+   * Enter pak nic nevybere a volající (chips) použije napsaný text.
+   */
+  function syncForEnter() {
+    if (itemsQ === input.value) return;
+    runDebounced.cancel();
+    const q = input.value;
+    if ((o.minChars || 0) > q.trim().length) {
+      close();
+      return;
+    }
+    const my = ++seq;
+    let res;
+    try {
+      res = o.source(q);
+    } catch {
+      res = [];
+    }
+    if (res && typeof res.then === 'function') {
+      // asynchronní výsledek dorazí později – do té doby nic nevybírat
+      unhighlight();
+      res.then(
+        (out) => {
+          if (my === seq && document.activeElement === input) setItems(q, out);
+        },
+        () => {}
+      );
+      return;
+    }
+    setItems(q, res);
+  }
 
   input.addEventListener('input', () => runDebounced());
   input.addEventListener('focus', () => {
@@ -125,7 +183,8 @@ export function combobox(input, o) {
       e.preventDefault();
       highlight(Math.max(0, activeIdx - 1));
     } else if (e.key === 'Enter') {
-      if (open && activeIdx >= 0) {
+      if (open) syncForEnter();
+      if (open && activeIdx >= 0 && items[activeIdx]) {
         e.preventDefault();
         e.stopPropagation();
         pick(activeIdx);

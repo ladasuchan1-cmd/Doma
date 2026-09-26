@@ -8,8 +8,10 @@
 //   DELETE /api/v1/strategies/:id            admin  → {ok: true}
 //   POST   /api/v1/strategies/reorder        admin  {ids: [...]} → priority 10, 20, 30… (neuvedené za nimi) → {ok, items}
 //   GET    /api/v1/strategies/presets        read   → {items: STRATEGY_PRESETS}
-//   POST   /api/v1/strategies/presets/:key   admin  → {strategy, segment|null, segment_created} (201)
-//   POST   /api/v1/simulate                  read   {config, segment_id?, filter?, limit?} → simulate() {stats, decisions, errors}
+//   POST   /api/v1/strategies/presets/:key   admin  → {strategy, segment|null, segment_created, warning|null} (201) – strategie
+//                                                   vzniká VYPNUTÁ; cílená se zařadí před záchytnou strategii pro všechny produkty
+//   POST   /api/v1/simulate                  read   {config, segment_id?, filter?, limit?} → simulate() {stats, decisions, truncated, errors}
+//                                                   (decisions = až `limit` změn + až `limit` přeskočených)
 //
 // strategie = {id, name, description, segment_id, segment_name, priority, enabled (bool), config (normalizovaný),
 //              config_errors: string[], created_at, updated_at}
@@ -18,6 +20,7 @@
 const { tx, nowIso, parseJson } = require('../../db');
 const { normalizeConfig, STRATEGY_PRESETS } = require('../../engine/presets');
 const { simulate } = require('../../engine/run');
+const { isEmptyFilter } = require('../../engine/filter');
 const { HttpError, intParam, paging } = require('../http');
 const V = require('./_views');
 
@@ -137,12 +140,28 @@ function applyPreset(ctx, key) {
       }
     }
     const name = uniqueName(db, 'strategies', preset.name);
+    // Pořadí: za zapnutou „záchytnou“ strategií (bez segmentu a podmínek – platí pro všechny produkty) by se nová
+    // strategie nikdy nepoužila. Cílená předvolba se proto zařadí PŘED ni (ostatní se posunou o 10); záchytná
+    // předvolba zůstane na konci s upozorněním (contract-4).
+    const catchAllOf = (row) => row.segment_id == null && isEmptyFilter(normalizeConfig(row.config).config.conditions || {});
+    const catchAll = db.prepare('SELECT id, name, priority, segment_id, config FROM strategies WHERE enabled = 1 ORDER BY priority, id').all().find(catchAllOf) || null;
+    const targeted = !(segmentId == null && isEmptyFilter(config.conditions || {}));
+    let priority = nextPriority(db);
+    let warning = null;
+    if (catchAll && targeted) {
+      db.prepare('UPDATE strategies SET priority = priority + 10, updated_at = ? WHERE priority >= ?').run(now, catchAll.priority);
+      priority = catchAll.priority;
+      warning = `Strategie je zařazena před strategií „${catchAll.name}“, která platí pro všechny produkty – jinak by se nikdy nepoužila.`;
+    } else if (catchAll) {
+      warning = `Strategie je až za strategií „${catchAll.name}“, která platí pro všechny produkty – nepoužije se, dokud ji nepřesunete výš.`;
+    }
+    // Předvolba vzniká VYPNUTÁ (jak slibuje UI): nejdřív zkontrolovat a nasimulovat, pak zapnout (contract-4).
     const id = Number(
       db
-        .prepare('INSERT INTO strategies (name, description, segment_id, priority, enabled, config, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)')
-        .run(name, preset.description || null, segmentId, nextPriority(db), preset.enabled === false ? 0 : 1, JSON.stringify(config), now, now).lastInsertRowid
+        .prepare('INSERT INTO strategies (name, description, segment_id, priority, enabled, config, created_at, updated_at) VALUES (?, ?, ?, ?, 0, ?, ?, ?)')
+        .run(name, preset.description || null, segmentId, priority, JSON.stringify(config), now, now).lastInsertRowid
     );
-    return { id, segmentId, segmentCreated };
+    return { id, segmentId, segmentCreated, warning };
   });
   ctx.audit({ action: 'strategy.preset', entity: 'strategy', entity_id: res.id, detail: { key, segment_id: res.segmentId, segment_created: res.segmentCreated } });
   V.invalidate(db, 'segments');
@@ -153,7 +172,7 @@ function applyPreset(ctx, key) {
     segment = segmentItem(row, V.getCache(db), strategiesBySegment(db));
   }
   ctx.status = 201;
-  return { strategy: getStrategy(db, res.id), segment, segment_created: res.segmentCreated };
+  return { strategy: getStrategy(db, res.id), segment, segment_created: res.segmentCreated, warning: res.warning };
 }
 
 function runSimulation(ctx) {
@@ -170,6 +189,7 @@ function runSimulation(ctx) {
   return {
     stats: res.stats,
     decisions: res.decisions.map((d) => ({ ...d, product: { id: d.product_id, code: d.code ?? null, name: d.name ?? null, manufacturer: d.manufacturer ?? null } })),
+    truncated: res.truncated,
     errors: [],
   };
 }

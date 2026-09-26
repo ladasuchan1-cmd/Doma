@@ -40,6 +40,24 @@ function displayUrl(host, port) {
 }
 
 /**
+ * Po startu procesu nemůže nic „běžet“: import i přecenění jsou synchronní v jednom procesu. Řádky ve stavu
+ * „running“ zůstaly po pádu (např. nedostatek paměti při importu) – označí se jako přerušené, aby je UI neukazovalo
+ * hodiny jako běžící (ops-2).
+ * @returns {{imports: number, runs: number, sources: number}}
+ */
+function recoverInterrupted(db, now = new Date()) {
+  const at = now.toISOString();
+  const imports = Number(
+    db.prepare("UPDATE imports SET status = 'error', finished_at = ?, error = 'Import byl přerušen (restart serveru).' WHERE status = 'running'").run(at).changes
+  );
+  const runs = Number(db.prepare("UPDATE runs SET status = 'error', finished_at = ?, error = 'Přecenění bylo přerušeno (restart serveru).' WHERE status = 'running'").run(at).changes);
+  const sources = Number(
+    db.prepare("UPDATE sources SET last_status = 'error', last_message = 'Stahování bylo přerušeno (restart serveru).' WHERE last_status = 'running'").run().changes
+  );
+  return { imports, runs, sources };
+}
+
+/**
  * Spustí server.
  * @param {object} [options] přepisy konfigurace (port, host, dbFile, password, secret, maxBodyMb, publicDir,
  *   trustProxy, schedulerEnabled) a navíc:
@@ -64,6 +82,8 @@ async function start(options = {}) {
   let server = null;
   let scheduler = null;
   try {
+    const rec = recoverInterrupted(db);
+    if (rec.imports || rec.runs || rec.sources) log.warn('Po restartu označeny přerušené úlohy', rec);
     const { generatedPassword, passwordSource } = initAuth(db, config);
     if (generatedPassword && !quiet) printPasswordBanner(generatedPassword, 'Cenotvorba – první spuštění: bylo vygenerováno heslo');
     if (passwordSource === 'env') log.info('Heslo je nastaveno proměnnou prostředí CENOTVORBA_PASSWORD.');
@@ -218,4 +238,4 @@ if (require.main === module) {
   main(process.argv.slice(2));
 }
 
-module.exports = { start, main };
+module.exports = { start, main, recoverInterrupted };

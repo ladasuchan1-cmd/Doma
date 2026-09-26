@@ -15,9 +15,14 @@ const zlib = require('node:zlib');
 const formats = require('../formats');
 const { ImportError, keyForms } = require('./mapping');
 
-const MAX_UNZIPPED = 600 * 1024 * 1024;
-const HEADER_SAMPLE = 1000;
-const OFFERS_SCAN = 200;
+// Rozbalená data (gzip / položka ZIP) se dekódují na jeden JS řetězec a parsují – limit drží velikost hluboko pod
+// hranicí řetězce V8 (~512 MB) i pod velikostí, kterou ještě zvládne JSON.parse (security-2, ops-3).
+const MAX_UNZIPPED = formats.MAX_ENTRY_BYTES || 256 * 1024 * 1024;
+// JSON.parse obřího pole (stovky milionů prvků) shodí proces NEZACHYTITELNOU chybou V8 („invalid size error“) –
+// větší JSON text proto odmítneme předem jako chybu importu (security-2).
+const LIMITS = { maxJsonChars: 128 * 1024 * 1024 };
+// Hlavičky (klíče) se sbírají ze VŠECH záznamů – jen omezený počet různých klíčů (data-13).
+const MAX_HEADERS = 5000;
 // Nejvyšší povolené zanoření záznamu při zploštění. Rekurze v flattenInto by na patologicky zanořeném JSONu
 // (např. 5 000× „[“) přetekla zásobník (RangeError → HTTP 500); XML parser má vlastní limit 1 000 úrovní.
 // Skutečná data mají jednotky až desítky úrovní.
@@ -227,8 +232,12 @@ const PRICE_LIKE = new Set([
   'sellingprice', 'offerprice', 'competitorprice', 'cenakonkurence', 'currentprice',
 ]);
 const ID_LIKE = new Set(['code', 'kod', 'sku', 'ean', 'gtin', 'itemid', 'id', 'productno', 'mpn', 'productcode']);
-// pole, která nejsou nabídkami ani variantami (doprava, splátky, daně)
-const NOT_OFFERS = /shipping|delivery|doprav|postovn|installment|splatk|tax|dph|vat|discount|sleva|bundle/;
+// Varianty katalogu: holé „id“ nestačí (POHODA stk:stockPrice má typ:id cenové hladiny – data-1)
+const VARIANT_ID_LIKE = new Set(['code', 'kod', 'sku', 'ean', 'gtin', 'itemid', 'productno', 'mpn', 'productcode']);
+// pole, která nejsou nabídkami ani variantami (doprava, splátky, daně, cenové hladiny POHODY – stk:stockPriceItem)
+const NOT_OFFERS = /shipping|delivery|doprav|postovn|installment|splatk|tax|dph|vat|discount|sleva|bundle|stockprice|pricelevel|cenovahladin|priceitem/;
+// jednotlivá nabídka jako objekt (XML s jedinou <OFFER>) – podle názvu elementu
+const OFFER_ELEMENT = /(^|[^a-z])(offers?|nabidk[ay]?|competitors?|konkurent|shops?)$/;
 
 function hasKeyLike(o, set) {
   for (const k in o) {
@@ -239,26 +248,44 @@ function hasKeyLike(o, set) {
   return false;
 }
 
-/** Najde cesty polí objektů, jejichž prvky obsahují cenu (případně i identifikátor). */
-function collectOfferPaths(value, path, paths, needId, depth) {
+/**
+ * Najde cesty polí objektů, jejichž prvky obsahují cenu (případně i identifikátor).
+ * U nabídek i jediný objekt pojmenovaný jako nabídka (<OFFERS><OFFER>…</OFFER></OFFERS> – XML z jediné <OFFER>
+ * pole nevytvoří; data-9).
+ */
+function collectOfferPaths(value, path, paths, kind, depth) {
   if (depth > 8 || !isPlain(value)) return;
+  const idSet = kind === 'products' ? VARIANT_ID_LIKE : null;
   for (const k in value) {
     if (!Object.hasOwn(value, k)) continue;
     const v = value[k];
     const p = path ? `${path}.${k}` : k;
     if (Array.isArray(v)) {
+      if (paths.has(p)) continue;
       const f = keyForms(p);
       if (f && NOT_OFFERS.test(f.full)) continue;
       const objs = v.filter(isPlain);
-      if (objs.length && objs.some((o) => hasKeyLike(o, PRICE_LIKE) && (!needId || hasKeyLike(o, ID_LIKE)))) paths.add(p);
-    } else if (isPlain(v)) collectOfferPaths(v, p, paths, needId, depth + 1);
+      if (objs.length && objs.some((o) => hasKeyLike(o, PRICE_LIKE) && (!idSet || hasKeyLike(o, idSet)))) paths.add(p);
+    } else if (isPlain(v)) {
+      if (kind === 'offers' && !paths.has(p)) {
+        const f = keyForms(k);
+        if (f && OFFER_ELEMENT.test(f.last) && !NOT_OFFERS.test(keyForms(p)?.full || '') && hasKeyLike(v, PRICE_LIKE)) {
+          paths.add(p);
+          continue;
+        }
+      }
+      collectOfferPaths(v, p, paths, kind, depth + 1);
+    }
   }
 }
 
+/** Cesta vnořených nabídek / variant – prochází VŠECHNY záznamy (jen klíče), ne jen začátek souboru (data-9). */
 function detectOffersPath(records, kind) {
   const paths = new Set();
-  const n = Math.min(records.length, OFFERS_SCAN);
-  for (let i = 0; i < n; i++) collectOfferPaths(records[i], '', paths, kind === 'products', 0);
+  for (let i = 0; i < records.length; i++) {
+    collectOfferPaths(records[i], '', paths, kind, 0);
+    if (paths.size > 1) return null;
+  }
   return paths.size === 1 ? [...paths][0] : null;
 }
 
@@ -290,15 +317,30 @@ function explodeRecord(record, segs, offersPath, kind, elementName, emit) {
   if (elementName && COMPETITOR_ELEMENT.test(String(elementName).toLowerCase())) {
     for (const k of Object.keys(parent)) if (k.startsWith('@')) setOwn(parent, `${elementName}.${k}`, parent[k]);
   }
+  // Varianty katalogu: vlastní kód varianty (sku / kód / EAN) musí přebít kód rodiče, jinak by se všechny varianty
+  // sloučily do jednoho produktu s cenou poslední varianty (data-11). Rodičovský kód zůstane jako `parent.<klíč>`.
+  const parentCodeKeys = kind === 'products' ? Object.keys(parent).filter((k) => VARIANT_CODE.has(keyForms(k)?.last)) : [];
   for (const child of children) {
     const c = flattenRecord(child);
     const row = { ...parent };
     for (const k in c) setOwn(row, `${offersPath}.${k}`, c[k]);
     for (const k in c) setOwn(row, k, c[k]);
+    if (parentCodeKeys.length) {
+      const own = Object.keys(c).find((k) => VARIANT_CODE.has(keyForms(k)?.last) && c[k] != null && c[k] !== '');
+      if (own !== undefined) {
+        for (const pk of parentCodeKeys) {
+          if (Object.hasOwn(c, pk)) continue; // potomek má stejně pojmenovaný klíč – už přepsáno
+          setOwn(row, `parent.${pk}`, parent[pk]);
+          setOwn(row, pk, c[own]);
+        }
+      }
+    }
     emit(row);
   }
   return children.length;
 }
+
+const VARIANT_CODE = new Set(['code', 'kod', 'sku', 'itemcode', 'productcode', 'katalogovecislo', 'variantcode']);
 
 // --- vstup ------------------------------------------------------------------------------------------------
 
@@ -310,6 +352,9 @@ function gunzip(buf) {
   try {
     return zlib.gunzipSync(buf, { maxOutputLength: MAX_UNZIPPED });
   } catch (e) {
+    if (e && (e.code === 'ERR_BUFFER_TOO_LARGE' || /maxOutputLength|too large/i.test(e.message))) {
+      throw new ImportError(`Soubor gzip je po rozbalení větší než povolených ${Math.round(MAX_UNZIPPED / 1024 / 1024)} MB.`, { status: 413, code: 'GZIP_TOO_LARGE' });
+    }
     throw new ImportError(`Soubor gzip nelze rozbalit: ${e.message}`, { code: 'GZIP_INVALID' });
   }
 }
@@ -349,13 +394,29 @@ function unzipDataFile(buf) {
   if (entries.has('xl/workbook.xml') || entries.has('[Content_Types].xml')) return null;
   const names = [...entries.keys()].filter((n) => !n.endsWith('/') && !/(^|\/)(__MACOSX|\.)/.test(n) && DATA_EXT.test(n));
   if (!names.length) throw new ImportError('Archiv ZIP neobsahuje sešit Excelu ani datový soubor (XML/CSV/JSON).', { code: 'ZIP_NO_DATA' });
+  // Víc datových souborů: dřív se tiše vzal první (a replace pak smazal nabídky ostatních konkurentů – data-15)
+  if (names.length > 1) {
+    throw new ImportError(`Archiv ZIP obsahuje více datových souborů (${names.slice(0, 10).join(', ')}${names.length > 10 ? ', …' : ''}) – pošlete je jednotlivě.`, {
+      code: 'ZIP_MULTIPLE',
+    });
+  }
   const name = names[0];
-  return { buffer: entries.get(name)(), filename: name.split('/').pop() };
+  try {
+    return { buffer: entries.get(name)(), filename: name.split('/').pop() };
+  } catch (e) {
+    throw wrapFormatError(e, 'xlsx');
+  }
 }
 
 // --- JSON ---------------------------------------------------------------------------------------------------
 
 function parseJsonText(text) {
+  if (text.length > LIMITS.maxJsonChars) {
+    throw new ImportError(`JSON je příliš velký (${Math.round(text.length / 1024 / 1024)} MB, nejvýše ${Math.round(LIMITS.maxJsonChars / 1024 / 1024)} MB) – rozdělte ho, nebo použijte XML/CSV.`, {
+      status: 413,
+      code: 'JSON_TOO_LARGE',
+    });
+  }
   const t = text.charCodeAt(0) === 0xfeff ? text.slice(1) : text;
   try {
     return JSON.parse(t);
@@ -382,8 +443,11 @@ function locateJsonRecords(root, itemPath) {
   }
   if (Array.isArray(root)) return { records: root, itemPath: null, segs: [] };
   if (!isPlain(root)) return { records: [root], itemPath: null, segs: [] };
-  // do šířky: první neprázdné pole objektů, jinak první neprázdné pole, jinak objekt sám
+  // Do šířky posbírat pole objektů a vybrat nejlepší (data-5): obálky API mívají před položkami i „warnings“,
+  // „errors“, „categories“… – první nalezené pole by pak byly varování (a deactivate_missing by vypnul katalog).
+  // Pořadí: známý název (items, products, offers, data…) > největší pole; servisní pole se přeskočí.
   const queue = [{ value: root, segs: [] }];
+  const cands = [];
   let anyArray = null;
   for (let qi = 0; qi < queue.length && qi < 10000; qi++) {
     const { value, segs } = queue[qi];
@@ -392,14 +456,24 @@ function locateJsonRecords(root, itemPath) {
       const v = value[k];
       const s = [...segs, k];
       if (Array.isArray(v)) {
-        if (v.length && v.some(isPlain)) return { records: v, itemPath: s.join('.'), segs: s };
-        if (v.length && !anyArray) anyArray = { records: v, itemPath: s.join('.'), segs: s };
+        if (v.length && v.some(isPlain)) {
+          if (!SERVICE_ARRAY.test(k)) cands.push({ records: v, itemPath: s.join('.'), segs: s, known: KNOWN_ARRAY.test(k), depth: s.length, order: cands.length });
+        } else if (v.length && !anyArray) anyArray = { records: v, itemPath: s.join('.'), segs: s };
       } else if (isPlain(v)) queue.push({ value: v, segs: s });
     }
+  }
+  if (cands.length) {
+    cands.sort((a, b) => Number(b.known) - Number(a.known) || b.records.length - a.records.length || a.depth - b.depth || a.order - b.order);
+    const { records, itemPath, segs } = cands[0];
+    return { records, itemPath, segs };
   }
   if (anyArray) return anyArray;
   return { records: [root], itemPath: null, segs: [] };
 }
+
+// servisní pole obálek API (nejsou to záznamy) a známé názvy polí se záznamy
+const SERVICE_ARRAY = /^(errors?|warnings?|messages?|notices?|notifications?|meta|metadata|links|debug|categories|filters|facets|pagination|paging|logs?)$/i;
+const KNOWN_ARRAY = /^(items?|products?|offers?|data|records?|results?|prices?|rows?|entries|list|shopitems?|nabidky|produkty|polozky|zbozi|ceny)$/i;
 
 /** Pole polí s hlavičkou v prvním řádku ([["ean","cena"],["859…",100]]) → objekty. */
 function arrayRowsToObjects(records) {
@@ -414,7 +488,17 @@ function arrayRowsToObjects(records) {
   });
 }
 
-/** Primitivní hodnoty kořene (mimo pole záznamů) – dědí je nabídky ({shop: 'X', items: [...]}). */
+// Z kořene (obálky) se do nabídek dědí jen kontext: konkurent / obchod, datum zjištění, měna (data-4). Nikdy klíče,
+// které by se namapovaly na párovací pole – obálka API {code: 200, data: [...]} by jinak spárovala všechny nabídky
+// s produktem „200“.
+const CONTEXT_KEY = /^(competitor\w*|konkurent\w*|konkurence|shop|shopname|eshop|eshopname|seller|sellername|obchod|nazevobchodu|merchant|merchantname|store|storename|retailer|retailername|prodejce|domain|domena|date|datum|timestamp|generated|generatedat|observedat|scrapedat|crawledat|updated|updatedat|lastupdate|datumzjisteni|currency|mena)$/;
+
+function isContextKey(k) {
+  const f = keyForms(k);
+  return !!f && (CONTEXT_KEY.test(f.last) || CONTEXT_KEY.test(f.full));
+}
+
+/** Primitivní hodnoty kořene (mimo pole záznamů), které dědí nabídky ({shop: 'X', items: [...]}) – jen kontext. */
 function rootContext(root, segs) {
   if (!isPlain(root) || !segs.length) return null;
   const flat = flattenRecord(withoutPath(root, segs));
@@ -423,6 +507,7 @@ function rootContext(root, segs) {
   for (const k of Object.keys(flat)) {
     const v = flat[k];
     if (v === null || v === '' || (typeof v === 'string' && v.length > 200)) continue;
+    if (!isContextKey(k)) continue;
     setOwn(out, k, v);
     if (++n >= 50) break;
   }
@@ -452,6 +537,8 @@ function xmlRootAttrs(text) {
   let n = 0;
   for (const k of Object.keys(attrs)) {
     if (/^xmlns(:|$)/.test(k) || /^(xsi:)?schemaLocation$/.test(k) || k === 'version') continue;
+    // jen kontext (konkurent, datum, měna) – <response code="200"> nesmí být „náš kód“ všech nabídek (data-4)
+    if (!isContextKey(k)) continue;
     setOwn(out, '@' + k, attrs[k]);
     n++;
   }
@@ -467,7 +554,8 @@ function xmlRootAttrs(text) {
  * @param {object} [mapping] {format, item_path, offers_path, csv: {delimiter, decimal, encoding, header_row}, xlsx: {sheet, header_row}, encoding}
  * @param {{kind?: 'products'|'offers', limit?: number}} [opts] kind ovlivní vnořené nabídky a dědění z kořene;
  *   limit = max. počet zdrojových záznamů (náhled)
- * @returns {{format: string, itemPath: string|null, offersPath: string|null, records: object[], headers: string[], truncated: boolean}}
+ * @returns {{format: string, itemPath: string|null, offersPath: string|null, records: object[], headers: string[], truncated: boolean,
+ *   delimiter: string|null, context: string[]}} delimiter = oddělovač CSV; context = klíče zděděné z kořene (obálky)
  */
 function extractRecords(input, mapping = {}, opts = {}) {
   const m = mapping && typeof mapping === 'object' ? mapping : {};
@@ -482,6 +570,7 @@ function extractRecords(input, mapping = {}, opts = {}) {
   let context = null;
   let elementName = null;
   let truncated = false;
+  let delimiter = null;
 
   if (Array.isArray(inp.records)) {
     format = 'json';
@@ -531,11 +620,12 @@ function extractRecords(input, mapping = {}, opts = {}) {
       } else if (text.charCodeAt(0) === 0xfeff) text = text.slice(1);
       if (format === 'csv') {
         const c = m.csv || {};
-        const delimiter = wanted === 'tsv' ? '\t' : c.delimiter || undefined;
+        const csvDelimiter = wanted === 'tsv' ? '\t' : c.delimiter || undefined;
         try {
-          const r = formats.parseCsv(text, { delimiter, headerRow: c.header_row ?? c.headerRow });
+          const r = formats.parseCsv(text, { delimiter: csvDelimiter, headerRow: c.header_row ?? c.headerRow });
           flatRows = r.rows;
           headers = r.headers;
+          delimiter = r.delimiter;
         } catch (e) {
           throw wrapFormatError(e, 'csv');
         }
@@ -601,19 +691,20 @@ function extractRecords(input, mapping = {}, opts = {}) {
   }
 
   if (!headers) {
+    // klíče ze VŠECH záznamů (řídký sloupec, např. EAN až od 1001. položky, se jinak nenamapuje – data-13)
     headers = [];
     const seen = new Set();
-    const n = Math.min(records.length, HEADER_SAMPLE);
-    for (let i = 0; i < n; i++) {
+    outer: for (let i = 0; i < records.length; i++) {
       for (const k in records[i]) {
         if (!seen.has(k)) {
           seen.add(k);
           headers.push(k);
+          if (headers.length >= MAX_HEADERS) break outer;
         }
       }
     }
   }
-  return { format, itemPath, offersPath, records, headers, truncated };
+  return { format, itemPath, offersPath, records, headers, truncated, delimiter, context: context ? Object.keys(context) : [] };
 }
 
-module.exports = { extractRecords, flattenRecord, detectOffersPath, splitPath, getPath };
+module.exports = { extractRecords, flattenRecord, detectOffersPath, splitPath, getPath, LIMITS };

@@ -9,7 +9,13 @@
 //   3. po úspěšném plánovaném přecenění, pokud je zapnuto automatické odeslání (schedule.auto_push_after_run
 //      nebo export.webhook.auto_push) a je nastavena URL webhooku: exportRows(scope 'approved') → pushWebhook →
 //      při úspěchu markExported (kind 'webhook'); při neúspěchu se nic neoznačí (a zapíše se chybový export log).
-//   4. jednou denně úklid: superseded/rejected návrhy, offer_history, audit a imports starší než retention_days.
+//      c) žádný z důvodů výše, ale od posledního běhu se u některé zapnuté strategie s časovým oknem (dny v týdnu,
+//         hodiny, platnost od/do) změnilo, zda okno platí → přecenění s důvodem 'window' (ops-9). Jinak by se okno
+//         projevilo jen náhodou, kdyby běh zrovna padl dovnitř (např. víkendová akce bez intervalu se nikdy nezapne).
+//      Časy běhu / importu v budoucnosti (hodiny serveru se posunuly zpět) se ignorují s varováním (ops-10).
+//   4. jednou denně úklid: rejected návrhy, offer_history, audit a imports starší než retention_days; superseded návrhy
+//      už po retention_superseded_days (výchozí 14 – jsou to jen nahrazené kopie), nespárované nabídky neviděné
+//      30 dní (konkurent je už nenabízí). Maže se po dávkách (kratší zámek DB, menší WAL).
 // Tiky se nikdy nepřekrývají (mutex); všechny chyby se zalogují, proces nikdy nespadne.
 
 const { getSettings, getSetting, setSetting, tx } = require('../db');
@@ -17,6 +23,10 @@ const defaultLog = require('../util/log');
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 const RETENTION_KEY = '_retention_last_at';
+const SUPERSEDED_DAYS_DEFAULT = 14;
+const UNMATCHED_DAYS_MAX = 30;
+const DELETE_BATCH = 10000;
+const CLOCK_SKEW_MS = 60 * 60 * 1000; // čas v DB víc než hodinu v budoucnosti = posun hodin serveru
 
 /** Výchozí závislosti – líné require, aby plánovač šel načíst i bez hotových modulů import/engine/export. */
 function defaultDeps() {
@@ -49,31 +59,91 @@ function isFailedResult(res) {
   return false;
 }
 
+/** Smaže řádky po dávkách (každá dávka ve vlastní transakci – krátké zámky, malý WAL). Vrací počet. */
+function deleteBatched(db, table, where, arg) {
+  const stmt = db.prepare(`DELETE FROM ${table} WHERE rowid IN (SELECT rowid FROM ${table} WHERE ${where} LIMIT ${DELETE_BATCH})`);
+  let total = 0;
+  for (;;) {
+    const n = Number(tx(db, () => stmt.run(arg).changes));
+    total += n;
+    if (n < DELETE_BATCH) return total;
+  }
+}
+
 /**
- * Smaže stará data podle retention_days. Běží v transakci.
+ * Smaže stará data podle retention_days.
  * @param {object} db
- * @param {{days: number, now?: Date|string}} opts
- * @returns {{skipped?: boolean, cutoff?: string, proposals?: number, offer_history?: number, audit?: number, imports?: number}}
+ * @param {{days: number, supersededDays?: number, now?: Date|string}} opts supersededDays = kratší horizont pro
+ *   nahrazené návrhy (výchozí 14 dní, nejvýše days)
+ * @returns {{skipped?: boolean, cutoff?: string, proposals?: number, offer_history?: number, audit?: number, imports?: number,
+ *   unmatched_offers?: number}}
  */
-function retentionCleanup(db, { days, now } = {}) {
+function retentionCleanup(db, { days, supersededDays, now } = {}) {
   const d = Number(days);
   // 0 / null / nesmysl = uchovávat navždy (nic nemazat)
   if (!Number.isFinite(d) || d <= 0) return { skipped: true };
   const nowMs = toMs(now) ?? Date.now();
   const cutoff = new Date(nowMs - d * DAY_MS).toISOString();
-  const out = tx(db, () => ({
+  const sd = Number(supersededDays);
+  const supDays = Math.min(d, Number.isFinite(sd) && sd > 0 ? sd : SUPERSEDED_DAYS_DEFAULT);
+  const supCutoff = new Date(nowMs - supDays * DAY_MS).toISOString();
+  const unmatchedCutoff = new Date(nowMs - Math.min(d, UNMATCHED_DAYS_MAX) * DAY_MS).toISOString();
+  const out = {
     cutoff,
-    proposals: db.prepare("DELETE FROM proposals WHERE status IN ('superseded', 'rejected') AND created_at < ?").run(cutoff).changes,
-    offer_history: db.prepare('DELETE FROM offer_history WHERE observed_at < ?').run(cutoff).changes,
-    audit: db.prepare('DELETE FROM audit WHERE at < ?').run(cutoff).changes,
-    imports: db.prepare('DELETE FROM imports WHERE started_at < ?').run(cutoff).changes,
-  }));
+    // nahrazené návrhy jsou jen historie (každý běh je dřív kopíroval) – kratší horizont (ops-5)
+    proposals:
+      deleteBatched(db, 'proposals', "status = 'superseded' AND created_at < ?", supCutoff) +
+      deleteBatched(db, 'proposals', "status = 'rejected' AND created_at < ?", cutoff),
+    offer_history: deleteBatched(db, 'offer_history', 'observed_at < ?', cutoff),
+    audit: deleteBatched(db, 'audit', 'at < ?', cutoff),
+    imports: deleteBatched(db, 'imports', 'started_at < ?', cutoff),
+    // nespárované nabídky, které konkurent už dlouho nenabízí (ops-11)
+    unmatched_offers: deleteBatched(db, 'unmatched_offers', 'last_seen_at < ?', unmatchedCutoff),
+  };
   try {
     db.exec('PRAGMA optimize');
+    // po velkém mazání zmenšit WAL soubor na disku
+    db.exec('PRAGMA wal_checkpoint(TRUNCATE)');
   } catch {
     /* nevadí */
   }
   return out;
+}
+
+/**
+ * Změnilo se mezi `from` a `to` u některé zapnuté strategie, zda platí její časové okno (config.schedule)?
+ * Porovnává stav na začátku a na konci a navíc po hodinách mezi nimi (okno kratší než interval tiků se nepřeskočí).
+ */
+function windowCrossed(db, from, to) {
+  const { scheduleActive } = require('../engine/metrics');
+  const { normalizeConfig } = require('../engine/presets');
+  const schedules = [];
+  for (const r of db.prepare('SELECT config FROM strategies WHERE enabled = 1').all()) {
+    let cfg;
+    try {
+      cfg = normalizeConfig(r.config).config;
+    } catch {
+      continue;
+    }
+    const sc = cfg && cfg.schedule;
+    if (!sc) continue;
+    const has = sc.valid_from || sc.valid_to || (Array.isArray(sc.weekdays) && sc.weekdays.length) || (Array.isArray(sc.hours) && sc.hours.length === 2);
+    if (has) schedules.push(sc);
+  }
+  if (!schedules.length) return false;
+  const a = from.getTime();
+  const b = to.getTime();
+  if (!(b > a)) return false;
+  const HOUR = 3600000;
+  // nejvýše ~2 týdny po hodinách; delší mezera = porovnat jen konce
+  const step = b - a > 14 * DAY_MS ? b - a : HOUR;
+  for (const sc of schedules) {
+    const start = scheduleActive(sc, new Date(a));
+    for (let t = a + step; t < b + step; t += step) {
+      if (scheduleActive(sc, new Date(Math.min(t, b))) !== start) return true;
+    }
+  }
+  return false;
 }
 
 /** Čas začátku posledního přecenění (ms) nebo null. */
@@ -98,7 +168,8 @@ async function autoPush({ db, deps, webhook, template, currency, now, log = defa
   const res = await deps.pushWebhook(rows, { ...webhook, template, ...(currency ? { currency } : {}) });
   if (res && res.ok) {
     const ids = [...new Set(rows.map((r) => r.proposal_id).filter((id) => id != null))];
-    const marked = ids.length ? await deps.markExported(db, ids, { kind: 'webhook', target: webhook.url, actor: 'scheduler', now }) : null;
+    // označit jen to, co webhook skutečně doručil (ruční cena změněná během odesílání se neoznačí – money-6/ops-4)
+    const marked = ids.length ? await deps.markExported(db, ids, { kind: 'webhook', target: webhook.url, actor: 'scheduler', now, delivered: rows }) : null;
     log.info(`Plánovač: ${rows.length} změn cen odesláno webhookem`, { status: res.status, export_id: marked ? marked.export_id : null });
     return { ok: true, count: rows.length, status: res.status ?? null, export_id: marked ? marked.export_id ?? null : null, marked: marked ? marked.count ?? ids.length : 0 };
   }
@@ -173,6 +244,11 @@ function startScheduler({ db, config = {}, log = defaultLog, deps, intervalMs = 
       const t0 = Date.now();
       try {
         const res = await d.runSource(db, src.id, { origin: 'schedule' });
+        if (res && res.busy) {
+          // zdroj právě stahuje ruční spuštění – nečekat ani nelogovat jako chybu
+          summary.sources.push({ id: src.id, name: src.name ?? null, kind: src.kind ?? null, ok: false, skipped: 'running' });
+          continue;
+        }
         const ok = !isFailedResult(res);
         summary.sources.push({ id: src.id, name: src.name ?? null, kind: src.kind ?? null, ok, import_id: res && res.import_id != null ? res.import_id : null });
         if (ok && src.kind === 'offers') offersImported = true;
@@ -193,15 +269,24 @@ function startScheduler({ db, config = {}, log = defaultLog, deps, intervalMs = 
     // dostane čas nejdřív konec posledního importu nabídek, který zpracovává.
     let runAt = now;
     try {
-      const lastRun = lastRunStartedMs(db);
-      const since = Math.max(lastRun ?? 0, lastAttemptMs);
+      let lastRun = lastRunStartedMs(db);
+      // Čas posledního běhu v budoucnosti (hodiny serveru šly napřed a pak se opravily) by plánované běhy zastavil
+      // až do doby, než ho skutečný čas dožene – ignorovat (ops-10).
+      if (lastRun != null && lastRun > nowMs + CLOCK_SKEW_MS) {
+        log.warn('Plánovač: čas posledního přecenění je v budoucnosti (posun hodin serveru?) – ignoruji ho', { last_run: new Date(lastRun).toISOString() });
+        lastRun = null;
+      }
+      const since = Math.max(lastRun ?? 0, lastAttemptMs > nowMs + CLOCK_SKEW_MS ? 0 : lastAttemptMs);
       if (sched.run_after_import) {
-        const lastImport = lastOfferImportMs(db);
+        let lastImport = lastOfferImportMs(db);
+        if (lastImport != null && lastImport > nowMs + CLOCK_SKEW_MS) lastImport = null;
         if (offersImported || (lastImport != null && lastImport > since)) reason = 'import';
         if (reason && lastImport != null && lastImport > nowMs) runAt = new Date(lastImport);
       }
       const interval = Number(sched.run_interval_minutes) || 0;
       if (!reason && interval > 0 && (!since || nowMs - since >= interval * 60 * 1000)) reason = 'interval';
+      // hranice časového okna některé strategie od posledního běhu (ops-9)
+      if (!reason && since && windowCrossed(db, new Date(since), now)) reason = 'window';
     } catch (e) {
       logError('decide', 'Plánovač: nelze zjistit stav posledního přecenění', e);
       summary.errors.push({ step: 'decide', error: e.message });
@@ -216,7 +301,7 @@ function startScheduler({ db, config = {}, log = defaultLog, deps, intervalMs = 
         }
         summary.run = { reason, ok: true, run_id: result && result.run_id != null ? result.run_id : null, stats: (result && result.stats) || null };
         const st = (result && result.stats) || {};
-        log.info(`Plánovač: přecenění dokončeno (${reason === 'import' ? 'po importu nabídek' : 'interval'})`, {
+        log.info(`Plánovač: přecenění dokončeno (${reason === 'import' ? 'po importu nabídek' : reason === 'window' ? 'změna časového okna strategie' : 'interval'})`, {
           run_id: summary.run.run_id,
           changes: st.changes,
           auto_approved: st.auto_approved,
@@ -250,11 +335,11 @@ function startScheduler({ db, config = {}, log = defaultLog, deps, intervalMs = 
     try {
       const lastCleanup = toMs(getSetting(db, RETENTION_KEY, null));
       if (lastCleanup == null || nowMs - lastCleanup >= DAY_MS || lastCleanup > nowMs + DAY_MS) {
-        summary.cleanup = retentionCleanup(db, { days: settings.retention_days, now });
+        summary.cleanup = retentionCleanup(db, { days: settings.retention_days, supersededDays: settings.retention_superseded_days, now });
         setSetting(db, RETENTION_KEY, now.toISOString());
         if (!summary.cleanup.skipped) {
           const c = summary.cleanup;
-          const total = c.proposals + c.offer_history + c.audit + c.imports;
+          const total = c.proposals + c.offer_history + c.audit + c.imports + (c.unmatched_offers || 0);
           (total ? log.info : log.debug)('Plánovač: úklid starých dat dokončen', c);
         }
       }
@@ -327,4 +412,4 @@ function startScheduler({ db, config = {}, log = defaultLog, deps, intervalMs = 
   };
 }
 
-module.exports = { startScheduler, retentionCleanup, autoPush, defaultDeps, RETENTION_KEY };
+module.exports = { startScheduler, retentionCleanup, autoPush, defaultDeps, windowCrossed, RETENTION_KEY };

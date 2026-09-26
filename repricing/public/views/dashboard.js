@@ -43,7 +43,8 @@ function safeHash(link) {
 
 function onboarding() {
   const steps = [
-    ['Nahrajte katalog produktů', 'CSV/XLSX export skladových zásob z POHODY nebo JSON/XML z adminu.', '#/import'],
+    // katalog → průvodce rovnou v režimu „Katalog produktů“ (jinak by se namapoval jako ceny konkurence – contract-9)
+    ['Nahrajte katalog produktů', 'CSV/XLSX export skladových zásob z POHODY nebo JSON/XML z adminu.', '#/import?kind=products'],
     ['Pošlete ceny konkurence', 'Soubor, URL feed nebo API – párování přes kód, EAN nebo MPN.', '#/import'],
     ['Rozdělte produkty do segmentů', 'Např. ležáky N7/N8, klíčové značky, produkty bez konkurence.', '#/segmenty'],
     ['Nastavte strategie', 'Jak se chovat vůči trhu: podlézt nejnižší cenu, držet pozici, medián…', '#/strategie'],
@@ -57,7 +58,8 @@ function onboarding() {
         icon: 'upload',
         title: 'Zatím tu nejsou žádné produkty',
         text: 'Cenotvorba potřebuje váš katalog (kódy, nákupní a prodejní ceny, sklad) a ceny konkurence. Začněte importem dat.',
-        actions: [h('a', { class: 'btn btn-primary', href: '#/import' }, icon('upload', { size: 16 }), h('span', null, 'Importovat data')), h('a', { class: 'btn', href: '#/import?tab=api' }, 'Jak posílat data přes API')],
+        // bez produktů je prvním krokem vždy katalog
+        actions: [h('a', { class: 'btn btn-primary', href: '#/import?kind=products' }, icon('upload', { size: 16 }), h('span', null, 'Importovat katalog')), h('a', { class: 'btn', href: '#/import?tab=api' }, 'Jak posílat data přes API')],
       }),
     }),
     card({

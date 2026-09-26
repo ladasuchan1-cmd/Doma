@@ -48,7 +48,7 @@ function envStr(v) {
  * Načte konfiguraci z proměnných prostředí.
  * @param {Record<string, string|undefined>} [env]
  * @returns {{port: number, host: string, dbFile: string, password: string|null, secret: string|null,
- *   maxBodyMb: number, publicDir: string, trustProxy: boolean, schedulerEnabled: boolean, logLevel: string}}
+ *   maxBodyMb: number, maxJsonMb: number, publicDir: string, trustProxy: boolean, schedulerEnabled: boolean, logLevel: string}}
  */
 function loadConfig(env = process.env) {
   env = env || {};
@@ -66,6 +66,9 @@ function loadConfig(env = process.env) {
     password: env.CENOTVORBA_PASSWORD != null && env.CENOTVORBA_PASSWORD !== '' ? String(env.CENOTVORBA_PASSWORD) : null,
     secret: envStr(env.CENOTVORBA_SECRET),
     maxBodyMb: envNumber(env.CENOTVORBA_MAX_BODY_MB, 300, { min: 0 }),
+    // Limit JSON těla, které API parsuje (ne soubory importu – ty čte import sám). JSON.parse obřího pole by shodil
+    // celý proces nezachytitelnou chybou V8 (security-1).
+    maxJsonMb: envNumber(env.CENOTVORBA_MAX_JSON_MB, 32, { min: 0.01 }),
     publicDir: path.resolve(envStr(env.CENOTVORBA_PUBLIC_DIR) || path.join(PROJECT_DIR, 'public')),
     trustProxy: envBool(env.CENOTVORBA_TRUST_PROXY, false),
     schedulerEnabled: envBool(env.CENOTVORBA_SCHEDULER, true),

@@ -386,6 +386,7 @@ function buildViews(db) {
     foldCache: new Map(),
     facets: null,
     attrFields: null,
+    attrKeys: null,
     build_ms: Math.round(performance.now() - t0),
     timing_ms: { products: Math.round(t1 - t0), offers: Math.round(t2 - t1), views: Math.round(performance.now() - t2) },
   };
@@ -473,6 +474,9 @@ function getCache(db) {
   if (!st.views) {
     st.views = buildViews(db);
     st.segments = null;
+    // Pořadí podle návrhů (proposal.*) jsou indexy do pohledů. Nové pohledy (import ze zdroje, TTL) je zneplatní –
+    // jinak by v seznamu seřazeném podle návrhu chyběly nově přidané produkty (ops-8).
+    if (st.proposals) st.proposals.sortCache = new Map();
   }
   if (!st.segments) st.segments = buildSegments(db, s, st.views);
   if (!st.proposals) st.proposals = buildProposals(s);
@@ -544,6 +548,9 @@ function writeAndRefresh(db, productIds, write) {
   cache.foldCache.clear();
   cache.facets = null;
   cache.attrFields = null;
+  cache.attrKeys = null;
+  // pořadí podle návrhů jsou indexy do pohledů – po změně pohledů neplatí
+  if (st.proposals) st.proposals.sortCache = new Map();
   st.fp = fingerprints(db, s);
   st.gate = `${s.tc.get().tc}:${s.dv.get().data_version}`;
   return result;
@@ -568,10 +575,40 @@ function invalidate(db, ...parts) {
 // ---------------------------------------------------------------------------------------------------------
 // Dotazy nad cache
 
-/** Seznam klíčů View, podle kterých lze řadit/filtrovat (FIELDS + sloupce produktu + attrs.*). */
+// Cache seřazených pořadí a „složených“ polí má omezenou velikost (LRU): každý neznámý klíč řazení by jinak
+// natrvalo alokoval pole o délce počtu produktů (security-6).
+const SORT_CACHE_MAX = 64;
+const FOLD_CACHE_MAX = 64;
+
+function lruGet(map, key) {
+  const v = map.get(key);
+  if (v !== undefined) {
+    map.delete(key);
+    map.set(key, v);
+  }
+  return v;
+}
+
+function lruSet(map, key, value, max) {
+  map.set(key, value);
+  while (map.size > max) map.delete(map.keys().next().value);
+}
+
+/** Klíče atributů, které má aspoň jeden produkt (lazy, zneplatní se s pohledy). */
+function attrKeysOf(cache) {
+  if (!cache.attrKeys) {
+    const set = new Set();
+    for (const v of cache.views) if (v.attrs && typeof v.attrs === 'object') for (const k of Object.keys(v.attrs)) set.add(k);
+    cache.attrKeys = set;
+  }
+  return cache.attrKeys;
+}
+
+/** Seznam klíčů View, podle kterých lze řadit/filtrovat (FIELDS + sloupce produktu + attrs.* existujících atributů). */
 function isKnownViewField(cache, field) {
   if (typeof field !== 'string' || !/^[A-Za-z0-9_.\-]+$/.test(field)) return false;
-  if (field.startsWith('attrs.')) return field.length > 6;
+  // jen atribut, který nějaký produkt skutečně má (ne libovolné attrs.<náhodný text> – security-6)
+  if (field.startsWith('attrs.')) return field.length > 6 && attrKeysOf(cache).has(field.slice(6));
   if (field.startsWith('proposal.')) return ['proposal.change_pct', 'proposal.new_price', 'proposal.final_price', 'proposal.status', 'proposal.id'].includes(field);
   if (field === 'proposal') return true;
   if (FIELDS.some((f) => f.key === field)) return true;
@@ -584,7 +621,7 @@ function sortedOrder(cache, field, dir) {
   const isProposal = field === 'proposal' || field.startsWith('proposal.');
   const bucket = isProposal ? cache.proposals.sortCache : cache.sortCache;
   const key = `${field}:${dir}`;
-  let order = bucket.get(key);
+  let order = lruGet(bucket, key);
   if (order) return order;
   const all = cache.views.map((_, i) => i);
   let valueOf;
@@ -599,7 +636,7 @@ function sortedOrder(cache, field, dir) {
     valueOf = (i) => get(cache.views[i]);
   }
   order = sortIndices(all, valueOf, dir);
-  bucket.set(key, order);
+  lruSet(bucket, key, order, SORT_CACHE_MAX);
   return order;
 }
 
@@ -616,10 +653,10 @@ function searchOf(cache) {
 
 /** Složené (fold) hodnoty pole pro rychlé porovnání bez diakritiky. */
 function foldedField(cache, field) {
-  let arr = cache.foldCache.get(field);
+  let arr = lruGet(cache.foldCache, field);
   if (!arr) {
     arr = cache.views.map((v) => fold(v[field]));
-    cache.foldCache.set(field, arr);
+    lruSet(cache.foldCache, field, arr, FOLD_CACHE_MAX);
   }
   return arr;
 }

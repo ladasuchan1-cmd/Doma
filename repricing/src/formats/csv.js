@@ -265,9 +265,12 @@ function formatNumber(n, decimal) {
 /**
  * Zapíše CSV přátelské k českému Excelu: středník, desetinná čárka, BOM, CRLF, uvozovky jen když je potřeba.
  * null/undefined → prázdná buňka, boolean → 1/0, Date → ISO, objekt/pole → JSON.
+ * Ochrana proti vložení vzorce (CSV injection, security-7): TEXT začínající = + - @ nebo tabulátorem / CR (název
+ * produktu, výrobce, konkurent z cizích feedů) dostane na začátek apostrof – Excel / LibreOffice ho pak berou jako
+ * text, ne jako vzorec (=HYPERLINK, DDE). Čísla (i záporná) se nemění. Vypnout jde opts.formulaSafe = false.
  * @param {object[]} rows
  * @param {Array<{key: string, label?: string}>} [columns] výchozí = klíče prvního řádku
- * @param {{delimiter?: string, bom?: boolean, decimal?: string, newline?: string, header?: boolean}} [opts]
+ * @param {{delimiter?: string, bom?: boolean, decimal?: string, newline?: string, header?: boolean, formulaSafe?: boolean}} [opts]
  * @returns {string}
  */
 function toCsv(rows, columns, opts = {}) {
@@ -283,6 +286,7 @@ function toCsv(rows, columns, opts = {}) {
   }
   const cols = columns.map((c) => (typeof c === 'string' ? { key: c } : c));
   const needs = new RegExp(`[${escapeRe(delimiter)}"\\r\\n]|^\\s|\\s$`);
+  const formulaSafe = opts.formulaSafe !== false;
   const cell = (v) => {
     let s;
     if (v == null) return '';
@@ -291,7 +295,10 @@ function toCsv(rows, columns, opts = {}) {
     else if (typeof v === 'bigint') s = v.toString();
     else if (v instanceof Date) s = Number.isNaN(v.getTime()) ? '' : v.toISOString();
     else if (typeof v === 'object') s = JSON.stringify(v);
-    else s = String(v);
+    else {
+      s = String(v);
+      if (formulaSafe && /^[=+\-@\t\r]/.test(s)) s = "'" + s;
+    }
     return needs.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
   };
   const lines = [];

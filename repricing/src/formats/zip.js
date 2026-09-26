@@ -87,7 +87,24 @@ function readZip(buf) {
   return entries;
 }
 
+// Nejvyšší velikost rozbalené položky (ZIP i XLSX). Rozbalená data se dekódují na jeden JS řetězec a parsují;
+// deklarovaná velikost se jinak bere z centrálního adresáře (až 4 GB) a 2MB „zip bomba“ zaplnila paměť
+// a na desítky sekund zablokovala server (ops-3, security-2). Sdílí i gzip v import/records.js.
+const MAX_ENTRY_BYTES = 256 * 1024 * 1024;
+// Poměr komprese nad tuto mez u velké položky = téměř jistě bomba (reálné CSV/XML se komprimují ~5–20×).
+const MAX_RATIO = 1000;
+const RATIO_MIN_BYTES = 50 * 1024 * 1024;
+
 function extract(buf, name, e) {
+  if (e.usize > MAX_ENTRY_BYTES) {
+    throw zipError(
+      `Položka „${name}“ je po rozbalení příliš velká (${Math.round(e.usize / 1024 / 1024)} MB, nejvýše ${MAX_ENTRY_BYTES / 1024 / 1024} MB).`,
+      'ZIP_TOO_LARGE'
+    );
+  }
+  if (e.method !== 0 && e.usize > RATIO_MIN_BYTES && e.usize / Math.max(e.csize, 1) > MAX_RATIO) {
+    throw zipError(`Položka „${name}“ má nepřirozeně vysoký poměr komprese – soubor odmítnut.`, 'ZIP_TOO_LARGE');
+  }
   const lo = e.localOffset;
   if (lo + 30 > buf.length || buf.readUInt32LE(lo) !== SIG_LOCAL) throw zipError(`Poškozený ZIP: chybí lokální hlavička „${name}“.`, 'ZIP_CORRUPT');
   // délky názvu/extra v lokální hlavičce se mohou lišit od centrálního adresáře; velikosti bereme z centrálního
@@ -100,7 +117,7 @@ function extract(buf, name, e) {
   if (e.method === 0) data = raw;
   else {
     try {
-      data = zlib.inflateRawSync(raw, { maxOutputLength: Math.min(Math.max(e.usize, 1), bufferConstants.MAX_LENGTH) });
+      data = zlib.inflateRawSync(raw, { maxOutputLength: Math.min(Math.max(e.usize, 1), MAX_ENTRY_BYTES, bufferConstants.MAX_LENGTH) });
     } catch (err) {
       throw zipError(`Poškozený ZIP: položku „${name}“ nelze rozbalit (${err.message}).`, 'ZIP_CORRUPT');
     }
@@ -194,4 +211,4 @@ function writeZip(entries, opts = {}) {
   return Buffer.concat([...chunks, cdBuf, eocd]);
 }
 
-module.exports = { readZip, writeZip };
+module.exports = { readZip, writeZip, MAX_ENTRY_BYTES };

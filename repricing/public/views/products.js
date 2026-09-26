@@ -6,8 +6,9 @@ import { icon } from '../lib/icons.js';
 import { DataTable } from '../lib/table.js';
 import { card, emptyState, positionBadge, changeEl, searchInput, checkbox } from '../lib/ui.js';
 import { filterBuilder } from '../lib/filter-builder.js';
-import { describeFilter, countConditions, isEmptyFilter } from '../lib/filter-model.js';
-import { money, percent, int, index, count, statusLabel, POSITION_LABELS, POSITION_ORDER } from '../lib/format.js';
+import { describeFilter, countConditions, isEmptyFilter, quickFiltersToSegment } from '../lib/filter-model.js';
+import { confirmDialog } from '../lib/modal.js';
+import { money, percent, int, index, count, statusLabel, POSITION_LABELS, POSITION_ORDER, toNum, round } from '../lib/format.js';
 import { finalPrice, finalChangePct, isManual } from '../lib/proposal-model.js';
 
 export const title = 'Produkty';
@@ -53,7 +54,8 @@ export async function show(root, ctx) {
     limit: Number(q.limit) || 50,
   };
   ctx.setTitle('Produkty', '');
-  ctx.setActions(h('a', { class: 'btn btn-ghost', href: '#/import' }, icon('upload', { size: 16 }), h('span', { class: 'lbl' }, 'Import katalogu')));
+  // import katalogu = průvodce v režimu „Katalog produktů“ (výchozí režim jsou ceny konkurence – contract-9)
+  ctx.setActions(h('a', { class: 'btn btn-ghost', href: '#/import?kind=products' }, icon('upload', { size: 16 }), h('span', { class: 'lbl' }, 'Import katalogu')));
 
   let facets = null;
   let segments = [];
@@ -138,7 +140,11 @@ export async function show(root, ctx) {
         const approved = p.status === 'approved';
         const manual = isManual(p);
         const tip = statusLabel(p.status) + (manual ? ' · ruční cena (navrženo ' + money(p.new_price) + ')' : '');
-        return h('div', { class: 'cell-2', style: 'align-items:flex-end', title: tip }, h('span', { class: 'num strong nowrap' }, approved ? h('span', { class: 'chg-up', 'aria-label': 'schváleno' }, icon('check', { size: 12 }), ' ') : null, money(finalPrice(p)), manual ? h('span', { class: 'muted', 'aria-label': 'ruční cena' }, ' ✎') : null), changeEl(finalChangePct(p)));
+        // contract-2: změna proti AKTUÁLNÍ ceně produktu (návrh mohl vzniknout při jiné ceně – import katalogu, ruční změna)
+        const fp = finalPrice(p);
+        const cur = toNum(r.price);
+        const pct = fp != null && cur ? round(((fp - cur) / cur) * 100, 2) : finalChangePct(p);
+        return h('div', { class: 'cell-2', style: 'align-items:flex-end', title: tip }, h('span', { class: 'num strong nowrap' }, approved ? h('span', { class: 'chg-up', 'aria-label': 'schváleno' }, icon('check', { size: 12 }), ' ') : null, money(fp), manual ? h('span', { class: 'muted', 'aria-label': 'ruční cena' }, ' ✎') : null), changeEl(pct));
       },
     },
   ];
@@ -165,7 +171,7 @@ export async function show(root, ctx) {
     empty: () =>
       anyFilter()
         ? emptyState({ icon: 'filter', title: 'Žádný produkt neodpovídá filtrům', text: 'Zkuste filtry uvolnit nebo zrušit.', actions: [h('button', { type: 'button', class: 'btn', onClick: clearFilters }, 'Zrušit filtry')] })
-        : emptyState({ icon: 'box', title: 'Zatím žádné produkty', text: 'Nahrajte katalog z POHODY nebo adminu – produkty se pak objeví tady.', actions: [h('a', { class: 'btn btn-primary', href: '#/import' }, 'Importovat katalog')] }),
+        : emptyState({ icon: 'box', title: 'Zatím žádné produkty', text: 'Nahrajte katalog z POHODY nebo adminu – produkty se pak objeví tady.', actions: [h('a', { class: 'btn btn-primary', href: '#/import?kind=products' }, 'Importovat katalog')] }),
   });
 
   // --------------------------------------------------------------- toolbar
@@ -258,6 +264,23 @@ export async function show(root, ctx) {
     pills.hidden = !items.length;
   }
 
+  /**
+   * „Uložit jako segment“: do segmentu i aktivní rychlé filtry (výrobce, pozice …), aby segment odpovídal
+   * zobrazenému seznamu. Co segment neumí (hledání, „jen s návrhem“ …), výslovně říct (contract-11).
+   */
+  async function saveAsSegment(advanced) {
+    const { filter, dropped } = quickFiltersToSegment(st, advanced, segments);
+    if (dropped.length) {
+      const ok = await confirmDialog({
+        title: 'Uložit jako segment',
+        message: 'Segment převezme pokročilé podmínky i rychlé filtry výrobce, kategorie, osoby, dodavatele, pozice a segmentu. Tyto filtry segment neumí a nepřenesou se: ' + dropped.join(', ') + ' – segment proto bude obsahovat víc produktů, než je teď vidět. Pokračovat?',
+        confirmLabel: 'Pokračovat',
+      });
+      if (!ok) return;
+    }
+    ctx.navigate(buildHash('/segmenty/novy', { filter }));
+  }
+
   async function toggleAdvanced(force) {
     const open = force ?? advPanel.hidden;
     advPanel.hidden = !open;
@@ -287,7 +310,7 @@ export async function show(root, ctx) {
             h('button', { type: 'button', class: 'btn btn-primary', dataset: { action: 'apply-filter' }, onClick: () => { st.filter = isEmptyFilter(pending) ? null : pending; st.page = 1; renderToolbar(); load(); } }, 'Použít filtr'),
             h('button', { type: 'button', class: 'btn', onClick: () => { fb.setFilter({}); pending = {}; st.filter = null; renderToolbar(); load(); } }, 'Vymazat'),
             h('span', { class: 'toolbar-spacer' }),
-            h('button', { type: 'button', class: 'btn btn-ghost', onClick: () => ctx.navigate(buildHash('/segmenty/novy', { filter: pending })) }, icon('layers', { size: 16 }), h('span', null, 'Uložit jako segment'))
+            h('button', { type: 'button', class: 'btn btn-ghost', dataset: { action: 'save-as-segment' }, onClick: () => saveAsSegment(pending) }, icon('layers', { size: 16 }), h('span', null, 'Uložit jako segment'))
           ),
         ],
       })

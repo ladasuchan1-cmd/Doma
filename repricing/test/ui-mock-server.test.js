@@ -100,12 +100,21 @@ test('návrhy: seznam se summary, schválení, ruční cena, XLSX', async () => 
   assert.strictEqual(p.status, 'pending');
   assert.ok(p.product && p.product.code && Array.isArray(p.flags) && Array.isArray(p.explain));
   assert.ok(Math.abs(l.items[0].change_pct) >= Math.abs(l.items[1].change_pct), 'výchozí řazení abs_change_pct desc');
-  const man = await json('/proposals/' + p.id, { method: 'PATCH', body: JSON.stringify({ manual_price: 999 }) });
+  // riziková ruční cena (velká změna – překlep?) bez potvrzení → 409 MANUAL_PRICE_CONFIRM jako skutečné API
+  const risky = await json('/proposals/' + p.id, { method: 'PATCH', body: JSON.stringify({ manual_price: 999 }) });
+  assert.strictEqual(risky.status, 409);
+  assert.strictEqual(risky.body.error.details.code, 'MANUAL_PRICE_CONFIRM');
+  assert.ok(risky.body.error.details.reasons.length);
+  const man = await json('/proposals/' + p.id, { method: 'PATCH', body: JSON.stringify({ manual_price: 999, confirm: true }) });
   assert.strictEqual(man.body.manual_price, 999);
   const ap = await json('/proposals/approve', { method: 'POST', body: JSON.stringify({ ids: [p.id] }) });
   assert.deepStrictEqual(ap.body, { updated: 1 });
   const again = await json('/proposals/approve', { method: 'POST', body: JSON.stringify({ ids: [p.id] }) });
   assert.deepStrictEqual(again.body, { updated: 0 }, 'jen čekající');
+  // schválený (neexportovaný) návrh jde zamítnout – jako skutečné API (contract-10)
+  const rej = await json('/proposals/reject', { method: 'POST', body: JSON.stringify({ ids: [p.id] }) });
+  assert.deepStrictEqual(rej.body, { updated: 1 });
+  assert.strictEqual((await json('/proposals?status=rejected&limit=500')).body.items.some((x) => x.id === p.id), true);
   const before = (await json('/proposals?limit=1&direction=up')).body.total;
   const all = await json('/proposals/approve', { method: 'POST', body: JSON.stringify({ all: true, filter: { direction: 'up' } }) });
   assert.strictEqual(all.body.updated, before);

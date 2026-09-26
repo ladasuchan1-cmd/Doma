@@ -256,12 +256,12 @@ function validateOptions(o, kind, errors) {
     if (!Number.isFinite(n) || n < 0) errors.push({ field: `options.${key}`, message: 'options.max_age_days musí být nezáporné číslo (dny).' });
     else o[key] = n;
   }
-  for (const key of ['deactivate_missing', 'deactivateMissing']) {
+  for (const key of ['deactivate_missing', 'deactivateMissing', 'force_deactivate', 'forceDeactivate']) {
     if (o[key] === undefined) continue;
     const v = o[key];
     if (typeof v === 'boolean') continue;
     const b = boolValue(v, null);
-    if (b === null) errors.push({ field: `options.${key}`, message: 'options.deactivate_missing musí být true nebo false.' });
+    if (b === null) errors.push({ field: `options.${key}`, message: `options.${key} musí být true nebo false.` });
     else o[key] = b;
   }
   if (o.timeout_ms !== undefined && o.timeout_ms !== null) {
@@ -426,6 +426,8 @@ async function runSourceHandler(ctx) {
     throw new HttpError(400, `Zdroj „${row.name}“ nemá nastavenou URL – data do něj posílejte přes API (POST /api/v1/import/${row.kind}?source=${id}).`);
   }
   const result = await runSource(ctx.db, id, { origin: 'manual' });
+  // zdroj se už stahuje (plánovač / jiný požadavek) – 409, nic dalšího se neděje
+  if (result.busy) throw new HttpError(409, result.error, { code: 'SOURCE_RUNNING', source_id: id });
   auditSafe(ctx, { action: 'source.run', entity: 'source', entity_id: id, detail: { ok: !!result.ok, import_id: result.import_id ?? null } });
   if (!result.ok) {
     // Chyba je už zaznamenaná (imports.status = error, sources.last_status = error). 502 = vzdálený zdroj

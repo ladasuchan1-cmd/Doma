@@ -2026,9 +2026,14 @@ function buildRoutes(st) {
   });
   const decideProposals = (ctx, status) => {
     const b = ctx.body || {};
+    // jako skutečné API: schválit jde jen čekající, zamítnout čekající i schválené (dosud neexportované)
+    const allowed = status === 'approved' ? ['pending'] : ['pending', 'approved'];
     let targets;
-    if (b.all) targets = filterProposals(st, { ...(b.filter || {}), status: 'pending' });
-    else if (Array.isArray(b.ids)) targets = st.proposals.filter((p) => b.ids.map(Number).includes(p.id) && p.status === 'pending');
+    if (b.all) {
+      const want = b.filter?.status ? String(b.filter.status).split(',').filter((x) => allowed.includes(x) || x === 'all') : allowed;
+      const statuses = want.includes('all') ? allowed : want;
+      targets = statuses.flatMap((x) => filterProposals(st, { ...(b.filter || {}), status: x }));
+    } else if (Array.isArray(b.ids)) targets = st.proposals.filter((p) => b.ids.map(Number).includes(p.id) && allowed.includes(p.status));
     else throw new HttpError(400, 'Zadejte ids nebo all.');
     const now = iso(st.now());
     for (const p of targets) {
@@ -2047,6 +2052,21 @@ function buildRoutes(st) {
     const mp = ctx.body?.manual_price;
     if (mp !== null && !(typeof mp === 'number' && mp > 0)) throw new HttpError(400, 'Ruční cena musí být kladné číslo (null ruší).');
     if (!['pending', 'approved'].includes(p.status)) throw new HttpError(409, 'Návrh už nelze upravit (stav ' + p.status + ').');
+    // jako skutečné API: riziková ruční cena (pod nákupem, velká změna) bez confirm → 409 MANUAL_PRICE_CONFIRM
+    if (mp != null && ctx.body?.confirm !== true) {
+      const prod = st.products.find((x) => x.id === p.product_id) || {};
+      const reasons = [];
+      if (prod.purchase_price > 0 && net(mp, prod.vat_rate ?? 21) < prod.purchase_price) reasons.push('cena bez DPH je pod nákupní cenou ' + prod.purchase_price + ' Kč');
+      const base = p.old_price || prod.price;
+      if (base && Math.abs(mp / base - 1) * 100 > 50) reasons.push('cena se mění o ' + round((mp / base - 1) * 100, 1) + ' % oproti ' + base + ' Kč');
+      if (reasons.length) throw new HttpError(409, 'Ruční cena vyžaduje potvrzení: ' + reasons.join('; ') + '.', { code: 'MANUAL_PRICE_CONFIRM', reasons });
+    }
+    // úprava ceny schváleného návrhu ho vrací ke schválení
+    if (p.status === 'approved' && p.manual_price !== mp) {
+      p.status = 'pending';
+      p.decided_at = null;
+      p.decided_by = null;
+    }
     p.manual_price = mp;
     audit(ctx, 'proposal.manual_price', 'proposal', p.id, { manual_price: mp });
     return proposalRow(st, p);

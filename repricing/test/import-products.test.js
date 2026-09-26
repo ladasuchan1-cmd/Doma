@@ -24,7 +24,7 @@ test('importProducts: založení, změna, beze změny; statistiky ve tvaru SPEC'
     { code: 'A-1', name: 'Kolo A', price: 10990, purchase_price: 7000, vat_rate: 21, ean: '8591234567890', mpn: 'AB-12 x', attrs: { N: 'N2' } },
     { code: 'B-2', name: 'Kolo B', price: 20990 },
   ], { now: T1 });
-  assert.deepEqual(s, { received: 2, created: 2, updated: 0, unchanged: 0, deactivated: 0, errors: [] });
+  assert.deepEqual(s, { received: 2, created: 2, updated: 0, unchanged: 0, deactivated: 0, superseded: 0, errors: [] });
   const a = product(db, 'A-1');
   assert.equal(a.ean_key, '8591234567890');
   assert.equal(a.mpn_key, 'AB12X');
@@ -169,10 +169,12 @@ test('importProducts: chyby, varování, duplicitní řádky, limit 100 chyb', (
     [
       [1, false],
       [2, true],
+      [3, true], // data-11: kód A je v importu 2× – varování
       [4, false],
     ]
   );
   assert.equal(s.errors[0].message, 'Chybí kód produktu');
+  assert.match(s.errors[2].message, /Kód A je v importu 2× \(řádky 2, 3\)/);
   const many = importProducts(db, Array.from({ length: 250 }, () => ({ name: 'x' })), { now: T1 });
   assert.equal(many.errors.length, 100);
   assert.equal(many.errors[99].row, null);
@@ -187,8 +189,10 @@ test('runImport: katalog z POHODY (cp1250 CSV) – kódy s mezerami, EAN v expon
   const r = runImport(db, { kind: 'products', input: fx('katalog-cp1250.csv'), origin: 'upload', now: T1 });
   assert.equal(r.stats.received, 6);
   assert.equal(r.stats.created, 4);
-  assert.equal(r.stats.errors.length, 1);
-  assert.deepEqual(r.stats.errors[0], { row: 6, message: 'Chybí kód produktu' });
+  assert.equal(r.stats.errors.length, 2);
+  // SRA-001 je v souboru dvakrát (data-11) → varování, platí poslední řádek
+  assert.deepEqual(r.stats.errors[0], { row: 4, message: 'Kód SRA-001 je v importu 2× (řádky 1, 4) – použit poslední řádek.', warning: true });
+  assert.deepEqual(r.stats.errors[1], { row: 6, message: 'Chybí kód produktu' });
   const s = product(db, 'SAN014XS');
   assert.equal(s.code, 'SAN 014 XS');
   assert.equal(s.ean, '8590000000000');

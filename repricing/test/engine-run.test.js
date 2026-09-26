@@ -217,17 +217,20 @@ test('run: supersede – starší pending/approved návrhy vyhodnocených produk
 
   const res2 = runPricing(db, { now: NOW });
   const st = (id) => db.prepare('SELECT status FROM proposals WHERE id = ?').get(id).status;
-  assert.equal(st(p1a.id), 'superseded');
+  // stejné rozhodnutí → stejný návrh se ponechá (přesune do nového běhu), stav zůstane (ops-1)
+  assert.equal(st(p1a.id), 'approved');
   assert.equal(st(p2a.id), 'exported', 'exportované zůstávají');
-  assert.equal(st(p3a.id), 'superseded');
-  assert.equal(st(p4old), 'superseded', 'i produkt, který teď nemá změnu');
+  assert.equal(st(p3a.id), 'pending');
+  assert.equal(st(p4old), 'superseded', 'produkt, který teď nemá změnu');
   assert.equal(st(p5rej), 'rejected');
-  assert.equal(st(p6old), 'pending', 'neaktivní produkt nebyl vyhodnocen');
-  assert.equal(res2.stats.superseded, 3);
-  // nové návrhy vznikly
+  assert.equal(st(p6old), 'superseded', 'neaktivní produkt: úplný běh jeho návrh zneplatní (money-4)');
+  assert.equal(res2.stats.superseded, 2);
+  assert.equal(res2.stats.kept, 2);
   assert.equal(proposalsOf(db, ids.p1).filter((p) => p.run_id === res2.run_id).length, 1);
+  assert.equal(proposalsOf(db, ids.p1).length, 1, 'žádná kopie návrhu');
 
-  // běh omezený na p3 nahradí jen návrhy p3
+  // běh omezený na p3 (jiná aktuální cena → jiný návrh) nahradí jen návrhy p3
+  db.prepare('UPDATE products SET price = price + 100 WHERE id = ?').run(ids.p3);
   const res3 = runPricing(db, { now: NOW, productIds: [ids.p3] });
   assert.equal(res3.stats.products, 1);
   assert.equal(res3.stats.superseded, 1);
@@ -308,7 +311,10 @@ test('run: simulate – ad-hoc strategie nad segmentem / filtrem, bez zápisu', 
   // bez rozsahu = všechny aktivní produkty; limit
   res = simulate(db, { config: cfg, limit: 1, now: NOW });
   assert.equal(res.stats.products, 6);
-  assert.equal(res.decisions.length, 1);
+  // limit zvlášť pro změny a přeskočené (contract-6) – přeskočené se nesmí odříznout za změnami
+  assert.equal(res.decisions.filter((d) => d.action === 'change').length, 1);
+  assert.equal(res.decisions.filter((d) => d.action === 'skip').length, 1);
+  assert.equal(res.truncated.changes, true);
   assert.equal(res.stats.skipped.locked, 1);
 
   // podmínky strategie v simulaci

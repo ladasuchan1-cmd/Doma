@@ -67,26 +67,34 @@ test('importOffers: statistiky mají přesně klíče ze SPEC; založení konkur
   assert.equal(o.prev_price, null);
 });
 
-test('párování: kód má přednost před EAN, pak EAN, pak MPN; kódy bez ohledu na mezery a velikost', () => {
+test('párování: kód, pak EAN, pak MPN; kódy bez ohledu na mezery a velikost; kód odporující EAN = konflikt', () => {
   const db = setup();
   const s = importOffers(
     db,
     [
-      { code: ' b ', ean: '8591234567890', competitor: 'X', price: 10 }, // kód B vyhrává nad EAN produktu A
+      { code: ' b ', competitor: 'X', price: 10 }, // kód B
+      { code: ' b ', ean: '8591234567890', competitor: 'Z', price: 9 }, // kód B, ale EAN produktu A → konflikt (data-3)
       { ean: '08591234567892', competitor: 'X', price: 11 }, // GTIN-14 s nulou → C
       { mpn: 'mpn a', competitor: 'X', price: 12 }, // MPN bez separátorů → A
       { code: 'NEZNÁMÝ', ean: '8591234567891', competitor: 'Y', price: 13 }, // kód nenalezen → EAN → B
+      { code: 'B', ean: '8591234567891', competitor: 'W', price: 14 }, // kód i EAN ukazují na B → B
     ],
     { now: T1 }
   );
-  assert.equal(s.matched, 4);
+  assert.equal(s.matched, 5);
+  assert.equal(s.unmatched, 1);
   const byComp = offers(db).map((o) => [o.code, o.competitor, o.price]);
   assert.deepEqual(byComp, [
     ['A', 'X', 12],
+    ['B', 'W', 14],
     ['B', 'X', 10],
     ['B', 'Y', 13],
     ['C', 'X', 11],
   ]);
+  const u = db.prepare('SELECT * FROM unmatched_offers').get();
+  const raw = JSON.parse(u.raw);
+  assert.equal(raw._reason, 'conflict');
+  assert.deepEqual(raw._candidates.sort(), [pid(db, 'A'), pid(db, 'B')].sort());
 });
 
 test('párování: více produktů se stejným EAN → ambiguous; MPN zúží; aktivní má přednost', () => {

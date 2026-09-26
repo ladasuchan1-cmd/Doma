@@ -202,12 +202,15 @@ test('API konkurenti, segmenty, strategie, simulace, běhy', async (t) => {
     r = await s.post(`/api/v1/strategies/presets/${withSeg.key}`);
     assert.equal(r.status, 201, r.text);
     assert.equal(r.json.strategy.name, withSeg.name);
-    assert.equal(r.json.strategy.enabled, true);
+    assert.equal(r.json.strategy.enabled, false, 'předvolba vzniká vypnutá – nejdřív zkontrolovat (contract-4)');
     assert.equal(r.json.segment.name, withSeg.segment.name);
     assert.equal(r.json.segment_created, true);
     assert.equal(r.json.strategy.segment_id, r.json.segment.id);
-    const maxPrio = Math.max(...before.json.items.map((x) => x.priority));
-    assert.ok(r.json.strategy.priority > maxPrio, 'na konec seznamu');
+    // v seedu je záchytná strategie „Podstřel minimum“ (bez segmentu) → cílená předvolba se zařadí PŘED ni
+    const catchAll = before.json.items.find((x) => x.segment_id == null && x.enabled);
+    const after = (await s.get('/api/v1/strategies')).json.items;
+    assert.ok(r.json.strategy.priority < after.find((x) => x.id === catchAll.id).priority, 'před záchytnou strategií');
+    assert.match(r.json.warning, /před strategií/);
     // podruhé: segment se znovu použije, strategie dostane odlišený název
     const r2 = await s.post(`/api/v1/strategies/presets/${withSeg.key}`);
     assert.equal(r2.json.segment.id, r.json.segment.id);
@@ -216,12 +219,13 @@ test('API konkurenti, segmenty, strategie, simulace, běhy', async (t) => {
     const disabled = STRATEGY_PRESETS.find((p) => p.enabled === false);
     if (disabled) {
       const r3 = await s.post(`/api/v1/strategies/presets/${disabled.key}`);
-      assert.equal(r3.json.strategy.enabled, false, 'vypnutá dle předvolby');
+      assert.equal(r3.json.strategy.enabled, false, 'vypnutá');
     }
     const noSeg = STRATEGY_PRESETS.find((p) => !p.segment);
     const r4 = await s.post(`/api/v1/strategies/presets/${noSeg.key}`);
     assert.equal(r4.json.segment, null);
     assert.equal(r4.json.strategy.segment_id, null);
+    assert.equal(r4.json.strategy.enabled, false);
     assert.equal((await s.post('/api/v1/strategies/presets/neexistuje')).status, 404);
     assert.equal((await read.post(`/api/v1/strategies/presets/${noSeg.key}`)).status, 403);
     // úklid: smazat strategie z předvoleb (ať neovlivní další testy)

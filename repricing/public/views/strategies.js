@@ -268,7 +268,9 @@ export async function show(root, ctx) {
                 h('div', { class: 'row' }, h('button', {
                   type: 'button', class: 'btn btn-sm',
                   onClick: async (e) => {
-                    e.currentTarget.disabled = true;
+                    // tlačítko uložit před await – po něm je e.currentTarget null a po chybě by zůstalo vypnuté
+                    const btn = e.currentTarget;
+                    btn.disabled = true;
                     try {
                       const res = await api.post('/strategies/presets/' + encodeURIComponent(p.key), {});
                       invalidate();
@@ -277,7 +279,9 @@ export async function show(root, ctx) {
                       if (sid) ctx.navigate('#/strategie/' + sid);
                       else loadList();
                     } catch {
-                      e.currentTarget.disabled = false;
+                      /* chyba je v toastu */
+                    } finally {
+                      btn.disabled = false;
                     }
                   },
                 }, icon('plus', { size: 14 }), h('span', null, 'Použít předvolbu')))

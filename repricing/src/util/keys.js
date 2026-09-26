@@ -38,11 +38,17 @@ function eanKey(s) {
   return k.length >= 6 ? k : null;
 }
 
-/** Kód výrobce (MPN): velká písmena, bez mezer, pomlček, teček a lomítek. */
+/**
+ * Kód výrobce (MPN): velká písmena, bez mezer, pomlček, teček a lomítek.
+ * Zástupné hodnoty („N/A“, „0“, „x“, „-“, „neuvedeno“…) a jednoznakové kódy nejsou identifikátor → null.
+ * Jinak by všechny nabídky s „N/A“ spárovaly na jediný produkt s „N/A“ v katalogu (data-6).
+ */
 function mpnKey(s) {
   if (s == null) return null;
   const k = String(s).toUpperCase().replace(/[\s\-_./\\]+/g, '');
-  return k || null;
+  if (!k || k.length < 2) return null;
+  if (/^(NA|NULL|NONE|NEUVEDENO|NEZNAMY|NEZNÁMÝ|UNKNOWN|NEDEFINOVANO|NOTAVAILABLE|0+|X+|-+)$/.test(k)) return null;
+  return k;
 }
 
 /** Klíč jména konkurenta – „Kolo-Shop.cz“, „kolo-shop.cz “ a „KOLO-SHOP.CZ“ jsou jeden konkurent. */

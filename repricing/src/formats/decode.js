@@ -193,16 +193,42 @@ function utf8Stats(buf) {
  * naopak Š Ť Ž š ť ž leží v ISO-8859-2 na 0xA9 0xAB 0xAE 0xB9 0xBB 0xBE (ve windows-1250 © « ® ą » ľ).
  */
 function guessSingleByte(buf) {
+  // Výchozí je windows-1250 (POHODA, Excel). ISO-8859-2 jen při kladném důkazu (data-17): bajty š/ž/Š/Ž na pozicích,
+  // kde v cp1250 leží ą ľ © ® « », a to v kontextu písmen (Ž + „lutý“). ® / © za slovem („Shimano®“) a dvojice « »
+  // naopak svědčí pro cp1250. Znaky 0x80–0x9F (š ž ť „ “ – v cp1250) vylučují ISO úplně.
   let c1 = 0;
   let iso = 0;
+  let cp = 0;
   const n = Math.min(buf.length, 4 * 1024 * 1024);
+  const letter = (x) => x !== undefined && ((x >= 0x41 && x <= 0x5a) || (x >= 0x61 && x <= 0x7a) || x >= 0xc0);
   for (let i = 0; i < n; i++) {
     const b = buf[i];
     if (b < 0x80) continue;
-    if (b <= 0x9f) c1++;
-    else if (b === 0xa9 || b === 0xab || b === 0xae || b === 0xb9 || b === 0xbb || b === 0xbe) iso++;
+    if (b <= 0x9f) {
+      c1++;
+      continue;
+    }
+    const prev = i > 0 ? buf[i - 1] : undefined;
+    const next = i + 1 < buf.length ? buf[i + 1] : undefined;
+    if (b === 0xb9 || b === 0xbe) {
+      // š / ž (ISO) vs. ą / ľ (cp1250) – v češtině téměř vždy š / ž uvnitř slova
+      if (letter(prev) || letter(next)) iso++;
+    } else if (b === 0xa9 || b === 0xae) {
+      // Š / Ž na začátku slova vs. © / ® za slovem
+      if (letter(next)) iso++;
+      else cp++;
+    } else if (b === 0xab) {
+      // « … » na jednom řádku = uvozovky cp1250 (Ť … ť v ISO by bylo nepravděpodobné)
+      for (let j = i + 1; j < Math.min(n, i + 80); j++) {
+        if (buf[j] === 0x0a || buf[j] === 0x0d) break;
+        if (buf[j] === 0xbb) {
+          cp += 2;
+          break;
+        }
+      }
+    }
   }
-  return c1 === 0 && iso > 0 ? 'iso-8859-2' : 'windows-1250';
+  return c1 === 0 && iso > 0 && iso > cp ? 'iso-8859-2' : 'windows-1250';
 }
 
 /**

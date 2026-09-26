@@ -285,6 +285,14 @@ export const FLAG_LABELS = {
   big_change: 'Velká změna',
   ceiling_over_change_limit: 'Strop nad limit změny',
   rounding_skipped: 'Bez zaokrouhlení',
+  // příznaky ruční ceny a životního cyklu návrhu (PATCH /proposals/:id, přecenění – contract-12)
+  manual: 'Ruční cena',
+  manual_below_cost: 'Ruční cena pod nákupem',
+  below_min: 'Pod min. cenou produktu',
+  above_max: 'Nad max. cenou produktu',
+  big_manual_change: 'Velká ruční změna',
+  manual_carried: 'Přenesená ruční cena',
+  previously_rejected: 'Dříve zamítnuto',
 };
 
 export const FLAG_HELP = {
@@ -299,6 +307,13 @@ export const FLAG_HELP = {
   big_change: 'Změna je větší než limit pro automatické schválení.',
   ceiling_over_change_limit: 'Horní hranice vynutila větší snížení, než dovoluje limit změny.',
   rounding_skipped: 'Zaokrouhlení by porušilo hranice – cena zůstala nezaokrouhlená.',
+  manual: 'Exportuje se ruční cena místo navržené.',
+  manual_below_cost: 'Ruční cena bez DPH je pod nákupní cenou – potvrzeno při uložení.',
+  below_min: 'Cena je pod ruční minimální cenou produktu.',
+  above_max: 'Cena je nad ruční maximální cenou produktu.',
+  big_manual_change: 'Ruční cena se od výchozí ceny liší víc, než je obvyklé (překlep?) – potvrzeno při uložení.',
+  manual_carried: 'Ruční cena se přenesla ze staršího návrhu – nový návrh čeká na schválení.',
+  previously_rejected: 'Stejnou cenu někdo v posledních dnech zamítl – návrh se automaticky neschválil.',
 };
 
 export const FLAG_SEVERITY = {
@@ -313,6 +328,13 @@ export const FLAG_SEVERITY = {
   big_change: 'warning',
   ceiling_over_change_limit: 'warning',
   rounding_skipped: 'info',
+  manual: 'info',
+  manual_below_cost: 'danger',
+  below_min: 'warning',
+  above_max: 'warning',
+  big_manual_change: 'warning',
+  manual_carried: 'info',
+  previously_rejected: 'warning',
 };
 
 export function flagLabel(f) {

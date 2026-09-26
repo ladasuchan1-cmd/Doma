@@ -434,7 +434,7 @@ test('úklid: maže staré superseded/rejected návrhy, offer_history, audit a i
   const { deps } = fakeDeps(db);
   const s = sched(db, deps);
   const summary = await s.tick({ now: NOW });
-  assert.deepStrictEqual({ ...summary.cleanup, cutoff: undefined }, { cutoff: undefined, proposals: 2, offer_history: 1, audit: 1, imports: 1 });
+  assert.deepStrictEqual({ ...summary.cleanup, cutoff: undefined }, { cutoff: undefined, proposals: 2, offer_history: 1, audit: 1, imports: 1, unmatched_offers: 0 });
   assert.strictEqual(summary.cleanup.cutoff, daysAgo(30));
   assert.deepStrictEqual(
     db.prepare('SELECT status FROM proposals ORDER BY id').all().map((r) => r.status),

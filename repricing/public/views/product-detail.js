@@ -17,7 +17,7 @@ import {
   money, percent, int, index, number, availability, age, ageDays, relTime, dateTime, date, excludedLabel, signedPercent, parseInputNumber, toNum,
   reasonLabel, TRIED_RESULT_LABELS,
 } from '../lib/format.js';
-import { finalPrice, finalChangePct, isManual } from '../lib/proposal-model.js';
+import { finalPrice, isManual, proposalAtRisk, basePriceChange, displayChange } from '../lib/proposal-model.js';
 
 export const title = 'Detail produktu';
 
@@ -112,6 +112,19 @@ export async function show(root, ctx) {
       h('button', {
         type: 'button', class: 'btn', dataset: { action: 'reprice-one' },
         onClick: async () => {
+          // contract-1: přepočet může nahradit schválený (neexportovaný) návrh – schválení by se ztratilo; bez potvrzení ne
+          const risk = proposalAtRisk(proposals);
+          if (risk) {
+            const ok = await confirmDialog({
+              title: 'Přepočítat produkt',
+              message: 'Produkt má schválený, dosud neexportovaný návrh ' + money(finalPrice(risk)) + (isManual(risk) ? ' (ruční cena)' : '') + '. ' +
+                'Když přepočet vyjde na jinou cenu, nahradí ho nový návrh a schválení se ztratí' +
+                (isManual(risk) ? ' – ruční cena se do nového návrhu přenese, ale musí se znovu schválit' : '') + '. Pokračovat?',
+              confirmLabel: 'Přepočítat',
+              danger: true,
+            });
+            if (!ok) return;
+          }
           const r = await ctx.runPricing({ productIds: [Number(p.id) || p.id], skipConfirm: true, quiet: true });
           if (r) load();
         },
@@ -286,9 +299,18 @@ export async function show(root, ctx) {
       body: simpleTable(
         [
           { key: 'created_at', label: 'Datum', sortable: true, render: (r) => h('span', { title: dateTime(r.created_at) }, date(r.created_at)) },
-          { key: 'old_price', label: 'Původní', format: 'money' },
+          {
+            key: 'old_price', label: 'Původní',
+            // contract-2: otevřený návrh ze staré ceny produktu – ukázat, že se cena mezitím změnila
+            render: (r) => {
+              const ch = basePriceChange(r, toNum(p.price));
+              return ch && !ch.taken
+                ? h('span', { title: 'Cena produktu se od návrhu změnila: ' + money(ch.from) + ' → ' + money(ch.to) }, money(r.old_price), ' ', badge('cena se změnila', 'warning'))
+                : money(r.old_price);
+            },
+          },
           { key: 'new_price', label: 'Návrh', align: 'right', render: (r) => h('span', { class: 'num strong', title: isManual(r) ? 'Ruční cena (navrženo ' + money(r.new_price) + ')' : null }, money(finalPrice(r)), isManual(r) ? h('span', { class: 'muted' }, ' ✎') : null) },
-          { key: 'change_pct', label: 'Změna', align: 'right', render: (r) => changeEl(finalChangePct(r)) },
+          { key: 'change_pct', label: 'Změna', align: 'right', title: 'U otevřených návrhů proti aktuální ceně produktu', render: (r) => changeEl(displayChange(r, toNum(p.price)).pct) },
           { key: 'flags', label: 'Příznaky', hideSm: true, render: (r) => flagBadges(r.flags) },
           { key: 'status', label: 'Stav', render: (r) => statusBadge(r.status) },
         ],

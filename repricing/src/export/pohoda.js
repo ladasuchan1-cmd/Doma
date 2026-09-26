@@ -92,6 +92,7 @@ function trimmed(v) {
  * Sestaví POHODA XML a vrátí vše potřebné pro odpověď API.
  * @param {object[]} rows řádky z exportRows (používá code, ean, price, product_id, proposal_id)
  * @param {{ico?: string, application?: string, filter_by?: 'code'|'ean', price_level?: string, note?: string,
+ *   price_level_includes_vat?: boolean (výchozí true; false = do dis:price cena bez DPH podle vat_rate řádku),
  *   id?: string, export_id?: number, encoding?: 'windows-1250'|'utf-8', now?: Date|string}} [opts]
  * @returns {{xml: string, buffer: Buffer, id: string, count: number, encoding: string, contentType: string,
  *   rows: object[], skipped: Array<{product_id, proposal_id, code, ean, reason, message}>}}
@@ -101,6 +102,12 @@ function buildPohodaXml(rows, opts = {}) {
   const encoding = normalizeEncoding(opts.encoding);
   const filterBy = normalizeFilterBy(opts.filter_by ?? opts.filterBy);
   const priceLevel = trimmed(opts.price_level ?? opts.priceLevel);
+  // Hladina v POHODĚ může mít ceny s DPH i bez DPH (vlastní nastavení výpočtu hladiny). Výchozí = s DPH.
+  const levelIncludesVat = (opts.price_level_includes_vat ?? opts.priceLevelIncludesVat) !== false;
+  const vatOf = (row) => {
+    const v = Number(row && row.vat_rate);
+    return Number.isFinite(v) && v >= 0 ? v : 21;
+  };
   const ico = trimmed(opts.ico).replace(/\s+/g, '');
   const application = (trimmed(opts.application) || 'Cenotvorba').slice(0, MAX_APPLICATION);
   const id = packId(opts);
@@ -206,7 +213,8 @@ function buildPohodaXml(rows, opts = {}) {
       leaf(8, 'typ:ids', priceLevel);
       close(7, 'dis:priceLevel');
       close(6, 'dis:filter');
-      leaf(6, 'dis:price', num(c.price));
+      // Cena hladiny je s DPH, nebo bez DPH podle nastavení hladiny v POHODĚ (výpočet) – viz price_level_includes_vat.
+      leaf(6, 'dis:price', num(levelIncludesVat ? c.price : c.price / (1 + vatOf(c.row) / 100)));
       close(5, 'dis:discountsItem');
       close(4, 'dis:discounts');
       close(3, 'dis:discountStockItem');

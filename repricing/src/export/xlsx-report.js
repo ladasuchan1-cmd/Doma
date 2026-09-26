@@ -13,7 +13,7 @@ const STATUS_LABELS = {
 };
 
 // Popisky příznaků přebíráme z enginu (jediný zdroj pravdy), aby nové příznaky nikdy neskončily jako kódy.
-const FLAG_LABELS = Object.freeze({ ...require('../engine/pricing').FLAG_LABELS });
+const FLAG_LABELS = Object.freeze({ ...require('../engine/pricing').FLAG_LABELS, ...require('../util/proposals').HUMAN_FLAG_LABELS });
 
 /** Pole návrhu – z API přijde produkt buď vnořený (`product: {code, …}`), nebo zploštělý. */
 function pick(p, key) {

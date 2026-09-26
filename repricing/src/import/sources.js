@@ -30,7 +30,11 @@ function boolOpt(v) {
 function importOptions(kind, options = {}) {
   const o = options && typeof options === 'object' ? options : {};
   if (kind === 'products') {
-    return { deactivateMissing: boolOpt(o.deactivateMissing ?? o.deactivate_missing) };
+    return {
+      deactivateMissing: boolOpt(o.deactivateMissing ?? o.deactivate_missing),
+      // vypnout i víc než polovinu katalogu najednou (jinak se deaktivace přeskočí jako podezřelá)
+      forceDeactivate: boolOpt(o.forceDeactivate ?? o.force_deactivate),
+    };
   }
   const maxAge = o.maxAgeDays ?? o.max_age_days;
   return {
@@ -59,15 +63,56 @@ function finalizeErrors(all, total = all.length) {
  * Přemapuje záznamy na kanonické. Vrací {canonical, rowNumbers, errors, compiled}.
  * Chyby nesou číslo záznamu (od 1, po rozložení vnořených nabídek).
  */
+/** Kontext rozpoznaného vstupu pro compileMapping (čtení čísel podle formátu, vnořené nabídky). */
+function mappingCtx(ex) {
+  return { format: ex.format, delimiter: ex.delimiter, nested: !!ex.offersPath };
+}
+
+// Pole, bez kterých import nemá smysl – chybí-li jejich VÝSLOVNĚ namapovaný sloupec, import selže (data-12).
+const REQUIRED_COLUMNS = { products: ['code'], offers: ['price', 'competitor'] };
+const MATCH_FIELDS = ['code', 'ean', 'mpn', 'ext_id', 'name'];
+
+/**
+ * Výslovně namapované sloupce, které ve vstupu nejsou (přejmenovaný sloupec u dodavatele / v šabloně POHODY).
+ * Dřív se tiše ignorovaly a pole (nákupní cena, sklad, dostupnost) zamrzla na staré hodnotě. Teď: varování u každého
+ * sloupce; u povinných / párovacích polí CSV a XLSX (hlavičky jsou úplné) chyba importu.
+ * @returns {object[]} obecné chyby/varování {row: null, message, warning}
+ */
+function missingColumnErrors(compiled, mapping, kind, ex) {
+  if (!compiled.missing.length) return [];
+  const explicit = mapping && mapping.fields && typeof mapping.fields === 'object' ? mapping.fields : {};
+  const missing = new Set(compiled.missing);
+  const fieldsMissing = [];
+  for (const [canon, src] of Object.entries(explicit)) {
+    const list = Array.isArray(src) ? src : [src];
+    if (list.length && list.every((k) => typeof k === 'string' && missing.has(k))) fieldsMissing.push(canon);
+  }
+  const tabular = ex.format === 'csv' || ex.format === 'xlsx';
+  const required = REQUIRED_COLUMNS[kind].filter((f) => fieldsMissing.includes(f) && !(compiled.defaults && compiled.defaults[f] !== undefined));
+  const matchMapped = MATCH_FIELDS.filter((f) => compiled.fields[f] !== undefined);
+  const allMatchMissing = kind === 'offers' && matchMapped.length > 0 && matchMapped.every((f) => fieldsMissing.includes(f));
+  if (tabular && (required.length || allMatchMissing)) {
+    throw new ImportError(
+      `Ve vstupu chybí sloupce z mapování: ${compiled.missing.map((k) => `„${k}“`).join(', ')} – bez nich import nelze provést. Upravte mapování zdroje.`,
+      { code: 'MAPPING_COLUMN_MISSING', details: { missing: compiled.missing } }
+    );
+  }
+  return compiled.missing.map((key) => ({ row: null, message: `Sloupec „${key}“ z mapování ve vstupu není – pole se nemění.`, warning: true }));
+}
+
 function mapRecords(ex, mapping, kind, now) {
-  const compiled = compileMapping(mapping, ex.headers, kind);
+  const compiled = compileMapping(mapping, ex.headers, kind, mappingCtx(ex));
   const canonical = [];
   const rowNumbers = [];
-  const errors = [];
-  let errorCount = 0;
+  const errors = missingColumnErrors(compiled, mapping, kind, ex);
+  let errorCount = errors.length;
+  // konkurenti chybných řádků (nabídky) – u nich se nesmí mazat „chybějící“ nabídky (replace; data-9)
+  const failedCompetitors = new Set();
+  let failedUnknown = 0;
   const recs = ex.records;
   for (let i = 0; i < recs.length; i++) {
-    const { value, errors: errs } = applyMapping(recs[i], mapping, kind, { compiled, now, offersPath: ex.offersPath });
+    const res = applyMapping(recs[i], mapping, kind, { compiled, now, offersPath: ex.offersPath });
+    const { value, errors: errs } = res;
     for (const message of errs) {
       errorCount++;
       if (errors.length < KEEP_ERRORS) errors.push(value ? { row: i + 1, message, warning: true } : { row: i + 1, message });
@@ -75,14 +120,17 @@ function mapRecords(ex, mapping, kind, now) {
     if (value) {
       canonical.push(value);
       rowNumbers.push(i + 1);
+    } else if (kind === 'offers') {
+      if (res.competitor) failedCompetitors.add(res.competitor);
+      else failedUnknown++;
     }
   }
-  return { canonical, rowNumbers, errors, errorCount, compiled };
+  return { canonical, rowNumbers, errors, errorCount, compiled, failedCompetitors, failedUnknown };
 }
 
 function emptyStats(kind) {
   return kind === 'products'
-    ? { received: 0, created: 0, updated: 0, unchanged: 0, deactivated: 0, errors: [] }
+    ? { received: 0, created: 0, updated: 0, unchanged: 0, deactivated: 0, superseded: 0, errors: [] }
     : { received: 0, matched: 0, unmatched: 0, ambiguous: 0, created: 0, updated: 0, unchanged: 0, stale: 0, duplicates: 0, removed: 0, competitors_created: 0, errors: [] };
 }
 
@@ -126,6 +174,10 @@ function runImport(db, params = {}) {
     };
     const allErrors = () => finalizeErrors([...mapped.errors, ...importErrors], mapped.errorCount + importErrorCount);
     const opts = { ...importOptions(kind, options), sourceId: sourceId ?? null, now: nowStr, importId, rowNumbers: mapped.rowNumbers, onError };
+    if (kind === 'offers') {
+      opts.failedCompetitors = mapped.failedCompetitors;
+      opts.failedUnknown = mapped.failedUnknown;
+    }
     const run = () => (kind === 'products' ? importProducts(db, mapped.canonical, opts) : importOffers(db, mapped.canonical, opts));
 
     let stats;
@@ -178,9 +230,12 @@ function previewImport(params = {}) {
   const kind = kindOf(params.kind);
   const mapping = normalizeMappingArg(params.mapping);
   const ex = extractRecords(params.input, mapping, { kind, limit: 1000 });
-  const compiled = compileMapping(mapping, ex.headers, kind);
+  const compiled = compileMapping(mapping, ex.headers, kind, mappingCtx(ex));
   const sample = ex.records.slice(0, PREVIEW_ROWS);
   const errors = [];
+  if (ex.context && ex.context.length) {
+    errors.push({ row: null, message: `Z obálky souboru se do všech záznamů dědí: ${ex.context.map((k) => `„${k}“`).join(', ')}.`, warning: true });
+  }
   for (const key of compiled.missing) errors.push({ row: null, message: `Sloupec „${key}“ z mapování ve vstupu není.` });
   for (const key of compiled.unknownFields) errors.push({ row: null, message: `Neznámé kanonické pole „${key}“ v mapování (ignorováno).` });
   if (!ex.records.length) errors.push({ row: null, message: 'Ve vstupu nebyly nalezeny žádné záznamy.' });
@@ -201,6 +256,7 @@ function previewImport(params = {}) {
     canonical,
     errors,
     truncated: ex.truncated,
+    context: ex.context || [],
   };
 }
 
@@ -220,10 +276,14 @@ function fetchError(message, extra = {}) {
   return e;
 }
 
+const MAX_REDIRECTS = 5;
+
 /**
  * Stáhne data zdroje. GET (nebo `method`), hlavičky z `headers` (JSON), přihlašovací údaje v URL → Basic auth,
- * přesměrování se následují, časový limit 60 s (AbortSignal.timeout), max. 500 MB (hlídá se už při čtení těla).
- * Ne-2xx → chyba s `status`.
+ * přesměrování (nejvýše 5) se následují ručně: na JINÝ původ (host/port/schéma) se už nepošlou nastavené hlavičky
+ * zdroje ani Authorization – API klíč feedu nesmí odejít na cizí server (security-4; fetch s redirect 'follow'
+ * vlastní hlavičky jako X-Api-Key přeposílal). Časový limit 60 s (AbortSignal.timeout), max. 500 MB (hlídá se už
+ * při čtení těla). Ne-2xx → chyba s `status`.
  * @param {{url: string, method?: string, headers?: object|string, options?: object|string}} source
  * @param {{timeoutMs?: number, maxBytes?: number, fetch?: Function}} [opts]
  * @returns {Promise<{buffer: Buffer, contentType: string|null, status: number, url: string, filename: string|null}>}
@@ -242,12 +302,21 @@ async function fetchSource(source, opts = {}) {
   }
   if (url.protocol !== 'http:' && url.protocol !== 'https:') throw new ImportError('URL zdroje musí začínat http:// nebo https://.', { code: 'BAD_URL' });
   const headers = {};
+  const secretHeaders = new Set(); // hlavičky, které smí jen na původní server (nastavené u zdroje + Authorization)
   const h = parseMaybeJson(source.headers, {});
-  if (h && typeof h === 'object' && !Array.isArray(h)) for (const [k, v] of Object.entries(h)) if (v != null && v !== '') headers[k] = String(v);
+  if (h && typeof h === 'object' && !Array.isArray(h)) {
+    for (const [k, v] of Object.entries(h)) {
+      if (v != null && v !== '') {
+        headers[k] = String(v);
+        secretHeaders.add(k);
+      }
+    }
+  }
   if (url.username || url.password) {
     if (!Object.keys(headers).some((k) => k.toLowerCase() === 'authorization')) {
       const cred = `${decodeURIComponent(url.username)}:${decodeURIComponent(url.password)}`;
       headers.Authorization = 'Basic ' + Buffer.from(cred).toString('base64');
+      secretHeaders.add('Authorization');
     }
     url.username = '';
     url.password = '';
@@ -264,9 +333,37 @@ async function fetchSource(source, opts = {}) {
   const safeUrl = url.toString();
   const timeoutMsg = `Vypršel časový limit ${Math.round(timeoutMs / 1000)} s při stahování ${safeUrl}.`;
   let res;
+  let current = url;
+  let curMethod = method;
+  let curBody = body;
+  let curHeaders = headers;
+  const origin = url.origin;
   try {
-    res = await fetchImpl(url, { method, headers, body, redirect: 'follow', signal });
+    for (let hop = 0; ; hop++) {
+      res = await fetchImpl(current, { method: curMethod, headers: curHeaders, body: curBody, redirect: 'manual', signal });
+      if (![301, 302, 303, 307, 308].includes(res.status)) break;
+      const location = res.headers.get('location');
+      try {
+        await res.body?.cancel();
+      } catch {
+        /* tělo přesměrování nás nezajímá */
+      }
+      if (!location) break;
+      if (hop >= MAX_REDIRECTS) throw fetchError(`Zdroj ${safeUrl}: příliš mnoho přesměrování.`, { code: 'FETCH_FAILED' });
+      const next = new URL(location, current);
+      if (next.protocol !== 'http:' && next.protocol !== 'https:') throw fetchError(`Zdroj ${safeUrl} přesměroval na nepodporovanou adresu.`, { code: 'FETCH_FAILED' });
+      if (next.origin !== origin) {
+        // jiný server: bez tajných hlaviček (API klíč, token, Basic auth)
+        curHeaders = Object.fromEntries(Object.entries(curHeaders).filter(([k]) => !secretHeaders.has(k) && !/^(authorization|cookie|proxy-authorization)$/i.test(k)));
+      }
+      if (res.status === 303 || ((res.status === 301 || res.status === 302) && curMethod === 'POST')) {
+        curMethod = 'GET';
+        curBody = undefined;
+      }
+      current = next;
+    }
   } catch (e) {
+    if (e && e.name === 'FetchError') throw e;
     if (signal.aborted || (e && (e.name === 'TimeoutError' || e.name === 'AbortError'))) throw fetchError(timeoutMsg, { code: 'FETCH_TIMEOUT' });
     const cause = e && e.cause && e.cause.message ? e.cause.message : e && e.message ? e.message : String(e);
     throw fetchError(`Zdroj ${safeUrl} nelze stáhnout: ${cause}`, { code: 'FETCH_FAILED' });
@@ -316,7 +413,7 @@ async function fetchSource(source, opts = {}) {
     throw fetchError(`Chyba při čtení dat ze zdroje ${safeUrl}: ${e && e.message ? e.message : e}`, { code: 'FETCH_FAILED' });
   }
   const buffer = Buffer.concat(chunks, total);
-  const finalUrl = res.url || safeUrl;
+  const finalUrl = (res.url && res.url !== '' ? res.url : null) || current.toString();
   let filename = null;
   try {
     const last = new URL(finalUrl).pathname.split('/').filter(Boolean).pop();
@@ -347,12 +444,33 @@ function summaryMessage(kind, stats) {
  * @param {{origin?: 'schedule'|'manual', now?: Date|string, fetch?: Function, timeoutMs?: number, maxBytes?: number}} [opts]
  * @returns {Promise<{ok: boolean, source_id: number, import_id: number|null, stats?: object, error?: string, duration_ms: number}>}
  */
+// Právě stahované zdroje (db → Set id). Plánovač a ruční „Spustit“ (nebo dvojklik) by jinak stahovaly a držely
+// v paměti tentýž velký feed dvakrát (ops-6).
+const RUNNING = new WeakMap();
+
 async function runSource(db, sourceId, opts = {}) {
   const origin = opts.origin === 'schedule' ? 'schedule' : 'url';
   const src = db.prepare('SELECT * FROM sources WHERE id = ?').get(Number(sourceId));
   if (!src) throw new ImportError('Zdroj nebyl nalezen.', { status: 404, code: 'NOT_FOUND' });
+  let running = RUNNING.get(db);
+  if (!running) RUNNING.set(db, (running = new Set()));
+  if (running.has(src.id)) {
+    return { ok: false, source_id: src.id, import_id: null, error: 'Zdroj se právě načítá – počkejte na dokončení.', busy: true, duration_ms: 0 };
+  }
+  running.add(src.id);
+  try {
+    return await runSourceOnce(db, src, origin, opts);
+  } finally {
+    running.delete(src.id);
+  }
+}
+
+async function runSourceOnce(db, src, origin, opts) {
   const startedAt = nowIso(opts.now);
   const t0 = Date.now();
+  // Pokus se zapíše PŘED stažením: kdyby import shodil proces (nedostatek paměti…), zdroj by byl po restartu hned
+  // znovu „splatný“ a server by padal dokola (ops-2). Takhle platí interval i po pádu.
+  db.prepare("UPDATE sources SET last_run_at = ?, last_status = 'running' WHERE id = ?").run(startedAt, src.id);
   let result;
   try {
     if (!src.url) throw new ImportError('Zdroj nemá nastavenou URL – data lze do něj jen posílat přes API.', { code: 'NO_URL' });
@@ -409,7 +527,9 @@ function dueSources(db, now) {
     .all();
   const out = [];
   for (const r of rows) {
-    const last = r.last_run_at ? Date.parse(r.last_run_at) : NaN;
+    let last = r.last_run_at ? Date.parse(r.last_run_at) : NaN;
+    // poslední běh víc než hodinu v budoucnosti = hodiny serveru se posunuly zpět → jako by neběžel (ops-10)
+    if (Number.isFinite(last) && last > nowMs + 3600000) last = NaN;
     if (!Number.isFinite(last) || last + r.interval_minutes * 60000 - DUE_SLACK_MS <= nowMs) out.push({ ...r });
   }
   return out;

@@ -91,17 +91,29 @@ const SINGLE_LINE = new Set(['name', 'manufacturer', 'category', 'supplier', 'ow
 // „prodejnicenasdph“). Pořadí = priorita (dřívější alias vyhrává). Položky s prefixem „~“ jsou slabé aliasy –
 // použijí se jen tehdy, když pro pole nic lepšího není (např. g:id → id jako náš kód).
 
+// Obecné identifikátory položky („ITEM_ID“, „SKU“…). V našem katalogu je to náš kód; v cenách konkurence je to
+// obvykle ID položky U KONKURENTA (jeho vlastní Heureka/Zboží feed) – jako „náš kód“ by párovalo na cizí produkty
+// (data-3). U nabídek proto patří k ext_id; za náš kód se berou jen ve feedu s vnořenými nabídkami (položky
+// NAŠEHO katalogu s cenami více obchodů – typický výstup služby pro monitoring cen).
+const GENERIC_ID_ALIASES = ['sku', 'productcode', 'itemcode', 'itemid', 'idproduktu', 'idpolozky', 'katalog', 'katalogovecislo', 'katcislo', 'catalognumber', 'articlenumber'];
+
 const COMMON_ALIASES = {
-  code: ['code', 'kod', 'kodproduktu', 'kodzbozi', 'kodpolozky', 'sku', 'productcode', 'itemcode', 'itemid', 'idproduktu', 'idpolozky', 'katalog', 'katalogovecislo', 'katcislo', 'catalognumber', 'articlenumber'],
+  code: ['code', 'kod', 'kodproduktu', 'kodzbozi', 'kodpolozky', ...GENERIC_ID_ALIASES],
   ean: ['ean', 'gtin', 'gtin13', 'ean13', 'gtin14', 'gtin12', 'upc', 'gtin8', 'ean8', 'barcode', 'carovykod', 'eankod', 'eancode', 'productean'],
   mpn: ['mpn', 'productno', 'partnumber', 'partno', 'kodvyrobce', 'manufacturercode', 'manufacturerpartnumber', 'mfrpartnumber', 'vendorcode', 'cislovyrobce', 'objednacicislo'],
   name: ['name', 'nazev', 'productname', 'nazevproduktu', 'nazevzbozi', 'nazevpolozky', 'itemname', 'product', 'title', '~text'],
+  // POHODA listStock: stockHeader.sellingPrice má přednost před cenami cenových hladin (stockPriceItem.stockPrice.price)
+  // – proto „stockheadersellingprice“ (shoda posledních dvou segmentů) a „sellingprice“ před obecným „price“ (data-1)
   price: [
-    'pricevat', 'pricewithvat', 'priceinclvat', 'priceincvat', 'pricegross', 'cenasdph', 'cenavcdph', 'cenavcetnedph', 'prodejnicenasdph', 'prodejnicenavcdph',
-    'price', 'cena', 'prodejnicena', 'sellingprice', 'currentprice', 'aktualnicena', 'offerprice', 'competitorprice', 'cenakonkurence', 'cenakonkurenta', 'cenazbozi',
+    'stockheadersellingprice', 'pricevat', 'pricewithvat', 'priceinclvat', 'priceincvat', 'pricegross', 'cenasdph', 'cenavcdph', 'cenavcetnedph', 'prodejnicenasdph',
+    'prodejnicenavcdph', 'sellingprice', 'price', 'cena', 'prodejnicena', 'currentprice', 'aktualnicena', 'offerprice', 'competitorprice', 'cenakonkurence', 'cenakonkurenta',
+    'cenazbozi',
   ],
   url: ['url', 'link', 'odkaz', 'producturl', 'offerurl', 'itemurl', 'weburl', 'detailurl', 'urladresa'],
 };
+
+/** Akční / zlevněná cena (Google Merchant g:sale_price, „akční cena“) – má přednost před běžnou cenou (data-7). */
+const SALE_PRICE_ALIASES = new Set(['saleprice', 'akcnicena', 'cenaposleve', 'specialprice', 'discountedprice', 'akcnicenasdph', 'cenavakci']);
 
 const ALIASES = {
   products: {
@@ -128,10 +140,10 @@ const ALIASES = {
       'retailername', 'merchant', 'merchantname', 'store', 'storename', 'prodejce', 'domain', 'domena', 'vendorname', 'konkurentname', 'obchodname',
     ],
     price: COMMON_ALIASES.price,
-    code: COMMON_ALIASES.code,
+    code: ['code', 'kod', 'naskod', 'ourcode', 'naskodproduktu', 'kodproduktu', 'kodzbozi', 'kodpolozky'],
     ean: COMMON_ALIASES.ean,
     mpn: COMMON_ALIASES.mpn,
-    ext_id: ['extid', 'externalid', 'offerid', 'providerid', 'providerproductid', 'productid', 'idnabidky', '~id'],
+    ext_id: ['extid', 'externalid', 'offerid', 'providerid', 'providerproductid', 'productid', 'idnabidky', '~id', ...GENERIC_ID_ALIASES.map((a) => '~' + a)],
     name: COMMON_ALIASES.name,
     shipping: ['shipping', 'shippingprice', 'shippingcost', 'deliveryprice', 'deliverycost', 'doprava', 'cenadopravy', 'postovne', 'postage', 'dopravacena', 'cenadoruceni'],
     availability: ['availability', 'dostupnost', 'stockstatus', 'availabilitystatus', 'stavdostupnosti', 'dostupnosttext', 'availabilitytext', 'deliverydate', 'skladem', 'instock', 'deliverydays', 'stock', 'sklad', 'stav'],
@@ -144,6 +156,13 @@ const ALIASES = {
       'datumaktualizace', 'aktualizovano', 'timestamp', 'datetime', 'datumacas', 'date', 'datum', 'cas', 'time',
     ],
   },
+};
+
+// nabídky ve feedu s vnořenými nabídkami: obecná ID položky = náš kód (viz GENERIC_ID_ALIASES)
+ALIASES.offers_nested = {
+  ...ALIASES.offers,
+  code: [...ALIASES.offers.code, ...GENERIC_ID_ALIASES],
+  ext_id: ALIASES.offers.ext_id.filter((a) => !GENERIC_ID_ALIASES.includes(a.replace(/^~/, ''))),
 };
 
 // alias → [{field, rank, weak}] pro rychlé vyhledávání
@@ -202,12 +221,13 @@ function kindOf(kind) {
  * Pole spravovaná aplikací (locked, min_price, …) se nenavrhují nikdy.
  * @param {string[]} headers
  * @param {'products'|'offers'} kind
- * @param {{exclude?: Iterable<string>, excludeHeaders?: Iterable<string>}} [opts] pole / klíče, které už jsou obsazené
+ * @param {{exclude?: Iterable<string>, excludeHeaders?: Iterable<string>, nested?: boolean}} [opts] pole / klíče, které už
+ *   jsou obsazené; nested = nabídky jsou vnořené v položkách (obecné ID položky pak = náš kód, jinak ID u poskytovatele)
  * @returns {{fields: Object<string, string>}}
  */
 function suggestMapping(headers, kind, opts = {}) {
   kindOf(kind);
-  const index = ALIAS_INDEX[kind];
+  const index = ALIAS_INDEX[kind === 'offers' && opts.nested ? 'offers_nested' : kind];
   const fieldIndex = FIELD_INDEX[kind];
   const excluded = new Set(opts.exclude || []);
   const excludedHeaders = new Set(opts.excludeHeaders || []);
@@ -474,6 +494,7 @@ function availabilityHint(sourceKey) {
 
 const DAY_MS = 86400000;
 const UNKNOWN = Object.freeze({ in_stock: null, delivery_days: null });
+const MAX_AVAIL_TEXT = 200;
 
 function fromDays(d) {
   if (!Number.isFinite(d)) return { in_stock: null, delivery_days: null };
@@ -505,8 +526,11 @@ function normalizeAvailability(v, opts = {}) {
   if (typeof v === 'boolean') return v ? { in_stock: 1, delivery_days: 0 } : { in_stock: 0, delivery_days: null };
   if (typeof v === 'number') return fromNumber(v, hint);
   if (typeof v !== 'string') return { ...UNKNOWN };
-  const raw = v.trim();
+  let raw = v.trim();
   if (!raw) return { ...UNKNOWN };
+  // Text dostupnosti je krátký; dlouhé hodnoty z cizích feedů ořízneme dřív, než se na ně pustí regulární výrazy
+  // (dlouhá řada číslic by jinak blokovala server na desítky sekund – security-3).
+  if (raw.length > MAX_AVAIL_TEXT) raw = raw.slice(0, MAX_AVAIL_TEXT);
   let s = fold(raw)
     .replace(/^https?:\/\/(www\.)?schema\.org\//, '')
     .replace(/[_]+/g, ' ')
@@ -521,11 +545,17 @@ function normalizeAvailability(v, opts = {}) {
   if (OUT_OF_STOCK_WORDS.has(s) || OUT_OF_STOCK_WORDS.has(s.replace(/\s+/g, ''))) return { in_stock: 0, delivery_days: null };
   const compact = s.replace(/\s+/g, '');
   // zápory dřív než „skladem…“ („není skladem“, „nemáme skladem“)
-  if (/^(neni|nemame|nejsou|not|no)\b/.test(s) || /vyprodan|out ?of ?stock|nedostupn|sold ?out|na dotaz|predobjedn|pre-?order|backorder/.test(s)) {
+  if (
+    /^(neni|nemame|nejsou|not|no)\b/.test(s) ||
+    /vyprodan|out ?of ?stock|nedostupn|sold ?out|na dotaz|predobjedn|pre-?order|backorder|predprodej|u dodavatele|na objednavku/.test(s)
+  ) {
     const days = daysFromText(s, opts.now);
     return { in_stock: 0, delivery_days: days != null && days > 0 ? days : null };
   }
   if (/^skladem/.test(s) || /^in ?stock/.test(s) || compact.startsWith('instock')) {
+    // „Skladem 0 ks“ / „skladem: 0 kusů“ = není skladem (data-16)
+    const qty = /^(?:skladem|in ?stock)\s*[:(]?\s*(\d{1,7})\s*(?:ks|kus|kusu|kusy|pcs|x)?\b/.exec(s);
+    if (qty && Number(qty[1]) === 0) return { in_stock: 0, delivery_days: null };
     if (/dodavatel|supplier|externi/.test(s)) {
       const days = daysFromText(s, opts.now);
       return { in_stock: 0, delivery_days: days != null && days > 0 ? days : null };
@@ -538,9 +568,11 @@ function normalizeAvailability(v, opts = {}) {
 }
 
 function daysFromText(s, now) {
-  let m = /(\d+)\s*(?:-|–|—|az|to)\s*(\d+)\s*(?:prac(?:ovnich|\.)?\s*)?(dnu|dni|dny|den|days?|d|tydnu|tydny|tyden|tydne|weeks?|hodin|hod|h|hours?)\b/.exec(s);
+  // Počty číslic jsou omezené a číslo nesmí navazovat na další číslici ((?<!\d)) – jinak regulární výraz na dlouhé
+  // řadě číslic zkouší každou pozici se vším zpětným hledáním (kvadratická doba – security-3).
+  let m = /(?<!\d)(\d{1,4})\s*(?:-|–|—|az|to)\s*(\d{1,4})\s*(?:prac(?:ovnich|\.)?\s*)?(dnu|dni|dny|den|days?|d|tydnu|tydny|tyden|tydne|weeks?|hodin|hod|h|hours?)\b/.exec(s);
   if (m) return unitDays(Math.max(Number(m[1]), Number(m[2])), m[3]);
-  m = /(\d+(?:[.,]\d+)?)\s*(?:prac(?:ovnich|ovni|\.)?\s*)?(dnu|dni|dny|den|days?|d|tydnu|tydny|tyden|tydne|weeks?|hodin|hodiny|hod|h|hours?)\b/.exec(s);
+  m = /(?<!\d)(\d{1,4}(?:[.,]\d{1,3})?)\s*(?:prac(?:ovnich|ovni|\.)?\s*)?(dnu|dni|dny|den|days?|d|tydnu|tydny|tyden|tydne|weeks?|hodin|hodiny|hod|h|hours?)\b/.exec(s);
   if (m) return unitDays(Number(m[1].replace(',', '.')), m[2]);
   if (/\b(zitra|tomorrow)\b/.test(s)) return 1;
   if (/\b(dnes|today)\b/.test(s)) return 0;
@@ -586,8 +618,10 @@ function normalizeMappingArg(mapping) {
  * @param {object} mapping
  * @param {string[]} headers
  * @param {'products'|'offers'} kind
+ * @param {{format?: string|null, delimiter?: string|null, nested?: boolean}} [ctx] rozpoznaný formát vstupu (čtení čísel:
+ *   v XML/JSON je tečka vždy desetinná, v CSV s oddělovačem „;“ je desetinná čárka), oddělovač CSV a vnořené nabídky
  */
-function compileMapping(mapping, headers, kind) {
+function compileMapping(mapping, headers, kind, ctx = {}) {
   kindOf(kind);
   const m = normalizeMappingArg(mapping);
   const hdrs = Array.isArray(headers) ? headers : [];
@@ -636,10 +670,18 @@ function compileMapping(mapping, headers, kind) {
   const used = new Set();
   for (const v of Object.values(fields)) for (const k of Array.isArray(v) ? v : [v]) used.add(k);
   if (m.suggest !== false) {
-    const sug = suggestMapping(hdrs, kind, { exclude: [...Object.keys(fields), ...disabled], excludeHeaders: used }).fields;
+    const sug = suggestMapping(hdrs, kind, { exclude: [...Object.keys(fields), ...disabled], excludeHeaders: used, nested: !!ctx.nested }).fields;
     for (const [canon, h] of Object.entries(sug)) {
       fields[canon] = h;
       used.add(h);
+    }
+    // Akční cena (g:sale_price) je cena, za kterou se skutečně prodává → přednost před běžnou (prázdná = běžná cena)
+    if (typeof sug.price === 'string' && explicit.price === undefined) {
+      const sale = hdrs.find((h) => !used.has(h) && SALE_PRICE_ALIASES.has(keyForms(h)?.last));
+      if (sale) {
+        fields.price = [sale, sug.price];
+        used.add(sale);
+      }
     }
   }
   const defaults = {};
@@ -656,6 +698,14 @@ function compileMapping(mapping, headers, kind) {
   if (m.attrs === 'none' || m.attrs === false) attrsMode = 'none';
   else if (Array.isArray(m.attrs)) attrsMode = new Set(m.attrs.map(String));
   const decimal = m.csv && (m.csv.decimal === ',' || m.csv.decimal === '.') ? m.csv.decimal : m.decimal === ',' || m.decimal === '.' ? m.decimal : undefined;
+  // Čtení čísel podle formátu (money-11, data-10): XML/JSON (xsd:double) – tečka je vždy desetinná („1299.000“ = 1299);
+  // CSV s oddělovačem „;“ (český Excel/POHODA) – čárka je vždy desetinná („123,456“ = 123,456).
+  const format = ctx.format || null;
+  const numberOpts = {
+    decimal,
+    dotThousands: !(format === 'xml' || format === 'json'),
+    commaThousands: !(format === 'csv' && ctx.delimiter === ';'),
+  };
   // pořadí polí podle CANONICAL (dostupnost se skládá až na konci)
   const order = CANONICAL[kind].map((f) => f.key).filter((k) => fields[k] !== undefined || defaults[k] !== undefined);
   return {
@@ -665,12 +715,21 @@ function compileMapping(mapping, headers, kind) {
     used,
     order,
     decimal,
+    numberOpts,
+    format,
     attrsMode,
     attrsMaxLength: Number(m.attrs_max_length) > 0 ? Number(m.attrs_max_length) : 1000,
     priceNet: m.price_net === true || m.price_net === 1 || m.price_net === 'true' || m.price_net === '1',
     missing,
     unknownFields,
   };
+}
+
+/** Zdrojový klíč, ze kterého getValue hodnotu skutečně vzal (u výčtu první neprázdný). */
+function getValueKey(flat, src) {
+  if (!Array.isArray(src)) return src;
+  for (const k of src) if (!isEmpty(flat[k])) return k;
+  return src.find((k) => flat[k] !== undefined) ?? src[0];
 }
 
 function getValue(flat, src) {
@@ -691,6 +750,29 @@ function describe(v) {
   return s && s.length > 60 ? s.slice(0, 57) + '…' : s;
 }
 
+/**
+ * Doprava s více hodnotami (Google Merchant: opakované g:shipping pro více zemí → „99 CZK|149 CZK“): vezme hodnotu pro
+ * CZ (sousední klíč `…country`), jinak nejnižší (data-7).
+ */
+function pickShipping(rec, srcKey, v) {
+  if (typeof v !== 'string' || !v.includes('|')) return v;
+  const parts = v.split('|').map((x) => x.trim());
+  const base = srcKey && srcKey.includes('.') ? srcKey.slice(0, srcKey.lastIndexOf('.')) : null;
+  const country = base != null ? rec[`${base}.country`] : undefined;
+  if (typeof country === 'string') {
+    const cs = country.split('|').map((x) => x.trim().toUpperCase());
+    const i = cs.indexOf('CZ');
+    if (i >= 0 && i < parts.length && parts[i] !== '') return parts[i];
+  }
+  let best = null;
+  for (const p of parts) {
+    if (/^(zdarma|free)$/i.test(fold(p))) return '0';
+    const n = parseNumber(p);
+    if (n != null && (best == null || n < best.n)) best = { n, p };
+  }
+  return best ? best.p : v;
+}
+
 function coerce(field, v, cm, errors) {
   const label = field.label;
   switch (field.type) {
@@ -702,7 +784,9 @@ function coerce(field, v, cm, errors) {
       return normalizeText(v, false);
     case 'number': {
       if (isEmpty(v)) return null;
-      const n = parseNumber(v, { decimal: cm.decimal });
+      // doprava „zdarma“ = 0 Kč (jinak by se ponechala stará placená doprava – data-16)
+      if (field.key === 'shipping' && typeof v === 'string' && /^\s*(zdarma|free|gratis|doprava zdarma|free shipping|0\s*,-)\s*$/i.test(fold(v))) return 0;
+      const n = parseNumber(v, cm.numberOpts || { decimal: cm.decimal });
       if (n == null) {
         errors.push(`Pole „${label}“: hodnota „${describe(v)}“ není číslo`);
         return undefined;
@@ -741,8 +825,11 @@ function coerce(field, v, cm, errors) {
   }
 }
 
-/** Hodnota pro attrs: čísla zůstávají, text celý číselný → číslo (kromě úvodních nul typu „0123“), prázdné → null. */
-function attrValue(v, maxLength) {
+/**
+ * Hodnota pro attrs: čísla zůstávají, text celý číselný → číslo (kromě úvodních nul typu „0123“), prázdné → null.
+ * Číslo se čte STEJNĚ jako kanonická pole (numberOpts – „1.500“ v CSV = 1500 všude, ne 1,5 v atributech; data-10).
+ */
+function attrValue(v, maxLength, numberOpts) {
   if (v === undefined || v === null) return null;
   if (typeof v === 'number') return Number.isFinite(v) ? v : null;
   if (typeof v === 'boolean') return v;
@@ -751,8 +838,8 @@ function attrValue(v, maxLength) {
   if (!s) return null;
   if (s.length > maxLength) return undefined; // dlouhé texty (popisy, HTML) do atributů nepatří
   if (/^-?\d+(?:[.,]\d+)?$/.test(s) && !/^-?0\d/.test(s)) {
-    const n = Number(s.replace(',', '.'));
-    if (Number.isFinite(n) && Math.abs(n) < 1e15) return n;
+    const n = numberOpts ? parseNumber(s, numberOpts) : Number(s.replace(',', '.'));
+    if (n != null && Number.isFinite(n) && Math.abs(n) < 1e15) return n;
   }
   return s;
 }
@@ -774,7 +861,7 @@ function attrValue(v, maxLength) {
  * @returns {{value: object|null, errors: string[]}}
  */
 function applyMapping(flat, mapping, kind, ctx = {}) {
-  const cm = ctx.compiled || compileMapping(mapping, Object.keys(flat || {}), kind);
+  const cm = ctx.compiled || compileMapping(mapping, Object.keys(flat || {}), kind, { format: ctx.format, delimiter: ctx.delimiter });
   const rec = flat && typeof flat === 'object' ? flat : {};
   const fieldIndex = FIELD_INDEX[cm.kind];
   const out = {};
@@ -802,6 +889,7 @@ function applyMapping(flat, mapping, kind, ctx = {}) {
       avail[key] = { v, srcKey };
       continue;
     }
+    if (key === 'shipping' && srcKey != null) v = pickShipping(rec, getValueKey(rec, src), v);
     const c = coerce(field, v, cm, errors);
     if (c !== undefined) out[key] = c;
     else invalid.add(key);
@@ -818,7 +906,8 @@ function applyMapping(flat, mapping, kind, ctx = {}) {
     if (!out.code && !out.ean && !out.mpn && !out.ext_id && !out.name) fatal.push('Chybí párovací klíč (náš kód, EAN, MPN, ID položky nebo název)');
     if (fatal.length) {
       const rest = invalid.has('price') ? errors.filter((e) => !e.startsWith(`Pole „${fieldIndex.get('price').label}“`)) : errors;
-      return { value: null, errors: [...fatal, ...rest] };
+      // konkurent chybného řádku – import pak u něj nemaže „chybějící“ nabídky (replace; data-9)
+      return { value: null, errors: [...fatal, ...rest], competitor: out.competitor ?? null };
     }
     return { value: out, errors };
   }
@@ -826,6 +915,20 @@ function applyMapping(flat, mapping, kind, ctx = {}) {
   // produkty
   if (!codeKey(out.code)) return { value: null, errors: ['Chybí kód produktu', ...errors] };
   if (cm.priceNet) out.price_is_net = true;
+  // Základ DPH podle záznamu (POHODA: <stk:sellingPrice payVAT="false"> = cena BEZ DPH, <stk:purchasingPrice payVAT="true">
+  // = nákup S DPH). Sousední klíč `<zdroj>.@payVAT`; převod udělá importProducts s DPH záznamu (money-10, data-1).
+  const netFields = [];
+  for (const f of ['price', 'msrp', 'purchase_price']) {
+    const src = cm.fields[f];
+    if (src === undefined || out[f] == null) continue;
+    const key = getValueKey(rec, src);
+    const pv = key != null ? rec[`${key}.@payVAT`] ?? rec[`${key}.@payvat`] : undefined;
+    const b = pv === undefined ? null : parseBool(pv);
+    if (b == null) continue;
+    if (f === 'purchase_price') out.purchase_is_gross = b === 1;
+    else if (b === 0) netFields.push(f);
+  }
+  if (netFields.length) out.price_net_fields = netFields;
   if (cm.attrsMode !== 'none') {
     let attrs = null;
     // u rozložených variant jsou klíče potomka i s prefixem (`VARIANTS.CODE`) – duplicitu do attrs nedávat
@@ -834,7 +937,7 @@ function applyMapping(flat, mapping, kind, ctx = {}) {
       if (cm.used.has(k)) continue;
       if (skipPrefix && k.startsWith(skipPrefix)) continue;
       if (cm.attrsMode !== 'all' && !cm.attrsMode.has(k)) continue;
-      const av = attrValue(rec[k], cm.attrsMaxLength);
+      const av = attrValue(rec[k], cm.attrsMaxLength, cm.numberOpts);
       if (av === undefined) continue;
       if (!attrs) attrs = {};
       attrs[k] = av;

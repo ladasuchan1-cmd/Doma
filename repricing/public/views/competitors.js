@@ -56,6 +56,11 @@ export async function show(root, ctx) {
     });
   }
 
+  /** Podtitulek „N konkurentů · M zapnuto“ – po každé změně zapnutí znovu (contract-18). */
+  function updateSub() {
+    ctx.setSub(count(competitors.length, 'konkurent', 'konkurenti', 'konkurentů') + ' · ' + int(competitors.filter((c) => c.enabled).length) + ' zapnuto');
+  }
+
   async function setEnabled(c, on) {
     try {
       await api.patch('/competitors/' + encodeURIComponent(c.id), { enabled: on });
@@ -63,6 +68,7 @@ export async function show(root, ctx) {
       invalidate('/competitors');
       toast((on ? 'Zapnuto: ' : 'Vypnuto: ') + c.name, { type: 'success', timeout: 2000 });
       compTable.setData(competitors);
+      updateSub();
     } catch {
       compTable.setData(competitors);
     }
@@ -96,7 +102,7 @@ export async function show(root, ctx) {
       const r = await api.get('/competitors', null, { signal: ctx.signal, silent: true });
       competitors = itemsOf(r);
       compTable.setData(competitors);
-      ctx.setSub(count(competitors.length, 'konkurent', 'konkurenti', 'konkurentů') + ' · ' + int(competitors.filter((c) => c.enabled).length) + ' zapnuto');
+      updateSub();
     } catch (e) {
       if (isAbort(e)) return;
       compTable.setError(e, () => loadCompetitors());

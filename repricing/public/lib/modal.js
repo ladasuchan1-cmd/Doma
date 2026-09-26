@@ -3,6 +3,15 @@ import { h, uid } from './dom.js';
 import { icon } from './icons.js';
 import { rehomeToasts } from './toast.js';
 
+// Otevřené dialogy – při navigaci (Zpět, změna hashe) je app.js zavře, jinak by dialog předchozí stránky
+// zůstal nad novou stránkou a jeho tlačítka by dál jednala (contract-15).
+const openModals = new Set();
+
+/** Zavře všechny otevřené dialogy (důvod 'nav'); potvrzovací dialogy se vyhodnotí jako zrušené. */
+export function closeAllModals(reason = 'nav') {
+  for (const m of [...openModals]) m.close(reason);
+}
+
 /**
  * Otevře modální dialog.
  * @param {{title: string, body: Node|Node[], footer?: Node[], size?: 'sm'|'md'|'lg'|'xl', onClose?: Function,
@@ -32,9 +41,11 @@ export function openModal(o) {
   );
   const previous = document.activeElement;
   let closed = false;
+  const handle = { close: (reason) => close(reason) };
   function close(reason) {
     if (closed) return;
     closed = true;
+    openModals.delete(handle);
     try {
       dlg.close();
     } catch {
@@ -42,7 +53,8 @@ export function openModal(o) {
     }
     rehomeToasts(dlg);
     dlg.remove();
-    if (previous && typeof previous.focus === 'function' && previous.isConnected) previous.focus();
+    // při navigaci fokus nevracet – prvek patří opouštěné stránce
+    if (reason !== 'nav' && previous && typeof previous.focus === 'function' && previous.isConnected) previous.focus();
     if (o.onClose) o.onClose(reason);
   }
   dlg.addEventListener('cancel', (e) => {
@@ -55,6 +67,7 @@ export function openModal(o) {
   });
   document.body.appendChild(dlg);
   dlg.showModal();
+  openModals.add(handle);
   if (o.initialFocus) {
     const f = dlg.querySelector(o.initialFocus);
     if (f) f.focus();

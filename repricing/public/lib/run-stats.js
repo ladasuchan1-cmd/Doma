@@ -28,6 +28,16 @@ export function runStatsView(stats, o = {}) {
     o.simulate ? null : kpi({ label: 'Čeká na schválení', value: int(s.pending) }),
     kpi({ label: 'Autom. schváleno', value: int(s.auto_approved) }),
     s.no_strategy ? kpi({ label: 'Bez strategie', value: int(s.no_strategy), tone: 'warning' }) : null,
+    // contract-1: běh nahrazuje otevřené návrhy (i schválené, neexportované) – manažer musí vidět kolik
+    !o.simulate && s.superseded != null
+      ? kpi({
+        label: 'Nahrazeno',
+        value: int(s.superseded),
+        sub: s.kept != null ? 'ponecháno beze změny ' + int(s.kept) : 'starší čekající i schválené návrhy',
+        title: 'Starší čekající a schválené (dosud neexportované) návrhy, které nahradil nový návrh – jejich schválení už neplatí. Návrhy se stejnou cenou zůstaly (ponecháno).',
+        tone: Number(s.superseded) > 0 ? 'warning' : null,
+      })
+      : null,
     kpi({ label: 'Dopad na marži', value: compactMoney(s.margin_impact_abs, { signed: true }), title: signedMoney(s.margin_impact_abs, { decimals: 0 }) + ' (bez DPH, součet za 1 ks od každého produktu)', sub: 'bez DPH, 1 ks od každého', tone: (s.margin_impact_abs || 0) < 0 ? 'danger' : 'good' })
   );
   const parts = [tiles];
@@ -40,6 +50,7 @@ export function runStatsView(stats, o = {}) {
     reasonRow('Přeskočeno:', s.skipped, reasonLabel, 'warning'),
     reasonRow('Beze změny:', s.no_change_reasons, reasonLabel),
     reasonRow('Příznaky změn:', s.flags, flagLabel, 'info'),
+    Number(s.held_by_human) > 0 ? h('div', { class: 'row reason-row' }, h('span', { class: 'muted small' }, 'Čeká na člověka:'), h('span', { class: 'small' }, count(s.held_by_human, 'návrh čeká', 'návrhy čekají', 'návrhů čeká') + ' na nové schválení (přenesená ruční cena nebo cena, kterou někdo nedávno zamítl)')) : null,
     Number(s.fallthrough) > 0 ? h('div', { class: 'row reason-row' }, h('span', { class: 'muted small' }, 'Propadnutí:'), h('span', { class: 'small' }, count(s.fallthrough, 'produkt', 'produkty', 'produktů') + ' přešlo na další strategii (chyběl základ ceny)')) : null,
   ].filter(Boolean);
   if (rows.length) parts.push(h('div', { class: 'stack-sm', style: 'margin-top:10px' }, rows));
@@ -60,6 +71,22 @@ export function runStatsView(stats, o = {}) {
     parts.push(h('div', { style: 'margin-top:14px' }, h('div', { class: 'form-subtitle' }, 'Podle strategií'), h('div', { class: 'card' }, t.el)));
   }
   return h('div', { class: 'run-stats' }, parts);
+}
+
+/**
+ * Varování do potvrzení přecenění (contract-1). Běh nahradí („Nahrazeno“) otevřené návrhy přeceněných produktů,
+ * u kterých vyjde jiná cena – i SCHVÁLENÉ, dosud neexportované (SPEC §3.6); jejich schválení se tím ztratí.
+ * Slovo „nevyřízené“ manažer chápe jen jako čekající, proto počet schválených uvádíme výslovně.
+ * @param {number|null|undefined} approved počet schválených neexportovaných návrhů (null = neznámý)
+ * @returns {string|null} text varování, nebo null když nic schváleného nečeká
+ */
+export function supersedeWarning(approved) {
+  const n = Number(approved);
+  const rule = 'Schválený návrh zůstane, jen když přecenění vyjde na stejnou cenu – jinak ho nahradí nový návrh a schválení se ztratí ' +
+    '(ruční cena se přenese, ale musí se znovu schválit). Schválené změny proto nejdřív exportujte (feed, webhook, POHODA).';
+  if (approved == null || !Number.isFinite(n)) return 'Pozor na schválené, dosud neexportované návrhy. ' + rule;
+  if (n <= 0) return null;
+  return 'Čeká ' + count(n, 'schválený, dosud neexportovaný návrh', 'schválené, dosud neexportované návrhy', 'schválených, dosud neexportovaných návrhů') + '. ' + rule;
 }
 
 /** Krátký textový souhrn běhu („42 změn · ▲ 10 · ▼ 32“). */

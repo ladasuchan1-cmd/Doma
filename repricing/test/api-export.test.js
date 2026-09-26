@@ -237,10 +237,12 @@ test('API export a feedy', async (t) => {
     assert.equal(r.status, 200);
     assert.equal(r.json.count, 0);
     assert.equal(received.length, 0);
+    // konkurence zlevnila → nové návrhy (stejný návrh by běh jen ponechal)
+    app.db.prepare('UPDATE offers SET price = price - 500 WHERE product_id IN (?, ?)').run(P.P1, P.P2);
     await s.post('/api/v1/runs', { product_ids: [P.P1, P.P2, P.P3, P.P4] });
     const pend = (await s.get('/api/v1/proposals')).json.items;
     assert.ok(pend.length >= 1);
-    await s.post('/api/v1/proposals/approve', { all: true });
+    await s.post('/api/v1/proposals/approve', { all: true, include_flagged: true });
     r = await exp.post('/api/v1/export/push');
     assert.equal(r.status, 200, r.text);
     assert.equal(r.json.ok, true);

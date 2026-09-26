@@ -6,11 +6,13 @@ import { icon } from '../lib/icons.js';
 import { DataTable } from '../lib/table.js';
 import { emptyState, flagBadges, statusBadge, changeEl, segmented, searchInput, badge, callout, dl } from '../lib/ui.js';
 import { explainList, priceMove } from '../lib/decision.js';
-import { finalPrice, finalChangePct, finalMargin } from '../lib/proposal-model.js';
+import {
+  finalPrice, finalMargin, basePriceChange, basePrice, displayChange, staleProposals, isSelectableProposal, bulkStatus,
+} from '../lib/proposal-model.js';
 import { confirmDialog } from '../lib/modal.js';
 import { toast } from '../lib/toast.js';
 import {
-  money, signedMoney, percent, int, count, FLAG_LABELS, parseInputNumber, round, relTime, dateTime, toNum,
+  money, signedMoney, percent, int, count, FLAG_LABELS, parseInputNumber, relTime, dateTime,
 } from '../lib/format.js';
 
 export const title = 'Návrhy cen';
@@ -23,6 +25,11 @@ const STATUSES = [
   { value: 'superseded', label: 'Nahrazeno' },
   { value: 'all', label: 'Vše' },
 ];
+
+/** „všech 5 …“ / „všechny 3 …“ / „1 …“ (shoda s číslovkou). */
+function allOf(n) {
+  return n === 1 ? '' : n >= 2 && n <= 4 ? 'všechny ' : 'všech ';
+}
 
 function prod(r) {
   return r.product || { code: r.code, name: r.name, manufacturer: r.manufacturer };
@@ -47,6 +54,8 @@ export async function show(root, ctx) {
   ctx.setTitle('Návrhy cen', '');
   let summary = null;
   let total = 0;
+  let maxId = null; // nejvyšší id ve výpisu – „schválit vše“ ho posílá jako expect (seznam se mezitím nezměnil)
+  let flagged = 0; // počet rizikových návrhů ve filtru (hromadné schválení je vynechá)
   let rows = [];
   let editing = null;
 
@@ -80,25 +89,62 @@ export async function show(root, ctx) {
   function updateActions() {
     xlsxLink.href = apiUrl('/export/proposals.xlsx', filterParams());
     xlsxLink.title = 'Stáhnout návrhy podle aktuálních filtrů jako XLSX';
-    const canAll = (st.status === 'pending' || st.status === 'all') && total > 0;
-    approveAllBtn.disabled = !canAll;
-    rejectAllBtn.disabled = !canAll;
-    approveAllBtn.title = canAll ? 'Schválit všechny čekající návrhy odpovídající filtru' : 'Hromadně lze schvalovat jen čekající návrhy';
+    const canApprove = bulkStatus('approve', st.status) != null && total > 0;
+    // contract-10: zamítnout hromadně jde i schválené (neexportované) – na záložce Schváleno
+    const rejectSt = bulkStatus('reject', st.status);
+    approveAllBtn.disabled = !canApprove;
+    rejectAllBtn.disabled = !(rejectSt != null && total > 0);
+    approveAllBtn.title = canApprove ? 'Schválit všechny čekající návrhy odpovídající filtru' : 'Hromadně lze schvalovat jen čekající návrhy';
+    rejectAllBtn.title = rejectSt === 'approved' ? 'Zamítnout všechny schválené (neexportované) návrhy odpovídající filtru – neodejdou do adminu' : 'Zamítnout všechny čekající návrhy odpovídající filtru';
   }
 
   // --------------------------------------------------------------- akce
-  function decidedToast(kind, n, skippedLocked) {
+  function decidedToast(kind, n, res = {}) {
     const msg = (kind === 'approve' ? 'Schváleno: ' : 'Zamítnuto: ') + count(n, 'návrh', 'návrhy', 'návrhů');
-    const skip = Number(skippedLocked) || 0;
-    if (skip) toast(msg + ' · ' + count(skip, 'návrh přeskočen', 'návrhy přeskočeny', 'návrhů přeskočeno') + ' (zamčený produkt)', { type: n ? 'warning' : 'error' });
+    const skips = [
+      [res.skipped_locked, 'zamčený produkt'],
+      [res.skipped_inactive, 'neaktivní produkt'],
+      [res.skipped_flagged, 'rizikový příznak – schvalte jednotlivě'],
+    ].filter(([v]) => Number(v) > 0).map(([v, why]) => count(Number(v), 'návrh přeskočen', 'návrhy přeskočeny', 'návrhů přeskočeno') + ' (' + why + ')');
+    if (skips.length) toast(msg + ' · ' + skips.join(' · '), { type: n ? 'warning' : 'error' });
     else toast(msg, { type: n ? 'success' : 'info' });
   }
+
+  /**
+   * contract-2: schvalování návrhů, které vznikly při jiné ceně produktu (import katalogu, ruční změna ceny) –
+   * exportovala by se cena spočítaná ze staré ceny. Vrací true, když uživatel přesto pokračuje (nebo nic takového není).
+   */
+  async function confirmStale(list) {
+    const stale = staleProposals(list);
+    if (!stale.length) return true;
+    const ex = stale.slice(0, 3).map((r) => {
+      const ch = basePriceChange(r);
+      return h('li', null, h('span', { class: 'mono' }, prod(r).code || '#' + r.product_id), ': návrh ze ', money(ch.from), ', teď ', money(ch.to), ' → k exportu ', money(finalPrice(r)));
+    });
+    return confirmDialog({
+      title: 'Cena produktu se od návrhu změnila',
+      message: h(
+        'div',
+        null,
+        h('p', null, count(stale.length, 'návrh vznikl', 'návrhy vznikly', 'návrhů vzniklo') + ' při jiné ceně produktu, než je teď (import katalogu nebo ruční změna). Schválením se exportuje cena spočítaná ze staré ceny.'),
+        h('ul', { class: 'validation-list' }, ex),
+        h('p', { class: 'muted small' }, 'Doporučujeme tyto produkty nejdřív přecenit znovu.')
+      ),
+      confirmLabel: 'Přesto schválit',
+      danger: true,
+    });
+  }
+
   async function decide(kind, ids) {
     if (!ids.length) return;
+    if (kind === 'approve') {
+      const idSet = new Set(ids.map(String));
+      if (!(await confirmStale(rows.filter((r) => idSet.has(String(r.id)) && r.status === 'pending')))) return;
+    }
     try {
       const res = await api.post('/proposals/' + kind, { ids });
       const n = res?.updated ?? ids.length;
-      decidedToast(kind, n, res?.skipped_locked);
+      decidedToast(kind, n, res || {});
       table.clearSelection();
       ctx.notifyChanged('proposals');
     } catch {
@@ -108,29 +154,43 @@ export async function show(root, ctx) {
   }
 
   async function decideAll(kind) {
-    const n = st.status === 'pending' ? total : summary?.pending ?? total;
+    const target = bulkStatus(kind, st.status);
+    if (!target) return;
+    // přesný počet známe, jen když výpis ukazuje právě cílový stav (jinak souhrn stavu – bez ostatních filtrů)
+    const exact = st.status === target;
+    const n = exact ? total : summary?.[target] ?? total;
+    const what = target === 'approved'
+      ? count(n, 'schválený (neexportovaný) návrh', 'schválené (neexportované) návrhy', 'schválených (neexportovaných) návrhů')
+      : count(n, 'čekající návrh', 'čekající návrhy', 'čekajících návrhů');
+    const pageStale = kind === 'approve' ? staleProposals(rows).length : 0;
     const ok = await confirmDialog({
       title: kind === 'approve' ? 'Schválit vše dle filtru' : 'Zamítnout vše dle filtru',
       message: h(
         'div',
         null,
-        h('p', null, (kind === 'approve' ? 'Schválit ' : 'Zamítnout ') + (st.status === 'pending' ? 'všech ' + count(n, 'čekající návrh', 'čekající návrhy', 'čekajících návrhů') : 'všechny čekající návrhy') + ' odpovídající aktuálnímu filtru?'),
-        kind === 'approve' ? h('p', { class: 'muted small' }, 'Schválené ceny se objeví v exportu (feed, webhook, POHODA XML).') : null
+        h('p', null, (kind === 'approve' ? 'Schválit ' : 'Zamítnout ') + (exact ? allOf(n) + what : 'všechny ' + (target === 'approved' ? 'schválené' : 'čekající') + ' návrhy') + ' odpovídající aktuálnímu filtru?'),
+        kind === 'approve' ? h('p', { class: 'muted small' }, 'Schválené ceny se objeví v exportu (feed, webhook, POHODA XML).') : null,
+        kind === 'approve' && flagged > 0 ? h('p', { class: 'muted small' }, count(flagged, 'návrh s rizikovým příznakem se přeskočí', 'návrhy s rizikovým příznakem se přeskočí', 'návrhů s rizikovým příznakem se přeskočí') + ' (pod nákupem, velká změna, ruční cena mimo meze…) – schvalte je jednotlivě.') : null,
+        pageStale ? callout(count(pageStale, 'návrh na této stránce vznikl', 'návrhy na této stránce vznikly', 'návrhů na této stránce vzniklo') + ' při jiné ceně produktu, než je teď – schválením se exportuje cena ze staré ceny. Doporučujeme je nejdřív přecenit.', 'warning') : null,
+        target === 'approved' ? h('p', { class: 'muted small' }, 'Zamítnuté návrhy se neodešlou do adminu (feed, webhook, POHODA).') : null
       ),
-      confirmLabel: kind === 'approve' ? 'Schválit ' + (st.status === 'pending' ? int(n) : 'vše') : 'Zamítnout',
-      danger: kind === 'reject',
+      confirmLabel: kind === 'approve' ? 'Schválit ' + (exact ? int(n) : 'vše') : 'Zamítnout',
+      danger: kind === 'reject' || pageStale > 0,
     });
     if (!ok) return;
     const filter = filterParams();
-    // Hromadně jen čekající návrhy (API by při zamítnutí bez stavu zamítlo i schválené).
-    filter.status = 'pending';
+    // Hromadně jen cílový stav (API by při zamítnutí bez stavu zamítlo čekající i schválené).
+    filter.status = target;
     for (const k of Object.keys(filter)) if (filter[k] == null) delete filter[k];
+    const body = { all: true, filter };
+    // Výpis ukazoval přesně tento výběr → server ověří, že se mezitím nezměnil (nové přecenění, jiný uživatel)
+    if (exact) body.expect = { count: total, max_id: maxId };
     try {
-      const res = await api.post('/proposals/' + kind, { all: true, filter });
-      decidedToast(kind, res?.updated ?? 0, res?.skipped_locked);
+      const res = await api.post('/proposals/' + kind, body);
+      decidedToast(kind, res?.updated ?? 0, res || {});
       ctx.notifyChanged('proposals');
     } catch {
-      /* toast */
+      /* toast (409 = seznam se změnil → obnoví se níže) */
     }
     load();
   }
@@ -141,15 +201,44 @@ export async function show(root, ctx) {
       toast('Zadejte kladnou cenu, nebo pole vymažte pro zrušení ruční ceny.', { type: 'error' });
       return false;
     }
+    const url = '/proposals/' + encodeURIComponent(r.id);
+    const wasApproved = r.status === 'approved';
+    let upd;
     try {
-      const upd = await api.patch('/proposals/' + encodeURIComponent(r.id), { manual_price: v });
-      Object.assign(r, upd && typeof upd === 'object' ? upd : { manual_price: v });
-      if (upd && !upd.product && r.product == null) r.product = prod(r);
-      toast(v == null ? 'Ruční cena zrušena' : 'Ruční cena uložena: ' + money(v), { type: 'success' });
-      return true;
-    } catch {
-      return false;
+      upd = await api.patch(url, { manual_price: v }, { silent: true });
+    } catch (e) {
+      // contract-12: riziková ruční cena (pod nákupem, mimo min./max. produktu, velká změna – překlep?) vyžaduje potvrzení
+      if (e?.status === 409 && e.details?.code === 'MANUAL_PRICE_CONFIRM') {
+        const reasons = Array.isArray(e.details.reasons) ? e.details.reasons : [];
+        const ok = await confirmDialog({
+          title: 'Zkontrolujte ruční cenu',
+          message: h(
+            'div',
+            null,
+            h('p', null, 'Ruční cena ', h('b', null, money(v)), ' pro ', h('span', { class: 'mono' }, prod(r).code || '#' + r.product_id), ' je neobvyklá:'),
+            reasons.length ? h('ul', { class: 'validation-list' }, reasons.map((t) => h('li', null, t))) : null,
+            h('p', { class: 'muted small' }, 'Nejde o překlep? Po uložení dostane návrh příznak' + (wasApproved ? ' a vrátí se ke schválení.' : '.'))
+          ),
+          confirmLabel: 'Uložit i tak',
+          danger: true,
+        });
+        if (!ok) return false;
+        try {
+          upd = await api.patch(url, { manual_price: v, confirm: true });
+        } catch {
+          return false;
+        }
+      } else {
+        toast(e?.message || 'Ruční cenu se nepodařilo uložit.', { type: 'error' });
+        return false;
+      }
     }
+    Object.assign(r, upd && typeof upd === 'object' ? upd : { manual_price: v });
+    if (upd && !upd.product && r.product == null) r.product = prod(r);
+    const reopened = wasApproved && r.status === 'pending';
+    toast((v == null ? 'Ruční cena zrušena' : 'Ruční cena uložena: ' + money(v)) + (reopened ? ' · návrh se vrátil ke schválení' : ''), { type: reopened ? 'warning' : 'success' });
+    if (reopened) ctx.notifyChanged('proposals');
+    return true;
   }
 
   // --------------------------------------------------------------- tabulka
@@ -219,7 +308,25 @@ export async function show(root, ctx) {
       },
     },
     { key: 'strategy_name', label: 'Strategie', hideSm: true, hideLg: true, render: (r) => h('div', { class: 'cell-2' }, h('span', { class: 'ellipsis', style: 'max-width:190px' }, r.strategy_name || '–'), r.segment_name ? h('span', { class: 'cell-sub ellipsis', style: 'max-width:190px' }, r.segment_name) : null) },
-    { key: 'old_price', label: 'Stará cena', format: 'money', sortable: true },
+    {
+      key: 'old_price',
+      label: 'Stará cena',
+      title: 'Cena, ze které se vychází (aktuální cena produktu; když se od vzniku návrhu změnila, je označená)',
+      align: 'right',
+      sortable: true,
+      render: (r) => {
+        // contract-2: cena produktu se od vzniku návrhu změnila (import katalogu, ruční změna) → ukázat aktuální a označit
+        const ch = basePriceChange(r);
+        if (!ch) return h('span', { class: 'num' }, money(r.old_price));
+        const tip = 'Cena produktu se od návrhu změnila: ' + money(ch.from) + ' → ' + money(ch.to) + (ch.taken ? ' (už odpovídá ceně k exportu).' : '. Návrh vychází ze staré ceny – doporučujeme produkt přecenit znovu.');
+        return h(
+          'div',
+          { class: 'cell-2', style: 'align-items:flex-end', dataset: { stale: ch.taken ? 'taken' : '1' }, title: tip },
+          h('span', { class: 'num' }, money(ch.to)),
+          h('span', { class: 'cell-sub' }, badge(ch.taken ? 'cena převzata' : 'cena se změnila', ch.taken ? 'info' : 'warning', tip), ' návrh ze ', money(ch.from))
+        );
+      },
+    },
     { key: 'new_price', label: 'Nová cena', title: 'Cena k exportu (ruční cena má přednost před navrženou)', align: 'right', sortKey: 'final_price', render: priceCell },
     {
       key: 'change_pct',
@@ -228,10 +335,9 @@ export async function show(root, ctx) {
       sortable: true,
       defaultDesc: true,
       render: (r) => {
-        const fp = finalPrice(r);
-        const old = toNum(r.old_price);
-        const abs = fp != null && old != null ? round(fp - old, 2) : toNum(r.change_abs);
-        return h('div', { class: 'cell-2', style: 'align-items:flex-end' }, changeEl(finalChangePct(r)), abs != null ? h('span', { class: 'cell-sub num' }, signedMoney(abs)) : null);
+        // změna, kterou schválení opravdu udělá – proti aktuální ceně produktu (contract-2)
+        const d = displayChange(r);
+        return h('div', { class: 'cell-2', style: 'align-items:flex-end' }, changeEl(d.pct), d.abs != null ? h('span', { class: 'cell-sub num' }, signedMoney(d.abs)) : null);
       },
     },
     {
@@ -253,26 +359,44 @@ export async function show(root, ctx) {
       key: 'actions',
       label: 'Akce',
       align: 'right',
-      render: (r) =>
-        r.status === 'pending'
-          ? h(
+      render: (r) => {
+        const decided = r.decided_at ? h('span', { class: 'muted small nowrap', title: dateTime(r.decided_at) + (r.decided_by ? ' · ' + r.decided_by : '') }, relTime(r.decided_at)) : null;
+        if (r.status === 'pending') {
+          return h(
             'span',
             { class: 'row-actions' },
             h('button', { type: 'button', class: 'btn-icon approve', 'aria-label': 'Schválit návrh ' + (prod(r).code || ''), title: 'Schválit', dataset: { action: 'approve-row' }, onClick: () => decide('approve', [r.id]) }, icon('check', { size: 16 })),
             h('button', { type: 'button', class: 'btn-icon reject', 'aria-label': 'Zamítnout návrh ' + (prod(r).code || ''), title: 'Zamítnout', dataset: { action: 'reject-row' }, onClick: () => decide('reject', [r.id]) }, icon('x', { size: 16 }))
-          )
-          : r.decided_at
-            ? h('span', { class: 'muted small nowrap', title: dateTime(r.decided_at) + (r.decided_by ? ' · ' + r.decided_by : '') }, relTime(r.decided_at))
-            : '',
+          );
+        }
+        if (r.status === 'approved') {
+          // contract-10: omylem schválený (i automaticky) návrh jde vrátit zamítnutím, dokud není exportovaný
+          return h(
+            'span',
+            { class: 'row-actions' },
+            decided,
+            h('button', {
+              type: 'button', class: 'btn-icon reject', 'aria-label': 'Zamítnout schválený návrh ' + (prod(r).code || ''), title: 'Zamítnout – zrušit schválení (neodejde do adminu)', dataset: { action: 'reject-approved-row' },
+              onClick: async () => {
+                const ok = await confirmDialog({ title: 'Zamítnout schválený návrh', message: 'Zrušit schválení návrhu ' + (prod(r).code || '#' + r.product_id) + ' (' + money(finalPrice(r)) + ')? Cena se neodešle do adminu; nový návrh vznikne při dalším přecenění.', confirmLabel: 'Zamítnout', danger: true });
+                if (ok) decide('reject', [r.id]);
+              },
+            }, icon('x', { size: 16 }))
+          );
+        }
+        return decided || '';
+      },
     },
   ];
 
   const bulkCount = h('span', { class: 'strong' });
+  // vybrané mohou být i schválené (jen k zamítnutí) – schválit má smysl jen čekající
+  const approveSelBtn = h('button', { type: 'button', class: 'btn btn-sm btn-success', dataset: { action: 'approve-selected' }, onClick: () => decide('approve', [...table.selected]) }, icon('check', { size: 14 }), h('span', null, 'Schválit vybrané'));
   const bulkbar = h(
     'div',
     { class: 'bulkbar', hidden: true, role: 'region', 'aria-label': 'Hromadné akce' },
     bulkCount,
-    h('button', { type: 'button', class: 'btn btn-sm btn-success', dataset: { action: 'approve-selected' }, onClick: () => decide('approve', [...table.selected]) }, icon('check', { size: 14 }), h('span', null, 'Schválit vybrané')),
+    approveSelBtn,
     h('button', { type: 'button', class: 'btn btn-sm btn-danger', dataset: { action: 'reject-selected' }, onClick: () => decide('reject', [...table.selected]) }, icon('x', { size: 14 }), h('span', null, 'Zamítnout vybrané')),
     h('button', { type: 'button', class: 'btn btn-sm btn-ghost', onClick: () => table.clearSelection() }, 'Zrušit výběr')
   );
@@ -281,7 +405,7 @@ export async function show(root, ctx) {
     columns,
     rowKey: 'id',
     selectable: true,
-    isSelectable: (r) => r.status === 'pending',
+    isSelectable: isSelectableProposal, // contract-10: i schválené (neexportované) – k zamítnutí
     expandable: (r) =>
       h(
         'div',
@@ -292,7 +416,8 @@ export async function show(root, ctx) {
           null,
           h('div', { class: 'form-subtitle' }, 'Detail'),
           dl([
-            ['Cena k exportu', priceMove(r.old_price, finalPrice(r))],
+            ['Cena k exportu', priceMove(basePrice(r), finalPrice(r))],
+            basePriceChange(r) ? ['Cena při vzniku návrhu', h('span', null, money(r.old_price), ' ', badge('cena produktu se od návrhu změnila', 'warning'))] : null,
             r.manual_price != null ? ['Navržená cena', money(r.new_price) + ' (nahrazena ruční cenou)'] : null,
             ['Cílová cena', money(r.target_price)],
             ['Reference', money(r.reference_price)],
@@ -308,6 +433,8 @@ export async function show(root, ctx) {
     onSelectionChange: (keys) => {
       bulkbar.hidden = !keys.length;
       bulkCount.textContent = 'Vybráno: ' + count(keys.length, 'návrh', 'návrhy', 'návrhů');
+      const sel = new Set(keys.map(String));
+      approveSelBtn.disabled = !rows.some((r) => sel.has(String(r.id)) && r.status === 'pending');
     },
     pagination: true,
     page: st.page,
@@ -382,8 +509,9 @@ export async function show(root, ctx) {
   );
   const summaryEl = h('div', { class: 'row small muted', style: 'margin:-4px 0 10px' });
   const runNote = h('div');
+  const staleNote = h('div', { dataset: { role: 'stale-note' } });
 
-  mount(root, h('div', { class: 'stack-sm' }, h('div', { class: 'row-between', style: 'margin-bottom:8px' }, statusCtl), toolbar, runNote, summaryEl, h('div', { class: 'card' }, table.el), bulkbar));
+  mount(root, h('div', { class: 'stack-sm' }, h('div', { class: 'row-between', style: 'margin-bottom:8px' }, statusCtl), toolbar, runNote, summaryEl, staleNote, h('div', { class: 'card' }, table.el), bulkbar));
 
   function renderSummary() {
     if (!summary) return mount(summaryEl);
@@ -395,6 +523,21 @@ export async function show(root, ctx) {
       h('span', null, '· celkem čeká ' + int(summary.pending) + ', schváleno ' + int(summary.approved) + ', dnes exportováno ' + int(summary.exported_today))
     );
     ctx.setSub(int(summary.pending) + ' čeká na schválení · ' + int(summary.approved) + ' schváleno k exportu');
+    // contract-2: návrhy ze staré ceny produktu – upozornit a nabídnout přecenění těchto produktů
+    const stale = staleProposals(rows);
+    mount(
+      staleNote,
+      stale.length
+        ? callout(h('span', null, count(stale.length, 'návrh na této stránce vznikl', 'návrhy na této stránce vznikly', 'návrhů na této stránce vzniklo') + ' při jiné ceně produktu, než je teď (import katalogu nebo ruční změna ceny) – změna v % je přepočtená na aktuální cenu. ',
+          h('button', {
+            type: 'button', class: 'btn btn-xs', dataset: { action: 'reprice-stale' },
+            onClick: async () => {
+              const res = await ctx.runPricing({ productIds: [...new Set(stale.map((r) => Number(r.product_id)))] });
+              if (res) load();
+            },
+          }, 'Přecenit tyto produkty')), 'warning')
+        : null
+    );
   }
 
   if (st.run) mount(runNote, callout(h('span', null, 'Zobrazeny návrhy z běhu #' + st.run + '. ', h('button', { type: 'button', class: 'btn btn-xs', onClick: () => { st.run = ''; mount(runNote); load(); } }, 'Zobrazit všechny')), 'info'));
@@ -410,6 +553,8 @@ export async function show(root, ctx) {
       if (my !== seq) return;
       rows = itemsOf(res);
       total = res.total ?? rows.length;
+      maxId = res.max_id ?? null;
+      flagged = Number(res.flagged) || 0;
       summary = res.summary || null;
       editing = null;
       table.el.classList.toggle('hide-status', st.status === 'pending');

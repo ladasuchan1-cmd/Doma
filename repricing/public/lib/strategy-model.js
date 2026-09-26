@@ -766,3 +766,35 @@ export function roundingExamples(rounding, values = [449.5, 1234, 8765, 12345, 4
   return values.map((v) => ({ value: v, result: roundPrice(v, rounding) }));
 }
 
+
+/**
+ * Zapnuté strategie, které přecenění vyzkouší DŘÍV než strategii `self` (contract-5). Pořadí jako engine:
+ * priorita, pak id (src/engine/run.js loadContext). Simulace (POST /simulate) hodnotí strategii samostatně
+ * a produkty, které si vezme některá z nich, započítá také – UI to musí říct.
+ * @param {object[]} all strategie z GET /strategies ({id, name, priority, enabled, segment_id, config})
+ * @param {{id?: number|string|null, priority?: number|null}} self upravovaná strategie (nová: id null;
+ *   priority null = zařadí se na konec)
+ * @returns {{list: object[], catchAll: object|null}} list = předchozí zapnuté strategie v pořadí;
+ *   catchAll = první z nich bez segmentu, podmínek a časového omezení (převezme skoro všechny produkty)
+ */
+export function precedingStrategies(all, self = {}) {
+  const selfId = self.id == null || self.id === '' ? null : String(self.id);
+  const others = (Array.isArray(all) ? all : []).filter((s) => s && String(s.id) !== selfId);
+  const prio = (s) => (s.priority == null || s.priority === '' || !Number.isFinite(Number(s.priority)) ? Infinity : Number(s.priority));
+  const myPrio = self.priority == null || self.priority === '' || !Number.isFinite(Number(self.priority)) ? Infinity : Number(self.priority);
+  const myId = selfId == null ? Infinity : Number(selfId);
+  const before = (s) => {
+    const p = prio(s);
+    if (p !== myPrio) return p < myPrio;
+    // stejná priorita → rozhoduje id (nová strategie dostane nejvyšší id → až za ostatními)
+    return Number(s.id) < myId;
+  };
+  const list = others
+    .filter((s) => (s.enabled === true || s.enabled === 1 || s.enabled === '1') && before(s))
+    .sort((a, b) => prio(a) - prio(b) || Number(a.id) - Number(b.id));
+  const catchAll = list.find((s) => {
+    const cfg = s.config || {};
+    return s.segment_id == null && isEmptyFilter(cfg.conditions || {}) && scheduleState(cfg.schedule) === 'none';
+  }) || null;
+  return { list, catchAll };
+}

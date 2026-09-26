@@ -30,6 +30,10 @@ npm start           # http://localhost:8080
 
 Při prvním spuštění se vygeneruje heslo do administrace a vypíše se do konzole (nebo ho nastavte proměnnou
 `CENOTVORBA_PASSWORD`). Docker: `docker build -t cenotvorba . && docker run -p 8080:8080 -v cenotvorba:/data -e CENOTVORBA_PASSWORD=… cenotvorba`.
+Kontejner běží pod uživatelem `node` (uid 1000). Připojíte-li místo pojmenovaného svazku adresář hostitele
+(`-v /srv/cenotvorba:/data`), musí do něj uid 1000 smět zapisovat: `chown 1000:1000 /srv/cenotvorba`
+(nebo `docker run --user $(id -u):$(id -g) …`). Jinak server skončí chybou „Nelze otevřít databázi … zkontrolujte, že
+adresář … je zapisovatelný“.
 
 | Proměnná | Význam | Výchozí |
 |---|---|---|
@@ -39,8 +43,17 @@ Při prvním spuštění se vygeneruje heslo do administrace a vypíše se do ko
 | `CENOTVORBA_SECRET` | tajemství pro podpis session cookie | vygeneruje se |
 | `CENOTVORBA_SCHEDULER` | `0` vypne plánovač (stahování zdrojů, automatické přecenění) | zapnuto |
 | `CENOTVORBA_TRUST_PROXY` | `1` za reverzní proxy (HTTPS, X-Forwarded-*) | vypnuto |
+| `CENOTVORBA_MAX_BODY_MB` | největší tělo požadavku (soubory importu) v MB | `300` |
+| `CENOTVORBA_MAX_JSON_MB` | největší JSON tělo běžných API (ne importů) v MB | `32` |
 
 Server patří do vnitřní sítě nebo za HTTPS reverzní proxy (nginx, Caddy).
+
+**Provoz a výkon.** Import, přecenění i přepočet přehledů běží synchronně v jednom procesu – po dobu velkého importu
+(desítky MB, desetitisíce produktů) server na několik sekund neodpovídá ani na feed a `/api/v1/health`. Požadavky se
+nezahazují, jen čekají: nastavte adminu pro stahování feedu i healthchecku kontejneru časový limit alespoň **30 s**.
+Paměť: import potřebuje zhruba **8–10× velikost vstupního souboru** (feed 50 MB ≈ 500 MB RAM). Komprimované vstupy
+(gzip, ZIP) se rozbalují nejvýše do 256 MB na soubor, JSON import nejvýše do 128 MB. Stejný zdroj se nikdy nestahuje
+dvakrát souběžně (plánovač + ruční spuštění → 409).
 
 ## Jak to funguje
 
@@ -82,6 +95,7 @@ curl -X POST "http://server:8080/api/v1/import/offers?source=3" \
   -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/xml" --data-binary @konkurence.xml
 
 # katalog z POHODY / adminu, produkty, které v souboru chybí, se deaktivují
+# (vypnout víc než polovinu katalogu najednou jde jen s force_deactivate=1 – ochrana před chybně rozpoznaným souborem)
 curl -X POST "http://server:8080/api/v1/import/products?deactivate_missing=1" \
   -H "Authorization: Bearer $TOKEN" -H "Content-Type: text/csv" --data-binary @katalog.csv
 
@@ -90,13 +104,17 @@ curl -X POST "http://server:8080/api/v1/runs" -H "Authorization: Bearer $TOKEN" 
 ```
 
 Parametr `replace=competitors` zajistí, že nabídky konkurentů, kteří v dávce jsou, ale produkt v ní chybí, se smažou
-(plný snapshot). `dry_run=1` jen ověří mapování.
+(plný snapshot). U konkurenta s chybnými řádky (neplatná cena…) se nic nemaže. `dry_run=1` jen ověří mapování.
+
+Čísla se čtou podle formátu: v XML a JSON je tečka vždy desetinná (`1299.000` = 1 299), v CSV se středníkem je čárka
+vždy desetinná (`123,456` = 123,456) a `12.990` jsou tisíce. Ceny v cizí měně (`1 299 €`, `USD`) se neimportují.
+POHODA: základ DPH se bere z atributu `payVAT` u `sellingPrice` / `purchasingPrice` (viz [docs/POHODA.md](docs/POHODA.md)).
 
 ## Napojení adminu
 
 | Způsob | Endpoint |
 |---|---|
-| Feed schválených změn (pull) | `GET /feed/changes.xml?token=…` (také `.json`, `.csv`) – po zpracování potvrďte `POST /api/v1/export/ack` s `{"codes": [...]}` nebo použijte `?mark=1` |
+| Feed schválených změn (pull) | `GET /feed/changes.xml?token=…` (také `.json`, `.csv`) – po zpracování potvrďte `POST /api/v1/export/ack` s `{"items": [{"code": "…", "price": 12990}]}` (kód + cena, kterou jste nasadili), nebo použijte `?mark=1` |
 | Kompletní ceník (idempotentní) | `GET /feed/prices.xml?token=…` – všechny aktivní produkty s aktuální / schválenou cenou |
 | Webhook (push) | Nastavení → Export → URL webhooku; po přecenění se schválené změny odešlou jako JSON/XML `POST` |
 | POHODA | `GET /api/v1/export/pohoda.xml?mark=1` → XML dataPack (Windows-1250) pro XML import nebo mServer, viz [docs/POHODA.md](docs/POHODA.md) |
@@ -115,6 +133,19 @@ Výchozí XML feed:
 ```
 
 Názvy elementů a sada polí jdou upravit v Nastavení → Export (např. `lowest_30d`, `strategy`, `segment`).
+
+**Potvrzení převzetí (ack).** Posílejte kód **a cenu**, kterou admin skutečně nasadil (`items`). Cenotvorba označí jako
+exportovaný právě návrh s touto cenou – i když ho mezitím nahradilo nové přecenění – a novější návrh, který admin
+neviděl, nechá čekat. Nesouhlasí-li cena, nic se neoznačí a položka je v odpovědi v `mismatched`. Starší tvar
+`{"codes": [...]}` označí naposledy **vydaný** návrh (feed si pamatuje, co komu vydal); `{"proposal_ids": [...]}` označí
+návrh jen tehdy, když se od vydání nezměnila jeho cena.
+
+**Co se do exportu nedostane.** Schválený návrh se těsně před exportem ověří proti aktuálnímu stavu produktu: zamčený
+produkt, mezitím změněná cena produktu (import katalogu, ruční cena), cena pod ruční minimální / nad maximální cenou
+nebo pod nákupní cenou → návrh se **zadrží** (hlavička `X-Export-Held` = počet, v POHODA XML mezi vynechanými). Změna
+ceny, nákupní ceny, DPH, limitů, zámku nebo deaktivace produktu navíc otevřené návrhy rovnou zneplatní – nový spočítá
+další přecenění. Ruční cenu mimo meze (pod nákupem, mimo min./max., změna přes 50 %) je třeba potvrdit a upravený
+schválený návrh jde znovu ke schválení.
 
 ## Vývoj
 

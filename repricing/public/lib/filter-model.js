@@ -293,3 +293,50 @@ export function describeFilter(f, fieldsMap) {
   const s = d(f, true);
   return s || 'Všechny produkty';
 }
+
+/** Rychlé filtry seznamu produktů, které mají přesný protějšek v podmínkách filtru (klíč = pole /fields). */
+const QUICK_FIELDS = [
+  ['manufacturer', 'Výrobce'],
+  ['category', 'Kategorie'],
+  ['owner', 'Zodpovědná osoba'],
+  ['supplier', 'Dodavatel'],
+];
+
+/**
+ * Filtr segmentu ze stavu seznamu produktů („Uložit jako segment“, contract-11). Dřív se uložil jen pokročilý filtr
+ * a rychlé filtry (výrobce, pozice …) se ztratily – segment pak obsahoval mnohem víc produktů, než bylo vidět.
+ * Rychlé filtry se převedou na podmínky se stejným významem (server porovnává bez diakritiky a velikosti písmen,
+ * stejně jako operátor „=“ filtru); filtr podle segmentu se nahradí filtrem toho segmentu. Co převést nejde
+ * (fulltext, „jen s návrhem“, neaktivní produkty), vrátí se v `dropped`, aby to UI řeklo.
+ * @param {object} st stav seznamu {q, manufacturer, category, owner, supplier, position, segment, has_proposal, status}
+ * @param {object|null} advanced pokročilý filtr (strom JSON)
+ * @param {{id, name, filter}[]} [segments] segmenty (kvůli rychlému filtru „Segment“)
+ * @returns {{filter: object, dropped: string[]}}
+ */
+export function quickFiltersToSegment(st, advanced, segments = []) {
+  const conds = [];
+  const dropped = [];
+  for (const [key] of QUICK_FIELDS) {
+    const v = st?.[key];
+    if (v != null && String(v).trim() !== '') conds.push({ field: key, op: '=', value: String(v) });
+  }
+  if (st?.position) {
+    const list = String(st.position).split(',').map((x) => x.trim()).filter(Boolean);
+    if (list.length === 1) conds.push({ field: 'position', op: '=', value: list[0] });
+    else if (list.length > 1) conds.push({ field: 'position', op: 'in', value: list });
+  }
+  if (st?.segment) {
+    const seg = (Array.isArray(segments) ? segments : []).find((x) => String(x.id) === String(st.segment));
+    if (seg && seg.filter && typeof seg.filter === 'object') {
+      if (!isEmptyFilter(seg.filter)) conds.push(seg.filter);
+    } else dropped.push('segment ' + (seg?.name ? '„' + seg.name + '“' : '#' + st.segment));
+  }
+  if (st?.q && String(st.q).trim()) dropped.push('hledání „' + String(st.q).trim() + '“');
+  if (st?.has_proposal) dropped.push('jen s návrhem');
+  if (st?.status && st.status !== 'active') dropped.push(st.status === 'inactive' ? 'neaktivní produkty' : 'aktivní i neaktivní produkty (segment počítá jen aktivní)');
+  const adv = advanced && !isEmptyFilter(advanced) ? advanced : null;
+  if (!conds.length) return { filter: adv || {}, dropped };
+  // pokročilý filtr typu „všechny podmínky“ (bez negace) rozbalit do jedné skupiny – v editoru je přehlednější
+  const advItems = adv ? (Array.isArray(adv.all) && Object.keys(adv).length === 1 ? adv.all : [adv]) : [];
+  return { filter: { all: [...conds, ...advItems] }, dropped };
+}

@@ -79,3 +79,24 @@ test('filtr příznaků v Návrzích nabízí všechny příznaky enginu', async
   const f = await loadFormat();
   for (const code of Object.keys(pricing.FLAG_LABELS)) assert.ok(f.FLAG_LABELS[code], code);
 });
+
+test('příznaky ruční ceny a životního cyklu návrhu (API návrhů, běh přecenění) mají český popisek', async () => {
+  const f = await loadFormat();
+  let util = {};
+  try {
+    util = require('../src/util/proposals.js');
+  } catch {
+    /* starší backend bez sdílených pravidel návrhů */
+  }
+  const codes = new Set([
+    ...(util.MANUAL_FLAGS || []),
+    ...Object.keys(util.HUMAN_FLAG_LABELS || {}),
+    ...literals(src('run.js'), /flags\.push\('([a-z_]+)'\)/g),
+    ...literals(fs.readFileSync(path.join(ROOT, 'src', 'server', 'api', 'proposals.js'), 'utf8'), /flags\.push\('([a-z_]+)'\)/g),
+  ]);
+  for (const code of codes) {
+    assert.ok(hasLabel(f.FLAG_LABELS, code), 'chybí popisek příznaku ' + code);
+    assert.ok(f.FLAG_HELP[code], 'chybí nápověda příznaku ' + code);
+    assert.ok(f.FLAG_SEVERITY[code], 'chybí závažnost příznaku ' + code);
+  }
+});
