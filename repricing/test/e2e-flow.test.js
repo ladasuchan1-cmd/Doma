@@ -31,8 +31,8 @@ const { parseCsv } = require('../src/formats/csv');
 const { parseXml } = require('../src/formats/xml');
 const { generateDemo } = require('../tools/demo-data');
 
-const XSD_FALLBACK = '/tmp/claude-0/-home-user-Doma/742d48af-6776-5fc6-af84-78d20384ca0e/scratchpad/allxsd';
-const XSD_DIR = process.env.POHODA_XSD_DIR || (fs.existsSync(path.join(XSD_FALLBACK, 'data.xsd')) ? XSD_FALLBACK : null);
+// Oficiální XSD POHODY nejsou v repozitáři (licence Stormware) – validace běží jen s POHODA_XSD_DIR (viz docs/POHODA.md).
+const XSD_DIR = process.env.POHODA_XSD_DIR && fs.existsSync(path.join(process.env.POHODA_XSD_DIR, 'data.xsd')) ? process.env.POHODA_XSD_DIR : null;
 const HAS_XMLLINT = !spawnSync('xmllint', ['--version']).error;
 
 // česká zpráva: diakritika nebo běžná česká slova (některé krátké zprávy diakritiku nemají)

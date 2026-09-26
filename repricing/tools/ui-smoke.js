@@ -10,7 +10,7 @@
 // Nezávislé na datech: ID a hledané texty bere z API (první produkt, strategie s posunem, segment), takže projde
 // s mockem i se skutečným serverem s demo daty (tools/demo-data.js). Smoke data mění (schválí návrhy, vytvoří segment,
 // zdroj a token, naimportuje examples/konkurence.csv, spustí přecenění) – proti produkční databázi ho nepouštějte.
-// Playwright: require('playwright'), jinak PLAYWRIGHT_PATH, jinak /opt/node22/lib/node_modules/playwright.
+// Playwright: require('playwright'), jinak PLAYWRIGHT_PATH, jinak globálně nainstalovaný (npm root -g).
 // Návratový kód 1 = nalezeny chyby.
 
 const path = require('node:path');
@@ -23,7 +23,13 @@ const args = Object.fromEntries(process.argv.slice(2).map((a) => {
 }));
 
 function loadPlaywright() {
-  const candidates = ['playwright', process.env.PLAYWRIGHT_PATH, '/opt/node22/lib/node_modules/playwright'].filter(Boolean);
+  let globalRoot = null;
+  try {
+    globalRoot = require('node:child_process').execSync('npm root -g', { stdio: ['ignore', 'pipe', 'ignore'] }).toString().trim();
+  } catch {
+    /* npm není k dispozici */
+  }
+  const candidates = ['playwright', process.env.PLAYWRIGHT_PATH, globalRoot && require('node:path').join(globalRoot, 'playwright')].filter(Boolean);
   for (const c of candidates) {
     try {
       return require(c);
