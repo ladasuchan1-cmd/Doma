@@ -218,10 +218,20 @@ export async function show(root, ctx) {
       const updXml = () => mount(xmlPrev, codeBlock(xmlPreview(), { title: 'Náhled XML feedu' }));
       const xmlFields = chipsInput({
         values: Array.isArray(get(draft, 'export.xml.fields')) ? get(draft, 'export.xml.fields') : Object.keys(get(draft, 'export.xml.fields') || {}),
+        id: 'settings-xml-fields',
         suggestions: XML_FIELDS,
         allowNew: false,
         placeholder: 'Přidat pole…',
         onChange: (v) => { set(draft, 'export.xml.fields', v); markDirty(); updXml(); },
+      });
+      // vlastní e-shop v datech konkurence (sloupec „koloshop.cz“ v matici z Heureky) – jeho ceny se při importu přeskočí
+      const ownShops = chipsInput({
+        values: Array.isArray(get(draft, 'own_shops')) ? get(draft, 'own_shops') : [],
+        suggestions: [],
+        allowNew: true,
+        placeholder: 'např. koloshop.cz',
+        ariaLabel: 'Vlastní e-shop v datech konkurence',
+        onChange: (v) => { set(draft, 'own_shops', v); markDirty(); },
       });
       const rootIn = textField('export.xml.root', 'Kořenový element', { mono: true });
       const itemIn = textField('export.xml.item', 'Element položky', { mono: true });
@@ -246,6 +256,15 @@ export async function show(root, ctx) {
             h('div', { class: 'form-grid' },
               // C1: paměť zamítnutých cen – stejná cena se po zamítnutí nějakou dobu znovu nenavrhne
               numField('reject_memory_days', 'Pamatovat zamítnuté ceny', { suffix: 'dní', int: true, min: 0, max: 365, help: 'Když někdo návrh zamítne, stejná cena se po tuto dobu znovu nenavrhne – přecenění produkt vyhodnotí jako „beze změny“ (stejná cena byla nedávno zamítnuta). Jiná cena se navrhne normálně. 0 = vypnuto.' })
+            ),
+            h('h3', { class: 'form-subtitle' }, 'Data o konkurenci'),
+            h('div', { class: 'form-grid' },
+              field({
+                label: 'Vlastní e-shop v datech konkurence',
+                control: ownShops.el,
+                input: ownShops.input,
+                help: 'Když export cen konkurence (např. z Heureky) obsahuje i váš vlastní obchod, zadejte ho sem – jeho ceny se při importu přeskočí a nebude se tvářit jako konkurent. Vaše cena se bere z katalogu.',
+              })
             ),
             h('div', { class: 'form-grid form-grid-2', style: 'margin-top:8px' },
               boolField('purchase_includes_vat', 'Nákupní ceny v importu jsou s DPH', 'Standard POHODY je bez DPH. Zapněte, pokud váš export obsahuje nákupní ceny s DPH – přepočtou se.'),

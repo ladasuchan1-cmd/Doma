@@ -557,6 +557,102 @@ function xmlRootAttrs(text) {
  * @returns {{format: string, itemPath: string|null, offersPath: string|null, records: object[], headers: string[], truncated: boolean,
  *   delimiter: string|null, context: string[]}} delimiter = oddělovač CSV; context = klíče zděděné z kořene (obálky)
  */
+// ---------------------------------------------------------------------------------------------------------
+// Excel tabulka s výchozími názvy sloupců („Column1“, „Sloupec1“…) – skutečné hlavičky jsou v prvním řádku dat.
+
+const DEFAULT_HEADER_RE = /^(column|sloupec|spalte|col|kolumna|stlpec|stĺpec)[ _]?\d+$/i;
+
+function promoteHeaderRow(headers, rows) {
+  if (!headers || !headers.length || !rows || !rows.length) return null;
+  if (!headers.every((h) => DEFAULT_HEADER_RE.test(String(h).trim()))) return null;
+  const first = rows[0];
+  const cells = headers.map((h) => (first[h] == null ? '' : String(first[h]).trim()));
+  // první řádek musí vypadat jako hlavičky: vyplněné, ne čísla
+  if (cells.filter(Boolean).length < Math.ceil(headers.length / 2)) return null;
+  if (cells.some((c) => c && /^-?[\d\s.,]+$/.test(c))) return null;
+  const names = formats.normalizeHeaders(cells);
+  const out = [];
+  for (let i = 1; i < rows.length; i++) {
+    const r = rows[i];
+    const o = {};
+    for (let j = 0; j < headers.length; j++) setOwn(o, names[j], r[headers[j]] ?? '');
+    out.push(o);
+  }
+  return { headers: names, rows: out };
+}
+
+// ---------------------------------------------------------------------------------------------------------
+// „Matice“ cen: řádek = produkt, sloupec = konkurent („kupkolo.cz heureka-cz“: 1099). Pro import nabídek se rozloží na
+// řádky produkt × konkurent {…identifikace, competitor, price}; prázdné buňky se přeskočí.
+
+const SHOP_RE = /(?:^|[\s(/@])((?:[a-z0-9-]+\.)+(?:cz|sk|com|eu|de|at|pl|hu|net|org|shop|store|info|biz|co\.uk|fr|it|es|nl|be|ch|ro|si|hr))(?=$|[\s)/,;:])/i;
+
+/** Název konkurenta z hlavičky sloupce: „kupkolo.cz heureka-cz“ → „kupkolo.cz“ (jinak hlavička beze změny). */
+function shopFromHeader(h) {
+  const m = SHOP_RE.exec(String(h).trim().toLowerCase());
+  return m ? m[1].replace(/^www\./, '') : String(h).trim();
+}
+
+function isNumericCell(v) {
+  if (typeof v === 'number') return Number.isFinite(v);
+  if (v == null) return false;
+  const s = String(v).trim();
+  return s !== '' && /^-?[\d\s .,]+(\s*(kč|czk|,-|\.-))?$/i.test(s);
+}
+
+/**
+ * Najde sloupce konkurentů v matici. mapping.wide: false = nikdy; {competitor_columns: [...]} = explicitně;
+ * jinak automaticky – jen u nabídek bez namapované ceny/konkurenta, sloupce s názvem obchodu (doména) a číselnými hodnotami.
+ */
+function detectWideColumns(headers, records, m) {
+  const w = m.wide;
+  if (w === false || w === 'none') return null;
+  if (w && Array.isArray(w.competitor_columns) && w.competitor_columns.length) {
+    const cols = w.competitor_columns.map(String).filter((c) => headers.includes(c));
+    return cols.length ? cols : null;
+  }
+  const fields = (m.fields && typeof m.fields === 'object') ? m.fields : {};
+  if (fields.price || fields.competitor || (m.defaults && m.defaults.competitor)) return null;
+  const sample = records.slice(0, 500);
+  const cols = headers.filter((h) => {
+    if (!SHOP_RE.test(String(h).toLowerCase())) return false;
+    let filled = 0;
+    let numeric = 0;
+    for (const r of sample) {
+      const v = r[h];
+      if (v === '' || v == null) continue;
+      filled++;
+      if (isNumericCell(v)) numeric++;
+    }
+    return filled === 0 ? sample.length > 0 : numeric / filled >= 0.8;
+  });
+  // aspoň jeden sloupec obchodu s nějakou hodnotou v celých datech a aspoň jeden identifikační sloupec
+  if (!cols.length || cols.length === headers.length) return null;
+  const any = cols.some((c) => records.some((r) => r[c] !== '' && r[c] != null));
+  return any ? cols : null;
+}
+
+function unpivotWide(records, headers, cols) {
+  const colSet = new Set(cols);
+  const idCols = headers.filter((h) => !colSet.has(h));
+  const rename = (k) => (k === 'competitor' || k === 'price' ? `${k}_puvodni` : k);
+  const shops = cols.map(shopFromHeader);
+  const out = [];
+  for (const r of records) {
+    const base = {};
+    for (const k of idCols) setOwn(base, rename(k), r[k]);
+    for (let i = 0; i < cols.length; i++) {
+      const v = r[cols[i]];
+      if (v === '' || v == null) continue;
+      const row = { ...base };
+      setOwn(row, 'competitor', shops[i]);
+      setOwn(row, 'price', v);
+      out.push(row);
+    }
+  }
+  return { records: out, headers: [...idCols.map(rename), 'competitor', 'price'], wide: { columns: cols, competitors: [...new Set(shops)], rows: records.length } };
+}
+
 function extractRecords(input, mapping = {}, opts = {}) {
   const m = mapping && typeof mapping === 'object' ? mapping : {};
   const kind = opts.kind || null;
@@ -657,6 +753,17 @@ function extractRecords(input, mapping = {}, opts = {}) {
     }
   }
 
+  // Excel tabulka s výchozími názvy sloupců → hlavičky jsou v prvním řádku
+  let headerPromoted = false;
+  if (flatRows) {
+    const pr = promoteHeaderRow(headers, flatRows);
+    if (pr) {
+      headers = pr.headers;
+      flatRows = pr.rows;
+      headerPromoted = true;
+    }
+  }
+
   if (source.length > limit) {
     source = source.slice(0, limit);
     truncated = true;
@@ -690,6 +797,19 @@ function extractRecords(input, mapping = {}, opts = {}) {
     }
   }
 
+  // matice cen (sloupec = konkurent) → řádky produkt × konkurent
+  let wide = null;
+  if (kind === 'offers' && records.length) {
+    const hs = headers || Object.keys(records[0] || {});
+    const cols = detectWideColumns(hs, records, m);
+    if (cols) {
+      const u = unpivotWide(records, hs, cols);
+      records = u.records;
+      headers = u.headers;
+      wide = u.wide;
+    }
+  }
+
   if (!headers) {
     // klíče ze VŠECH záznamů (řídký sloupec, např. EAN až od 1001. položky, se jinak nenamapuje – data-13)
     headers = [];
@@ -704,7 +824,7 @@ function extractRecords(input, mapping = {}, opts = {}) {
       }
     }
   }
-  return { format, itemPath, offersPath, records, headers, truncated, delimiter, context: context ? Object.keys(context) : [] };
+  return { format, itemPath, offersPath, records, headers, truncated, delimiter, context: context ? Object.keys(context) : [], wide, headerPromoted };
 }
 
-module.exports = { extractRecords, flattenRecord, detectOffersPath, splitPath, getPath, LIMITS };
+module.exports = { extractRecords, flattenRecord, detectOffersPath, splitPath, getPath, shopFromHeader, LIMITS };

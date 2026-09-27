@@ -64,6 +64,12 @@ dvakrát souběžně (plánovač + ruční spuštění → 409).
 2. **Import konkurence** – řádek = produkt × konkurent: identifikace (náš kód / EAN / kód výrobce), konkurent, cena s DPH,
    doprava, dostupnost, URL, čas zjištění. Párování: kód → EAN → MPN → ruční párování. Nespárované nabídky najdete
    v záložce Konkurence a spárujete je ručně (párování se zapamatuje).
+   **Matice cen** (řádek = produkt, sloupec = konkurent, např. export sledování Heureky se sloupci
+   „kupkolo.cz heureka-cz“, „moolbike.cz heureka-cz“…) se pozná sama a rozloží na řádky produkt × konkurent; prázdné
+   buňky se vynechají. Pokud je v matici i váš vlastní obchod, zadejte ho v **Nastavení → Vlastní e-shop v datech
+   konkurence** – jeho ceny se přeskočí (vaše cena se bere z katalogu). Nabídky, které nenesou kód, EAN ani MPN, se
+   párují podle **přesného názvu** produktu (bez ohledu na velikost písmen, diakritiku a mezery); víc produktů se stejným
+   názvem = nejednoznačné, k ručnímu spárování.
 3. **Segmenty** – filtry nad jakýmikoli poli a metrikami (výrobce ∈ {…}, N ∈ {N7, N8}, marže < 15 %, jsme nejdražší,
    počet konkurentů ≥ 2, dny zásoby > 90, …), skupiny A/NEBO, živý náhled.
 4. **Strategie** – seřazené podle priority; produkt dostane první strategii, jejíž segment (a volitelné podmínky a časové okno)

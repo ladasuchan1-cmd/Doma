@@ -121,7 +121,8 @@ test('contract-16: XML šablona nabízí všechna pole exportu serveru (i lowest
   const { XML_FIELDS } = await view();
   for (const f of ROW_FIELDS) assert.ok(XML_FIELDS.includes(f), 'chybí pole ' + f);
   const root = await render();
-  const chipsInput = root.querySelector('input.chips-input');
+  // první chips v nastavení je „Vlastní e-shop“ – pole XML šablony má vlastní id
+  const chipsInput = root.querySelector('#settings-xml-fields');
   chipsInput.focus();
   await dom.settle();
   dom.type(chipsInput, 'lowest_30d');

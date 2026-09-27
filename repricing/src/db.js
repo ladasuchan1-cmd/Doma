@@ -307,6 +307,8 @@ const DEFAULT_SETTINGS = {
   // Paměť zamítnutí: stejnou cenu (±0,5 Kč), kterou člověk zamítl v posledních N dnech, přecenění znovu nenavrhne
   // (rozhodnutí „beze změny“, důvod rejected_before). 0 = vypnuto.
   reject_memory_days: 14,
+  // Vlastní e-shop(y) v datech o konkurenci (např. „koloshop.cz“ ve sloupci matice z Heureky) – nabídky se přeskočí.
+  own_shops: [],
 };
 
 function nowIso(d) {

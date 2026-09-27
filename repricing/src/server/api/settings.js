@@ -107,6 +107,11 @@ const SCHEMA = {
   retention_days: num({ min: 0, max: 36500, integer: true }),
   retention_superseded_days: num({ min: 1, max: 36500, integer: true }),
   reject_memory_days: num({ min: 0, max: 365, integer: true }),
+  own_shops: (v) => {
+    if (!Array.isArray(v)) return 'musí být seznam názvů obchodů';
+    if (v.length > 20) return 'nejvýše 20 obchodů';
+    return v.every((x) => typeof x === 'string' && x.trim() && x.length <= 200) ? null : 'každá položka musí být neprázdný text (max. 200 znaků)';
+  },
 };
 
 const LABELS = {
@@ -118,6 +123,7 @@ const LABELS = {
   retention_days: 'Doba uchování dat (dny)',
   retention_superseded_days: 'Doba uchování nahrazených návrhů (dny)',
   reject_memory_days: 'Paměť zamítnutých cen (dny)',
+  own_shops: 'Vlastní e-shop v datech konkurence',
 };
 
 /** Projde (sloučený) objekt podle schématu; neznámé klíče v těle hlásí zvlášť. */

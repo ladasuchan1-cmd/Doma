@@ -197,6 +197,7 @@ function productLookup(db, bulk) {
       code: (k) => byCode.get(k) ?? null,
       ean: (k) => arr(byEan.get(k)),
       mpn: (k) => arr(byMpn.get(k)),
+      name: nameIndex(db, info),
     };
   }
   const qCode = db.prepare('SELECT id, active, vat_rate, ean_key FROM products WHERE code_key = ?');
@@ -224,6 +225,29 @@ function productLookup(db, bulk) {
     code: (k) => cached('c', k, () => remember(qCode.all(k))[0] ?? null),
     ean: (k) => cached('e', k, () => remember(qEan.all(k))),
     mpn: (k) => cached('m', k, () => remember(qMpn.all(k))),
+    name: nameIndex(db, info),
+  };
+}
+
+/**
+ * Párování podle přesného názvu (bez diakritiky, velikosti písmen a vícenásobných mezer) – index se načte líně
+ * při prvním použití. Používá se jen pro nabídky, které nenesou žádný jiný identifikátor (kód, EAN, MPN, ID).
+ */
+function nameIndex(db, info) {
+  let byName = null;
+  return (k) => {
+    if (!byName) {
+      byName = new Map();
+      for (const p of db.prepare('SELECT id, name, active, vat_rate, ean_key FROM products WHERE name IS NOT NULL').iterate()) {
+        const nk = nameMatchKey(p.name);
+        if (!nk) continue;
+        if (!info.has(p.id)) info.set(p.id, { active: p.active, vat_rate: p.vat_rate, ean_key: p.ean_key });
+        const cur = byName.get(nk);
+        if (cur) cur.push(p.id);
+        else byName.set(nk, [p.id]);
+      }
+    }
+    return byName.get(k) || [];
   };
 }
 
@@ -270,6 +294,15 @@ function importOffers(db, records, opts = {}) {
   const settings = getSettings(db);
   const vatDefault = settings.vat_rate_default != null && Number.isFinite(Number(settings.vat_rate_default)) ? Number(settings.vat_rate_default) : 21;
   const bulk = list.length > BULK_THRESHOLD || replace === 'all';
+  // vlastní e-shop v datech konkurence (např. sloupec „koloshop.cz“ v matici z Heureky) – není to konkurent
+  const ownKeys = new Set();
+  for (const n of [...(Array.isArray(settings.own_shops) ? settings.own_shops : []), ...(Array.isArray(opts.ownShops) ? opts.ownShops : [])]) {
+    const k = nameKey(n);
+    if (k) ownKeys.add(k);
+  }
+  if (ownKeys.size) stats.own_skipped = 0;
+  // párování podle názvu jen u nabídek bez jiného identifikátoru; opts.matchByName === false vypne
+  const matchByName = opts.matchByName !== false;
 
   tx(db, () => {
     const lookup = productLookup(db, bulk);
@@ -302,6 +335,10 @@ function importOffers(db, records, opts = {}) {
         const ck = list[i] && typeof list[i] === 'object' ? nameKey(normalizeText(list[i].competitor, true)) : null;
         if (ck) failedInPass.add(ck);
         else failedUnknownInPass++;
+        continue;
+      }
+      if (ownKeys.has(o.competitor_key)) {
+        stats.own_skipped++;
         continue;
       }
       for (const w of warnings) errs.add(row, w, { warning: true });
@@ -376,6 +413,14 @@ function importOffers(db, records, opts = {}) {
             candidates = null;
             reason = null;
           }
+        }
+        // 5. přesný název – jen když nabídka nemá kód, EAN, MPN ani ID (typicky export z Heureky jen s názvem)
+        if (pid == null && !candidates && !reason && matchByName && k.name && !k.code && !k.eans.length && !k.mpn && !k.ext) {
+          const nIds = preferActive(lookup.name(k.name), lookup);
+          if (nIds.length === 1) {
+            pid = nIds[0];
+            stats.matched_by_name = (stats.matched_by_name || 0) + 1;
+          } else if (nIds.length > 1) candidates = nIds;
         }
       }
 

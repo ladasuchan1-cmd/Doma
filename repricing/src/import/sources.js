@@ -205,6 +205,7 @@ function runImport(db, params = {}) {
       stats = tx(db, () => {
         const s = run();
         s.received = ex.records.length;
+        if (ex.wide) s.wide = { competitors: ex.wide.competitors, rows: ex.wide.rows };
         s.errors = allErrors();
         db.prepare("UPDATE imports SET status = 'ok', format = ?, finished_at = ?, stats = ? WHERE id = ?").run(format, nowIso(), JSON.stringify(s), importId);
         return s;
@@ -212,6 +213,7 @@ function runImport(db, params = {}) {
     }
     stats.received = ex.records.length;
     stats.errors = allErrors();
+    if (ex.wide) stats.wide = { competitors: ex.wide.competitors, rows: ex.wide.rows };
     const out = { import_id: importId, stats, format, itemPath: ex.itemPath };
     if (dryRun) {
       out.preview = mapped.canonical.slice(0, DRY_RUN_PREVIEW);
@@ -247,6 +249,14 @@ function previewImport(params = {}) {
   if (ex.context && ex.context.length) {
     errors.push({ row: null, message: `Z obálky souboru se do všech záznamů dědí: ${ex.context.map((k) => `„${k}“`).join(', ')}.`, warning: true });
   }
+  if (ex.headerPromoted) errors.push({ row: null, message: 'Hlavičky sloupců byly v prvním řádku tabulky (Excel „Column1…“) – použity ty.', warning: true });
+  if (ex.wide) {
+    errors.push({
+      row: null,
+      message: `Soubor je matice cen (sloupec = konkurent): ${ex.wide.competitors.map((c) => `„${c}“`).join(', ')} – rozloženo na řádky produkt × konkurent. Vlastní e-shop zadejte v Nastavení → Vlastní e-shop, jeho ceny se pak přeskočí.`,
+      warning: true,
+    });
+  }
   for (const key of compiled.missing) errors.push({ row: null, message: `Sloupec „${key}“ z mapování ve vstupu není.` });
   for (const key of compiled.unknownFields) errors.push({ row: null, message: `Neznámé kanonické pole „${key}“ v mapování (ignorováno).` });
   if (!ex.records.length) errors.push({ row: null, message: 'Ve vstupu nebyly nalezeny žádné záznamy.' });
@@ -268,6 +278,7 @@ function previewImport(params = {}) {
     errors,
     truncated: ex.truncated,
     context: ex.context || [],
+    wide: ex.wide || null,
   };
 }
 

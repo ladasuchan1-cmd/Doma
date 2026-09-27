@@ -784,3 +784,16 @@ Pages:
   rounding bands/directions incl. floor interaction, thresholds, auto-approve rules, stale/out-of-stock/outlier exclusion.
 - No unhandled promise rejections; server never crashes on bad input.
 - Performance target: run over 30 000 products × 8 competitors in < 5 s; import 200 000 offers in < 20 s.
+
+## 11. Matice cen, párování podle názvu, vlastní e-shop (doplněk)
+- `extractRecords` (kind `offers`): XLSX/CSV s výchozími názvy sloupců Excel tabulky (`Column1`, `Sloupec1`…) → hlavičky
+  z 1. řádku (`headerPromoted`). Matice cen (`wide`): sloupce, jejichž hlavička obsahuje doménu obchodu (`kupkolo.cz heureka-cz`)
+  a hodnoty jsou převážně čísla, se rozloží na řádky `{…identifikační sloupce, competitor: <doména>, price}`; prázdné buňky
+  se vynechají. Vypnutí `mapping.wide = false`, explicitně `mapping.wide = {competitor_columns: [...]}`; automaticky se
+  nepoužije, když mapování určuje `price`, `competitor` nebo `defaults.competitor`. Výsledek nese `wide = {columns, competitors, rows}`
+  (i ve `stats.wide` importu a v náhledu).
+- `importOffers`: krok 5 párování – přesný název (`nameMatchKey`) jen u nabídek bez kódu, EAN, MPN a ext ID; víc produktů
+  se stejným názvem (po preferenci jediného aktivního) = `ambiguous`. `stats.matched_by_name`. Vypnutí `opts.matchByName = false`.
+- Nastavení `own_shops` (seznam názvů obchodů, max. 20) – nabídky těchto „konkurentů“ se přeskočí (`stats.own_skipped`,
+  jen když je seznam neprázdný); konkurent se nezaloží.
+

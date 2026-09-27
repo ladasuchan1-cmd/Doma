@@ -40,6 +40,7 @@ const DEFAULT_SETTINGS = {
   retention_superseded_days: 14,
   // C1: stejná cena, kterou někdo zamítl, se po tuto dobu znovu nenavrhne (0 = vypnuto)
   reject_memory_days: 14,
+  own_shops: [],
 };
 
 // Kopie výchozí konfigurace strategie enginu (src/engine/presets.js DEFAULT_CONFIG – shodu hlídá test ui-strategy-sync).
