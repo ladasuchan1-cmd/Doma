@@ -74,3 +74,26 @@ test('název varianty z POHODY s „@“ se spáruje s názvem z Heureky', () =>
   assert.equal(s.matched, 1);
   assert.equal(s.matched_by_name, 1);
 });
+
+test('vážená nákupní cena má přednost u produktů skladem; služby se přeskočí', () => {
+  const db = openDb();
+  const r = runImport(db, {
+    kind: 'products',
+    now: NOW,
+    input: {
+      text: [
+        'Typ;Kód;Název;Nákupní;Vážená;Prodejní DPH;Stav zásoby;Členění',
+        'Karta;S1;Skladem;100;90;200;2;sSklad',
+        'Karta;S1;Skladem;100;0;200;0;sPRAHA', // členění bez zásoby s váženou 0 – do průměru se nepočítá
+        'Karta;S2;Skladem dvakrát;100;80;200;1;sSklad',
+        'Karta;S2;Skladem dvakrát;100;110;200;3;sBRNO', // průměr vážený stavem: (80·1 + 110·3) / 4 = 102,5
+        'Karta;N1;Bez zásoby;100;95;200;0;sSklad',
+        'Služba;SV1;Servis kola;0;0;500;0;sSklad',
+      ].join('\n'),
+    },
+  });
+  const pp = Object.fromEntries(db.prepare('SELECT code, purchase_price FROM products').all().map((p) => [p.code, p.purchase_price]));
+  assert.deepEqual(pp, { S1: 90, S2: 102.5, N1: 100 });
+  assert.equal(r.stats.skipped_services, 1);
+  assert.equal(previewImport({ kind: 'products', input: { text: 'Kód;Vážená\nA;1\n' } }).suggested.purchase_price_weighted, 'Vážená');
+});

@@ -146,6 +146,18 @@ function mergeDuplicateStock(list, rowOf, mode) {
     }
     const first = { ...list[group[0]] };
     if (any) first.stock = Math.round(sum * 1000) / 1000;
+    // vážená nákupka přes členění = průměr vážený stavem zásoby (členění bez zásoby mívají váženou cenu 0)
+    let wSum = 0;
+    let wQty = 0;
+    for (const i of group) {
+      const w = toNum(list[i].purchase_price_weighted);
+      const q = toNum(list[i].stock);
+      if (typeof w === 'number' && w > 0 && typeof q === 'number' && q > 0) {
+        wSum += w * q;
+        wQty += q;
+      }
+    }
+    if (wQty > 0) first.purchase_price_weighted = Math.round((wSum / wQty) * 10000) / 10000;
     replaced.set(group[0], first);
     for (const i of group.slice(1)) drop.add(i);
     codes++;
@@ -159,6 +171,19 @@ function mergeDuplicateStock(list, rowOf, mode) {
     rows.push(rowOf(i));
   });
   return { list: out, rows, merged: { codes, rows: drop.size } };
+}
+
+/** Řádek je služba (sloupec „Typ“ / „Typ zásoby“ = „Služba“ / „service“) – ne zboží k přecenění. */
+function isService(r) {
+  const a = r && r.attrs && typeof r.attrs === 'object' ? r.attrs : null;
+  if (!a) return false;
+  for (const k of Object.keys(a)) {
+    const f = attrFold(k);
+    if (f !== 'typ' && f !== 'typ_zasoby' && f !== 'type' && f !== 'item_type') continue;
+    const v = attrFold(a[k] ?? '');
+    if (v === 'sluzba' || v === 'service' || v === 'sluzby') return true;
+  }
+  return false;
 }
 
 function normalizeRecord(rec) {
@@ -194,6 +219,12 @@ function normalizeRecord(rec) {
     if (d == null && rec.locked_until !== null && rec.locked_until !== '') warnings.push(`Pole „Zamčeno do“: neplatné datum „${rec.locked_until}“`);
     else set.locked_until = d;
   }
+  // vážená nákupní cena (POHODA „Vážená“) má u produktů SKLADEM přednost – odpovídá skutečné ceně zásoby
+  if (rec.purchase_price_weighted !== undefined) {
+    const w = toNum(rec.purchase_price_weighted);
+    const st = set.stock !== undefined ? set.stock : toNum(rec.stock);
+    if (typeof w === 'number' && w > 0 && typeof st === 'number' && st > 0) set.purchase_price = w;
+  }
   // sazba DPH z poměru cen s DPH a bez DPH (POHODA „Prodejní DPH“ / „Prodejní“), když ji soubor nemá
   if (rec.vat_rate === undefined && rec.price_net !== undefined && set.price != null) {
     const v = vatFromNet(set.price, toNum(rec.price_net));
@@ -222,7 +253,27 @@ function importProducts(db, records, opts = {}) {
   const stats = { received: input.length, created: 0, updated: 0, unchanged: 0, deactivated: 0, superseded: 0, errors: [] };
   // stejná karta ve více členěních skladu → jeden záznam se součtem stavu zásoby
   const inputRowOf = (i) => (opts.rowNumbers && opts.rowNumbers[i] != null ? opts.rowNumbers[i] : i + 1);
-  const md = mergeDuplicateStock(input, inputRowOf, opts.sumDuplicateStock === undefined ? 'auto' : opts.sumDuplicateStock);
+  // služby (POHODA „Typ“ = Služba) se nepřeceňují – řádky se přeskočí (opts.skipServices = false vypne)
+  let src = input;
+  let srcRows = input.map((_, i) => inputRowOf(i));
+  if (opts.skipServices !== false) {
+    const keep = [];
+    const rows = [];
+    let skipped = 0;
+    input.forEach((r, i) => {
+      if (isService(r)) skipped++;
+      else {
+        keep.push(r);
+        rows.push(inputRowOf(i));
+      }
+    });
+    if (skipped) {
+      stats.skipped_services = skipped;
+      src = keep;
+      srcRows = rows;
+    }
+  }
+  const md = mergeDuplicateStock(src, (i) => srcRows[i], opts.sumDuplicateStock === undefined ? 'auto' : opts.sumDuplicateStock);
   const list = md.list;
   if (md.merged.codes) stats.stock_merged = md.merged;
   const createMissing = opts.createMissing !== false;

@@ -49,6 +49,8 @@ function importOptions(kind, options = {}) {
       createMissing: createOpt(o.createMissing ?? o.create_missing),
       // stejný kód ve více členěních skladu: 'auto' (výchozí) sečte stav zásoby, když se řádky liší členěním; 1 vždy; 0 nikdy
       sumDuplicateStock: sumOpt(o.sumDuplicateStock ?? o.sum_duplicate_stock),
+      // služby (Typ = Služba) se nezakládají ani neaktualizují; skip_services = 0 vypne
+      skipServices: createOpt(o.skipServices ?? o.skip_services),
     };
   }
   const maxAge = o.maxAgeDays ?? o.max_age_days;

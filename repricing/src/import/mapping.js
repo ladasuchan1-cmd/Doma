@@ -55,6 +55,12 @@ const CANONICAL = {
     { key: 'purchase_price', label: 'Nákupní cena (bez DPH)', type: 'number' },
     { key: 'price', label: 'Prodejní cena (s DPH)', type: 'number' },
     {
+      key: 'purchase_price_weighted',
+      label: 'Vážená nákupní cena (bez DPH)',
+      type: 'number',
+      help: 'U produktů SKLADEM má přednost před nákupní cenou (POHODA „Vážená“ = průměr skutečných nákupů). Bez zásoby nebo s nulou platí nákupní cena.',
+    },
+    {
       key: 'price_net',
       label: 'Prodejní cena bez DPH (pro odvození sazby DPH)',
       type: 'number',
@@ -139,6 +145,7 @@ const ALIASES = {
     owner: ['owner', 'zodpovednaosoba', 'zodpovedny', 'odpovednaosoba', 'responsible', 'responsibleperson', 'categorymanager', 'productmanager', 'produktovymanazer', 'manager', 'spravce', 'nakupci', 'buyer'],
     purchase_price: ['purchaseprice', 'nakupnicena', 'nakupni', 'nakupnicenabezdph', 'nakupbezdph', 'cenanakupni', 'nakup', 'cost', 'costprice', 'unitcost', 'purchasingprice', 'buyprice', 'wholesaleprice', 'nakupka'],
     price: COMMON_ALIASES.price,
+    purchase_price_weighted: ['vazena', 'vazenanakupnicena', 'vazenacena', 'vazenanakupni', 'weightedpurchaseprice', 'stockheaderweightedpurchaseprice', 'weightedcost', 'averagecost', 'prumernanakupnicena'],
     price_net: ['prodejni', 'prodejnibezdph', 'prodejnicenabezdph', 'pricenet', 'priceexclvat', 'pricewithoutvat', 'sellingpricenet'],
     vat_rate: ['vatrate', 'vat', 'dph', 'sazbadph', 'dphsazba', 'sazbadphprodej', 'sellingratevat', 'ratevat', 'vatpercent', 'dphprocent', 'taxrate', 'tax'],
     msrp: ['msrp', 'rrp', 'moc', 'dopmoc', 'doporucenamoc', 'mocsdph', 'mocvcdph', 'doporucenacena', 'doporucenaprodejnicena', 'doporucenamaloobchodnicena', 'recommendedprice', 'recommendedretailprice', 'standardprice', 'listprice', 'cenikovacena'],

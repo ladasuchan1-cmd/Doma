@@ -410,8 +410,8 @@ const STRATEGY_PRESETS = [
     priority: 20,
     segment: {
       name: 'Ležáky N7/N8',
-      description: 'Stáří zásoby (atribut N) je N7 nebo N8.',
-      filter: { field: 'attrs.N', op: 'in', value: ['N7', 'N8'] },
+      description: 'Stáří zásoby N7 nebo N8 (atribut „N“ = N7/N8, nebo POHODA „Zdraví zboží“ = 7/8).',
+      filter: { any: [{ field: 'attrs.N', op: 'in', value: ['N7', 'N8'] }, { field: 'attrs.Zdraví zboží', op: '>=', value: 7 }] },
     },
     config: P({
       target: { mode: 'undercut_min', offset_pct: -1 },

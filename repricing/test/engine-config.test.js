@@ -143,7 +143,8 @@ test('presets: všechny předvolby jsou platné a úplné', () => {
   ])
     assert.ok(byName[n], `chybí předvolba ${n}`);
   const n78 = byName['Ležáky N7/N8 – doprodej'];
-  assert.deepEqual(n78.segment.filter, { field: 'attrs.N', op: 'in', value: ['N7', 'N8'] });
+  // N-kategorie jako atribut „N“ (N7/N8) nebo z POHODY „Zdraví zboží“ (7/8)
+  assert.deepEqual(n78.segment.filter, { any: [{ field: 'attrs.N', op: 'in', value: ['N7', 'N8'] }, { field: 'attrs.Zdraví zboží', op: '>=', value: 7 }] });
   assert.equal(n78.config.target.mode, 'undercut_min');
   assert.equal(n78.config.target.offset_pct, -1);
   assert.equal(n78.config.limits.min_margin_pct, 3);
