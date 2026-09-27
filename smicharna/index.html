@@ -701,7 +701,7 @@
     const sample = state.aiOff ? null : state.sample;
     if (sample) {
       try {
-        const reply = await sample.json(P.aiPrompt(text, programId), { modelTier: 'quick', cache: opts.fresh ? false : true });
+        const reply = await sample.json(P.aiPrompt(text, programId, opts.context), { modelTier: 'quick', cache: opts.fresh ? false : true });
         const ok = P.checkAi(reply, text);
         if (ok) return Object.assign(ok, { program: P.getProgram(programId).id });
       } catch (e) {
@@ -1193,7 +1193,7 @@
     state.drafts.set(p.id, '');
     state.notices.delete(p.id);
     scheduleRender();
-    const res = await washText(text, p.program, {});
+    const res = await washText(text, p.program, { context: p.text || p.url });
     state.pending.delete(p.id);
     const c = {
       postId: p.id, authorId: state.me.id || null, who: state.me.key, nick: myNick(),

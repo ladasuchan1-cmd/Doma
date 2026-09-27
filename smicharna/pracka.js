@@ -37,6 +37,8 @@
   const START = '(?<![\\p{L}\\p{N}])';
   const END = '(?![\\p{L}\\p{N}])';
   const has = (o, k) => Object.prototype.hasOwnProperty.call(o, k);
+  // Koncovky přídavných jmen psané s diakritikou: „hrozný“ ano, „hrozny“ (hrozen) ani „hrozně dobrý“ ne
+  const ADJ = /^(ý|á|é|ého|ému|ém|ým|ou|ých|ými|ej|ejch|ější|ejší|ějších|ějším)$/;
 
   function matchCase(src, out) {
     const letters = src.replace(/[^\p{L}]/gu, '');
@@ -82,7 +84,12 @@
   // Pořadí je důležité: fráze a delší kmeny před kratšími.
   const RULES = [
     // Výhrůžky a nenávist – celá zpráva jde do šablony
-    exact({ 'zabij se': '', 'zabiju tě': '', 'chcípni': '', 'chcípneš': '', 'zdechni': '', 'oběs se': '', 'skoč z okna': '', 'umři': '', 'podřežu': '', 'zmlátím tě': '', 'rozbiju ti hubu': '', 'kill yourself': '', 'kys': '' }, SEVERE),
+    exact({
+      'zabij se': '', 'jdi se zabít': '', 'zabiju tě': '', 'zabiju vás': '', 'zabiju ho': '', 'zabiju ji': '',
+      'chcípni': '', 'chcípneš': '', 'chcípněte': '', 'zdechni': '', 'zdechneš': '', 'zdechněte': '', 'oběs se': '', 'umři': '',
+      'skoč z okna': '', 'skoč pod vlak': '', 'trefí tě šlak': '', 'podřežu': '', 'zmlátím tě': '',
+      'rozbiju ti hubu': '', 'rozbiju ti držku': '', 'dám ti přes držku': '', 'kill yourself': '', 'kys': '',
+    }, SEVERE),
     swap('negr', null, SEVERE),
     swap('buzn', null, SEVERE),
     swap('buzerant', null, SEVERE),
@@ -94,9 +101,11 @@
     // Fráze
     exact({
       'ty vole': 'ty zlato', 'do prdele': 'do pohádky', 'v prdeli': 'v pohádce', 'do háje': 'do cukrárny',
-      'drž hubu': 'usměj se', 'drž tlamu': 'usměj se', 'zavři hubu': 'usměj se', 'zavři tlamu': 'usměj se', 'sklapni': 'usměj se',
+      'do píči': 'do pohádky', 'ty prase': 'ty princi',
+      'drž hubu': 'usměj se', 'drž tlamu': 'usměj se', 'drž držku': 'usměj se', 'zavři hubu': 'usměj se', 'zavři tlamu': 'usměj se', 'sklapni': 'usměj se',
       'sere mě to': 'baví mě to', 'sere mě': 'baví mě', 'serou mě': 'baví mě', 'seru na to': 'slavím to',
-      'what the fuck': 'wow', 'wtf': 'wow', 'fuck you': 'love you', 'fuck off': 'love you',
+      'neser mě': 'usměj se', 'neser': 'neboj', 'nesrat': 'neřešit', 'sereš': 'slavíš', 'sere': 'slaví',
+      'what the fuck': 'wow', 'wtf': 'wow', 'fuck you': 'love you', 'fuck off': 'love you', 'stfu': 'usměj se',
     }, MILD),
     exact({
       'nikoho to nezajímá': 'všechny to baví', 'nikoho to nebaví': 'všechny to baví', 'nikoho nezajímá': 'všechny baví', 'nikoho nebaví': 'všechny baví',
@@ -104,7 +113,40 @@
     }, NEG),
 
     // Vulgarismy a urážky → podobně znějící hezká slova
-    exact({ 'vole': 'zlato', 'vůl': 'kamarád', 'fucking': 'fantastic', 'fuck': 'fajn', 'shit': 'šik', 'bullshit': 'bomba' }, MILD),
+    exact({
+      'vole': 'zlato', 'vůl': 'kamarád', 'fucking': 'fantastic', 'fuck': 'fajn', 'shit': 'šik', 'bullshit': 'bomba',
+      'bitch': 'princezna', 'asshole': 'andílek', 'motherfucker': 'miláček', 'sucks': 'rocks',
+      'svině': 'sluníčko', 'sviňa': 'sluníčko', 'sviňo': 'sluníčko', 'sviňák': 'sluníčko', 'sviňáku': 'sluníčko', 'svinstvo': 'paráda', 'sviňárna': 'paráda',
+      'mrdat': 'tancovat', 'mrdá': 'tancuje', 'mrdej': 'tancuj', 'mrdám': 'tancuju', 'mrdal': 'tancoval', 'vymrdaný': 'vymazlený', 'vymrdanej': 'vymazlenej',
+      'šukat': 'tancovat', 'šuká': 'tancuje', 'šukej': 'tancuj',
+      'jebat': 'jásat', 'jebe': 'jásá', 'jebu': 'jásám', 'jebni': 'jásej', 'jebnutý': 'nadšený', 'jebnutej': 'nadšenej', 'jebnutá': 'nadšená',
+      'vyjebaný': 'vymazlený', 'vyjebanej': 'vymazlenej', 'vyjebat': 'vymazlit', 'zajebaný': 'zasloužený', 'zajebanej': 'zaslouženej',
+      'downe': 'drahoušku', 'downík': 'drahoušek', 'downíku': 'drahoušku',
+      'mrzáci': 'mazlíci', 'hlupáci': 'hrdinové', 'cvoci': 'cvrčci',
+    }, MILD),
+    forms('zkurvysyn', { '*': 'zlatíčko', '': 'zlatíčko', i: 'zlatíčka', ove: 'zlatíčka' }, MILD),
+    // „kripl“ a další urážky kvůli postižení
+    forms('kripl', { '': 'klaďas', a: 'klaďase', e: 'klaďasi', em: 'klaďasem', ovi: 'klaďasovi', ove: 'klaďasové', i: 'klaďasové', u: 'klaďasů', um: 'klaďasům', y: 'klaďasy', ama: 'klaďasama' }, MILD),
+    forms('mrzák', { '': 'mazlík', u: 'mazlíku', a: 'mazlíka', em: 'mazlíkem', ovi: 'mazlíkovi' }, MILD),
+    forms('postižen', { ej: 'nadanej', ec: 'nadšenec', ce: 'nadšenče', ci: 'nadšenci', cem: 'nadšencem', cu: 'nadšenců' }, MILD),
+    forms('mongol', { e: 'miláčku', oid: 'miláček', oide: 'miláčku', oidi: 'miláčci' }, MILD),
+    forms('magor', { '': 'miláček', e: 'miláčku', a: 'miláčka', em: 'miláčkem', i: 'miláčci', ove: 'miláčci', u: 'miláčků' }, MILD),
+    forms('cvok', { '': 'cvrček', u: 'cvrčku', a: 'cvrčka', em: 'cvrčkem', ove: 'cvrčci' }, MILD),
+    forms('sráč', { '': 'sladkáč', i: 'sladkáči', e: 'sladkáče', em: 'sladkáčem', u: 'sladkáčů', ove: 'sladkáči' }, MILD),
+    forms('pitom', { ec: 'poklad', ce: 'poklade', ci: 'poklady', cem: 'pokladem', cu: 'pokladů', y: 'pohádkový', a: 'pohádková', e: 'pohádkové', ej: 'pohádkovej', eho: 'pohádkového', ost: 'pohádka', osti: 'pohádky' }, MILD),
+    forms('hlupák', { '': 'hrdina', u: 'hrdino', a: 'hrdinu', em: 'hrdinou', ovi: 'hrdinovi' }, MILD),
+    forms('tup', { ec: 'tulipán', ce: 'tulipáne', ci: 'tulipáni', cem: 'tulipánem', cu: 'tulipánů' }, MILD),
+    forms('imbecil', { '': 'iluzionista', e: 'iluzionisto', a: 'iluzionistu', i: 'iluzionisté', ove: 'iluzionisté', em: 'iluzionistou', ni: 'kouzelný', ne: 'kouzelně' }, MILD),
+    forms('zmet', { ek: 'zázrak', ku: 'zázraku', ka: 'zázraka', kem: 'zázrakem', ci: 'zázraky' }, MILD),
+    forms('parchant', { '': 'princ', e: 'princi', a: 'prince', i: 'princové', ove: 'princové', em: 'princem', u: 'princů' }, MILD),
+    forms('dobyt', { ek: 'drahoušek', ku: 'drahoušku', ka: 'drahouška', kem: 'drahouškem', ci: 'drahoušci' }, MILD),
+    forms('kráv', { a: 'kráska', o: 'krásko', y: 'krásky', u: 'krásku', ou: 'kráskou', e: 'krásce' }, MILD), // „kravina“ zůstává
+    forms('děvk', { a: 'víla', o: 'vílo', y: 'víly', u: 'vílu', ou: 'vílou', ama: 'vílama' }, MILD),
+    forms('šlapk', { a: 'šikulka', o: 'šikulko', y: 'šikulky', u: 'šikulku', ou: 'šikulkou' }, MILD),
+    forms('čubk', { a: 'kočička', o: 'kočičko', y: 'kočičky', u: 'kočičku', ou: 'kočičkou' }, MILD),
+    forms('kund', { a: 'kytka', o: 'kytko', y: 'kytky', u: 'kytku', ou: 'kytkou', icka: 'kytička' }, MILD),
+    forms('mrdk', { a: 'medvídek', o: 'medvídku', y: 'medvídci', u: 'medvídka', ou: 'medvídkem' }, MILD),
+    forms('držk', { a: 'tvářička', u: 'tvářičku', o: 'tvářičko', ou: 'tvářičkou', y: 'tvářičky' }, MILD),
     swap('kurevsk', 'královsk', MILD),
     swap('zkurven', 'zkrášlen', MILD),
     swap('kurv', 'krás', MILD),
@@ -131,9 +173,10 @@
     exact({ 'čuráci': 'čarodějové' }, MILD),
     forms('čurák', { '': 'čaroděj', u: 'čaroději', a: 'čaroděje', em: 'čarodějem', ovi: 'čaroději', '*': 'čaroděj' }, MILD),
     swap('kokot', 'kamarád', MILD),
-    forms('hajzl', { '': 'hrdina', e: 'hrdino', a: 'hrdinu', i: 'hrdinové', ove: 'hrdinové', ovi: 'hrdinovi', em: 'hrdinou', u: 'hrdinů', '*': 'hrdina' }, MILD),
+    forms('hajzl', { '': 'hrdina', e: 'hrdino', a: 'hrdinu', i: 'hrdinové', ove: 'hrdinové', ovi: 'hrdinovi', em: 'hrdinou', u: 'hrdinů', iku: 'hrdino' }, MILD),
     swap('šmejd', 'šperk', MILD),
-    exact({ 'stupid': 'super', 'loser': 'legenda', 'cringe': 'roztomilé' }, NEG),
+    exact({ 'stupid': 'super', 'loser': 'legenda', 'cringe': 'roztomilé', 'trash': 'poklad', 'garbage': 'poklad', 'lame': 'legendární' }, NEG),
+    forms('lůzr', { '': 'legenda', e: 'legendo', a: 'legendu', i: 'legendy', ove: 'legendy', em: 'legendou' }, NEG),
 
     // Negativní hodnocení bez sprostých slov
     swap('trapn', 'třpytiv', NEG, { nej: true }),
@@ -147,8 +190,7 @@
     swap('hloup', 'hrav', NEG, { nej: true }),
     swap('uboh', 'úchvatn', NEG, { nej: true }),
     forms('ubožák', { '': 'šikula', u: 'šikulo', '*': 'šikula' }, NEG),
-    // „hrozný“ ano, „hrozny“ (hrozen) a „hrozně dobrý“ ne
-    swap('hrozn', 'úžasn', NEG, { nej: true, only: (b, raw) => /^(ý|á|é|ého|ému|ém|ým|ou|ých|ými|ej|ejch|ější|ejší|ějších|ějším)$/.test(raw) }),
+    swap('hrozn', 'úžasn', NEG, { nej: true, only: (b, raw) => ADJ.test(raw) }),
     swap('otřesn', (b, raw) => (raw === 'ě' ? 'kouzelně' : 'okouzlující'), NEG),
     exact({ 'nejhorší': 'nejlepší' }, NEG),
     swap('nevtipn', 'vtipn', NEG, { nej: true }),
@@ -156,7 +198,26 @@
     swap('nesmysl', 'nápad', NEG),
     exact({ 'odpad': 'poklad', 'odpadu': 'pokladu' }, NEG),
     exact({ 'nesnáším': 'zbožňuju', 'nesnášim': 'zbožňuju', 'nenávidím': 'zbožňuju', 'nenávidim': 'zbožňuju' }, NEG),
+    swap('odporn', 'úžasn', NEG, { nej: true }),
+    swap('příšern', 'přenádhern', NEG, { nej: true }),
+    swap('nesnesiteln', 'neodolateln', NEG, { nej: true }),
+    // jen přídavná jména: „zbytečný“ ano, „zbytečně jsem se bál“ ne
+    swap('zbytečn', 'užitečn', NEG, { nej: true, only: (b, raw) => ADJ.test(raw) }),
+    swap('děsn', 'báječn', NEG, { nej: true, only: (b, raw) => ADJ.test(raw) }),
   ];
+
+  // Rýpnutí do rodiny („tvoje máma…“, „tvůj fotr…“) – samo o sobě nevadí, s urážkou jde celé do šablony
+  const FAMILY = new RegExp(
+    START + '(?:' + ['tvoje', 'tvoji', 'tvojí', 'tvou', 'tvá', 'tvý', 'tvůj', 'tvýho', 'tvého', 'tvojeho'].map(loose).join('|') + ')\\s+(?:' +
+    ['mám', 'mamk', 'mamink', 'matk', 'matc', 'máti', 'star', 'fotr', 'tát', 'tatík', 'taťk', 'otc', 'otec', 'sestr', 'ségr', 'bab', 'děd',
+      'brách', 'brat', 'žen', 'manžel', 'holk', 'přítel', 'chlap', 'rodin', 'rodič', 'děck', 'dět', 'syn', 'dcer'].map(loose).join('|') + ')\\p{L}*' + END +
+    '|' + START + '(?:yo|your|ur)\\s+(?:mama|momma|mom|mum|mother)' + END,
+    'iu');
+  // Samotné „Tvoje máma.“ jako odpověď je klasická urážka
+  const RETORT = new RegExp(
+    '^\\s*(?:a\\s+)?(?:' + ['tvoje', 'tvá'].map(loose).join('|') + ')\\s+(?:' + ['máma', 'mamka', 'matka', 'stará', 'máti'].map(loose).join('|') + ')[\\s.!?…]*$' +
+    '|^\\s*(?:yo|your)\\s+(?:mama|mom|mum)[\\s.!?]*$',
+    'iu');
 
   function apply(text) {
     const hits = [];
@@ -174,13 +235,18 @@
     return { out, hits };
   }
 
+  function classify(text) {
+    const src = String(text);
+    const { out, hits } = apply(src);
+    let level = hits.some((x) => x.level === SEVERE) ? SEVERE : hits.some((x) => x.level === MILD) ? MILD : hits.length ? NEG : 'clean';
+    if (RETORT.test(src) || (level !== 'clean' && FAMILY.test(src))) level = SEVERE;
+    return { out, hits, level };
+  }
+
   function detect(text) {
-    const { hits } = apply(text);
+    const { hits, level } = classify(text);
     const count = (lvl) => hits.filter((x) => x.level === lvl).length;
-    const severe = count(SEVERE);
-    const mild = count(MILD);
-    const neg = count(NEG);
-    return { severe, mild, neg, dirty: severe + mild > 0, level: severe ? SEVERE : mild ? MILD : neg ? NEG : 'clean' };
+    return { severe: count(SEVERE), mild: count(MILD), neg: count(NEG), dirty: level === SEVERE || level === MILD, level };
   }
 
   // --- Šablony programů -------------------------------------------------------
@@ -250,8 +316,7 @@
     opts = opts || {};
     const program = getProgram(programId);
     const input = String(text == null ? '' : text).replace(/\s+/g, ' ').trim();
-    const { out, hits } = apply(input);
-    const level = hits.some((x) => x.level === SEVERE) ? SEVERE : hits.some((x) => x.level === MILD) ? MILD : hits.length ? NEG : 'clean';
+    const { out, level } = classify(input);
     const result = { program: program.id, engine: 'local', level };
     if (level === 'clean') return Object.assign(result, { washed: false, text: input });
     const seed = hash(input) + (opts.variant | 0);
@@ -260,15 +325,19 @@
   }
 
   // --- Praní přes Claude --------------------------------------------------------
-  function aiPrompt(text, programId) {
+  // context = text příspěvku, pod kterým komentář je (nepovinné)
+  function aiPrompt(text, programId, context) {
     const p = getProgram(programId);
+    const post = String(context || '').replace(/\s+/g, ' ').trim().slice(0, 300);
     return [
       'You are "Pračka" (the washing machine) in Smíchárna, a friendly Czech community where friends share funny videos and jokes. You wash comments so that nobody gets hurt.',
       '',
       'Washing program: ' + p.name + ' (' + p.temp + ' °C) = write like ' + p.ai + '.',
+      post ? 'The MESSAGE is a comment under this post (context only): «' + post + '»' : '',
       '',
-      'Decide whether the MESSAGE contains swearing, vulgar words, insults, mockery, hate or threats, or is mean, dismissive or negative towards the post or its author.',
-      '- If it does, rewrite it in the style of the washing program. Keep the harmless topic, drop every negative part, and make it warm, kind and funny. No vulgar words, no insults, no sarcasm, no slurs.',
+      'Decide whether the MESSAGE contains swearing, vulgar words, insults, mockery, hate or threats, or is mean, dismissive or negative towards the post, its author or anyone else.',
+      'Count as insults too: yo-mama jokes and any jab at someone\'s family, slurs about disability, ethnicity, sexuality or looks (for example "kripl", "mongol", "buzna", "tlustá kráva"), and mean remarks disguised as banter. When unsure, wash it.',
+      '- If it does, rewrite it in the style of the washing program. Keep the harmless topic, drop every negative part and the insulting frame (never keep who the jab was aimed at), and make it warm, kind and funny. When nothing harmless is left, say something warm about the post. No vulgar words, no insults, no sarcasm, no slurs.',
       '- If it is already kind or neutral and has no vulgar words, return it unchanged.',
       '',
       "Write in the language of the MESSAGE (usually colloquial Czech with correct diacritics). Avoid gendered verb forms, because the author's gender is unknown. At most 2 short sentences; a poem may have 2 to 4 short rhyming lines. Never mention washing, rewriting or the original words.",

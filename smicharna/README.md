@@ -31,15 +31,16 @@ sed -e 's#<title>Smíchárna</title>#<title>Pračka na nadávky</title>#' \
 
 ## Jak pere
 
-1. **Claude** (`sample`, rychlý model) dostane zadání z `Pracka.aiPrompt()` – program, pravidla a zprávu
-   v oddělovačích jako nedůvěryhodná data – a vrátí `{"washed": …, "text": …}`. Pere na účtu toho, kdo
-   zrovna pere; při prvním praní se zeptá na svolení.
+1. **Claude** (`sample`, rychlý model) dostane zadání z `Pracka.aiPrompt()` – program, pravidla, text
+   příspěvku jako kontext a zprávu v oddělovačích jako nedůvěryhodná data – a vrátí `{"washed": …, "text": …}`.
+   Pere na účtu toho, kdo zrovna pere; při prvním praní se zeptá na svolení.
 2. Odpověď kontroluje `Pracka.checkAi()`: když je výstup pořád sprostý, nebo Claude tvrdí „čisté“,
    ale jsou tam nadávky, použije se rychloprogram.
 3. **Rychloprogram** (`Pracka.wash()`) běží bez AI přímo v prohlížeči. Pozná nadávky s diakritikou
    i bez ní, vymění je za podobně znějící hezká slova se správnou koncovkou („idiote“ → „idole“,
-   „blbče“ → „borče“, „nejtrapnější“ → „nejtřpytivější“) a výhrůžky nebo nenávist nahradí celé šablonou
-   daného programu.
+   „blbče“ → „borče“, „kriple“ → „klaďasi“, „nejtrapnější“ → „nejtřpytivější“) a výhrůžky, nenávist
+   nebo rýpnutí do rodiny („tvoje máma…“ spolu s urážkou, i samotné „Tvoje máma.“) nahradí celé
+   šablonou daného programu.
 
 ## Data (`db`)
 
