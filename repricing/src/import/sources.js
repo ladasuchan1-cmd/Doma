@@ -32,6 +32,11 @@ function createOpt(v) {
   return !(v === false || v === 0 || ['0', 'false', 'no', 'ne', 'off'].includes(String(v).trim().toLowerCase()));
 }
 
+function sumOpt(v) {
+  if (v === undefined || v === null || v === '' || v === 'auto') return 'auto';
+  return boolOpt(v);
+}
+
 /** Volby importu z API / zdroje (snake_case i camelCase). */
 function importOptions(kind, options = {}) {
   const o = options && typeof options === 'object' ? options : {};
@@ -42,6 +47,8 @@ function importOptions(kind, options = {}) {
       forceDeactivate: boolOpt(o.forceDeactivate ?? o.force_deactivate),
       // false = „jen aktualizovat existující produkty“ (neznámé kódy se nezakládají); výchozí true
       createMissing: createOpt(o.createMissing ?? o.create_missing),
+      // stejný kód ve více členěních skladu: 'auto' (výchozí) sečte stav zásoby, když se řádky liší členěním; 1 vždy; 0 nikdy
+      sumDuplicateStock: sumOpt(o.sumDuplicateStock ?? o.sum_duplicate_stock),
     };
   }
   const maxAge = o.maxAgeDays ?? o.max_age_days;

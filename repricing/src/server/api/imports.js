@@ -306,6 +306,16 @@ function importOptions(kind, source, q) {
       delete o.forceDeactivate;
       o.force_deactivate = boolValue(q.force_deactivate);
     }
+    if (q.sum_duplicate_stock !== undefined && String(q.sum_duplicate_stock).trim() !== '') {
+      // stejný kód ve více členěních skladu (POHODA): auto = sečíst stav, když se liší členění; 1 = vždy; 0 = nikdy
+      const v = String(q.sum_duplicate_stock).trim().toLowerCase();
+      if (v === 'auto') o.sum_duplicate_stock = 'auto';
+      else {
+        const b = boolValue(q.sum_duplicate_stock, null);
+        if (b === null) throw new HttpError(400, 'Parametr „sum_duplicate_stock“ musí být auto, 1 nebo 0.', { field: 'sum_duplicate_stock' });
+        o.sum_duplicate_stock = b;
+      }
+    }
     if (q.create_missing !== undefined && String(q.create_missing).trim() !== '') {
       // create_missing=0 → „jen aktualizovat“: neznámé kódy se nezakládají (stats.skipped_unknown, unknown_codes)
       delete o.createMissing;

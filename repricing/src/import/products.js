@@ -91,6 +91,76 @@ function parseAttrs(v) {
  * Z (kanonického) záznamu vybere a znormalizuje pole. Vrací {code, key, set: {pole: hodnota}, attrs, warnings}.
  * Pole s neplatnou hodnotou se vynechá a přidá se varování.
  */
+/** Zákonná sazba DPH (21 / 12 / 0 %) z poměru ceny s DPH a bez DPH; jiný poměr (zaokrouhlení, chyba) → null. */
+function vatFromNet(gross, netPrice) {
+  if (!(gross > 0) || !(netPrice > 0)) return null;
+  const r = (gross / netPrice - 1) * 100;
+  for (const v of [21, 12, 0]) if (Math.abs(r - v) <= 0.6) return v;
+  return null;
+}
+
+// atribut se členěním skladu (POHODA „Členění“, „Sklad“, „Středisko“…) – řádky téhož kódu z různých členění = jedna karta
+const STORAGE_ATTR_RE = /^(cleneni|sklad|storage|store|warehouse|stredisko|pobocka|provozovna)$/;
+
+/**
+ * Duplicitní kódy v jednom importu. POHODA exportuje stejnou kartu zvlášť pro každé členění skladu (sSklad, sPRAHA…) –
+ * správný stav zásoby je SOUČET. mode: 'auto' (výchozí) = sečíst, když se řádky liší členěním skladu (atribut „Členění“,
+ * „Sklad“…); true = sečíst vždy; false = nechat (platí poslední řádek). Ostatní pole bere z PRVNÍHO řádku kódu.
+ * @returns {{list: object[], rows: number[], merged: {codes: number, rows: number}}}
+ */
+function mergeDuplicateStock(list, rowOf, mode) {
+  if (mode === false) return { list, rows: list.map((_, i) => rowOf(i)), merged: { codes: 0, rows: 0 } };
+  const idx = new Map();
+  list.forEach((r, i) => {
+    const k = r && typeof r === 'object' ? codeKey(normalizeCode(r.code)) : null;
+    if (!k) return;
+    const a = idx.get(k);
+    if (a) a.push(i);
+    else idx.set(k, [i]);
+  });
+  const drop = new Set();
+  const replaced = new Map();
+  let codes = 0;
+  const storageOf = (r) => {
+    const a = r && r.attrs && typeof r.attrs === 'object' ? r.attrs : null;
+    if (!a) return undefined;
+    // podpis ze VŠECH sloupců členění/skladu (POHODA má „Středisko“ často prázdné a „Členění“ vyplněné)
+    const parts = [];
+    for (const k of Object.keys(a)) if (STORAGE_ATTR_RE.test(attrFold(k))) parts.push(String(a[k] ?? ''));
+    return parts.length ? parts.join('\u0001') : undefined;
+  };
+  for (const group of idx.values()) {
+    if (group.length < 2) continue;
+    if (mode !== true) {
+      const st = group.map((i) => storageOf(list[i]));
+      if (st.some((x) => x === undefined) || new Set(st).size < 2) continue;
+    }
+    let sum = 0;
+    let any = false;
+    for (const i of group) {
+      const n = toNum(list[i].stock);
+      if (typeof n === 'number' && Number.isFinite(n)) {
+        sum += n;
+        any = true;
+      }
+    }
+    const first = { ...list[group[0]] };
+    if (any) first.stock = Math.round(sum * 1000) / 1000;
+    replaced.set(group[0], first);
+    for (const i of group.slice(1)) drop.add(i);
+    codes++;
+  }
+  if (!codes) return { list, rows: list.map((_, i) => rowOf(i)), merged: { codes: 0, rows: 0 } };
+  const out = [];
+  const rows = [];
+  list.forEach((r, i) => {
+    if (drop.has(i)) return;
+    out.push(replaced.get(i) || r);
+    rows.push(rowOf(i));
+  });
+  return { list: out, rows, merged: { codes, rows: drop.size } };
+}
+
 function normalizeRecord(rec) {
   const warnings = [];
   const code = normalizeCode(rec.code);
@@ -124,6 +194,11 @@ function normalizeRecord(rec) {
     if (d == null && rec.locked_until !== null && rec.locked_until !== '') warnings.push(`Pole „Zamčeno do“: neplatné datum „${rec.locked_until}“`);
     else set.locked_until = d;
   }
+  // sazba DPH z poměru cen s DPH a bez DPH (POHODA „Prodejní DPH“ / „Prodejní“), když ji soubor nemá
+  if (rec.vat_rate === undefined && rec.price_net !== undefined && set.price != null) {
+    const v = vatFromNet(set.price, toNum(rec.price_net));
+    if (v != null) set.vat_rate = v;
+  }
   const attrs = rec.attrs !== undefined ? parseAttrs(rec.attrs) : null;
   const netFields = Array.isArray(rec.price_net_fields) ? rec.price_net_fields.filter((f) => GROSS_FIELDS.includes(f)) : [];
   return { code, key, set, attrs, warnings, priceIsNet: rec.price_is_net === true, netFields, purchaseIsGross: rec.purchase_is_gross };
@@ -142,9 +217,14 @@ function normalizeRecord(rec) {
  *   attrs_merged?: Object<string, string>}}
  */
 function importProducts(db, records, opts = {}) {
-  const list = Array.isArray(records) ? records : [];
+  const input = Array.isArray(records) ? records : [];
   const now = nowIso(opts.now);
-  const stats = { received: list.length, created: 0, updated: 0, unchanged: 0, deactivated: 0, superseded: 0, errors: [] };
+  const stats = { received: input.length, created: 0, updated: 0, unchanged: 0, deactivated: 0, superseded: 0, errors: [] };
+  // stejná karta ve více členěních skladu → jeden záznam se součtem stavu zásoby
+  const inputRowOf = (i) => (opts.rowNumbers && opts.rowNumbers[i] != null ? opts.rowNumbers[i] : i + 1);
+  const md = mergeDuplicateStock(input, inputRowOf, opts.sumDuplicateStock === undefined ? 'auto' : opts.sumDuplicateStock);
+  const list = md.list;
+  if (md.merged.codes) stats.stock_merged = md.merged;
   const createMissing = opts.createMissing !== false;
   if (!createMissing) {
     stats.skipped_unknown = 0;
@@ -155,7 +235,7 @@ function importProducts(db, records, opts = {}) {
   const vatDefault = Number.isFinite(Number(settings.vat_rate_default)) && settings.vat_rate_default !== null ? Number(settings.vat_rate_default) : 21;
   const purchaseInclVat = settings.purchase_includes_vat === true || settings.purchase_includes_vat === 1;
   const refId = opts.importId ?? null;
-  const rowOf = (i) => (opts.rowNumbers && opts.rowNumbers[i] != null ? opts.rowNumbers[i] : i + 1);
+  const rowOf = (i) => md.rows[i];
 
   tx(db, () => {
     const byKey = new Map();

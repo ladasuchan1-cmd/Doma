@@ -61,6 +61,9 @@ dvakrát souběžně (plánovač + ruční spuštění → 409).
    prodejní cena (s DPH), DPH, MOC, sklad, prodeje. **Každý další sloupec** (N-kategorie, sezóna, imprese z Disiva, ABC…)
    se uloží jako vlastní atribut a dá se podle něj segmentovat. Sloupec, jehož název se od existujícího atributu liší jen
    velikostí písmen, diakritikou či oddělovači („Imprese 30“ vs. `imprese_30`), se zapíše do toho existujícího.
+   **Export zásob z POHODY** do Excelu se napáruje sám (Kód, Název, Čárkód, Výrobce, Dodavatel, Nákupní, Prodejní DPH,
+   Dop MOC, Stav zásoby, Zodpovědná osoba…); sazba DPH se odvodí z poměru „Prodejní DPH“ / „Prodejní“. Karta, která je
+   v exportu víckrát kvůli členění skladu (sSklad, sPRAHA…), se sloučí a stav zásoby se sečte.
 2. **Import konkurence** – řádek = produkt × konkurent: identifikace (náš kód / EAN / kód výrobce), konkurent, cena s DPH,
    doprava, dostupnost, URL, čas zjištění. Párování: kód → EAN → MPN → ruční párování. Nespárované nabídky najdete
    v záložce Konkurence a spárujete je ručně (párování se zapamatuje).

@@ -796,4 +796,9 @@ Pages:
   se stejným názvem (po preferenci jediného aktivního) = `ambiguous`. `stats.matched_by_name`. Vypnutí `opts.matchByName = false`.
 - Nastavení `own_shops` (seznam názvů obchodů, max. 20) – nabídky těchto „konkurentů“ se přeskočí (`stats.own_skipped`,
   jen když je seznam neprázdný); konkurent se nezaloží.
+- Katalog z POHODY (export zásob do Excelu): aliasy `Čárkód` → ean, `Nákupní` → purchase_price, `Prodejní DPH` → price,
+  `Dop MOC` → msrp; nové kanonické pole `price_net` (`Prodejní`) slouží jen k odvození `vat_rate` z poměru cen
+  (jen 0 / 12 / 21 %, jinak výchozí sazba). Stejný kód ve více členěních skladu (atributy `Členění`, `Sklad`, `Středisko`…)
+  → jeden záznam se SOUČTEM `stock`, ostatní pole z prvního řádku (`stats.stock_merged = {codes, rows}`); volba
+  `sum_duplicate_stock` = auto (výchozí) | 1 | 0. Párovací klíč názvu bere „@“ jako mezeru („modrá@vel. 45“ = „modrá vel. 45“).
 

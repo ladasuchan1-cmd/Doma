@@ -54,6 +54,12 @@ const CANONICAL = {
     },
     { key: 'purchase_price', label: 'Nákupní cena (bez DPH)', type: 'number' },
     { key: 'price', label: 'Prodejní cena (s DPH)', type: 'number' },
+    {
+      key: 'price_net',
+      label: 'Prodejní cena bez DPH (pro odvození sazby DPH)',
+      type: 'number',
+      help: 'Když soubor nemá sazbu DPH, spočítá se z poměru ceny s DPH a bez DPH (POHODA „Prodejní DPH“ / „Prodejní“) – jen 0, 12 nebo 21 %.',
+    },
     { key: 'vat_rate', label: 'Sazba DPH %', type: 'vat' },
     { key: 'msrp', label: 'Doporučená cena (MOC)', type: 'number' },
     { key: 'stock', label: 'Sklad (ks)', type: 'number' },
@@ -105,13 +111,13 @@ const GENERIC_ID_ALIASES = ['sku', 'productcode', 'itemcode', 'itemid', 'idprodu
 
 const COMMON_ALIASES = {
   code: ['code', 'kod', 'kodproduktu', 'kodzbozi', 'kodpolozky', ...GENERIC_ID_ALIASES],
-  ean: ['ean', 'gtin', 'gtin13', 'ean13', 'gtin14', 'gtin12', 'upc', 'gtin8', 'ean8', 'barcode', 'carovykod', 'eankod', 'eancode', 'productean'],
+  ean: ['ean', 'gtin', 'gtin13', 'ean13', 'gtin14', 'gtin12', 'upc', 'gtin8', 'ean8', 'barcode', 'carovykod', 'carkod', 'eankod', 'eancode', 'productean'],
   mpn: ['mpn', 'productno', 'partnumber', 'partno', 'kodvyrobce', 'manufacturercode', 'manufacturerpartnumber', 'mfrpartnumber', 'vendorcode', 'cislovyrobce', 'objednacicislo'],
   name: ['name', 'nazev', 'productname', 'nazevproduktu', 'nazevzbozi', 'nazevpolozky', 'itemname', 'product', 'title', '~text'],
   // POHODA listStock: stockHeader.sellingPrice má přednost před cenami cenových hladin (stockPriceItem.stockPrice.price)
   // – proto „stockheadersellingprice“ (shoda posledních dvou segmentů) a „sellingprice“ před obecným „price“ (data-1)
   price: [
-    'stockheadersellingprice', 'pricevat', 'pricewithvat', 'priceinclvat', 'priceincvat', 'pricegross', 'cenasdph', 'cenavcdph', 'cenavcetnedph', 'prodejnicenasdph',
+    'stockheadersellingprice', 'prodejnidph', 'prodejnisdph', 'prodejnivcdph', 'pricevat', 'pricewithvat', 'priceinclvat', 'priceincvat', 'pricegross', 'cenasdph', 'cenavcdph', 'cenavcetnedph', 'prodejnicenasdph',
     'prodejnicenavcdph', 'sellingprice', 'price', 'cena', 'prodejnicena', 'currentprice', 'aktualnicena', 'offerprice', 'competitorprice', 'cenakonkurence', 'cenakonkurenta',
     'cenazbozi',
   ],
@@ -131,10 +137,11 @@ const ALIASES = {
     category: ['category', 'kategorie', 'categorytext', 'categoryname', 'categorypath', 'nazevkategorie', 'producttype', 'group', 'skupina', 'skupinazbozi', 'sekce', '~googleproductcategory'],
     supplier: ['supplier', 'dodavatel', 'suppliername', 'nazevdodavatele', 'distributor'],
     owner: ['owner', 'zodpovednaosoba', 'zodpovedny', 'odpovednaosoba', 'responsible', 'responsibleperson', 'categorymanager', 'productmanager', 'produktovymanazer', 'manager', 'spravce', 'nakupci', 'buyer'],
-    purchase_price: ['purchaseprice', 'nakupnicena', 'nakupnicenabezdph', 'nakupbezdph', 'cenanakupni', 'nakup', 'cost', 'costprice', 'unitcost', 'purchasingprice', 'buyprice', 'wholesaleprice', 'nakupka'],
+    purchase_price: ['purchaseprice', 'nakupnicena', 'nakupni', 'nakupnicenabezdph', 'nakupbezdph', 'cenanakupni', 'nakup', 'cost', 'costprice', 'unitcost', 'purchasingprice', 'buyprice', 'wholesaleprice', 'nakupka'],
     price: COMMON_ALIASES.price,
+    price_net: ['prodejni', 'prodejnibezdph', 'prodejnicenabezdph', 'pricenet', 'priceexclvat', 'pricewithoutvat', 'sellingpricenet'],
     vat_rate: ['vatrate', 'vat', 'dph', 'sazbadph', 'dphsazba', 'sazbadphprodej', 'sellingratevat', 'ratevat', 'vatpercent', 'dphprocent', 'taxrate', 'tax'],
-    msrp: ['msrp', 'rrp', 'moc', 'mocsdph', 'mocvcdph', 'doporucenacena', 'doporucenaprodejnicena', 'doporucenamaloobchodnicena', 'recommendedprice', 'recommendedretailprice', 'standardprice', 'listprice', 'cenikovacena'],
+    msrp: ['msrp', 'rrp', 'moc', 'dopmoc', 'doporucenamoc', 'mocsdph', 'mocvcdph', 'doporucenacena', 'doporucenaprodejnicena', 'doporucenamaloobchodnicena', 'recommendedprice', 'recommendedretailprice', 'standardprice', 'listprice', 'cenikovacena'],
     stock: ['stock', 'qty', 'quantity', 'count', 'mnozstvi', 'stav', 'stavskladu', 'sklademks', 'stavzasoby', 'zasoba', 'sklad', 'pocetks', 'pocetkusu', 'stockqty', 'stockquantity', 'inventory', 'volnemnozstvi', 'skladem', '~ks'],
     sales_30: ['sales30', 'sales30d', 'sales30days', 'prodej30', 'prodej30d', 'prodej30dni', 'prodeje30', 'prodeje30d', 'prodeje30dni', 'prodano30', 'prodano30dni', 'sold30', 'sold30d', 'units30', 'prodejzamesic', 'monthlysales'],
     sales_90: ['sales90', 'sales90d', 'sales90days', 'prodej90', 'prodej90d', 'prodej90dni', 'prodeje90', 'prodeje90d', 'prodeje90dni', 'prodano90', 'prodano90dni', 'sold90', 'sold90d', 'units90', 'quarterlysales'],

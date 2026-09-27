@@ -34,7 +34,8 @@ function extKey(v) {
 
 /** Klíč názvu pro alias / match_key. */
 function nameMatchKey(v) {
-  const f = fold(v);
+  // POHODA píše variantu za „@“ („boty modrá@vel. 45“), Heureka mezerou („boty modrá vel. 45“) → „@“ = mezera
+  const f = fold(v == null ? v : String(v).replace(/@/g, ' '));
   return f ? f.slice(0, 200) : null;
 }
 
