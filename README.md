@@ -78,6 +78,13 @@ pro dynamickou cenotvorbu podle vlastních dat o konkurenci: import cen konkuren
 segmentace podle vlastních metrik, cenové strategie s limity marže, schvalování návrhů a export nových cen do adminu
 (feed, webhook, API) nebo přímo do POHODY (XML). Spuštění: `cd repricing && npm run demo && npm start`.
 
+## Další projekt v repozitáři: Smíchárna
+
+Složka [`smicharna/`](smicharna/README.md) obsahuje **Smíchárnu** – prototyp komunity pro kamarády, kde se sdílejí
+vtipné kraviny, reaguje se jen pozitivně a nadávky v komentářích „vypere“ pračka (Claude, nebo offline rychloprogram
+`smicharna/pracka.js`, který nadávky vymění za podobně znějící hezká slova). Běží jako Claude Artifact.
+Testy: `node --test smicharna/test/*.test.js`.
+
 ## Licence
 
 MIT

@@ -1,0 +1,1383 @@
+<title>Smíchárna</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Lilita+One&family=Onest:wght@400;500;600;700&family=VT323&display=swap">
+<style>
+  :root {
+    --tile: #EDF3F2;
+    --grout: #DFE8E7;
+    --paper: #FFFFFF;
+    --panel: #F3F7F8;
+    --ink: #15232B;
+    --ink-2: #51646C;
+    --line: #D2DEDF;
+    --cobalt: #2346D8;
+    --on-cobalt: #FFFFFF;
+    --cobalt-soft: #E7ECFF;
+    --sun: #FFC83D;
+    --sun-soft: #FFF4D2;
+    --mint: #DCF3E9;
+    --mint-ink: #0B6A4C;
+    --danger: #B3261E;
+    --strike: #C8412F;
+    --lcd-bg: #16211F;
+    --lcd-ink: #8AF5C8;
+    --chrome-1: #E4EBEE;
+    --chrome-2: #9EABB2;
+    --shadow: 0 1px 2px rgba(21, 35, 43, .06), 0 10px 28px rgba(21, 35, 43, .10);
+    --font-display: "Lilita One", "Arial Rounded MT Bold", "Trebuchet MS", system-ui, sans-serif;
+    --font-body: "Onest", system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    --font-lcd: "VT323", ui-monospace, Menlo, Consolas, monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      color-scheme: dark;
+      --tile: #0D161B;
+      --grout: #13212A;
+      --paper: #15222B;
+      --panel: #1B2B35;
+      --ink: #E6EEF0;
+      --ink-2: #9DB2B9;
+      --line: #283B45;
+      --cobalt: #93AAFF;
+      --on-cobalt: #0D161B;
+      --cobalt-soft: #1D2B57;
+      --sun: #FFD35E;
+      --sun-soft: #3A3014;
+      --mint: #133A2F;
+      --mint-ink: #8AE5C2;
+      --danger: #FFB4AB;
+      --strike: #FF8A7A;
+      --lcd-bg: #0A1311;
+      --lcd-ink: #7CF0C4;
+      --chrome-1: #56656D;
+      --chrome-2: #26333B;
+      --shadow: 0 1px 2px rgba(0, 0, 0, .3), 0 10px 28px rgba(0, 0, 0, .35);
+    }
+  }
+  :root[data-theme="dark"] {
+    color-scheme: dark;
+    --tile: #0D161B;
+    --grout: #13212A;
+    --paper: #15222B;
+    --panel: #1B2B35;
+    --ink: #E6EEF0;
+    --ink-2: #9DB2B9;
+    --line: #283B45;
+    --cobalt: #93AAFF;
+    --on-cobalt: #0D161B;
+    --cobalt-soft: #1D2B57;
+    --sun: #FFD35E;
+    --sun-soft: #3A3014;
+    --mint: #133A2F;
+    --mint-ink: #8AE5C2;
+    --danger: #FFB4AB;
+    --strike: #FF8A7A;
+    --lcd-bg: #0A1311;
+    --lcd-ink: #7CF0C4;
+    --chrome-1: #56656D;
+    --chrome-2: #26333B;
+    --shadow: 0 1px 2px rgba(0, 0, 0, .3), 0 10px 28px rgba(0, 0, 0, .35);
+  }
+
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background-color: var(--tile);
+    background-image: linear-gradient(var(--grout) 1px, transparent 1px), linear-gradient(90deg, var(--grout) 1px, transparent 1px);
+    background-size: 32px 32px;
+    color: var(--ink);
+    font: 400 16px/1.5 var(--font-body);
+    padding-inline: 16px;
+    padding-block: 0 56px;
+    -webkit-font-smoothing: antialiased;
+  }
+  .wrap { max-width: 720px; margin-inline: auto; }
+  h1, h2, h3 { text-wrap: balance; }
+  button { font: inherit; color: inherit; }
+  :focus-visible { outline: 3px solid var(--cobalt); outline-offset: 2px; }
+
+  /* Hlavička */
+  .masthead { display: flex; align-items: center; gap: 12px; padding-block: 20px 12px; }
+  .logo { width: 46px; height: 46px; flex: none; }
+  .l-body { fill: var(--cobalt); }
+  .l-knob { fill: var(--on-cobalt); opacity: .8; }
+  .l-ring { fill: var(--paper); }
+  .l-glass { fill: var(--sun); }
+  .l-eye { fill: #15232B; }
+  .l-smile { fill: none; stroke: #15232B; stroke-width: 2; stroke-linecap: round; }
+  h1 { margin: 0; font: 400 32px/1 var(--font-display); letter-spacing: .01em; }
+  .tagline { margin: 4px 0 0; color: var(--ink-2); font-size: 14px; }
+
+  .tabbar {
+    position: sticky; top: env(safe-area-inset-top, 0px); z-index: 10;
+    margin-inline: -16px; padding: 8px 16px;
+    background: var(--tile);
+    background: color-mix(in srgb, var(--tile) 88%, transparent);
+    -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px);
+    border-bottom: 1px solid var(--line);
+  }
+  .tabs { display: inline-flex; gap: 4px; padding: 4px; max-width: 100%; background: var(--paper); border: 1px solid var(--line); border-radius: 999px; }
+  .tab { border: 0; background: transparent; color: var(--ink-2); font-weight: 600; font-size: 15px; line-height: 1; padding: 10px 16px; border-radius: 999px; cursor: pointer; white-space: nowrap; }
+  .tab:hover { color: var(--ink); }
+  .tab[aria-selected="true"] { background: var(--cobalt); color: var(--on-cobalt); }
+  @media (max-width: 480px) {
+    .tabs { display: flex; width: 100%; }
+    .tab { flex: 1 1 auto; padding-inline: 10px; font-size: 14px; }
+    h1 { font-size: 28px; }
+  }
+
+  main { padding-block: 16px 0; }
+  [role="tabpanel"] { display: grid; grid-template-columns: minmax(0, 1fr); gap: 14px; }
+  .note { margin: 0; padding: 10px 14px; border: 1px dashed var(--line); border-radius: 14px; background: var(--paper); color: var(--ink-2); font-size: 14px; }
+
+  /* Tlačítka a pole */
+  .btn-primary {
+    display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+    border: 0; border-radius: 999px; background: var(--cobalt); color: var(--on-cobalt);
+    font-weight: 700; font-size: 16px; line-height: 1; padding: 14px 24px; cursor: pointer;
+    transition: transform .12s ease, filter .12s ease;
+  }
+  .btn-primary:hover { filter: brightness(1.08); }
+  .btn-primary:active { transform: translateY(1px); }
+  .btn-primary[disabled] { opacity: .65; cursor: progress; }
+  .btn-ghost {
+    display: inline-flex; align-items: center; gap: 6px;
+    border: 1.5px solid var(--line); background: var(--paper); color: var(--ink);
+    border-radius: 999px; padding: 9px 14px; font-weight: 600; font-size: 14px; line-height: 1.1; cursor: pointer;
+  }
+  .btn-ghost:hover { border-color: var(--ink-2); }
+  .btn-ghost[disabled] { opacity: .55; cursor: default; }
+  .link-btn { border: 0; background: none; padding: 4px 6px; color: var(--ink-2); font-size: 13px; font-weight: 600; cursor: pointer; border-radius: 6px; }
+  .link-btn.danger { color: var(--danger); }
+  input[type="text"], input[type="url"], textarea {
+    width: 100%; border: 1.5px solid var(--line); border-radius: 12px; background: var(--paper); color: var(--ink);
+    font: 400 16px/1.45 var(--font-body); padding: 10px 12px;
+  }
+  textarea { resize: vertical; min-height: 64px; }
+  input::placeholder, textarea::placeholder { color: var(--ink-2); opacity: .8; }
+  input:focus, textarea:focus { outline: none; border-color: var(--cobalt); box-shadow: 0 0 0 3px color-mix(in srgb, var(--cobalt) 25%, transparent); }
+  .field { display: grid; grid-template-columns: minmax(0, 1fr); gap: 6px; }
+  .field label, .label { font-weight: 600; font-size: 14px; color: var(--ink-2); }
+
+  /* Programy (symboly z visaček na prádle) */
+  .programs { display: flex; flex-wrap: wrap; gap: 8px; }
+  .prog {
+    flex: 1 1 auto; min-width: 74px; display: grid; justify-items: center; gap: 3px;
+    padding: 8px 10px 7px; border-radius: 14px; border: 1.5px solid var(--line); background: var(--paper);
+    color: var(--ink-2); font-weight: 600; font-size: 13px; line-height: 1.15; cursor: pointer;
+  }
+  .prog:hover { color: var(--ink); border-color: var(--ink-2); }
+  .prog[aria-checked="true"] { color: var(--cobalt); border-color: var(--cobalt); background: var(--cobalt-soft); }
+  .programs-sm .prog { padding: 6px 8px; font-size: 12.5px; min-width: 66px; }
+  .tub { width: 34px; height: 26px; overflow: visible; flex: none; }
+  .tub path { fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+  .tub text { fill: currentColor; font: 700 10.5px var(--font-body); }
+  .tub.sm { width: 24px; height: 18px; }
+  .tub.xs { width: 17px; height: 13px; }
+
+  /* Pračka */
+  .machine { background: var(--paper); border: 1px solid var(--line); border-radius: 28px; box-shadow: var(--shadow); overflow: hidden; }
+  .machine-top { background: var(--panel); border-bottom: 1px solid var(--line); padding: 14px 16px 14px; display: grid; grid-template-columns: minmax(0, 1fr); gap: 12px; }
+  .lcd {
+    display: flex; flex-wrap: wrap; justify-content: space-between; align-items: baseline; gap: 2px 12px;
+    background: var(--lcd-bg); color: var(--lcd-ink); border-radius: 10px; padding: 7px 12px 6px;
+    font: 400 23px/1 var(--font-lcd); letter-spacing: .06em; text-transform: uppercase;
+    box-shadow: inset 0 0 0 2px rgba(0, 0, 0, .35), inset 0 6px 14px rgba(0, 0, 0, .35);
+    text-shadow: 0 0 8px rgba(124, 240, 196, .45);
+  }
+  .machine-body { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 24px; align-items: center; padding: 22px 18px; }
+  .drum {
+    width: 176px; aspect-ratio: 1; max-width: 100%; border-radius: 50%; padding: 13px;
+    background: conic-gradient(from 210deg, var(--chrome-1), var(--chrome-2) 25%, var(--chrome-1) 50%, var(--chrome-2) 75%, var(--chrome-1));
+    box-shadow: 0 0 0 6px var(--panel), 0 0 0 7px var(--line), 0 12px 24px rgba(15, 30, 45, .18);
+  }
+  .glass {
+    position: relative; width: 100%; height: 100%; border-radius: 50%; overflow: hidden;
+    background: radial-gradient(circle at 50% 118%, #9CCBFF 0 22%, #3A6BE0 58%, #1C3585 100%);
+    box-shadow: inset 0 10px 24px rgba(0, 0, 0, .45);
+  }
+  .glass::after {
+    content: ""; position: absolute; left: 12%; top: 9%; width: 42%; height: 30%; border-radius: 50%;
+    background: linear-gradient(160deg, rgba(255, 255, 255, .6), rgba(255, 255, 255, 0) 72%);
+    transform: rotate(-24deg); pointer-events: none;
+  }
+  .water { position: absolute; left: -20%; right: -20%; bottom: -30%; height: 62%; border-radius: 42%; background: rgba(170, 214, 255, .28); }
+  .load { position: absolute; inset: 0; }
+  .load span {
+    position: absolute; transform: translate(-50%, -50%) rotate(var(--tilt, 0deg));
+    background: rgba(255, 255, 255, .93); color: #15232B; font: 600 11.5px/1.2 var(--font-body);
+    padding: 3px 8px; border-radius: 999px; white-space: nowrap; max-width: 104px; overflow: hidden; text-overflow: ellipsis;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, .25);
+  }
+  .drum.done .load span { background: #FFF3CC; }
+  .suds i { position: absolute; bottom: -12px; width: 12px; height: 12px; border-radius: 50%; background: rgba(255, 255, 255, .75); opacity: 0; }
+  .suds i:nth-child(1) { left: 18%; }
+  .suds i:nth-child(2) { left: 36%; width: 9px; height: 9px; animation-delay: .5s !important; }
+  .suds i:nth-child(3) { left: 55%; animation-delay: .9s !important; }
+  .suds i:nth-child(4) { left: 70%; width: 8px; height: 8px; animation-delay: .3s !important; }
+  .suds i:nth-child(5) { left: 44%; width: 14px; height: 14px; animation-delay: 1.3s !important; }
+  .drum.spin .load { animation: tumble 1.25s linear infinite; }
+  .drum.spin.fast .load { animation-duration: .42s; }
+  .drum.spin .water { animation: slosh 1.6s ease-in-out infinite; }
+  .drum.spin .suds i { animation: rise 1.8s ease-in infinite; }
+  @keyframes tumble { to { transform: rotate(360deg); } }
+  @keyframes slosh { 0%, 100% { transform: translateX(-6%) rotate(-4deg); } 50% { transform: translateX(6%) rotate(4deg); } }
+  @keyframes rise { 0% { transform: translateY(0) scale(.6); opacity: 0; } 20% { opacity: .9; } 100% { transform: translateY(-150px) scale(1.2); opacity: 0; } }
+  .intake { display: grid; grid-template-columns: minmax(0, 1fr); gap: 8px; min-width: 0; }
+  .intake label { font-weight: 600; font-size: 14px; color: var(--ink-2); }
+  .actions { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+  .engine { margin: 0; font-size: 13px; color: var(--ink-2); }
+  .result { border-top: 1px dashed var(--line); padding: 18px 18px 20px; display: grid; grid-template-columns: minmax(0, 1fr); gap: 10px; }
+  .res-head { display: flex; align-items: center; gap: 10px; }
+  .res-head b { font: 400 21px/1 var(--font-display); color: var(--mint-ink); }
+  .before { margin: 0; color: var(--ink-2); font-size: 15px; overflow-wrap: anywhere; }
+  .before s { text-decoration-thickness: 2px; text-decoration-color: var(--strike); }
+  .after { margin: 0; font: 400 26px/1.28 var(--font-display); letter-spacing: .005em; white-space: pre-line; overflow-wrap: anywhere; }
+  .res-sub { margin: 0; font-size: 13px; color: var(--ink-2); }
+  .res-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+  @media (max-width: 560px) {
+    .machine-body { grid-template-columns: minmax(0, 1fr); justify-items: center; gap: 18px; padding: 20px 16px; }
+    .intake { width: 100%; }
+    .drum { width: 150px; }
+    .after { font-size: 22px; }
+    .lcd { font-size: 21px; }
+  }
+
+  /* Kraviny */
+  .composer { background: var(--paper); border: 1px solid var(--line); border-radius: 18px; }
+  .composer > summary { list-style: none; cursor: pointer; display: flex; align-items: center; gap: 10px; padding: 14px 16px; font: 400 21px/1 var(--font-display); color: var(--cobalt); border-radius: 18px; }
+  .composer > summary::-webkit-details-marker { display: none; }
+  .composer > summary::before {
+    content: "+"; display: grid; place-items: center; width: 30px; height: 30px; flex: none; border-radius: 50%;
+    background: var(--cobalt); color: var(--on-cobalt); font: 700 20px/1 var(--font-body);
+  }
+  .composer[open] > summary::before { content: "–"; }
+  .composer form { display: grid; grid-template-columns: minmax(0, 1fr); gap: 12px; padding: 0 16px 16px; }
+  .composer-actions { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+  .hint { margin: 0; color: var(--danger); font-size: 14px; }
+  .hint:empty { display: none; }
+  .feed { display: grid; grid-template-columns: minmax(0, 1fr); gap: 14px; }
+  .post { background: var(--paper); border: 1px solid var(--line); border-radius: 18px; padding: 14px 16px; display: grid; grid-template-columns: minmax(0, 1fr); gap: 12px; }
+  .post-head { display: flex; align-items: center; gap: 10px; }
+  .post-meta { flex: 1; min-width: 0; display: flex; flex-wrap: wrap; align-items: baseline; gap: 0 8px; }
+  .name { font-weight: 700; }
+  .time { color: var(--ink-2); font-size: 13px; font-variant-numeric: tabular-nums; }
+  .avatar {
+    width: 36px; height: 36px; border-radius: 50%; display: grid; place-items: center; flex: none; overflow: hidden;
+    background: var(--c, #1F6F99); color: #FFFFFF; font: 700 15px/1 var(--font-body);
+  }
+  .avatar img { width: 100%; height: 100%; object-fit: cover; }
+  .demo-tag { font: 700 11px/1 var(--font-body); letter-spacing: .08em; text-transform: uppercase; color: var(--ink-2); border: 1px dashed var(--ink-2); padding: 4px 6px; border-radius: 6px; white-space: nowrap; }
+  .post-text { margin: 0; font-size: 17px; white-space: pre-line; overflow-wrap: anywhere; }
+  .link-card { display: flex; align-items: center; gap: 10px; border: 1px solid var(--line); border-radius: 12px; padding: 10px 12px; text-decoration: none; color: var(--ink); background: var(--panel); }
+  .link-card:hover { border-color: var(--ink-2); }
+  .platform { font: 700 11.5px/1 var(--font-body); text-transform: uppercase; letter-spacing: .06em; padding: 6px 8px; border-radius: 6px; background: var(--ink); color: var(--paper); flex: none; }
+  .host { color: var(--ink-2); font-size: 14px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; min-width: 0; }
+  .open { color: var(--cobalt); font-weight: 600; font-size: 14px; white-space: nowrap; }
+  .reacts { display: flex; gap: 8px; flex-wrap: wrap; }
+  .react {
+    display: inline-flex; align-items: center; gap: 6px; border: 1.5px solid var(--line); background: var(--paper);
+    color: var(--ink); border-radius: 999px; padding: 6px 12px; font-weight: 600; font-size: 14px; line-height: 1; cursor: pointer;
+  }
+  .react:hover:not([disabled]) { border-color: var(--ink-2); }
+  .react[aria-pressed="true"] { background: var(--sun-soft); border-color: var(--sun); }
+  .react[disabled] { cursor: default; }
+  .react .emo { font-size: 18px; line-height: 1; }
+  .react .lbl { color: var(--ink-2); font-weight: 500; }
+  .react .cnt { font-variant-numeric: tabular-nums; }
+  @media (max-width: 400px) { .react .lbl { display: none; } }
+  .comment-zone { display: grid; grid-template-columns: minmax(0, 1fr); gap: 8px; }
+  .comments { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: minmax(0, 1fr); gap: 8px; }
+  .comment { background: var(--panel); border-radius: 12px; padding: 8px 12px; font-size: 15px; overflow-wrap: anywhere; }
+  .comment > b { margin-right: 6px; }
+  .comment .badge-washed { margin-left: 6px; vertical-align: 1px; }
+  .comment.pending { color: var(--ink-2); display: flex; align-items: center; gap: 8px; }
+  .badge-washed { display: inline-flex; align-items: center; gap: 5px; background: var(--mint); color: var(--mint-ink); font: 600 12px/1 var(--font-body); padding: 4px 8px; border-radius: 999px; white-space: nowrap; }
+  .spinner { width: 14px; height: 14px; border-radius: 50%; border: 2px solid var(--line); border-top-color: var(--cobalt); animation: tumble .8s linear infinite; flex: none; }
+  .wash-notice { border: 1px solid color-mix(in srgb, var(--mint-ink) 35%, var(--line)); background: var(--mint); border-radius: 12px; padding: 10px 12px; display: grid; grid-template-columns: minmax(0, 1fr); gap: 4px; }
+  .wn-title { margin: 0; font-weight: 700; font-size: 13px; color: var(--mint-ink); }
+  .wash-notice .before { font-size: 14px; }
+  .wn-after { margin: 0; font-weight: 600; overflow-wrap: anywhere; }
+  .wash-notice .link-btn { justify-self: start; padding-left: 0; color: var(--mint-ink); }
+  .comment-form { display: flex; gap: 8px; }
+  .comment-form input { flex: 1; min-width: 0; padding-block: 8px; }
+  .comment-form .btn-ghost { flex: none; }
+  .post-foot { display: flex; align-items: center; gap: 6px; color: var(--ink-2); font-size: 13px; border-top: 1px solid var(--line); padding-top: 10px; }
+
+  /* Jak to funguje */
+  .h2 { font: 400 22px/1.15 var(--font-display); margin: 6px 0 0; }
+  .rules { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+  .rules li { background: var(--paper); border: 1px solid var(--line); border-radius: 16px; padding: 14px 16px; }
+  .rules h3 { margin: 0 0 4px; font-size: 16px; }
+  .rules p { margin: 0; color: var(--ink-2); font-size: 14.5px; }
+  @media (max-width: 560px) { .rules { grid-template-columns: 1fr; } }
+  .care-wrap { overflow-x: auto; background: var(--paper); border: 1px solid var(--line); border-radius: 16px; }
+  .care { width: 100%; border-collapse: collapse; font-size: 14.5px; }
+  .care th, .care td { text-align: left; padding: 10px 14px; border-bottom: 1px solid var(--line); vertical-align: middle; }
+  .care tr:last-child td { border-bottom: 0; }
+  .care th { font-size: 12px; text-transform: uppercase; letter-spacing: .08em; color: var(--ink-2); font-weight: 700; }
+  .care td:first-child { width: 64px; color: var(--cobalt); }
+  .care .temp { color: var(--ink-2); font-variant-numeric: tabular-nums; }
+  .owner-box { background: var(--sun-soft); border: 1px solid var(--sun); border-radius: 16px; padding: 14px 16px; }
+  .owner-box h3 { margin: 0 0 4px; font-size: 16px; }
+  .owner-box p { margin: 0; font-size: 14.5px; }
+
+  .toast {
+    position: fixed; left: 50%; bottom: calc(16px + env(safe-area-inset-bottom, 0px)); transform: translateX(-50%); z-index: 20;
+    background: var(--ink); color: var(--paper); padding: 10px 16px; border-radius: 12px; font-weight: 600; font-size: 14px;
+    max-width: calc(100% - 32px); width: max-content; box-shadow: var(--shadow);
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .drum.spin .load, .drum.spin .water, .drum.spin .suds i, .spinner { animation: none; }
+    .btn-primary { transition: none; }
+  }
+</style>
+
+<header class="masthead wrap">
+  <svg class="logo" viewBox="0 0 40 40" aria-hidden="true">
+    <rect class="l-body" x="2" y="2" width="36" height="36" rx="10"/>
+    <circle class="l-knob" cx="9" cy="8.6" r="1.7"/>
+    <circle class="l-knob" cx="14.2" cy="8.6" r="1.7"/>
+    <circle class="l-ring" cx="20" cy="23.5" r="10.5"/>
+    <circle class="l-glass" cx="20" cy="23.5" r="7.6"/>
+    <circle class="l-eye" cx="17.2" cy="21.4" r="1.15"/>
+    <circle class="l-eye" cx="22.8" cy="21.4" r="1.15"/>
+    <path class="l-smile" d="M16.3 24.6 q3.7 3.6 7.4 0"/>
+  </svg>
+  <div>
+    <h1>Smíchárna</h1>
+    <p class="tagline">Pošli kravinu. Sklidíš jen úsměvy.</p>
+  </div>
+</header>
+
+<nav class="tabbar" aria-label="Sekce">
+  <div class="wrap">
+    <div class="tabs" role="tablist">
+      <button class="tab" role="tab" id="tab-kraviny" aria-controls="panel-kraviny" aria-selected="true" type="button">Kraviny</button>
+      <button class="tab" role="tab" id="tab-pracka" aria-controls="panel-pracka" aria-selected="false" tabindex="-1" type="button">Pračka</button>
+      <button class="tab" role="tab" id="tab-pravidla" aria-controls="panel-pravidla" aria-selected="false" tabindex="-1" type="button">Jak to funguje</button>
+    </div>
+  </div>
+</nav>
+
+<main class="wrap" id="app" data-default-tab="kraviny">
+  <section id="panel-kraviny" role="tabpanel" aria-labelledby="tab-kraviny">
+    <p class="note" id="feed-note" hidden></p>
+    <details class="composer" id="composer">
+      <summary>Pošli kravinu</summary>
+      <form id="composer-form" novalidate>
+        <div class="field" id="nick-field" hidden>
+          <label for="nick">Tvoje přezdívka</label>
+          <input id="nick" type="text" maxlength="30" autocomplete="nickname" placeholder="Jak ti kamarádi říkají?">
+        </div>
+        <div class="field">
+          <label for="post-url">Odkaz na video nebo obrázek</label>
+          <input id="post-url" type="url" inputmode="url" maxlength="500" autocomplete="off" placeholder="https://www.tiktok.com/…">
+        </div>
+        <div class="field">
+          <label for="post-text">Popisek nebo vtip</label>
+          <textarea id="post-text" rows="2" maxlength="600" placeholder="Co tě pobavilo?"></textarea>
+        </div>
+        <div class="field">
+          <span class="label" id="post-programs-label">Nadávky pod příspěvkem bude prát</span>
+          <div class="programs programs-sm" id="post-programs" role="radiogroup" aria-labelledby="post-programs-label"></div>
+        </div>
+        <div class="composer-actions">
+          <button class="btn-primary" type="submit" id="btn-post">Poslat kravinu</button>
+          <p class="hint" id="composer-hint" role="alert"></p>
+        </div>
+      </form>
+    </details>
+    <div class="feed" id="feed"></div>
+  </section>
+
+  <section id="panel-pracka" role="tabpanel" aria-labelledby="tab-pracka" hidden>
+    <div class="machine">
+      <div class="machine-top">
+        <div class="lcd" aria-hidden="true"><span id="lcd-prog">BABIČKA 40°C</span><span id="lcd-phase">PŘIPRAVENO</span></div>
+        <div class="programs" id="programs" role="radiogroup" aria-label="Program praní"></div>
+      </div>
+      <div class="machine-body">
+        <div class="drum" id="drum" aria-hidden="true">
+          <div class="glass">
+            <div class="water"></div>
+            <div class="load" id="load"></div>
+            <div class="suds"><i></i><i></i><i></i><i></i><i></i></div>
+          </div>
+        </div>
+        <div class="intake">
+          <label for="dirty">Špinavé prádlo</label>
+          <textarea id="dirty" rows="3" maxlength="400" placeholder="Sem napiš nadávku, urážku nebo hejt…">Ty vole, to je nejtrapnější video, co tu kdy bylo.</textarea>
+          <div class="actions">
+            <button class="btn-primary" id="btn-wash" type="button">Vyprat</button>
+            <button class="btn-ghost" id="btn-example" type="button">Jiný příklad</button>
+          </div>
+          <p class="engine" id="engine">Pere rychloprogram přímo v prohlížeči, bez AI.</p>
+        </div>
+      </div>
+      <div class="result" id="result" aria-live="polite">
+        <div class="res-head"><b id="res-title">Vypráno</b><span class="demo-tag" id="res-example">Ukázka</span></div>
+        <p class="before" id="res-before-wrap"><s id="res-before"></s></p>
+        <p class="after" id="res-after"></p>
+        <p class="res-sub" id="res-sub"></p>
+        <div class="res-actions">
+          <button class="btn-ghost" id="btn-copy" type="button">Kopírovat</button>
+          <button class="btn-ghost" id="btn-save" type="button" hidden>Uložit obrázek</button>
+          <button class="btn-ghost" id="btn-again" type="button">Vyprat jinak</button>
+          <button class="btn-ghost" id="btn-tofeed" type="button">Poslat do Smíchárny</button>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section id="panel-pravidla" role="tabpanel" aria-labelledby="tab-pravidla" hidden>
+    <h2 class="h2">Pravidla Smíchárny</h2>
+    <ul class="rules">
+      <li><h3>Reaguje se jen hezky</h3><p>Srdíčko, tlemík, nebo palec. Palec dolů tu není.</p></li>
+      <li><h3>Nadávky vypere pračka</h3><p>Každý komentář projde pračkou. Urážku nebo hejt přepere do něčeho hezkého a u komentáře je vidět, že prošel pračkou. Autor hned vidí, co z jeho zprávy vzniklo.</p></li>
+      <li><h3>Žádné „zobrazeno“</h3><p>Nikdo neuvidí, kdo si příspěvek prohlédl a nereagoval. Ticho nikoho nemrzí.</p></li>
+      <li><h3>Sdílí se odkazy</h3><p>Videa zůstávají na TikToku, Instagramu nebo YouTube. Sem patří odkaz a pár slov.</p></li>
+    </ul>
+    <h2 class="h2">Programy pračky</h2>
+    <div class="care-wrap">
+      <table class="care">
+        <thead><tr><th scope="col">Symbol</th><th scope="col">Program</th><th scope="col">Co udělá s nadávkou</th></tr></thead>
+        <tbody id="care-body"></tbody>
+      </table>
+    </div>
+    <p class="note">Pračka používá Claude z účtu toho, kdo zrovna pere. Při prvním praní se tě zeptá na svolení. Když Claude k dispozici není, pere rychloprogram přímo v prohlížeči: nadávky vymění za podobně znějící hezká slova, třeba „idiot“ za „idol“ nebo „blbec“ za „borec“.</p>
+    <div class="owner-box" id="owner-box" hidden>
+      <h3>Jak pozvat kamarády</h3>
+      <p>Otevři nahoře Sdílet a pozvi kamarády e-mailem. Aby mohli přidávat kraviny, reagovat a komentovat, dej jim roli Editor. Kamarádi potřebují účet na claude.ai.</p>
+    </div>
+  </section>
+</main>
+<div class="toast" id="toast" role="status" hidden></div>
+
+<script src="pracka.js"></script>
+<script>
+(function () {
+  'use strict';
+  const $ = (s, el) => (el || document).querySelector(s);
+  const $$ = (s, el) => Array.from((el || document).querySelectorAll(s));
+  const P = window.Pracka;
+  if (!P) {
+    $('#feed-note').hidden = false;
+    $('#feed-note').textContent = 'Pračku se nepodařilo načíst. Obnov prosím stránku.';
+    return;
+  }
+
+  const reduced = !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
+  const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+  const str = (x) => (typeof x === 'string' ? x : '');
+  const num = (x) => (typeof x === 'number' && isFinite(x) ? x : 0);
+  const arr = (x) => (Array.isArray(x) ? x : []);
+  const obj = (x) => (x && typeof x === 'object' && !Array.isArray(x) ? x : {});
+
+  function h(tag, attrs) {
+    const el = document.createElement(tag);
+    if (attrs) {
+      for (const k of Object.keys(attrs)) {
+        const v = attrs[k];
+        if (v == null || v === false) continue;
+        if (k === 'class') el.className = v;
+        else if (k === 'text') el.textContent = v;
+        else if (k.startsWith('on')) el.addEventListener(k.slice(2), v);
+        else el.setAttribute(k, v === true ? '' : String(v));
+      }
+    }
+    for (let i = 2; i < arguments.length; i++) add(el, arguments[i]);
+    return el;
+  }
+  function add(el, kid) {
+    if (kid == null || kid === false) return;
+    if (Array.isArray(kid)) { kid.forEach((k) => add(el, k)); return; }
+    el.append(kid.nodeType ? kid : String(kid));
+  }
+
+  // Jen pohodlí pro jednoho diváka (poslední záložka, přezdívka, ukázková data).
+  const store = {
+    get(k, d) { try { const v = localStorage.getItem('smicharna:' + k); return v == null ? d : JSON.parse(v); } catch (e) { return d; } },
+    set(k, v) { try { localStorage.setItem('smicharna:' + k, JSON.stringify(v)); } catch (e) { /* bez úložiště to jde taky */ } },
+  };
+
+  function use(name) {
+    try {
+      if (window.claude && typeof window.claude.use === 'function') return Promise.resolve(window.claude.use(name)).then((x) => x || null, () => null);
+    } catch (e) { /* stránka běží mimo Claude */ }
+    return Promise.resolve(null);
+  }
+
+  // ---------- Data ----------
+  const REACTIONS = [
+    { id: 'heart', emo: '❤️', label: 'srdíčko' },
+    { id: 'laugh', emo: '😂', label: 'tlemík' },
+    { id: 'thumb', emo: '👍', label: 'palec' },
+  ];
+  const REACTION_IDS = REACTIONS.map((r) => r.id);
+  const AVATAR_COLORS = ['#C2412D', '#1F6F99', '#7A4A99', '#2D7D57', '#A0650A', '#B03269'];
+  const EXAMPLE_INSULTS = [
+    'Ty vole, to je nejtrapnější video, co tu kdy bylo.',
+    'Tohle je fakt hovadina, smaž to, debile.',
+    'Kurva, to je nuda. Nikoho to nezajímá.',
+    'Idiote, tohle nevtipný video fakt nikoho nebaví.',
+    'Blbče, to je největší blbost, co tu dneska je.',
+  ];
+  const T0 = Date.now();
+  const EXAMPLES = [
+    {
+      id: 'ukazka-kola', nick: 'Jana', createdAt: T0 - 12 * 60e3, program: 'babicka', url: '',
+      text: 'Správný počet kol je N+1, kde N je počet kol, která už máš. Horní hranice je S−1, kde S je počet, při kterém ti doma vymění zámky.',
+      base: { heart: 3, laugh: 5, thumb: 1 },
+      comments: [
+        { nick: 'Petr', text: 'Tohle si tisknu na dveře garáže.' },
+        { nick: 'Karel', text: 'Zlatíčko, to je tak pravdivé, že ti na to upeču bábovku.', washed: true },
+      ],
+    },
+    {
+      id: 'ukazka-okurka', nick: 'Tomáš', createdAt: T0 - 2 * 3600e3, program: 'komentator',
+      url: 'https://www.youtube.com/results?search_query=cats+scared+of+cucumbers',
+      text: 'Kočka vs. okurka. Pořád nevím, kdo vyhrál.',
+      base: { heart: 2, laugh: 7, thumb: 2 },
+      comments: [
+        { nick: 'Lenka', text: 'Moje kočka se takhle bojí vysavače.' },
+        { nick: 'Ondra', text: 'A je to tam! Tahle okurka skórovala přímo do šibenice! Góóól!', washed: true },
+      ],
+    },
+    {
+      id: 'ukazka-excel', nick: 'Martin', createdAt: T0 - 26 * 3600e3, program: 'urednik', url: '',
+      text: 'Kolega se ptal, jestli umím Excel. Řekl jsem, že jo. Třetí den hledám, kde se vypíná SVYHLEDAT.',
+      base: { heart: 1, laugh: 4, thumb: 3 },
+      comments: [
+        { nick: 'Eva', text: 'Dovolujeme si ocenit Vaši upřímnost i odvahu. S úctou, Odbor dobré nálady, č. j. SM-4120/2026.', washed: true },
+      ],
+    },
+  ];
+
+  function hashStr(s) {
+    let x = 0;
+    s = String(s);
+    for (let i = 0; i < s.length; i++) x = (x * 31 + s.charCodeAt(i)) >>> 0;
+    return x;
+  }
+  // Segment cesty v db smí obsahovat jen písmena, číslice a _ - . ~ : @ +
+  function safeSeg(s) {
+    const out = String(s || '').replace(/[^A-Za-z0-9_\-.~:@+]/g, '_').slice(0, 120);
+    return !out || out === '.' || out === '..' ? 'x' + out.length : out;
+  }
+  function localKey() {
+    let k = store.get('key', null);
+    if (typeof k !== 'string' || !k) {
+      k = 'l' + Math.random().toString(36).slice(2, 10) + Date.now().toString(36);
+      store.set('key', k);
+    }
+    return k;
+  }
+
+  const state = {
+    modeKnown: false, live: false, liveReady: false, liveError: false, openedEmpty: false,
+    db: null, user: null, sample: null, downloads: null, aiOff: false,
+    me: { key: safeSeg(localKey()), id: null, name: '' },
+    canWrite: true, canWriteKnown: false,
+    posts: [], comments: [], reacts: [],
+    demo: {
+      posts: arr(store.get('demoPosts', [])),
+      comments: arr(store.get('demoComments', [])),
+      reacts: obj(store.get('demoReacts', {})),
+    },
+    program: P.getProgram(store.get('program', P.DEFAULT_PROGRAM)).id,
+    postProgram: P.getProgram(store.get('postProgram', P.DEFAULT_PROGRAM)).id,
+    drafts: new Map(), pending: new Set(), notices: new Map(),
+    confirmDelete: null, lastResult: null, variant: 0, exampleIdx: 0, washing: false,
+  };
+
+  // ---------- Drobnosti UI ----------
+  let toastTimer = 0;
+  function toast(msg) {
+    const t = $('#toast');
+    t.textContent = msg;
+    t.hidden = false;
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => { t.hidden = true; }, 3400);
+  }
+
+  // Symbol praní z visačky na oblečení: vanička s vlnkou a teplotou
+  const NS = 'http://www.w3.org/2000/svg';
+  function tubSvg(temp, cls) {
+    const svg = document.createElementNS(NS, 'svg');
+    svg.setAttribute('viewBox', '0 0 34 26');
+    svg.setAttribute('class', 'tub' + (cls ? ' ' + cls : ''));
+    svg.setAttribute('aria-hidden', 'true');
+    for (const d of ['M3 8 L6.5 23.5 H27.5 L31 8', 'M3 8 q3.5 -4 7 0 t7 0 t7 0 t7 0']) {
+      const p = document.createElementNS(NS, 'path');
+      p.setAttribute('d', d);
+      svg.appendChild(p);
+    }
+    const t = document.createElementNS(NS, 'text');
+    t.setAttribute('x', '17');
+    t.setAttribute('y', '20.5');
+    t.setAttribute('text-anchor', 'middle');
+    t.textContent = String(temp);
+    svg.appendChild(t);
+    return svg;
+  }
+
+  function buildPrograms(box, current, onPick) {
+    box.replaceChildren(...P.PROGRAMS.map((pr) => h('button', {
+      type: 'button', class: 'prog', role: 'radio', 'data-p': pr.id, title: pr.about,
+      'aria-checked': pr.id === current ? 'true' : 'false', tabindex: pr.id === current ? '0' : '-1',
+      onclick: () => onPick(pr.id),
+    }, tubSvg(pr.temp), h('span', { text: pr.name }))));
+    box.addEventListener('keydown', (ev) => {
+      const dir = { ArrowRight: 1, ArrowDown: 1, ArrowLeft: -1, ArrowUp: -1 }[ev.key];
+      if (!dir) return;
+      ev.preventDefault();
+      const ids = P.PROGRAMS.map((p) => p.id);
+      const cur = box.querySelector('[aria-checked="true"]');
+      const next = ids[(ids.indexOf(cur ? cur.dataset.p : ids[0]) + dir + ids.length) % ids.length];
+      onPick(next);
+      box.querySelector('[data-p="' + next + '"]').focus();
+    });
+  }
+  function markProgram(box, id) {
+    $$('.prog', box).forEach((b) => {
+      const on = b.dataset.p === id;
+      b.setAttribute('aria-checked', on ? 'true' : 'false');
+      b.tabIndex = on ? 0 : -1;
+    });
+  }
+
+  const TABS = ['kraviny', 'pracka', 'pravidla'];
+  function selectTab(id) {
+    for (const t of TABS) {
+      const on = t === id;
+      const tab = $('#tab-' + t);
+      tab.setAttribute('aria-selected', on ? 'true' : 'false');
+      tab.tabIndex = on ? 0 : -1;
+      $('#panel-' + t).hidden = !on;
+    }
+    store.set('tab', id);
+  }
+  TABS.forEach((t, i) => {
+    const tab = $('#tab-' + t);
+    tab.addEventListener('click', () => selectTab(t));
+    tab.addEventListener('keydown', (ev) => {
+      if (ev.key !== 'ArrowRight' && ev.key !== 'ArrowLeft') return;
+      const n = TABS[(i + (ev.key === 'ArrowRight' ? 1 : TABS.length - 1)) % TABS.length];
+      selectTab(n);
+      $('#tab-' + n).focus();
+    });
+  });
+
+  // ---------- Pračka ----------
+  const SPOTS = [[50, 26], [27, 45], [73, 43], [36, 67], [65, 68], [52, 47]];
+  function fillDrum(text, clean) {
+    let words = String(text || '').split(/\s+/).map((w) => w.replace(/^[„“"'(]+|[„“"',.!?…)]+$/g, '')).filter(Boolean).slice(0, SPOTS.length);
+    if (!words.length) words = ['špinavé', 'prádlo'];
+    $('#load').replaceChildren(...words.map((w, i) => {
+      const s = h('span', { text: w.slice(0, 16) });
+      s.style.left = SPOTS[i][0] + '%';
+      s.style.top = SPOTS[i][1] + '%';
+      s.style.setProperty('--tilt', (((i * 41) % 50) - 25) + 'deg');
+      return s;
+    }));
+    $('#drum').classList.toggle('done', !!clean);
+  }
+  function setLcd(phase) {
+    const pr = P.getProgram(state.program);
+    $('#lcd-prog').textContent = (pr.name + ' ' + pr.temp + '°C').toUpperCase();
+    $('#lcd-phase').textContent = phase;
+  }
+  function updateEngine() {
+    $('#engine').textContent = state.sample && !state.aiOff
+      ? 'Pere Claude. Při prvním praní se tě zeptá na svolení.'
+      : 'Pere rychloprogram přímo v prohlížeči, bez AI.';
+  }
+
+  // Claude, když je k dispozici a jeho výstup projde kontrolou; jinak rychloprogram.
+  async function washText(text, programId, opts) {
+    opts = opts || {};
+    const sample = state.aiOff ? null : state.sample;
+    if (sample) {
+      try {
+        const reply = await sample.json(P.aiPrompt(text, programId), { modelTier: 'quick', cache: opts.fresh ? false : true });
+        const ok = P.checkAi(reply, text);
+        if (ok) return Object.assign(ok, { program: P.getProgram(programId).id });
+      } catch (e) {
+        const code = e && e.code;
+        if (['not_granted', 'sampling_disabled', 'not_declared', 'capability_disabled', 'capability_removed'].includes(code)) {
+          state.aiOff = true;
+          updateEngine();
+        } else if (code === 'rate_limited') toast('Claude je chvíli přetížený. Pere rychloprogram.');
+        else if (code === 'session_expired') toast('Přihlas se znovu do Claude. Zatím pere rychloprogram.');
+      }
+    }
+    return P.wash(text, programId, { variant: opts.variant || 0 });
+  }
+
+  let cycleTimer = 0;
+  function startCycle() {
+    const drum = $('#drum');
+    drum.classList.remove('done', 'fast');
+    drum.classList.add('spin');
+    const phases = ['NAMÁČENÍ', 'PRANÍ', 'MÁCHÁNÍ'];
+    let i = 0;
+    setLcd(phases[0]);
+    clearInterval(cycleTimer);
+    cycleTimer = setInterval(() => { i = i >= 2 ? 1 : i + 1; setLcd(phases[i]); }, 650);
+  }
+  async function finishCycle(res, input) {
+    clearInterval(cycleTimer);
+    const drum = $('#drum');
+    setLcd('ŽDÍMÁNÍ');
+    drum.classList.add('fast');
+    await wait(reduced ? 0 : 600);
+    drum.classList.remove('spin', 'fast');
+    fillDrum(res.washed ? res.text : input, true);
+    setLcd(res.washed ? 'HOTOVO' : 'ČISTÉ');
+  }
+  function setWashBusy(on) {
+    ['#btn-wash', '#btn-example', '#btn-again'].forEach((s) => { $(s).disabled = on; });
+    $('#btn-wash').textContent = on ? 'Pere se…' : 'Vyprat';
+  }
+  async function doWash(fresh) {
+    if (state.washing) return;
+    const text = $('#dirty').value.trim();
+    if (!text) { toast('Nejdřív hoď do pračky nějaké špinavé prádlo.'); $('#dirty').focus(); return; }
+    state.washing = true;
+    setWashBusy(true);
+    state.variant = fresh ? state.variant + 1 : 0;
+    fillDrum(text, false);
+    startCycle();
+    try {
+      const out = await Promise.all([washText(text, state.program, { fresh: !!fresh, variant: state.variant }), wait(reduced ? 250 : 1500)]);
+      await finishCycle(out[0], text);
+      showResult(text, out[0], false);
+    } finally {
+      clearInterval(cycleTimer);
+      state.washing = false;
+      setWashBusy(false);
+    }
+  }
+  function showResult(before, res, example) {
+    const pr = P.getProgram(res.program || state.program);
+    state.lastResult = { before, text: res.washed ? res.text : before, washed: !!res.washed, program: pr.id, engine: res.engine };
+    $('#res-title').textContent = res.washed ? 'Vypráno' : 'Čisté prádlo';
+    $('#res-example').hidden = !example;
+    $('#res-before').textContent = before;
+    $('#res-before-wrap').hidden = !res.washed;
+    $('#res-after').textContent = state.lastResult.text;
+    $('#res-sub').textContent = res.washed
+      ? 'Program ' + pr.name + ' ' + pr.temp + ' °C · ' + (res.engine === 'ai' ? 'pere Claude' : 'rychloprogram bez AI')
+      : 'Tohle je hezké samo o sobě, pračka nemá co prát.';
+    $('#btn-save').hidden = !(state.downloads && res.washed);
+  }
+  function selectText(el) {
+    try {
+      const r = document.createRange();
+      r.selectNodeContents(el);
+      const s = window.getSelection();
+      s.removeAllRanges();
+      s.addRange(r);
+    } catch (e) { /* nic */ }
+  }
+  function copyResult() {
+    const r = state.lastResult;
+    if (!r) return;
+    const text = r.text + '\n— vypráno v Smíchárně (program ' + P.getProgram(r.program).name + ')';
+    let job;
+    try { job = navigator.clipboard.writeText(text); } catch (e) { job = Promise.reject(e); }
+    Promise.resolve(job).then(
+      () => toast('Zkopírováno. Pošli to kamarádům.'),
+      () => { selectText($('#res-after')); toast('Text je označený, zkopíruj ho ručně.'); },
+    );
+  }
+  async function saveImage() {
+    const r = state.lastResult;
+    if (!state.downloads || !r) return;
+    try {
+      const blob = await drawCard(r);
+      await state.downloads.save({ filename: 'vyprano-smicharna.png', data: blob });
+      toast('Obrázek je uložený.');
+    } catch (e) {
+      const code = e && e.code;
+      if (code === 'declined') return;
+      if (code === 'rate_limited') { toast('Chvilku počkej, ukládání už běží.'); return; }
+      if (['unavailable', 'not_granted', 'capability_disabled', 'capability_removed'].includes(code)) {
+        state.downloads = null;
+        $('#btn-save').hidden = true;
+        toast('Ukládání tu není dostupné. Použij Kopírovat.');
+        return;
+      }
+      toast('Obrázek se nepodařilo uložit.');
+    }
+  }
+
+  // Čtvercový obrázek 1080 × 1080 na Instagram nebo do WhatsAppu
+  async function drawCard(r) {
+    try {
+      await Promise.all([document.fonts.load('60px "Lilita One"'), document.fonts.load('600 30px "Onest"'), document.fonts.load('400 30px "Onest"')]);
+    } catch (e) { /* použije se náhradní písmo */ }
+    const W = 1080, H = 1080, X = 130, MAXW = W - 2 * X;
+    const c = document.createElement('canvas');
+    c.width = W;
+    c.height = H;
+    const g = c.getContext('2d');
+    g.fillStyle = '#EDF3F2';
+    g.fillRect(0, 0, W, H);
+    g.strokeStyle = '#DAE5E4';
+    g.lineWidth = 2;
+    for (let x = 0; x <= W; x += 60) { g.beginPath(); g.moveTo(x, 0); g.lineTo(x, H); g.stroke(); }
+    for (let y = 0; y <= H; y += 60) { g.beginPath(); g.moveTo(0, y); g.lineTo(W, y); g.stroke(); }
+    roundRect(g, 70, 70, W - 140, H - 140, 56);
+    g.fillStyle = '#FFFFFF';
+    g.fill();
+    g.fillStyle = '#2346D8';
+    g.font = '52px "Lilita One", "Arial Rounded MT Bold", sans-serif';
+    g.fillText('Smíchárna', X, 190);
+    g.fillStyle = '#51646C';
+    g.font = '600 26px "Onest", system-ui, sans-serif';
+    g.fillText('PRAČKA NA NADÁVKY', X, 232);
+    let y = 322;
+    g.font = '400 32px "Onest", system-ui, sans-serif';
+    for (const line of clip(wrapLines(g, r.before, MAXW), 3)) {
+      g.fillStyle = '#7B8C93';
+      g.fillText(line, X, y);
+      g.fillStyle = '#C8412F';
+      g.fillRect(X, y - 11, g.measureText(line).width, 4);
+      y += 46;
+    }
+    y += 28;
+    const pr = P.getProgram(r.program);
+    drawTub(g, X, y - 36, 1.6, String(pr.temp));
+    g.fillStyle = '#0B6A4C';
+    g.font = '700 28px "Onest", system-ui, sans-serif';
+    g.fillText('vypráno · program ' + pr.name, X + 72, y - 6);
+    y += 40;
+    const bottom = H - 180;
+    let size = 64, lines = [];
+    for (;;) {
+      g.font = size + 'px "Lilita One", "Arial Rounded MT Bold", sans-serif';
+      lines = wrapLines(g, r.text, MAXW);
+      if (y + lines.length * size * 1.22 <= bottom || size <= 30) break;
+      size -= 4;
+    }
+    lines = clip(lines, Math.max(1, Math.floor((bottom - y) / (size * 1.22))));
+    g.fillStyle = '#15232B';
+    for (const line of lines) { y += size; g.fillText(line, X, y); y += size * 0.22; }
+    g.fillStyle = '#51646C';
+    g.font = '600 26px "Onest", system-ui, sans-serif';
+    g.fillText('Smíchárna · tady se reaguje jen hezky', X, H - 122);
+    return new Promise((resolve, reject) => c.toBlob((b) => (b ? resolve(b) : reject(new Error('png'))), 'image/png'));
+  }
+  function clip(lines, max) {
+    if (lines.length <= max) return lines;
+    const out = lines.slice(0, max);
+    out[max - 1] = out[max - 1].replace(/\s*\S*$/, '') + '…';
+    return out;
+  }
+  function wrapLines(g, text, maxW) {
+    const out = [];
+    for (const para of String(text).split('\n')) {
+      let line = '';
+      for (const word of para.split(/\s+/).filter(Boolean)) {
+        const test = line ? line + ' ' + word : word;
+        if (line && g.measureText(test).width > maxW) { out.push(line); line = word; } else line = test;
+      }
+      out.push(line);
+    }
+    return out;
+  }
+  function roundRect(g, x, y, w, hh, r) {
+    g.beginPath();
+    g.moveTo(x + r, y);
+    g.arcTo(x + w, y, x + w, y + hh, r);
+    g.arcTo(x + w, y + hh, x, y + hh, r);
+    g.arcTo(x, y + hh, x, y, r);
+    g.arcTo(x, y, x + w, y, r);
+    g.closePath();
+  }
+  function drawTub(g, x, y, s, label) {
+    g.save();
+    g.translate(x, y);
+    g.scale(s, s);
+    g.strokeStyle = '#0B6A4C';
+    g.lineWidth = 2;
+    g.lineCap = 'round';
+    g.lineJoin = 'round';
+    g.beginPath(); g.moveTo(3, 8); g.lineTo(6.5, 23.5); g.lineTo(27.5, 23.5); g.lineTo(31, 8); g.stroke();
+    g.beginPath(); g.moveTo(3, 8);
+    for (let i = 0; i < 4; i++) g.quadraticCurveTo(6.5 + i * 7, i % 2 ? 12 : 4, 10 + i * 7, 8);
+    g.stroke();
+    g.fillStyle = '#0B6A4C';
+    g.font = '700 10.5px "Onest", system-ui, sans-serif';
+    g.textAlign = 'center';
+    g.fillText(label, 17, 20.5);
+    g.restore();
+  }
+
+  function toFeed() {
+    const r = state.lastResult;
+    if (!r) return;
+    if (state.live && !state.canWrite) { toast('Přidávat můžou jen pozvaní kamarádi.'); return; }
+    selectTab('kraviny');
+    $('#composer').open = true;
+    $('#post-text').value = r.washed ? '„' + r.text + '“\n(vypráno programem ' + P.getProgram(r.program).name + ')' : r.text;
+    $('#post-text').focus();
+    toast('Připraveno. Stačí kliknout na Poslat kravinu.');
+  }
+
+  // ---------- Kraviny ----------
+  function viewPosts() {
+    const list = [];
+    if (state.live) state.posts.forEach((p) => list.push(livePost(p)));
+    else state.demo.posts.forEach((p) => list.push(demoPost(p)));
+    if (!state.live || (state.liveReady && !state.posts.length)) EXAMPLES.forEach((e) => list.push(demoPost(e)));
+    return list;
+  }
+  function demoPost(e) {
+    const mine = new Set(arr(state.demo.reacts[e.id]).filter((x) => REACTION_IDS.includes(x)));
+    const counts = {};
+    REACTIONS.forEach((r) => { counts[r.id] = num(e.base && e.base[r.id]) + (mine.has(r.id) ? 1 : 0); });
+    const comments = arr(e.comments).map((c, i) => ({ id: e.id + '-u' + i, nick: str(c.nick), text: str(c.text), washed: !!c.washed, program: P.getProgram(c.program || e.program).id, own: false }))
+      .concat(state.demo.comments.filter((c) => c && c.postId === e.id)
+        .map((c, i) => ({ id: e.id + '-m' + i, nick: str(c.nick), text: str(c.text), washed: !!c.washed, program: P.getProgram(c.program).id, own: true })));
+    return {
+      id: str(e.id), demo: true, own: !!e.own, authorId: null, nick: str(e.nick), createdAt: num(e.createdAt),
+      text: str(e.text).slice(0, 600), url: str(e.url).slice(0, 500), program: P.getProgram(e.program).id, counts, mine, comments,
+    };
+  }
+  function livePost(p) {
+    const counts = { heart: 0, laugh: 0, thumb: 0 };
+    const mine = new Set();
+    for (const r of state.reacts) {
+      if (r.postId !== p.id) continue;
+      for (const id of new Set(arr(r.e))) {
+        if (!REACTION_IDS.includes(id)) continue;
+        counts[id]++;
+        if (r.who === state.me.key) mine.add(id);
+      }
+    }
+    const comments = state.comments.filter((c) => c.postId === p.id).map((c) => ({
+      id: c.id, authorId: str(c.authorId) || null, who: str(c.who), nick: str(c.nick).slice(0, 30), text: str(c.text).slice(0, 600),
+      washed: c.washed === true, program: P.getProgram(c.program).id, own: c.who === state.me.key,
+    }));
+    return {
+      id: p.id, demo: false, own: p.who === state.me.key || (!!state.me.id && p.authorId === state.me.id),
+      authorId: str(p.authorId) || null, who: str(p.who), nick: str(p.nick).slice(0, 30), createdAt: num(p.createdAt),
+      text: str(p.text).slice(0, 600), url: str(p.url).slice(0, 500), program: P.getProgram(p.program).id, counts, mine, comments,
+    };
+  }
+  function colorFor(s) { return AVATAR_COLORS[hashStr(s) % AVATAR_COLORS.length]; }
+  function who(item, profiles) {
+    const prof = item.authorId ? profiles[item.authorId] : null;
+    if (prof && prof.name) return { name: prof.name, avatar: prof.avatarUrl || '', color: colorFor(item.authorId) };
+    const nick = str(item.nick).trim();
+    const name = nick || (item.own ? (state.me.name || 'Ty') : 'Kamarád');
+    return { name, avatar: '', color: colorFor(nick || item.authorId || item.who || name) };
+  }
+  function avatarEl(a) {
+    const el = h('span', { class: 'avatar', 'aria-hidden': 'true' });
+    el.style.setProperty('--c', a.color);
+    if (a.avatar) el.append(h('img', { src: a.avatar, alt: '' }));
+    else el.textContent = (a.name.trim().charAt(0) || '?').toUpperCase();
+    return el;
+  }
+  function ago(ts) {
+    const s = Math.max(0, (Date.now() - ts) / 1000);
+    if (s < 60) return 'právě teď';
+    const m = Math.floor(s / 60);
+    if (m < 60) return 'před ' + m + ' min';
+    const hrs = Math.floor(m / 60);
+    if (hrs < 24) return 'před ' + hrs + ' h';
+    const d = Math.floor(hrs / 24);
+    if (d === 1) return 'včera';
+    if (d < 7) return 'před ' + d + ' dny';
+    const dt = new Date(ts);
+    return dt.getDate() + '. ' + (dt.getMonth() + 1) + '.';
+  }
+  function platformOf(host) {
+    const list = [[/tiktok\.com$/, 'TikTok'], [/instagram\.com$/, 'Instagram'], [/(youtube\.com|youtu\.be)$/, 'YouTube'], [/(facebook\.com|fb\.watch|fb\.com)$/, 'Facebook'], [/(^|\.)(x|twitter)\.com$/, 'X'], [/reddit\.com$/, 'Reddit'], [/9gag\.com$/, '9GAG'], [/imgur\.com$/, 'Imgur']];
+    for (const [re, name] of list) if (re.test(host)) return name;
+    return 'Odkaz';
+  }
+  function linkCard(url) {
+    let u;
+    try { u = new URL(url); } catch (e) { return null; }
+    if (u.protocol !== 'https:' && u.protocol !== 'http:') return null;
+    const host = u.hostname.replace(/^(www|m)\./, '');
+    return h('a', { class: 'link-card', href: u.href, target: '_blank', rel: 'noopener noreferrer' },
+      h('span', { class: 'platform', text: platformOf(host) }),
+      h('span', { class: 'host', text: host + u.pathname.replace(/\/$/, '') }),
+      h('span', { class: 'open', text: 'Otevřít ↗' }));
+  }
+  function canInteract(p) { return p.demo || (state.live && state.canWrite); }
+  function reactsEl(p) {
+    const can = canInteract(p);
+    return h('div', { class: 'reacts', role: 'group', 'aria-label': 'Reakce' }, REACTIONS.map((r) => {
+      const n = p.counts[r.id] || 0;
+      return h('button', {
+        type: 'button', class: 'react', disabled: !can, 'aria-pressed': p.mine.has(r.id) ? 'true' : 'false',
+        'aria-label': r.label + ', ' + n, title: can ? r.label : 'Reagovat můžou pozvaní kamarádi',
+        onclick: () => toggleReact(p, r.id),
+      }, h('span', { class: 'emo', 'aria-hidden': 'true', text: r.emo }), h('span', { class: 'lbl', text: r.label }), n ? h('b', { class: 'cnt', text: String(n) }) : null);
+    }));
+  }
+  function washedBadge(programId) {
+    const pr = P.getProgram(programId);
+    return h('span', { class: 'badge-washed', title: 'Původní komentář prošel pračkou (program ' + pr.name + ').' }, tubSvg(pr.temp, 'xs'), 'vypráno · ' + pr.name);
+  }
+  function commentsEl(p, profiles) {
+    const items = p.comments.map((c) => {
+      const a = who(c, profiles);
+      return h('li', { class: 'comment' }, h('b', { text: a.name }), h('span', { text: c.text }), c.washed ? washedBadge(c.program) : null);
+    });
+    if (state.pending.has(p.id)) items.push(h('li', { class: 'comment pending', role: 'status' }, h('span', { class: 'spinner', 'aria-hidden': 'true' }), h('span', { text: 'Pračka se točí…' })));
+    const note = state.notices.get(p.id);
+    const noticeEl = note ? h('div', { class: 'wash-notice', role: 'status' },
+      h('p', { class: 'wn-title', text: 'Tvůj komentář prošel pračkou' }),
+      h('p', { class: 'before' }, h('s', { text: note.before })),
+      h('p', { class: 'wn-after', text: note.after }),
+      h('button', { class: 'link-btn', type: 'button', text: 'Rozumím', onclick: () => { state.notices.delete(p.id); scheduleRender(); } })) : null;
+    if (!items.length && !noticeEl) return null;
+    return h('div', { class: 'comment-zone' }, items.length ? h('ul', { class: 'comments' }, items) : null, noticeEl);
+  }
+  function commentForm(p) {
+    const input = h('input', { type: 'text', id: 'c-' + p.id, 'data-draft': p.id, maxlength: '400', autocomplete: 'off', placeholder: 'Napiš komentář…', 'aria-label': 'Komentář' });
+    input.value = state.drafts.get(p.id) || '';
+    input.addEventListener('input', () => state.drafts.set(p.id, input.value));
+    return h('form', { class: 'comment-form', onsubmit: (ev) => { ev.preventDefault(); sendComment(p, input.value); } },
+      input, h('button', { class: 'btn-ghost', type: 'submit', disabled: state.pending.has(p.id), text: 'Odeslat' }));
+  }
+  function deleteBtn(p) {
+    const armed = state.confirmDelete === p.id;
+    return h('button', {
+      class: 'link-btn danger', type: 'button', text: armed ? 'Opravdu smazat?' : 'Smazat',
+      onclick: () => {
+        if (!armed) {
+          state.confirmDelete = p.id;
+          scheduleRender();
+          setTimeout(() => { if (state.confirmDelete === p.id) { state.confirmDelete = null; scheduleRender(); } }, 4000);
+          return;
+        }
+        state.confirmDelete = null;
+        deletePost(p);
+      },
+    });
+  }
+  function postEl(p, profiles) {
+    const a = who(p, profiles);
+    const pr = P.getProgram(p.program);
+    return h('article', { class: 'post', 'data-id': p.id },
+      h('header', { class: 'post-head' },
+        avatarEl(a),
+        h('div', { class: 'post-meta' }, h('b', { class: 'name', text: a.name }), h('span', { class: 'time', 'data-t': String(p.createdAt), text: ago(p.createdAt) })),
+        p.demo ? h('span', { class: 'demo-tag', text: p.own ? 'Jen u tebe' : 'Ukázka' }) : null,
+        p.own ? deleteBtn(p) : null),
+      p.text ? h('p', { class: 'post-text', text: p.text }) : null,
+      p.url ? linkCard(p.url) : null,
+      reactsEl(p),
+      commentsEl(p, profiles),
+      canInteract(p) ? commentForm(p) : null,
+      h('footer', { class: 'post-foot' }, tubSvg(pr.temp, 'sm'), h('span', { text: 'Nadávky tu pere program ' + pr.name + ' (' + pr.temp + ' °C)' })));
+  }
+
+  let renderSeq = 0;
+  let renderQueued = false;
+  function scheduleRender() {
+    if (renderQueued) return;
+    renderQueued = true;
+    requestAnimationFrame(() => { renderQueued = false; renderFeed(); });
+  }
+  async function renderFeed() {
+    const seq = ++renderSeq;
+    const posts = viewPosts();
+    let profiles = {};
+    if (state.user && state.live) {
+      const ids = new Set();
+      posts.forEach((p) => { if (p.authorId) ids.add(p.authorId); p.comments.forEach((c) => { if (c.authorId) ids.add(c.authorId); }); });
+      if (ids.size) {
+        try { profiles = obj(await state.user.profiles([...ids])); } catch (e) { profiles = {}; }
+      }
+      if (seq !== renderSeq) return;
+    }
+    const feed = $('#feed');
+    const active = document.activeElement;
+    const draftId = active && active.getAttribute ? active.getAttribute('data-draft') : null;
+    const caret = draftId ? active.selectionStart : null;
+    feed.replaceChildren(...posts.map((p) => postEl(p, profiles)));
+    if (draftId) {
+      const el = feed.querySelector('[data-draft="' + CSS.escape(draftId) + '"]');
+      if (el) {
+        el.focus({ preventScroll: true });
+        try { el.setSelectionRange(caret, caret); } catch (e) { /* nic */ }
+      }
+    }
+    renderFeedNote();
+  }
+  function renderFeedNote() {
+    const n = $('#feed-note');
+    let msg = '';
+    if (state.modeKnown) {
+      if (!state.live) msg = 'Ukázková Smíchárna. Co tu přidáš, vidíš jen ty v tomhle prohlížeči.';
+      else if (state.liveError) msg = 'Kraviny se teď nepodařilo načíst. Zkus stránku obnovit.';
+      else if (!state.liveReady) msg = 'Načítám kraviny…';
+      else if (!state.posts.length) msg = 'Zatím tu nic není. Pošli první kravinu! Ukázky níž zmizí, jakmile přibude první příspěvek.';
+      if (state.live && !state.canWrite) msg = (msg ? msg + ' ' : '') + 'Můžeš se dívat a zkoušet pračku. Přidávat a reagovat můžou pozvaní kamarádi.';
+    }
+    n.textContent = msg;
+    n.hidden = !msg;
+  }
+  function renderComposer() {
+    $('#composer').hidden = state.live && !state.canWrite;
+    $('#nick-field').hidden = !(state.live && !state.me.name);
+  }
+
+  // Zápisy do jednoho dokumentu vždy po jednom
+  const chains = new Map();
+  function queued(key, fn) {
+    const next = (chains.get(key) || Promise.resolve()).then(() => fn()).catch(onWriteError);
+    chains.set(key, next);
+    return next;
+  }
+  function onWriteError(e) {
+    const code = e && e.code;
+    if (code === 'invalid_argument' && !state.canWriteKnown) {
+      state.canWrite = false;
+      renderComposer();
+      scheduleRender();
+      toast('Tady se můžeš jen dívat. Přidávat můžou pozvaní kamarádi.');
+    } else if (code === 'quota_exceeded') toast('Smíchárna je plná. Smažte pár starých kravin.');
+    else if (code === 'resource_exhausted') toast('Moc rychle. Chvilku počkej a zkus to znovu.');
+    else toast('Nepodařilo se uložit. Zkus to prosím znovu.');
+  }
+  function myNick() {
+    if (state.me.name) return '';
+    return str($('#nick').value || store.get('nick', '')).trim().slice(0, 30);
+  }
+  function needNick() { return state.live && !state.me.name && !myNick(); }
+  function askNick() {
+    selectTab('kraviny');
+    $('#composer').open = true;
+    $('#nick-field').hidden = false;
+    $('#nick').focus();
+    toast('Nejdřív napiš svou přezdívku, ať kamarádi vědí, kdo píše.');
+  }
+
+  function toggleReact(p, rid) {
+    if (!canInteract(p)) return;
+    const mine = new Set(p.mine);
+    if (mine.has(rid)) mine.delete(rid); else mine.add(rid);
+    if (p.demo) {
+      state.demo.reacts[p.id] = [...mine];
+      store.set('demoReacts', state.demo.reacts);
+      scheduleRender();
+      return;
+    }
+    const docId = safeSeg(p.id) + '~' + state.me.key;
+    state.reacts = state.reacts.filter((r) => r.id !== docId);
+    if (mine.size) state.reacts.push({ id: docId, postId: p.id, who: state.me.key, e: [...mine] });
+    scheduleRender();
+    queued(docId, () => {
+      const ref = state.db.doc('reactions/' + docId);
+      return mine.size ? ref.set({ postId: p.id, who: state.me.key, e: [...mine], at: Date.now() }) : ref.delete();
+    });
+  }
+
+  async function sendComment(p, raw) {
+    const text = String(raw || '').replace(/\s+/g, ' ').trim().slice(0, 400);
+    if (!text || state.pending.has(p.id)) return;
+    if (!p.demo && needNick()) { state.drafts.set(p.id, text); askNick(); return; }
+    state.pending.add(p.id);
+    state.drafts.set(p.id, '');
+    state.notices.delete(p.id);
+    scheduleRender();
+    const res = await washText(text, p.program, {});
+    state.pending.delete(p.id);
+    const c = {
+      postId: p.id, authorId: state.me.id || null, who: state.me.key, nick: myNick(),
+      text: res.washed ? res.text : text, washed: !!res.washed, program: P.getProgram(p.program).id,
+      engine: res.engine || 'local', createdAt: Date.now(),
+    };
+    if (res.washed) state.notices.set(p.id, { before: text, after: c.text });
+    if (p.demo) {
+      state.demo.comments = state.demo.comments.concat(c).slice(-200);
+      store.set('demoComments', state.demo.comments);
+    } else {
+      try { await state.db.collection('comments').add(c); } catch (e) {
+        state.notices.delete(p.id);
+        state.drafts.set(p.id, text);
+        onWriteError(e);
+      }
+    }
+    scheduleRender();
+  }
+
+  function normalizeUrl(raw) {
+    let s = raw.trim();
+    if (!/^[a-z][a-z0-9+.-]*:/i.test(s) && /^[\w-]+(\.[\w-]+)+/.test(s)) s = 'https://' + s;
+    try {
+      const u = new URL(s);
+      return u.protocol === 'http:' || u.protocol === 'https:' ? u.href : '';
+    } catch (e) { return ''; }
+  }
+  async function submitPost(ev) {
+    ev.preventDefault();
+    const hint = $('#composer-hint');
+    hint.textContent = '';
+    const rawUrl = $('#post-url').value.trim();
+    const text = $('#post-text').value.trim().slice(0, 600);
+    if (!rawUrl && !text) { hint.textContent = 'Vlož odkaz nebo napiš vtip.'; $('#post-url').focus(); return; }
+    let url = '';
+    if (rawUrl) {
+      url = normalizeUrl(rawUrl);
+      if (!url) { hint.textContent = 'Tohle nevypadá jako odkaz. Zkopíruj adresu z TikToku, Instagramu nebo YouTube.'; $('#post-url').focus(); return; }
+    }
+    if (needNick()) { hint.textContent = 'Napiš svou přezdívku, ať kamarádi vědí, kdo posílá.'; $('#nick-field').hidden = false; $('#nick').focus(); return; }
+    const post = { authorId: state.me.id || null, who: state.me.key, nick: myNick(), url, text, program: state.postProgram, createdAt: Date.now() };
+    const btn = $('#btn-post');
+    btn.disabled = true;
+    try {
+      if (state.live) await state.db.collection('posts').add(post);
+      else {
+        state.demo.posts = [Object.assign({ id: 'moje-' + Date.now().toString(36), own: true, base: {}, comments: [] }, post)].concat(state.demo.posts).slice(0, 30);
+        store.set('demoPosts', state.demo.posts);
+      }
+      $('#post-url').value = '';
+      $('#post-text').value = '';
+      $('#composer').open = false;
+      toast('Kravina je venku.');
+      scheduleRender();
+    } catch (e) {
+      onWriteError(e);
+    } finally {
+      btn.disabled = false;
+    }
+  }
+  async function deletePost(p) {
+    if (p.demo) {
+      state.demo.posts = state.demo.posts.filter((x) => x.id !== p.id);
+      state.demo.comments = state.demo.comments.filter((c) => c.postId !== p.id);
+      delete state.demo.reacts[p.id];
+      store.set('demoPosts', state.demo.posts);
+      store.set('demoComments', state.demo.comments);
+      store.set('demoReacts', state.demo.reacts);
+      scheduleRender();
+      return;
+    }
+    try {
+      await state.db.doc('posts/' + p.id).delete();
+      // uklidit i komentáře a reakce ke smazané kravině
+      for (const c of state.comments.filter((x) => x.postId === p.id)) await state.db.doc('comments/' + c.id).delete().catch(() => {});
+      for (const r of state.reacts.filter((x) => x.postId === p.id)) await state.db.doc('reactions/' + r.id).delete().catch(() => {});
+      toast('Smazáno.');
+    } catch (e) {
+      onWriteError(e);
+    }
+  }
+
+  function startLive(db) {
+    state.db = db;
+    state.live = true;
+    const fail = (e) => { state.liveError = true; renderFeedNote(); console.warn('Smíchárna:', e && e.code); };
+    const rows = (snap) => snap.docs.map((d) => Object.assign({}, d.data(), { id: d.id }));
+    db.collection('posts').orderBy('createdAt', 'desc').limit(200).onSnapshot((snap) => {
+      state.posts = rows(snap);
+      state.liveReady = true;
+      state.liveError = false;
+      if (!state.posts.length && !state.openedEmpty && state.canWrite) { state.openedEmpty = true; $('#composer').open = true; }
+      scheduleRender();
+    }, fail);
+    db.collection('comments').orderBy('createdAt', 'asc').limit(1000).onSnapshot((snap) => { state.comments = rows(snap); scheduleRender(); }, fail);
+    db.collection('reactions').limit(1000).onSnapshot((snap) => { state.reacts = rows(snap); scheduleRender(); }, fail);
+  }
+
+  // ---------- Start ----------
+  function buildCareTable() {
+    $('#care-body').replaceChildren(...P.PROGRAMS.map((pr) => h('tr', null,
+      h('td', null, tubSvg(pr.temp)),
+      h('td', null, h('b', { text: pr.name }), h('span', { class: 'temp', text: ' ' + pr.temp + ' °C' })),
+      h('td', { text: pr.about }))));
+  }
+
+  function init() {
+    buildPrograms($('#programs'), state.program, (id) => {
+      state.program = id;
+      store.set('program', id);
+      markProgram($('#programs'), id);
+      if (!state.washing) setLcd('PŘIPRAVENO');
+    });
+    buildPrograms($('#post-programs'), state.postProgram, (id) => {
+      state.postProgram = id;
+      store.set('postProgram', id);
+      markProgram($('#post-programs'), id);
+    });
+    buildCareTable();
+    const fromHash = location.hash.replace('#', '');
+    const saved = store.get('tab', '');
+    selectTab(TABS.includes(fromHash) ? fromHash : TABS.includes(saved) ? saved : ($('#app').dataset.defaultTab || 'kraviny'));
+
+    const dirty = $('#dirty');
+    fillDrum(dirty.value, false);
+    setLcd('PŘIPRAVENO');
+    showResult(dirty.value, P.wash(dirty.value, state.program), true);
+    let drumFrame = 0;
+    dirty.addEventListener('input', () => {
+      if (state.washing) return;
+      cancelAnimationFrame(drumFrame);
+      drumFrame = requestAnimationFrame(() => { fillDrum(dirty.value, false); setLcd('PŘIPRAVENO'); });
+    });
+    dirty.addEventListener('keydown', (ev) => { if (ev.key === 'Enter' && (ev.ctrlKey || ev.metaKey)) { ev.preventDefault(); doWash(false); } });
+    $('#btn-wash').addEventListener('click', () => doWash(false));
+    $('#btn-again').addEventListener('click', () => doWash(true));
+    $('#btn-example').addEventListener('click', () => {
+      state.exampleIdx = (state.exampleIdx + 1) % EXAMPLE_INSULTS.length;
+      dirty.value = EXAMPLE_INSULTS[state.exampleIdx];
+      doWash(false);
+    });
+    $('#btn-copy').addEventListener('click', copyResult);
+    $('#btn-save').addEventListener('click', saveImage);
+    $('#btn-tofeed').addEventListener('click', toFeed);
+    $('#composer-form').addEventListener('submit', submitPost);
+    $('#nick').value = str(store.get('nick', ''));
+    $('#nick').addEventListener('input', () => store.set('nick', $('#nick').value.trim().slice(0, 30)));
+
+    updateEngine();
+    renderComposer();
+    renderFeed();
+    setInterval(() => $$('.time[data-t]').forEach((el) => { el.textContent = ago(Number(el.dataset.t)); }), 60000);
+  }
+
+  async function connect() {
+    use('sample').then((s) => { state.sample = s; updateEngine(); });
+    use('downloads').then((d) => {
+      state.downloads = d;
+      if (state.lastResult) $('#btn-save').hidden = !(d && state.lastResult.washed);
+    });
+    const caps = await Promise.all([use('db'), use('user')]);
+    const db = caps[0];
+    const user = caps[1];
+    if (user) {
+      state.user = user;
+      try {
+        const me = await user.me();
+        if (me && me.id) { state.me.id = me.id; state.me.key = safeSeg(me.id); }
+        state.me.name = (me && me.name) || '';
+        const cw = await user.can('data.write');
+        state.canWrite = cw !== false;
+        state.canWriteKnown = cw !== null;
+        if (db && (await user.isOwner())) $('#owner-box').hidden = false;
+      } catch (e) { /* čtení o uživateli neselhává, ale pro jistotu */ }
+    }
+    state.modeKnown = true;
+    if (db) startLive(db);
+    renderComposer();
+    renderFeedNote();
+    scheduleRender();
+  }
+
+  init();
+  connect();
+})();
+</script>
