@@ -71,6 +71,13 @@ Android APK se sestavuje v Android Studiu nebo `cd android && ./gradlew assemble
 
 Omezení: PDF dokumenty se zatím nečtou (rozšíření na to upozorní); analýza je automatická a **nenahrazuje právní poradenství**.
 
+## Další projekt v repozitáři: Cenotvorba
+
+Složka [`repricing/`](repricing/README.md) obsahuje **Cenotvorbu** – samostatný repricingový nástroj (obdoba Disiva)
+pro dynamickou cenotvorbu podle vlastních dat o konkurenci: import cen konkurence (API / JSON / XML / CSV / XLSX),
+segmentace podle vlastních metrik, cenové strategie s limity marže, schvalování návrhů a export nových cen do adminu
+(feed, webhook, API) nebo přímo do POHODY (XML). Spuštění: `cd repricing && npm run demo && npm start`.
+
 ## Licence
 
 MIT

@@ -1,0 +1,5 @@
+{
+  "//": "Soubory v public/ jsou ES moduly pro prohlížeč; tento soubor jen říká Node testům, aby je načítal jako ESM.",
+  "type": "module",
+  "private": true
+}

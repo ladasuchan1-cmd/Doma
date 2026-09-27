@@ -1,0 +1,8 @@
+﻿EAN;Kód výrobce;Název u nás;Cena;Doprava;Dostupnost;Odkaz;Zjištěno;Poznámka analytika
+8597315660484;XTR-M9100;SRAM XTR kliky;"12 990 Kč";99;skladem;https://velo.example/p/1;25.09.2026 10:15;ok
+8597315660484;XTR-M9100;SRAM XTR kliky (duplicita);12.490,-;99;do 3 dnů;https://velo.example/p/1b;25.09.2026 10:16;levnější duplicita
+
+8.59E+12;;Santa Cruz Thron;"107 990,00 Kč";0;na dotaz;https://velo.example/p/2;2026-09-25T08:00:00Z;
+9999999999994;;Neznámý produkt;1 490;;2;https://velo.example/p/3;25. 9. 2026;
+;;Bez identifikace a bez ceny;;;;;;
+8595234463384;;Maxxis Nobby Nic;-5;;skladem;;;záporná cena

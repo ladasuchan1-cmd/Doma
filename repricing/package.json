@@ -1,0 +1,17 @@
+{
+  "name": "cenotvorba",
+  "version": "0.1.0",
+  "description": "Repricingový nástroj – import cen konkurence, segmentace produktů, cenové strategie a export nových cen do adminu / POHODY.",
+  "private": true,
+  "main": "server.js",
+  "engines": {
+    "node": ">=22.13"
+  },
+  "scripts": {
+    "start": "node --disable-warning=ExperimentalWarning server.js",
+    "dev": "node --disable-warning=ExperimentalWarning --watch server.js",
+    "test": "node --disable-warning=ExperimentalWarning --test \"test/**/*.test.js\"",
+    "demo": "node --disable-warning=ExperimentalWarning tools/demo-data.js"
+  },
+  "license": "MIT"
+}

@@ -1,0 +1,32 @@
+# Testy repricingového nástroje Cenotvorba (složka repricing/).
+name: Cenotvorba
+
+on:
+  push:
+    branches: ["**"]
+    paths:
+      - "repricing/**"
+      - ".github/workflows/repricing.yml"
+  pull_request:
+    paths:
+      - "repricing/**"
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: repricing
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Jednotkové a integrační testy
+        run: npm test
+        env:
+          CI_SLOW: "1"

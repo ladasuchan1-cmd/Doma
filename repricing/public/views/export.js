@@ -1,0 +1,318 @@
+// Export – feedy pro admin (URL s tokenem), stažení souborů, odeslání webhookem, dokumentace potvrzení (ack), historie
+// s opětovným stažením doručených změn (GET /exports/:id/changes.json|xml|csv – C8).
+import { h, mount } from '../lib/dom.js';
+import { api, apiUrl, itemsOf, isAbort, basePath, bindDownload } from '../lib/api.js';
+import { icon } from '../lib/icons.js';
+import { DataTable } from '../lib/table.js';
+import { card, kpi, emptyState, callout, codeBlock, copyField, jobStatusBadge, checkbox, select, field, dl, button, changeEl, badge } from '../lib/ui.js';
+import { confirmDialog } from '../lib/modal.js';
+import { toast } from '../lib/toast.js';
+import { int, money, dateTime, relTime, EXPORT_KIND_LABELS, count, truncate, duration, detailText } from '../lib/format.js';
+import { priceMove } from '../lib/decision.js';
+import { finalPrice, basePrice, basePriceChange, displayChange } from '../lib/proposal-model.js';
+
+export const title = 'Export';
+
+export async function show(root, ctx) {
+  ctx.setTitle('Export', 'Jak se schválené ceny dostanou do adminu a POHODY');
+  const origin = location.origin + basePath().replace(/\/$/, '');
+  const feedBase = origin + '/feed/';
+  let settings = null;
+  let approved = null;
+  let pushBtn = null;
+
+  const approvedHost = h('div');
+  const webhookHost = h('div');
+  const logHost = h('div');
+
+  // ------------------------------------------------------------- feedy
+  const feedRows = [
+    ['Změny (schválené) – XML', 'changes.xml'],
+    ['Změny (schválené) – JSON', 'changes.json'],
+    ['Změny (schválené) – CSV', 'changes.csv'],
+    ['Celý ceník – XML', 'prices.xml'],
+    ['Celý ceník – JSON', 'prices.json'],
+    ['Celý ceník – CSV', 'prices.csv'],
+  ];
+  const feedsCard = card({
+    title: 'Feedy pro admin',
+    icon: 'link',
+    subtitle: 'Admin si je stahuje pravidelně (cron). VAS_TOKEN nahraďte tokenem s oprávněním export.',
+    actions: [h('a', { class: 'btn btn-sm', href: '#/nastaveni?tab=tokeny' }, icon('key', { size: 14 }), h('span', null, 'Vytvořit token'))],
+    dataset: { card: 'feeds' },
+    body: [
+      feedRows.map(([label, file]) => h('div', { class: 'feed-row' }, h('span', { class: 'small strong' }, label), copyField(feedBase + file + '?token=VAS_TOKEN', { ariaLabel: 'URL feedu ' + label }))),
+      h(
+        'div',
+        { style: 'margin-top:12px' },
+        callout(h('span', null, h('b', null, 'changes'), ' obsahuje jen schválené a dosud neexportované změny. Přidejte ', h('code', null, '&mark=1'), ' a stažené změny se rovnou označí jako exportované (hlavička X-Export-Id), nebo je po úspěšném importu v adminu potvrďte voláním ack (viz níže). ', h('b', null, 'prices'), ' je vždy celý ceník.'), 'info')
+      ),
+    ],
+  });
+
+  // ------------------------------------------------------------- stažení
+  const markChanges = { v: false };
+  const changeLinks = ['json', 'xml', 'csv'].map((f) => h('a', { class: 'btn btn-sm', href: apiUrl('/export/changes.' + f), download: '', dataset: { format: f } }, icon('download', { size: 14 }), h('span', null, f.toUpperCase())));
+  function updateChangeLinks() {
+    for (const a of changeLinks) a.href = apiUrl('/export/changes.' + a.dataset.format, markChanges.v ? { mark: 1 } : null);
+  }
+  const afterDownload = (r) => {
+    if (r.exportId) {
+      toast('Staženo ' + r.filename + ' – ' + count(r.count ?? 0, 'změna označena', 'změny označeny', 'změn označeno') + ' jako exportované (export #' + r.exportId + ').', { type: 'success' });
+      ctx.notifyChanged('export');
+      loadApproved();
+      loadLog();
+    }
+  };
+  for (const a of changeLinks) bindDownload(a, afterDownload);
+  const pohodaScope = select([{ value: 'approved', label: 'Jen schválené změny' }, { value: 'all', label: 'Celý ceník' }], 'approved');
+  // bez parametru server použije nastavení (export.pohoda.encoding, výchozí windows-1250) – posíláme ho vždy explicitně
+  const pohodaEnc = select([{ value: 'windows-1250', label: 'Windows-1250 (výchozí)' }, { value: 'utf-8', label: 'UTF-8' }], 'windows-1250');
+  const pohodaMark = { v: false };
+  const pohodaLink = h('a', { class: 'btn btn-sm btn-primary', download: '', dataset: { action: 'pohoda' } }, icon('download', { size: 14 }), h('span', null, 'POHODA XML'));
+  function updatePohoda() {
+    pohodaLink.href = apiUrl('/export/pohoda.xml', { scope: pohodaScope.value, encoding: pohodaEnc.value, mark: pohodaMark.v ? 1 : null });
+  }
+  pohodaScope.addEventListener('change', updatePohoda);
+  pohodaEnc.addEventListener('change', updatePohoda);
+  bindDownload(pohodaLink, afterDownload);
+  updatePohoda();
+  const downloadsCard = card({
+    title: 'Stáhnout soubory',
+    icon: 'download',
+    dataset: { card: 'downloads' },
+    body: h(
+      'div',
+      { class: 'download-grid' },
+      h('div', { class: 'download' }, h('h3', null, 'Schválené změny'), h('p', null, 'Kód, EAN, název, nová a stará cena, změna %. Pro ruční import do adminu.'), h('div', { class: 'btn-group' }, changeLinks), checkbox('Označit jako exportované', false, (v) => { markChanges.v = v; updateChangeLinks(); })),
+      h(
+        'div',
+        { class: 'download' },
+        h('h3', null, 'POHODA XML'),
+        h('p', null, 'Datový balík pro import do POHODY (aktualizace prodejní ceny zásob, párování podle kódu nebo EAN).'),
+        h('div', { class: 'stack-sm' }, field({ label: 'Rozsah', control: pohodaScope }), field({ label: 'Kódování', control: pohodaEnc })),
+        checkbox('Označit jako exportované', false, (v) => { pohodaMark.v = v; updatePohoda(); }),
+        h('div', null, pohodaLink)
+      ),
+      h('div', { class: 'download' }, h('h3', null, 'Ceník'), h('p', null, 'Všechny aktivní produkty s cenou k exportu (schválený návrh, jinak aktuální cena).'), h('div', { class: 'btn-group' }, ['xlsx', 'csv', 'json', 'xml'].map((f) => bindDownload(h('a', { class: 'btn btn-sm', href: apiUrl('/export/pricelist.' + f), download: '' }, icon('download', { size: 14 }), h('span', null, f.toUpperCase())))))),
+      h('div', { class: 'download' }, h('h3', null, 'Návrhy cen (XLSX)'), h('p', null, 'Přehled čekajících návrhů pro poradu nebo schválení mimo aplikaci.'), h('div', null, bindDownload(h('a', { class: 'btn btn-sm', href: apiUrl('/export/proposals.xlsx', { status: 'pending' }), download: '' }, icon('download', { size: 14 }), h('span', null, 'Návrhy XLSX')))))
+    ),
+  });
+
+  // ------------------------------------------------------------- ack
+  const ackCard = card({
+    title: 'Potvrzení importu v adminu (ack)',
+    icon: 'check',
+    subtitle: 'Doporučený postup pro spolehlivý přenos: stáhnout → naimportovat → potvrdit. Nepotvrzené změny zůstanou ve feedu i příště.',
+    body: h(
+      'div',
+      { class: 'stack' },
+      h('ol', { class: 'validation-list' },
+        h('li', null, 'Admin stáhne ', h('code', null, 'GET /feed/changes.json?token=…'), ' (nebo ', h('code', null, 'GET /api/v1/export/changes.json'), ' s hlavičkou Authorization).'),
+        h('li', null, 'Každá položka má ', h('code', null, 'proposal_id'), ', ', h('code', null, 'code'), ' a ', h('code', null, 'price'), ' (s DPH).'),
+        h('li', null, 'Po úspěšném uložení cen admin zavolá ', h('code', null, 'POST /api/v1/export/ack'), ' s položkami ', h('code', null, '{proposal_id, price}'), ' (nebo ', h('code', null, '{code, price}'), ') – cenou, kterou opravdu nasadil.'),
+        h('li', null, 'Cenotvorba je označí jako exportované a (dle nastavení) přepíše aktuální cenu produktu. Nesouhlasí-li cena, nic se neoznačí a položka je v odpovědi v ', h('code', null, 'mismatched'), '.')
+      ),
+      codeBlock([
+        `curl "${origin}/feed/changes.json?token=$CENOTVORBA_TOKEN"`,
+        '',
+        `curl -X POST "${origin}/api/v1/export/ack" \\`,
+        '  -H "Authorization: Bearer $CENOTVORBA_TOKEN" -H "Content-Type: application/json" \\',
+        '  --data-binary \'{"items": [{"proposal_id": 1201, "price": 52990}, {"proposal_id": 1202, "price": 1290}]}\'',
+        '',
+        '# nebo podle kódů produktů (kód + nasazená cena)',
+        `curl -X POST "${origin}/api/v1/export/ack" -H "Authorization: Bearer $CENOTVORBA_TOKEN" \\`,
+        '  -H "Content-Type: application/json" --data-binary \'{"items": [{"code": "TRK-MAR7GEN3-M", "price": 20990}]}\'',
+      ].join('\n'), { title: 'Příklad' }),
+      h('p', { class: 'muted small' }, 'Odpověď: {"export_id": 12, "count": 2, "unknown_codes": [], "mismatched": [], …}. Potvrdit lze jen schválené návrhy; jiné se ignorují. Ack je bezpečné poslat znovu – už označené se podruhé nezapočítají.'),
+      callout(h('span', null, h('b', null, 'Parametr mark=1 není bezpečný pro opakování: '), 'stažením se změny rovnou označí jako exportované – když se odpověď cestou ztratí, další stažení je už neobsahuje. Stejná data pak stáhnete znovu z historie níže (', h('i', null, 'Znovu stáhnout'), ', ', h('code', null, 'GET /api/v1/exports/{id}/changes.json'), '), případně srovnejte ceny celým ceníkem ', h('code', null, '/feed/prices.json'), '. Kompletní návod pro programátora adminu je v ', h('code', null, 'docs/ADMIN-API.md'), '.'), 'warning')
+    ),
+  });
+
+  const logTable = new DataTable({
+    columns: [
+      { key: 'created_at', label: 'Čas', sortable: true, value: (e) => Date.parse(e.created_at), render: (e) => h('div', { class: 'cell-2' }, h('span', { class: 'nowrap' }, dateTime(e.created_at)), h('span', { class: 'cell-sub' }, relTime(e.created_at))) },
+      { key: 'kind', label: 'Způsob', sortable: true, render: (e) => EXPORT_KIND_LABELS[e.kind] || e.kind },
+      { key: 'target', label: 'Cíl', hideSm: true, render: (e) => h('span', { class: 'small mono', title: e.target || '' }, truncate(e.target || '–', 48)) },
+      { key: 'count', label: 'Položek', format: 'int', sortable: true },
+      { key: 'status', label: 'Stav', render: (e) => jobStatusBadge(e.status) },
+      { key: 'detail', label: 'Detail', hideSm: true, render: (e) => h('span', { class: 'small muted', title: typeof e.detail === 'object' && e.detail ? JSON.stringify(e.detail, null, 1) : e.detail || '' }, truncate(detailText(e.detail), 80)) },
+      {
+        // C8: doručené změny exportu jde stáhnout znovu (ztracená odpověď u mark=1, kontrola, co admin dostal)
+        key: 'redownload',
+        label: 'Znovu stáhnout',
+        title: 'Stáhnout znovu přesně ty změny (a ceny), které tento export doručil',
+        render: (e) => (e.redownload
+          ? h('span', { class: 'btn-group', dataset: { redownload: e.id } }, ['json', 'xml', 'csv'].map((f) => bindDownload(h('a', { class: 'btn btn-xs', href: apiUrl('/exports/' + encodeURIComponent(e.id) + '/changes.' + f), download: '', title: 'Změny exportu #' + e.id + ' jako ' + f.toUpperCase(), dataset: { format: f } }, f.toUpperCase()))))
+          : h('span', { class: 'muted' }, '–')),
+      },
+    ],
+    clientSort: true,
+    sort: { key: 'created_at', dir: 'desc' },
+    caption: 'Historie exportů',
+    empty: () => emptyState({ icon: 'download', title: 'Zatím žádný export', text: 'Každé stažení s označením, odeslání webhookem nebo ack se zapíše sem.', compact: true }),
+  });
+
+  mount(
+    root,
+    h(
+      'div',
+      { class: 'stack' },
+      h('div', { class: 'grid-2' }, approvedHost, webhookHost),
+      feedsCard,
+      downloadsCard,
+      ackCard,
+      card({ title: 'Historie exportů', icon: 'clock', flush: true, body: logTable.el, dataset: { card: 'export-log' } }),
+      logHost
+    )
+  );
+
+  async function loadApproved() {
+    let rows = [];
+    try {
+      const r = await api.get('/proposals', { status: 'approved', limit: 6, sort: 'decided_at', dir: 'desc' }, { signal: ctx.signal, silent: true });
+      approved = r?.total ?? 0;
+      rows = itemsOf(r);
+    } catch (e) {
+      if (isAbort(e)) return;
+      approved = null;
+    }
+    const list = rows.length
+      ? h(
+        'ul',
+        { class: 'export-preview', 'aria-label': 'Schválené změny k exportu' },
+        rows.map((r) => {
+          const p = r.product || { code: r.code, name: r.name };
+          return h(
+            'li',
+            { dataset: { proposalId: r.id } },
+            h('div', { class: 'export-preview-name' }, h('a', { href: '#/produkty/' + encodeURIComponent(r.product_id), title: p.name || '' }, p.name || p.code || '#' + r.product_id), h('span', { class: 'mono muted small' }, p.code || '')),
+            // contract-2: když se cena produktu od návrhu změnila, ukázat změnu proti aktuální ceně a označit
+            (() => {
+              const ch = basePriceChange(r);
+              return h('div', { class: 'export-preview-price' }, priceMove(basePrice(r), finalPrice(r)), changeEl(displayChange(r).pct),
+                ch && !ch.taken ? badge('cena se změnila', 'warning', 'Cena produktu se od návrhu změnila: ' + money(ch.from) + ' → ' + money(ch.to) + '. Návrh vychází ze staré ceny – doporučujeme produkt přecenit.') : null);
+            })()
+          );
+        }),
+        approved > rows.length ? h('li', { class: 'muted small' }, '… a další ' + count(approved - rows.length, 'změna', 'změny', 'změn')) : null
+      )
+      : null;
+    mount(
+      approvedHost,
+      card({
+        title: 'Čeká na export',
+        icon: 'download',
+        dataset: { card: 'approved' },
+        body: h(
+          'div',
+          { class: 'stack-sm' },
+          kpi({ label: 'Schválené změny cen', value: approved == null ? '–' : int(approved), sub: approved ? 'připraveno pro admin / POHODU' : 'nic nečeká', tone: approved ? 'info' : null }),
+          list,
+          h('div', { class: 'row' }, h('a', { class: 'btn btn-sm', href: '#/navrhy?status=approved' }, 'Zobrazit schválené'), h('a', { class: 'btn btn-sm btn-ghost', href: '#/navrhy' }, 'Schválit další'))
+        ),
+      })
+    );
+    updatePushBtn();
+  }
+
+  /** contract-17: bez URL webhooku nebo bez schválených změn není co odeslat – tlačítko vypnout a říct proč. */
+  function updatePushBtn() {
+    if (!pushBtn) return;
+    const url = settings?.export?.webhook?.url;
+    pushBtn.disabled = !url || approved === 0;
+    pushBtn.title = !url ? 'Nejdřív nastavte URL webhooku' : approved === 0 ? 'Nic k odeslání – žádné schválené změny' : 'Odeslat schválené změny na ' + url;
+  }
+
+  async function push(btn) {
+    if (approved === 0) {
+      toast('Nic k odeslání – žádné schválené změny', { type: 'info' });
+      return;
+    }
+    const ok = await confirmDialog({ title: 'Odeslat schválené změny', message: 'Odeslat ' + (approved ? count(approved, 'schválenou změnu', 'schválené změny', 'schválených změn') : 'schválené změny') + ' na ' + settings.export.webhook.url + '? Po úspěchu se označí jako exportované.', confirmLabel: 'Odeslat' });
+    if (!ok) return;
+    btn.disabled = true;
+    btn.classList.add('is-busy');
+    const resultHost = webhookHost.querySelector('[data-role="push-result"]');
+    try {
+      const r = await api.post('/export/push', {});
+      const held = Array.isArray(r?.held) ? r.held.length : 0;
+      const heldText = held ? count(held, 'schválená změna zadržena', 'schválené změny zadrženy', 'schválených změn zadrženo') + ' kontrolou před exportem' : null;
+      // contract-17: server nic neposlal (žádné schválené změny) – to není úspěšné odeslání
+      const nothing = r && r.ok !== false && (r.skipped === 'no_changes' || (!r.count && r.status == null));
+      const good = r && r.ok !== false && !nothing;
+      if (nothing) toast('Nic se neodeslalo – žádné schválené změny k odeslání' + (heldText ? ' (' + heldText + ')' : ''), { type: held ? 'warning' : 'info' });
+      else toast(good ? 'Odesláno: ' + count(r?.count ?? 0, 'změna', 'změny', 'změn') + (heldText ? ' · ' + heldText : '') : 'Webhook selhal (HTTP ' + (r?.status ?? '?') + ')', { type: good ? (held ? 'warning' : 'success') : 'error' });
+      if (resultHost) {
+        mount(
+          resultHost,
+          nothing
+            ? callout(h('div', null, dl([['Výsledek', 'Nic se neodeslalo – žádné schválené změny'], heldText ? ['Zadrženo', heldText] : null])), held ? 'warning' : 'info')
+            : callout(h('div', null, dl([['Výsledek', good ? 'OK' : 'Chyba'], ['HTTP status', String(r?.status ?? '–')], ['Doba', duration(r?.duration_ms)], ['Odesláno', int(r?.count)], heldText ? ['Zadrženo', heldText] : null, r?.export_id ? ['Export', '#' + r.export_id] : null, r?.body ? ['Odpověď', h('code', { class: 'small' }, truncate(String(r.body), 300))] : null])), good ? 'success' : 'danger')
+        );
+      }
+      if (!nothing) ctx.notifyChanged('export');
+    } catch {
+      /* toast */
+    }
+    btn.classList.remove('is-busy');
+    btn.disabled = false;
+    await loadApproved();
+    loadLog();
+  }
+
+  async function loadSettings() {
+    try {
+      settings = await api.get('/settings', null, { signal: ctx.signal, silent: true });
+    } catch (e) {
+      if (isAbort(e)) return;
+      settings = null;
+    }
+    const wh = settings?.export?.webhook || {};
+    const enc = String(settings?.export?.pohoda?.encoding || '').toLowerCase();
+    if (enc === 'utf-8' || enc === 'windows-1250') {
+      pohodaEnc.value = enc;
+      updatePohoda();
+    }
+    pushBtn = button('Odeslat schválené změny', { icon: 'send', variant: 'primary', disabled: !wh.url, dataset: { action: 'push' } });
+    pushBtn.addEventListener('click', () => push(pushBtn));
+    updatePushBtn();
+    mount(
+      webhookHost,
+      card({
+        title: 'Odeslat webhookem',
+        icon: 'send',
+        subtitle: 'Cenotvorba pošle schválené změny POSTem na URL adminu (JSON nebo XML).',
+        dataset: { card: 'webhook' },
+        body: h(
+          'div',
+          { class: 'stack-sm' },
+          wh.url
+            ? dl([['URL', h('span', { class: 'mono small' }, wh.url)], ['Formát', String(wh.format || 'json').toUpperCase()], ['Automaticky po přecenění', settings?.schedule?.auto_push_after_run || wh.auto_push ? 'ano' : 'ne']])
+            : callout(h('span', null, 'Webhook zatím není nastaven. ', h('a', { href: '#/nastaveni' }, 'Nastavit URL →')), 'warning'),
+          h('div', { class: 'row' }, pushBtn, h('a', { class: 'btn btn-sm btn-ghost', href: '#/nastaveni' }, 'Nastavení')),
+          h('div', { dataset: { role: 'push-result' } })
+        ),
+      })
+    );
+  }
+
+  async function loadLog() {
+    logTable.setLoading(true);
+    try {
+      const r = await api.get('/exports', null, { signal: ctx.signal, silent: true });
+      logTable.setData(itemsOf(r));
+    } catch (e) {
+      if (isAbort(e)) return;
+      logTable.setError(e, () => loadLog());
+    }
+  }
+
+  ctx.onChanged((what) => {
+    if (what !== 'export') {
+      loadApproved();
+      loadLog();
+    }
+  });
+  await Promise.all([loadApproved(), loadSettings(), loadLog()]);
+}

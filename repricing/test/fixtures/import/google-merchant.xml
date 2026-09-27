@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<rss xmlns:g="http://base.google.com/ns/1.0" version="2.0">
+  <channel>
+    <title>Kola u nás</title>
+    <link>https://kola.example</link>
+    <description>Produktový feed</description>
+    <item>
+      <g:id>SRA-001</g:id>
+      <g:title>SRAM XTR kliky</g:title>
+      <g:description>Nejlehčí kliky pro XC.</g:description>
+      <g:link>https://kola.example/sra-001</g:link>
+      <g:price>9 990.00 CZK</g:price>
+      <g:availability>in_stock</g:availability>
+      <g:gtin>8597315660484</g:gtin>
+      <g:brand>SRAM</g:brand>
+      <g:mpn>XTR-M9100</g:mpn>
+      <g:product_type>Komponenty &gt; Kliky</g:product_type>
+      <g:shipping>
+        <g:country>CZ</g:country>
+        <g:price>99 CZK</g:price>
+      </g:shipping>
+      <g:shipping>
+        <g:country>SK</g:country>
+        <g:price>149 CZK</g:price>
+      </g:shipping>
+    </item>
+    <item>
+      <g:id>MAX-028</g:id>
+      <g:title>Maxxis Nobby Nic</g:title>
+      <g:link>https://kola.example/max-028</g:link>
+      <g:price>819.00 CZK</g:price>
+      <g:availability>out_of_stock</g:availability>
+      <g:gtin>08595234463384</g:gtin>
+      <g:brand>Maxxis</g:brand>
+      <g:product_type>Pláště</g:product_type>
+      <g:shipping>
+        <g:country>CZ</g:country>
+        <g:price>0 CZK</g:price>
+      </g:shipping>
+    </item>
+  </channel>
+</rss>
