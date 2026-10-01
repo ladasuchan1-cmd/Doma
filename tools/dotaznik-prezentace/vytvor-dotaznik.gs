@@ -36,6 +36,15 @@ function vytvorDotaznik() {
       .setTitle('Pokud chceš reagovat či upřesnit svůj pohled, prosím, napiš to sem.')
       .setRequired(false);
 
+  [
+    ['Jakých 5 značek vnímáš ty sám jako nejprodejnější?', 'Napiš 5 značek, ideálně každou na nový řádek.'],
+    ['Jaké značky tě naopak odrazují, či je nechceš / neumíš prodávat?', ''],
+    ['Je nějaká značka, kterou bys chtěl naopak prodávat navíc?', ''],
+    ['Je něco, co chceš dodat, říct nebo připomenout? Napiš.', '']
+  ].forEach(function (q) {
+    form.addParagraphTextItem().setTitle(q[0]).setHelpText(q[1]).setRequired(false);
+  });
+
   // Odpovědi zároveň do Google Tabulky
   var sheet = SpreadsheetApp.create('PREZENTACE LÁĎA - 1.10.2026 (odpovědi)');
   form.setDestination(FormApp.DestinationType.SPREADSHEET, sheet.getId());
