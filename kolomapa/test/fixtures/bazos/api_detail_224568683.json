@@ -1,0 +1,43 @@
+{
+ "id": "224568683",
+ "from": "Fri, 02 Oct 2026 15:23:16 +0200",
+ "status": "active",
+ "topped": false,
+ "title": "horské kolo Giant Talon 1 GE",
+ "description": "Hlavní komponenty a výbava:\r\n• Rám: Hliníkový rám ze slitiny ALUXX s vnitřním vedením kabelů.\r\n• Vidlice: Vzduchová odpružená vidlice se zdvihem 100 mm a uzamykáním.\r\n• Pohon: Systém řazení Shimano Deore s převody 2x11 a klikami Praxis.\r\n• Brzdy: Hydraulické kotoučové brzdy Shimano pro vysoký a bezpečný brzdný účinek v terénu\r\nVelikost:S\r\nJezdilo se na něm rok",
+ "price_formatted": "3 000 Kč",
+ "currency": "CZK",
+ "price": "3000",
+ "price_type": "EXACT",
+ "zip_code": "664 31",
+ "locality": "Brno venkov",
+ "latitude": "49.289978",
+ "longitude": "16.575022",
+ "category": {
+  "id": "256",
+  "title": "Horská kola",
+  "url": "horska"
+ },
+ "url": "https://sport.bazos.cz/inzerat/224568683/horske-kolo-giant-talon-1-ge.php",
+ "top_possible": "true",
+ "top_total": "0",
+ "top_limit": "21",
+ "topped_for_days": "",
+ "action_possible": "false",
+ "views": "1",
+ "section": {
+  "id": "SP",
+  "title": "Sport",
+  "url": "sport",
+  "image": "https://www.bazos.cz/obrazky/api/sport.png"
+ },
+ "images": [
+  "https://www.bazos.cz/img/1/683/224568683.jpg?t=1790947693"
+ ],
+ "image_thumbnail": "https://www.bazos.cz/img/1/683/224568683.jpg?t=1790947693",
+ "image_thumbnail_width": "1200",
+ "image_thumbnail_height": "903",
+ "favourite": "false",
+ "user_ads_count": "1",
+ "user_reviews_count": "0"
+}

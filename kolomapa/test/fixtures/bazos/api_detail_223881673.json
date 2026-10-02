@@ -1,0 +1,45 @@
+{
+ "id": "223881673",
+ "from": "Fri, 02 Oct 2026 15:33:15 +0200",
+ "status": "active",
+ "topped": true,
+ "title": "Dětské kolo Woom 4, 20” kola, Microshift 7 speed 2024",
+ "description": "Prodám dětské kolo woom 4, 20 palcová kola. Kolo je v perfektním funkčním stavu. Kolo je ve velmi zachovalém stavu. Model rok 2024, řazení MicroShift 7 speed.\r\nOriginální stojánek, zvonek a držák na pití\r\nPřidámm světlo zadní a přední",
+ "price_formatted": "10 800 Kč",
+ "currency": "CZK",
+ "price": "10800",
+ "price_type": "EXACT",
+ "zip_code": "250 82",
+ "locality": "Praha - východ",
+ "latitude": "50.081820",
+ "longitude": "14.736786",
+ "category": {
+  "id": "456",
+  "title": "Kola",
+  "url": "kola"
+ },
+ "url": "https://deti.bazos.cz/inzerat/223881673/detske-kolo-woom-4-20-kola-microshift-7-speed-2024.php",
+ "top_possible": "true",
+ "top_total": "2",
+ "top_limit": "21",
+ "topped_for_days": "13",
+ "action_possible": "false",
+ "views": "204",
+ "section": {
+  "id": "DE",
+  "title": "Děti",
+  "url": "deti",
+  "image": "https://www.bazos.cz/obrazky/api/deti.png"
+ },
+ "images": [
+  "https://www.bazos.cz/img/1/673/223881673.jpg?t=1790685252",
+  "https://www.bazos.cz/img/2/673/223881673.jpg?t=1790685252",
+  "https://www.bazos.cz/img/3/673/223881673.jpg?t=1790685252"
+ ],
+ "image_thumbnail": "https://www.bazos.cz/img/1/673/223881673.jpg?t=1790685252",
+ "image_thumbnail_width": "1200",
+ "image_thumbnail_height": "900",
+ "favourite": "false",
+ "user_ads_count": "6",
+ "user_reviews_count": "0"
+}

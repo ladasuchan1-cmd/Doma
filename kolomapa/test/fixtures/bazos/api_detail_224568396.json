@@ -1,0 +1,51 @@
+{
+ "id": "224568396",
+ "from": "Fri, 02 Oct 2026 15:13:54 +0200",
+ "status": "active",
+ "topped": false,
+ "title": "Fox 36 Rhythm",
+ "description": "Prodam vidlic Fox 36 Rhythm 150mm zdvih nese už známky použivani na vnitřnich nohach je škrabla ale je to přeleštěne jinak plně funkční jak uzamykani tak odskok a je osazena 4 tokeny.",
+ "price_formatted": "Nabídněte",
+ "currency": "CZK",
+ "price": "Nabídněte",
+ "price_type": "OFFERED",
+ "zip_code": "739 81",
+ "locality": "Frýdek - Místek",
+ "latitude": "49.586010",
+ "longitude": "18.685684",
+ "category": {
+  "id": "256",
+  "title": "Horská kola",
+  "url": "horska"
+ },
+ "url": "https://sport.bazos.cz/inzerat/224568396/fox-36-rhythm.php",
+ "top_possible": "true",
+ "top_total": "0",
+ "top_limit": "21",
+ "topped_for_days": "",
+ "action_possible": "false",
+ "views": "7",
+ "section": {
+  "id": "SP",
+  "title": "Sport",
+  "url": "sport",
+  "image": "https://www.bazos.cz/obrazky/api/sport.png"
+ },
+ "images": [
+  "https://www.bazos.cz/img/1/396/224568396.jpg?t=1790947759",
+  "https://www.bazos.cz/img/2/396/224568396.jpg?t=1790947759",
+  "https://www.bazos.cz/img/3/396/224568396.jpg?t=1790947759",
+  "https://www.bazos.cz/img/4/396/224568396.jpg?t=1790947759",
+  "https://www.bazos.cz/img/5/396/224568396.jpg?t=1790947759",
+  "https://www.bazos.cz/img/6/396/224568396.jpg?t=1790947759",
+  "https://www.bazos.cz/img/7/396/224568396.jpg?t=1790947759",
+  "https://www.bazos.cz/img/8/396/224568396.jpg?t=1790947759",
+  "https://www.bazos.cz/img/9/396/224568396.jpg?t=1790947759"
+ ],
+ "image_thumbnail": "https://www.bazos.cz/img/1/396/224568396.jpg?t=1790947759",
+ "image_thumbnail_width": "676",
+ "image_thumbnail_height": "1200",
+ "favourite": "false",
+ "user_ads_count": "2",
+ "user_reviews_count": "0"
+}

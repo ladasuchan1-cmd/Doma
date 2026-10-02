@@ -1,0 +1,76 @@
+{
+ "result": {
+  "buyer_protection": false,
+  "category": {
+   "id": 437,
+   "name": "Kola a koloběžky ",
+   "seo_name": "437-kola-kolobezky"
+  },
+  "create_date": "2026-10-02T09:30:07",
+  "description": "Prodám oblíbené, velmi lehké dětské kolo woom 3 \"16\" i s blatníky a stojánkém. Výborný stav. Pouze osobní předání.",
+  "edit_date": "2026-10-02T09:33:19",
+  "id": 234505983,
+  "images": [
+   {
+    "id": 1237421112,
+    "image_kind": 0,
+    "url": "//d46-a.sdn.cz/d_46/c_img_qG_A/kcKfrMAkFCpZ9wJVvH7pADP/56c2.jpeg"
+   },
+   {
+    "id": 1237421115,
+    "image_kind": 0,
+    "url": "//d46-a.sdn.cz/d_46/c_img_qG_A/nCR9NVflLChOIjN4IH7pAD4/e493.jpeg"
+   }
+  ],
+  "is_reserved": false,
+  "localities": [
+   {
+    "id": 40809804,
+    "locality": {
+     "citypart": "Zlín",
+     "district": "Zlín",
+     "district_id": 38,
+     "entity_id": 14682,
+     "entity_type": "ward",
+     "municipality": "Zlín",
+     "municipality_id": 3045,
+     "quarter": "",
+     "quarter_id": 0,
+     "region": "Zlínský kraj",
+     "region_id": 9,
+     "ward": "Zlín",
+     "ward_id": 14682,
+     "zip": ""
+    },
+    "main": true
+   }
+  ],
+  "locality": {
+   "citypart": "Zlín",
+   "district": "Zlín",
+   "district_id": 38,
+   "entity_id": 14682,
+   "entity_type": "ward",
+   "municipality": "Zlín",
+   "municipality_id": 3045,
+   "quarter": "",
+   "quarter_id": 0,
+   "region": "Zlínský kraj",
+   "region_id": 9,
+   "ward": "Zlín",
+   "ward_id": 14682,
+   "zip": ""
+  },
+  "name": "Dětské kolo WOOM 3 \"16\"",
+  "price": 8190,
+  "price_by_agreement": false,
+  "price_original": 8190,
+  "seo_name": "234505983-detske-kolo-woom-3-16",
+  "sorting_date": "2026-10-02T09:33:19",
+  "status": "active",
+  "topped": false,
+  "valid_to": "2026-12-01T09:33:19"
+ },
+ "status_code": 200,
+ "status_message": "OK"
+}

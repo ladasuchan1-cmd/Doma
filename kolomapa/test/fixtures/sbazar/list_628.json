@@ -1,0 +1,474 @@
+{
+ "pagination": {
+  "limit": 500,
+  "offset": 0,
+  "total": 11
+ },
+ "results": [
+  {
+   "buyer_protection": false,
+   "category": {
+    "id": 628,
+    "name": "Kola",
+    "seo_name": "628-kola"
+   },
+   "create_date": "2026-10-02T14:59:32",
+   "edit_date": "2026-10-02T15:24:33",
+   "id": 234515967,
+   "images": [
+    {
+     "url": "//d46-a.sdn.cz/d_46/c_img_qG_A/kcKfrMAkFMsuhNraH7xVQq/63c1.jpeg"
+    }
+   ],
+   "images_total_count": 0,
+   "is_reserved": false,
+   "locality": {
+    "citypart": "",
+    "district": "Hodonín",
+    "district_id": 75,
+    "entity_id": 5673,
+    "entity_type": "municipality",
+    "municipality": "Šardice",
+    "municipality_id": 5673,
+    "quarter": "",
+    "quarter_id": 0,
+    "region": "Jihomoravský kraj",
+    "region_id": 14,
+    "ward": "",
+    "ward_id": 0,
+    "zip": ""
+   },
+   "name": "Horské kolo KELLYS VANITY 50",
+   "other_localities_count": 0,
+   "premise": null,
+   "price": 6300,
+   "price_by_agreement": false,
+   "seo_name": "234515967-horske-kolo-kellys-vanity-50",
+   "sorting_date": "2026-10-02T15:24:33",
+   "topped": false
+  },
+  {
+   "buyer_protection": false,
+   "category": {
+    "id": 628,
+    "name": "Kola",
+    "seo_name": "628-kola"
+   },
+   "create_date": "2026-10-02T14:38:14",
+   "edit_date": "2026-10-02T14:41:14",
+   "id": 234515478,
+   "images": [
+    {
+     "url": "//d46-a.sdn.cz/d_46/c_img_qG_A/kcKfrMAkFnIwlPJSH7wvsY/b1d1.jpeg"
+    }
+   ],
+   "images_total_count": 0,
+   "is_reserved": false,
+   "locality": {
+    "citypart": "Brno-Židenice",
+    "district": "Brno-město",
+    "district_id": 72,
+    "entity_id": 15,
+    "entity_type": "quarter",
+    "municipality": "Brno",
+    "municipality_id": 5740,
+    "quarter": "Brno-Židenice",
+    "quarter_id": 15,
+    "region": "Jihomoravský kraj",
+    "region_id": 14,
+    "ward": "",
+    "ward_id": 0,
+    "zip": ""
+   },
+   "name": "Rekreační silniční kolo Triban RC120 (vel. S)",
+   "other_localities_count": 0,
+   "premise": null,
+   "price": 10000,
+   "price_by_agreement": false,
+   "seo_name": "234515478-rekreacni-silnicni-kolo-triban-rc120-vel-s",
+   "sorting_date": "2026-10-02T14:41:14",
+   "topped": false
+  },
+  {
+   "buyer_protection": false,
+   "category": {
+    "id": 628,
+    "name": "Kola",
+    "seo_name": "628-kola"
+   },
+   "create_date": "2026-10-02T14:33:41",
+   "edit_date": "2026-10-02T14:36:19",
+   "id": 234515325,
+   "images": [
+    {
+     "url": "//d46-a.sdn.cz/d_46/c_img_qG_A/kcKfrMAkFCpZ9wKc4H7wqKD/3da1.jpeg"
+    }
+   ],
+   "images_total_count": 0,
+   "is_reserved": false,
+   "locality": {
+    "citypart": "",
+    "district": "Znojmo",
+    "district_id": 77,
+    "entity_id": 6076,
+    "entity_type": "municipality",
+    "municipality": "Olbramkostel",
+    "municipality_id": 6076,
+    "quarter": "",
+    "quarter_id": 0,
+    "region": "Jihomoravský kraj",
+    "region_id": 14,
+    "ward": "",
+    "ward_id": 0,
+    "zip": "671 51"
+   },
+   "name": "Cannondale trail SL",
+   "other_localities_count": 0,
+   "premise": null,
+   "price": 19500,
+   "price_by_agreement": false,
+   "seo_name": "234515325-cannondale-trail-sl",
+   "sorting_date": "2026-10-02T14:36:19",
+   "topped": false
+  },
+  {
+   "buyer_protection": false,
+   "category": {
+    "id": 628,
+    "name": "Kola",
+    "seo_name": "628-kola"
+   },
+   "create_date": "2026-10-02T13:21:53",
+   "edit_date": "2026-10-02T15:17:03",
+   "id": 234513321,
+   "images": [
+    {
+     "url": "//d46-a.sdn.cz/d_46/c_img_qG_A/nCR9NVflLBaEbFH4GH7xrwT/6acd.jpeg"
+    }
+   ],
+   "images_total_count": 0,
+   "is_reserved": false,
+   "locality": {
+    "citypart": "Praha 5",
+    "district": "Hlavní město Praha",
+    "district_id": 47,
+    "entity_id": 97,
+    "entity_type": "quarter",
+    "municipality": "Praha",
+    "municipality_id": 3468,
+    "quarter": "Praha 5",
+    "quarter_id": 97,
+    "region": "Hlavní město Praha",
+    "region_id": 10,
+    "ward": "",
+    "ward_id": 0,
+    "zip": ""
+   },
+   "name": "Horské kolo Author 26\"",
+   "other_localities_count": 0,
+   "premise": null,
+   "price": 890,
+   "price_by_agreement": false,
+   "seo_name": "234513321-horske-kolo-author-26",
+   "sorting_date": "2026-10-02T15:17:03",
+   "topped": false
+  },
+  {
+   "buyer_protection": false,
+   "category": {
+    "id": 628,
+    "name": "Kola",
+    "seo_name": "628-kola"
+   },
+   "create_date": "2026-10-02T12:45:19",
+   "edit_date": "2026-10-02T12:46:53",
+   "id": 234512184,
+   "images": [
+    {
+     "url": "//d46-a.sdn.cz/d_46/c_img_qG_A/nCR9NVflLCNT9cHN5H7t3yt/aa62.jpeg"
+    }
+   ],
+   "images_total_count": 0,
+   "is_reserved": false,
+   "locality": {
+    "citypart": "",
+    "district": "Hlavní město Praha",
+    "district_id": 47,
+    "entity_id": 3468,
+    "entity_type": "municipality",
+    "municipality": "Praha",
+    "municipality_id": 3468,
+    "quarter": "",
+    "quarter_id": 0,
+    "region": "Hlavní město Praha",
+    "region_id": 10,
+    "ward": "",
+    "ward_id": 0,
+    "zip": ""
+   },
+   "name": "Elektrokolo KTM",
+   "other_localities_count": 0,
+   "premise": null,
+   "price": 0,
+   "price_by_agreement": true,
+   "seo_name": "234512184-elektrokolo-ktm",
+   "sorting_date": "2026-10-02T12:46:53",
+   "topped": false
+  },
+  {
+   "buyer_protection": false,
+   "category": {
+    "id": 628,
+    "name": "Kola",
+    "seo_name": "628-kola"
+   },
+   "create_date": "2026-10-02T12:41:17",
+   "edit_date": "2026-10-02T12:44:08",
+   "id": 234512046,
+   "images": [
+    {
+     "url": "//d46-a.sdn.cz/d_46/c_img_qG_A/kcKfrMAkFB3JsTN34H7tyQs/8294.jpeg"
+    }
+   ],
+   "images_total_count": 0,
+   "is_reserved": false,
+   "locality": {
+    "citypart": "České Budějovice 2",
+    "district": "České Budějovice",
+    "district_id": 1,
+    "entity_id": 13985,
+    "entity_type": "ward",
+    "municipality": "České Budějovice",
+    "municipality_id": 537,
+    "quarter": "",
+    "quarter_id": 0,
+    "region": "Jihočeský kraj",
+    "region_id": 1,
+    "ward": "České Budějovice 2",
+    "ward_id": 13985,
+    "zip": "370 05"
+   },
+   "name": "Dětské horské kolo GT Stomper 24",
+   "other_localities_count": 0,
+   "premise": null,
+   "price": 3500,
+   "price_by_agreement": false,
+   "seo_name": "234512046-detske-horske-kolo-gt-stomper-24",
+   "sorting_date": "2026-10-02T12:44:08",
+   "topped": false
+  },
+  {
+   "buyer_protection": false,
+   "category": {
+    "id": 628,
+    "name": "Kola",
+    "seo_name": "628-kola"
+   },
+   "create_date": "2026-10-02T12:05:01",
+   "edit_date": "2026-10-02T12:12:35",
+   "id": 234511107,
+   "images": [
+    {
+     "url": "//d46-a.sdn.cz/d_46/c_img_qG_A/nCR9NVflLrfprCm0H7s3mf/333a.jpeg"
+    }
+   ],
+   "images_total_count": 0,
+   "is_reserved": false,
+   "locality": {
+    "citypart": "Smíchov",
+    "district": "Hlavní město Praha",
+    "district_id": 47,
+    "entity_id": 13687,
+    "entity_type": "ward",
+    "municipality": "Praha",
+    "municipality_id": 3468,
+    "quarter": "",
+    "quarter_id": 0,
+    "region": "Hlavní město Praha",
+    "region_id": 10,
+    "ward": "Smíchov",
+    "ward_id": 13687,
+    "zip": ""
+   },
+   "name": "silniční kolo Favorit - autentický a původní stav",
+   "other_localities_count": 0,
+   "premise": null,
+   "price": 4000,
+   "price_by_agreement": false,
+   "seo_name": "234511107-silnicni-kolo-favorit-autenticky-a-puvodni-stav",
+   "sorting_date": "2026-10-02T12:12:35",
+   "topped": false
+  },
+  {
+   "buyer_protection": false,
+   "category": {
+    "id": 628,
+    "name": "Kola",
+    "seo_name": "628-kola"
+   },
+   "create_date": "2026-10-02T11:32:22",
+   "edit_date": "2026-10-02T11:34:55",
+   "id": 234510066,
+   "images": [
+    {
+     "url": "//d46-a.sdn.cz/d_46/c_img_qG_A/nCR9NVflLChOIjOdaH7sE7L/56e4.jpeg"
+    }
+   ],
+   "images_total_count": 0,
+   "is_reserved": false,
+   "locality": {
+    "citypart": "",
+    "district": "Kolín",
+    "district_id": 51,
+    "entity_id": 3465,
+    "entity_type": "municipality",
+    "municipality": "Radim",
+    "municipality_id": 3465,
+    "quarter": "",
+    "quarter_id": 0,
+    "region": "Středočeský kraj",
+    "region_id": 11,
+    "ward": "",
+    "ward_id": 0,
+    "zip": "281 03"
+   },
+   "name": "Jízdní kolo Scorpion",
+   "other_localities_count": 0,
+   "premise": null,
+   "price": 500,
+   "price_by_agreement": false,
+   "seo_name": "234510066-jizdni-kolo-scorpion",
+   "sorting_date": "2026-10-02T11:34:55",
+   "topped": false
+  },
+  {
+   "buyer_protection": false,
+   "category": {
+    "id": 628,
+    "name": "Kola",
+    "seo_name": "628-kola"
+   },
+   "create_date": "2026-10-02T12:56:53",
+   "edit_date": "2026-10-02T13:20:17",
+   "id": 234512556,
+   "images": [
+    {
+     "url": "//d46-a.sdn.cz/d_46/c_img_qG_A/nCR9NVflLChOIjOoCH7uO5N/cff7.jpeg"
+    }
+   ],
+   "images_total_count": 0,
+   "is_reserved": false,
+   "locality": {
+    "citypart": "",
+    "district": "Kolín",
+    "district_id": 51,
+    "entity_id": 3412,
+    "entity_type": "municipality",
+    "municipality": "Kolín",
+    "municipality_id": 3412,
+    "quarter": "",
+    "quarter_id": 0,
+    "region": "Středočeský kraj",
+    "region_id": 11,
+    "ward": "",
+    "ward_id": 0,
+    "zip": ""
+   },
+   "name": "elektro Specialized Levo FSR Comp 29, velký dojezd",
+   "other_localities_count": 1,
+   "premise": null,
+   "price": 65000,
+   "price_by_agreement": false,
+   "seo_name": "234512556-elektro-specialized-levo-fsr-comp-29-velky-dojezd",
+   "sorting_date": "2026-10-02T13:20:17",
+   "topped": true
+  },
+  {
+   "buyer_protection": false,
+   "category": {
+    "id": 628,
+    "name": "Kola",
+    "seo_name": "628-kola"
+   },
+   "create_date": "2026-10-02T10:22:14",
+   "edit_date": "2026-10-02T10:25:02",
+   "id": 234507753,
+   "images": [
+    {
+     "url": "//d46-a.sdn.cz/d_46/c_img_qG_A/kcKfrMAkFDbqUhT2JH7qS8C/764d.jpeg"
+    }
+   ],
+   "images_total_count": 0,
+   "is_reserved": false,
+   "locality": {
+    "citypart": "Praha 4",
+    "district": "Hlavní město Praha",
+    "district_id": 47,
+    "entity_id": 90,
+    "entity_type": "quarter",
+    "municipality": "Praha",
+    "municipality_id": 3468,
+    "quarter": "Praha 4",
+    "quarter_id": 90,
+    "region": "Hlavní město Praha",
+    "region_id": 10,
+    "ward": "",
+    "ward_id": 0,
+    "zip": ""
+   },
+   "name": "Cyklotretry",
+   "other_localities_count": 0,
+   "premise": null,
+   "price": 300,
+   "price_by_agreement": false,
+   "seo_name": "234507753-cyklotretry",
+   "sorting_date": "2026-10-02T10:25:02",
+   "topped": false
+  },
+  {
+   "buyer_protection": false,
+   "category": {
+    "id": 628,
+    "name": "Kola",
+    "seo_name": "628-kola"
+   },
+   "create_date": "2026-10-01T07:15:35",
+   "edit_date": "2026-10-02T07:17:31",
+   "id": 234471468,
+   "images": [
+    {
+     "url": "//d46-a.sdn.cz/d_46/c_img_qG_A/kcKfrMAkFDzJCCKHTH7BWn7/ba58.jpeg"
+    }
+   ],
+   "images_total_count": 0,
+   "is_reserved": true,
+   "locality": {
+    "citypart": "",
+    "district": "Jablonec nad Nisou",
+    "district_id": 21,
+    "entity_id": 1789,
+    "entity_type": "municipality",
+    "municipality": "Janov nad Nisou",
+    "municipality_id": 1789,
+    "quarter": "",
+    "quarter_id": 0,
+    "region": "Liberecký kraj",
+    "region_id": 5,
+    "ward": "",
+    "ward_id": 0,
+    "zip": ""
+   },
+   "name": "Dětské kolo CUBE REACTION 240 PRO Teamline",
+   "other_localities_count": 0,
+   "premise": null,
+   "price": 10000,
+   "price_by_agreement": false,
+   "seo_name": "234471468-detske-kolo-cube-reaction-240-pro-teamline",
+   "sorting_date": "2026-10-01T07:19:03",
+   "topped": false
+  }
+ ],
+ "status_code": 200,
+ "status_message": "OK",
+ "warnings": {}
+}

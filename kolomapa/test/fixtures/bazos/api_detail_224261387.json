@@ -1,0 +1,44 @@
+{
+ "id": "224261387",
+ "from": "Fri, 02 Oct 2026 15:33:13 +0200",
+ "status": "active",
+ "topped": true,
+ "title": "KTM MACINA PROWLER PRESTIGE 2020",
+ "description": "Vrcholný model s karbonovým rámem, původní cena 200 tisíc.\r\nPřed měsícem nový motor, před létem /cca 500 km/ nová kazeta, řetěz, servis vidlice, používaný stav v terénu - oděrky se najdou - takové kolo se nekupuje doufám na cyklostezku:) Motor byl měněn kvůli nadměrnému zatížení - prakticky jen v nejsilnějším režimu a čipu. Ten je tam znovu a bez něj by pro mě kolo nemělo smysl, nový majitel může odinstalovat. Čip je od Pear tuning, jediní jsou schopni dodržet záruku, Speedbox jsem měnil třikrát. Aktuálně tam je běžnější kazeta, ty odlehčené nevydržely prakticky nic a řešit pár deka u elektrokola mi přijde zbytečné.\r\nNajeto cca 6000 km. Debaty o ceně při reálném setkání.",
+ "price_formatted": "70 000 Kč",
+ "currency": "CZK",
+ "price": "70000",
+ "price_type": "EXACT",
+ "zip_code": "612 00",
+ "locality": "Brno",
+ "latitude": "49.232956",
+ "longitude": "16.602573",
+ "category": {
+  "id": "465",
+  "title": "Elektrokola",
+  "url": "elektrokola"
+ },
+ "url": "https://sport.bazos.cz/inzerat/224261387/ktm-macina-prowler-prestige-2020.php",
+ "top_possible": "true",
+ "top_total": "3",
+ "top_limit": "21",
+ "topped_for_days": "18",
+ "action_possible": "false",
+ "views": "286",
+ "section": {
+  "id": "SP",
+  "title": "Sport",
+  "url": "sport",
+  "image": "https://www.bazos.cz/obrazky/api/sport.png"
+ },
+ "images": [
+  "https://www.bazos.cz/img/1/387/224261387.jpg?t=1790499062",
+  "https://www.bazos.cz/img/2/387/224261387.jpg?t=1790499062"
+ ],
+ "image_thumbnail": "https://www.bazos.cz/img/1/387/224261387.jpg?t=1790499062",
+ "image_thumbnail_width": "1200",
+ "image_thumbnail_height": "900",
+ "favourite": "false",
+ "user_ads_count": "1",
+ "user_reviews_count": "0"
+}

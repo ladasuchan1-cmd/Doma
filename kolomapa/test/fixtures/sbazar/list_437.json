@@ -1,0 +1,180 @@
+{
+ "pagination": {
+  "limit": 500,
+  "offset": 0,
+  "total": 4
+ },
+ "results": [
+  {
+   "buyer_protection": false,
+   "category": {
+    "id": 437,
+    "name": "Kola a koloběžky ",
+    "seo_name": "437-kola-kolobezky"
+   },
+   "create_date": "2026-10-02T14:23:24",
+   "edit_date": "2026-10-02T14:24:24",
+   "id": 234515025,
+   "images": [
+    {
+     "url": "//d46-a.sdn.cz/d_46/c_img_qG_A/nCR9NVflLBaEbFHmVH7wXRQ/97ec.jpeg"
+    }
+   ],
+   "images_total_count": 0,
+   "is_reserved": false,
+   "locality": {
+    "citypart": "",
+    "district": "Nový Jičín",
+    "district_id": 63,
+    "entity_id": 4648,
+    "entity_type": "municipality",
+    "municipality": "Štramberk",
+    "municipality_id": 4648,
+    "quarter": "",
+    "quarter_id": 0,
+    "region": "Moravskoslezský kraj",
+    "region_id": 12,
+    "ward": "",
+    "ward_id": 0,
+    "zip": "742 66"
+   },
+   "name": "Dětská sedačka na kolo",
+   "other_localities_count": 0,
+   "premise": null,
+   "price": 0,
+   "price_by_agreement": false,
+   "seo_name": "234515025-detska-sedacka-na-kolo",
+   "sorting_date": "2026-10-02T14:24:24",
+   "topped": false
+  },
+  {
+   "buyer_protection": false,
+   "category": {
+    "id": 437,
+    "name": "Kola a koloběžky ",
+    "seo_name": "437-kola-kolobezky"
+   },
+   "create_date": "2026-10-02T09:30:07",
+   "edit_date": "2026-10-02T09:33:19",
+   "id": 234505983,
+   "images": [
+    {
+     "url": "//d46-a.sdn.cz/d_46/c_img_qG_A/kcKfrMAkFCpZ9wJVvH7pADP/56c2.jpeg"
+    }
+   ],
+   "images_total_count": 0,
+   "is_reserved": false,
+   "locality": {
+    "citypart": "Zlín",
+    "district": "Zlín",
+    "district_id": 38,
+    "entity_id": 14682,
+    "entity_type": "ward",
+    "municipality": "Zlín",
+    "municipality_id": 3045,
+    "quarter": "",
+    "quarter_id": 0,
+    "region": "Zlínský kraj",
+    "region_id": 9,
+    "ward": "Zlín",
+    "ward_id": 14682,
+    "zip": ""
+   },
+   "name": "Dětské kolo WOOM 3 \"16\"",
+   "other_localities_count": 0,
+   "premise": null,
+   "price": 8190,
+   "price_by_agreement": false,
+   "seo_name": "234505983-detske-kolo-woom-3-16",
+   "sorting_date": "2026-10-02T09:33:19",
+   "topped": false
+  },
+  {
+   "buyer_protection": false,
+   "category": {
+    "id": 437,
+    "name": "Kola a koloběžky ",
+    "seo_name": "437-kola-kolobezky"
+   },
+   "create_date": "2026-10-01T10:36:49",
+   "edit_date": "2026-10-01T10:38:43",
+   "id": 234476094,
+   "images": [
+    {
+     "url": "//d46-a.sdn.cz/d_46/c_img_qG_A/nCR9NVflLrfprLBAH7GaaS/dd52.jpeg"
+    }
+   ],
+   "images_total_count": 0,
+   "is_reserved": false,
+   "locality": {
+    "citypart": "",
+    "district": "Benešov",
+    "district_id": 48,
+    "entity_id": 3524,
+    "entity_type": "municipality",
+    "municipality": "Mnichovice",
+    "municipality_id": 3524,
+    "quarter": "",
+    "quarter_id": 0,
+    "region": "Středočeský kraj",
+    "region_id": 11,
+    "ward": "",
+    "ward_id": 0,
+    "zip": ""
+   },
+   "name": "Sedačka na kolo",
+   "other_localities_count": 0,
+   "premise": null,
+   "price": 0,
+   "price_by_agreement": true,
+   "seo_name": "234476094-sedacka-na-kolo",
+   "sorting_date": "2026-10-01T10:38:43",
+   "topped": false
+  },
+  {
+   "buyer_protection": false,
+   "category": {
+    "id": 437,
+    "name": "Kola a koloběžky ",
+    "seo_name": "437-kola-kolobezky"
+   },
+   "create_date": "2026-09-30T20:33:14",
+   "edit_date": "2026-09-30T20:34:53",
+   "id": 234465612,
+   "images": [
+    {
+     "url": "//d46-a.sdn.cz/d_46/c_img_qF_C/kcKfrMAkFDbqUhK3LH6vLZY/9778.jpeg"
+    }
+   ],
+   "images_total_count": 0,
+   "is_reserved": false,
+   "locality": {
+    "citypart": "Zelené Předměstí",
+    "district": "Pardubice",
+    "district_id": 32,
+    "entity_id": 14980,
+    "entity_type": "ward",
+    "municipality": "Pardubice",
+    "municipality_id": 1258,
+    "quarter": "Pardubice V",
+    "quarter_id": 79,
+    "region": "Pardubický kraj",
+    "region_id": 7,
+    "ward": "Zelené Předměstí",
+    "ward_id": 14980,
+    "zip": "530 02"
+   },
+   "name": "Dětské kolo Woom 2, 14\"",
+   "other_localities_count": 0,
+   "premise": null,
+   "price": 7500,
+   "price_by_agreement": false,
+   "seo_name": "234465612-detske-kolo-woom-2-14",
+   "sorting_date": "2026-09-30T20:34:53",
+   "topped": false
+  }
+ ],
+ "status_code": 200,
+ "status_message": "OK",
+ "warnings": {}
+}

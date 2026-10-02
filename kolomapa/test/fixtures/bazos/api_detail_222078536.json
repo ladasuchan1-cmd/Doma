@@ -1,0 +1,47 @@
+{
+ "id": "222078536",
+ "from": "Mon, 03 Aug 2026 01:30:00 +0200",
+ "status": "active",
+ "topped": false,
+ "title": "Junior horské kolo Superior Team 26 (vel. rámu 14\" / XS)",
+ "description": "Prodám kvalitní juniorské horské kolo Superior Team 26. Kolo je postavené na lehkém hliníkovém rámu typu XS (cca 14\"), díky čemuž je perfektní jako přechodové kolo pro odrostlejší děti z menšího kola na dospělé.\r\nKolo je používané, ale v zachovalém stavu, pravidelně udržované, čisté a plně funkční.\r\nSpolehlivé osazení Shimano Alivio. Pláště jsou v dobrém stavu s pěkným vzorkem, bez prasklin a připravené na ježdění.",
+ "price_formatted": "5 900 Kč",
+ "currency": "CZK",
+ "price": "5900",
+ "price_type": "EXACT",
+ "zip_code": "155 00",
+ "locality": "Praha 5",
+ "latitude": "50.030571",
+ "longitude": "14.308491",
+ "category": {
+  "id": "256",
+  "title": "Horská kola",
+  "url": "horska"
+ },
+ "url": "https://sport.bazos.cz/inzerat/222078536/junior-horske-kolo-superior-team-26-vel-ramu-14-xs.php",
+ "top_possible": "false",
+ "top_total": "0",
+ "top_limit": "21",
+ "topped_for_days": "",
+ "action_possible": "false",
+ "views": "240",
+ "section": {
+  "id": "SP",
+  "title": "Sport",
+  "url": "sport",
+  "image": "https://www.bazos.cz/obrazky/api/sport.png"
+ },
+ "images": [
+  "https://www.bazos.cz/img/1/536/222078536.jpg",
+  "https://www.bazos.cz/img/2/536/222078536.jpg",
+  "https://www.bazos.cz/img/3/536/222078536.jpg",
+  "https://www.bazos.cz/img/4/536/222078536.jpg",
+  "https://www.bazos.cz/img/5/536/222078536.jpg"
+ ],
+ "image_thumbnail": "https://www.bazos.cz/img/1/536/222078536.jpg",
+ "image_thumbnail_width": "1200",
+ "image_thumbnail_height": "900",
+ "favourite": "false",
+ "user_ads_count": "3",
+ "user_reviews_count": "0"
+}

@@ -1,0 +1,76 @@
+{
+ "result": {
+  "buyer_protection": false,
+  "category": {
+   "id": 628,
+   "name": "Kola",
+   "seo_name": "628-kola"
+  },
+  "create_date": "2026-02-02T11:44:41",
+  "description": "Velmi pěkné kvalitní elektrokolo, kompletní příslušenství, baterie, nabíječka. Záruka, doklad. Prosím telefonujte nebo SMS. Doručení zdarma nebo osobní vyzvednutí.\n\n(Celoodpružené elektrokolo - celopéro)\n\nrám Alu 6061\nVidlice ROCKSHOX FS Judy Silver TK Solo Air 29\" BOOST, zdvih 120 mm, uzamykatelná z vidlice\nPrůměr kol 29\"\nRáfky CRUSSIS 29\" disc, dvoustěnné, vložkované, 30 mm\nhmotnost Vážení elektrokol neprobíhá podle žádného zavedeného standardu, kterého by se drželi všichni výrobci. Některé značky uvádějí uměle snížené hmotnosti. Pro zjištění váhy kola je třeba nechat ho zvážit přímo na prodejně.\nnosnost 120 kg\nřídítka CRUSSIS AL 31,8 mm, šířka 780 mm\npředstavec CRUSSIS AL 60 mm, úhel 7°\ngripy CRUSSIS, 100% silikon\nhlavové složení TAPERED 1,5\"\nVýráběné velikosti 17, 19, 21\nbaterie LG Li-Ion 36V / 720 Wh (20 Ah)\nVýkon motoru PANASONIC GX Ultimate, 250W (MAX 600W) 95 Nm\nUmístění motoru středový\ndisplej PANASONIC LCD panel, barevný displej\nřídící jednotka Integrovaná v motoru\nsnímač šlapání torzní\nnabíječka 4 A (součást výbavy)\nDojezd až 170, Zvýšený (150-170 km)\npedály WELLGO, alu s odrazkou\nUSB port USB Micro-B\nAsistent chůze ano\nPočet převodů 1 x 12\npřehazovačka SRAM SX Eagle, 12 rychlostí\nřazení SRAM SX Eagle\nřetěz SRAM SX Eagle, 12 rychlostí\nkazeta / vícekolo SRAM CS-PG1210 Eagle, 11-50z\npřevodník a kliky SRAM X-SYNC 2 34Z, CRS ISIS 170 mm\nbrzda přední SRAM Level, hydraulická, rotor 200 mm\nbrzda zadní SRAM Level, hydraulická, rotor 180 mm\npláště MAXXIS REKON RACE 29 x 2,40\nsedlo SELLE ROYAL\nsedlová objímka CRUSSIS s RU AL, černá 34,9 mm\nsedlovka CRUSSIS se zámkem, 30,9, 350 nebo 400 mm\nnáboj přední CRUSSIS disc, průmyslová ložiska, 32D, BOOST pevná osa 15x110 mm\nnáboj zadní CRUSSIS disc, průmyslová ložiska, 32D, BOOST pevná osa 12x148 mm\nzadní tlumič ROCKSHOX DELUXE SELECT R, 210x55 mm\nMotor Panasonic GXU\nKapacita baterie 720 Wh (20 Ah)\nModely ONE-Full\nKategorie elektrokola Celoodpružená\nModelová řada 9",
+  "edit_date": "2026-10-01T16:20:01",
+  "id": 227490322,
+  "images": [
+   {
+    "id": 1206041233,
+    "image_kind": 0,
+    "url": "//d46-a.sdn.cz/d_46/c_img_p8_A/kBfrbpoeNDpoIQDcHFqOyTm/3258.jpeg"
+   },
+   {
+    "id": 1206041257,
+    "image_kind": 0,
+    "url": "//d46-a.sdn.cz/d_46/c_img_p8_A/kBfrbpoeND2I1YDZ0FqOyi4/2a1a.jpeg"
+   }
+  ],
+  "is_reserved": false,
+  "localities": [
+   {
+    "id": 35658238,
+    "locality": {
+     "citypart": "",
+     "district": "Hlavní město Praha",
+     "district_id": 47,
+     "entity_id": 3468,
+     "entity_type": "municipality",
+     "municipality": "Praha",
+     "municipality_id": 3468,
+     "quarter": "",
+     "quarter_id": 0,
+     "region": "Hlavní město Praha",
+     "region_id": 10,
+     "ward": "",
+     "ward_id": 0,
+     "zip": ""
+    },
+    "main": true
+   }
+  ],
+  "locality": {
+   "citypart": "",
+   "district": "Hlavní město Praha",
+   "district_id": 47,
+   "entity_id": 3468,
+   "entity_type": "municipality",
+   "municipality": "Praha",
+   "municipality_id": 3468,
+   "quarter": "",
+   "quarter_id": 0,
+   "region": "Hlavní město Praha",
+   "region_id": 10,
+   "ward": "",
+   "ward_id": 0,
+   "zip": ""
+  },
+  "name": "Crussis ONE-FULL 9, PANASONIC, elektrokolo, záruka",
+  "price": 0,
+  "price_by_agreement": true,
+  "price_original": 0,
+  "seo_name": "227490322-crussis-one-full-9-panasonic-elektrokolo-zaruka",
+  "sorting_date": "2026-10-01T16:20:01",
+  "status": "active",
+  "topped": true,
+  "valid_to": "2026-11-30T16:20:01"
+ },
+ "status_code": 200,
+ "status_message": "OK"
+}

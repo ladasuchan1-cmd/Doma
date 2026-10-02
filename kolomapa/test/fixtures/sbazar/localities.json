@@ -1,0 +1,203 @@
+{
+ "_note": "GET /api/v1/localities/resolve?entity_id&entity_type (2026-10-02)",
+ "samples": {
+  "municipality:5673": {
+   "result": {
+    "citypart": "",
+    "district": "Hodonín",
+    "district_id": 75,
+    "entity_id": 5673,
+    "entity_type": "municipality",
+    "gps_lat": 48.96402840134779,
+    "gps_lon": 17.02811829478396,
+    "municipality": "Šardice",
+    "municipality_id": 5673,
+    "quarter": "",
+    "quarter_id": 0,
+    "region": "Jihomoravský kraj",
+    "region_id": 14,
+    "ward": "",
+    "ward_id": 0,
+    "zip": ""
+   },
+   "status_code": 200,
+   "status_message": "OK"
+  },
+  "ward:2946": {
+   "result": {
+    "citypart": "Horní Počernice",
+    "district": "Hlavní město Praha",
+    "district_id": 47,
+    "entity_id": 2946,
+    "entity_type": "ward",
+    "gps_lat": 50.115113179752555,
+    "gps_lon": 14.621504317565925,
+    "municipality": "Praha",
+    "municipality_id": 3468,
+    "quarter": "",
+    "quarter_id": 0,
+    "region": "Hlavní město Praha",
+    "region_id": 10,
+    "ward": "Horní Počernice",
+    "ward_id": 2946,
+    "zip": ""
+   },
+   "status_code": 200,
+   "status_message": "OK"
+  },
+  "quarter:97": {
+   "result": {
+    "citypart": "Praha 5",
+    "district": "Hlavní město Praha",
+    "district_id": 47,
+    "entity_id": 97,
+    "entity_type": "quarter",
+    "gps_lat": 50.0552925,
+    "gps_lon": 14.3796905556,
+    "municipality": "Praha",
+    "municipality_id": 3468,
+    "quarter": "Praha 5",
+    "quarter_id": 97,
+    "region": "Hlavní město Praha",
+    "region_id": 10,
+    "ward": "",
+    "ward_id": 0,
+    "zip": ""
+   },
+   "status_code": 200,
+   "status_message": "OK"
+  },
+  "district:39": {
+   "result": {
+    "citypart": "",
+    "district": "Kroměříž",
+    "district_id": 39,
+    "entity_id": 39,
+    "entity_type": "district",
+    "gps_lat": 49.29177170056581,
+    "gps_lon": 17.44483751843678,
+    "municipality": "",
+    "municipality_id": 0,
+    "quarter": "",
+    "quarter_id": 0,
+    "region": "Zlínský kraj",
+    "region_id": 9,
+    "ward": "",
+    "ward_id": 0,
+    "zip": ""
+   },
+   "status_code": 200,
+   "status_message": "OK"
+  },
+  "municipality:3468": {
+   "result": {
+    "citypart": "",
+    "district": "Hlavní město Praha",
+    "district_id": 47,
+    "entity_id": 3468,
+    "entity_type": "municipality",
+    "gps_lat": 50.0835493857,
+    "gps_lon": 14.4341412988,
+    "municipality": "Praha",
+    "municipality_id": 3468,
+    "quarter": "",
+    "quarter_id": 0,
+    "region": "Hlavní město Praha",
+    "region_id": 10,
+    "ward": "",
+    "ward_id": 0,
+    "zip": ""
+   },
+   "status_code": 200,
+   "status_message": "OK"
+  },
+  "ward:14682": {
+   "result": {
+    "citypart": "Zlín",
+    "district": "Zlín",
+    "district_id": 38,
+    "entity_id": 14682,
+    "entity_type": "ward",
+    "gps_lat": 49.22665516512134,
+    "gps_lon": 17.66633749696203,
+    "municipality": "Zlín",
+    "municipality_id": 3045,
+    "quarter": "",
+    "quarter_id": 0,
+    "region": "Zlínský kraj",
+    "region_id": 9,
+    "ward": "Zlín",
+    "ward_id": 14682,
+    "zip": ""
+   },
+   "status_code": 200,
+   "status_message": "OK"
+  },
+  "municipality:3412": {
+   "result": {
+    "citypart": "",
+    "district": "Kolín",
+    "district_id": 51,
+    "entity_id": 3412,
+    "entity_type": "municipality",
+    "gps_lat": 50.02813578191113,
+    "gps_lon": 15.200567287186011,
+    "municipality": "Kolín",
+    "municipality_id": 3412,
+    "quarter": "",
+    "quarter_id": 0,
+    "region": "Středočeský kraj",
+    "region_id": 11,
+    "ward": "",
+    "ward_id": 0,
+    "zip": ""
+   },
+   "status_code": 200,
+   "status_message": "OK"
+  },
+  "municipality:6076": {
+   "result": {
+    "citypart": "",
+    "district": "Znojmo",
+    "district_id": 77,
+    "entity_id": 6076,
+    "entity_type": "municipality",
+    "gps_lat": 48.921713468239155,
+    "gps_lon": 15.949601295560239,
+    "municipality": "Olbramkostel",
+    "municipality_id": 6076,
+    "quarter": "",
+    "quarter_id": 0,
+    "region": "Jihomoravský kraj",
+    "region_id": 14,
+    "ward": "",
+    "ward_id": 0,
+    "zip": ""
+   },
+   "status_code": 200,
+   "status_message": "OK"
+  },
+  "quarter:15": {
+   "result": {
+    "citypart": "Brno-Židenice",
+    "district": "Brno-město",
+    "district_id": 72,
+    "entity_id": 15,
+    "entity_type": "quarter",
+    "gps_lat": 49.196302302242984,
+    "gps_lon": 16.647522229811567,
+    "municipality": "Brno",
+    "municipality_id": 5740,
+    "quarter": "Brno-Židenice",
+    "quarter_id": 15,
+    "region": "Jihomoravský kraj",
+    "region_id": 14,
+    "ward": "",
+    "ward_id": 0,
+    "zip": ""
+   },
+   "status_code": 200,
+   "status_message": "OK"
+  }
+ }
+}
