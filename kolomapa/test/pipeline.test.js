@@ -83,7 +83,8 @@ test('runPipeline: detaily, klasifikace, geolokace, nacenění', async () => {
   const r = await runPipeline({ db, config, sources: [src], trigger: 'test' });
   assert.equal(r.status, 'ok');
   assert.equal(r.stats.sources.fake.new, 3);
-  assert.equal(src.calls.detail.length, 3);
+  // nekolo (helma) se pozná už z výpisu → detail se nestahuje
+  assert.deepEqual(src.calls.detail.sort(), ['1', '3']);
   const rows = db.prepare('SELECT source_id, is_bike, kraj, geo_precision, est_czk, description FROM listings ORDER BY source_id').all();
   assert.deepEqual(rows.map((x) => x.is_bike), [1, 0, 1]);
   assert.equal(rows[0].kraj, 'JHM');
@@ -149,4 +150,39 @@ test('ctx.cache: trvalá cache zdroje přes běhy', async () => {
   await runPipeline({ db, config, sources: [src] });
   await runPipeline({ db, config, sources: [src] });
   assert.deepEqual(seen, [undefined, { lat: 49.1, lon: 16.6 }]);
+});
+
+test('upsertItem: cena „Dohodou“ (null) smaže dřívější cenu; číselná cena smaže poznámku', () => {
+  const db = openDb(':memory:');
+  upsertItem(db, 'fake', item('1', { priceCzk: 9000 }), '2026-10-01T00:00:00Z');
+  upsertItem(db, 'fake', item('1', { priceCzk: null, priceNote: 'Dohodou' }), '2026-10-02T00:00:00Z');
+  let r = db.prepare('SELECT price_czk, price_note FROM listings').get();
+  assert.deepEqual([r.price_czk, r.price_note], [null, 'Dohodou']);
+  upsertItem(db, 'fake', item('1', { priceCzk: 8500 }), '2026-10-03T00:00:00Z');
+  r = db.prepare('SELECT price_czk, price_note FROM listings').get();
+  assert.deepEqual([r.price_czk, r.price_note], [8500, null]);
+});
+
+test('upsertItem: parametry z výpisu se slévají, null klíč smaže; proměnlivé parametry nemění otisk', () => {
+  const db = openDb(':memory:');
+  upsertItem(db, 'fake', { ...item('1'), params: { 'Velikost rámu': 'L', Rezervováno: 'ano' } }, '2026-10-01T00:00:00Z', { fromDetail: true });
+  const h1 = db.prepare('SELECT content_hash FROM listings').get().content_hash;
+  const r = upsertItem(db, 'fake', item('1', { params: { Rezervováno: null, Konec: '5. 10. 2026 20:00' } }), '2026-10-02T00:00:00Z');
+  const row = db.prepare('SELECT params, content_hash FROM listings').get();
+  assert.deepEqual(JSON.parse(row.params), { 'Velikost rámu': 'L', Konec: '5. 10. 2026 20:00' });
+  assert.equal(row.content_hash, h1);
+  assert.equal(r.changed, false);
+});
+
+test('geolokace: souřadnice z webu s přesností „psc“ → rozptyl pinů; nové souřadnice se přepočítají', async () => {
+  const db = openDb(':memory:');
+  const src = makeSource([
+    [item('1', { locationText: 'Brno venkov' })],
+    [item('1', { locationText: 'Brno venkov', lat: 49.289978, lon: 16.575022, latLonPrecision: 'psc' })],
+  ]);
+  await runPipeline({ db, config, sources: [src] });
+  assert.equal(db.prepare('SELECT geo_precision FROM listings').get().geo_precision, 'okres');
+  await runPipeline({ db, config, sources: [src] });
+  const r = db.prepare('SELECT lat, lon, kraj, geo_precision, src_lat FROM listings').get();
+  assert.deepEqual([r.lat, r.lon, r.kraj, r.geo_precision, r.src_lat], [49.289978, 16.575022, 'JHM', 'psc', 49.289978]);
 });

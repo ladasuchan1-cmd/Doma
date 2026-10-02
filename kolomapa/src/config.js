@@ -11,9 +11,11 @@
 //   KOLOMAPA_RUN_ON_START       1 = při startu serveru hned spustit stahování, pokud dnes ještě neproběhlo (výchozí 1)
 //   KOLOMAPA_DELAY_MS           pauza mezi požadavky na jeden web v ms (výchozí 1200 – šetrné k webům)
 //   KOLOMAPA_MAX_PAGES          max. stránek výpisu na kategorii za běh (výchozí 400; ochrana před nekonečným během)
-//   KOLOMAPA_MAX_DETAILS        max. detailů inzerátů na zdroj za běh (výchozí 1500; zbytek se dočte další dny)
+//   KOLOMAPA_MAX_DETAILS        max. detailů inzerátů na zdroj za běh (výchozí podle zdroje: Bazoš 4000, Sbazar 2000,
+//                               Aukro 300, Cyklobazar 120 – zbytek se dočte další dny; nastavení platí pro všechny)
 //   KOLOMAPA_FULL_SCAN_DAYS     jak často projít výpis celý (kvůli odhalení prodaných/smazaných) – dny (výchozí 1)
-//   KOLOMAPA_MIN_PRICE          inzeráty s cenou pod touto hranicí se ignorují (výchozí 500 Kč)
+//   KOLOMAPA_SBAZAR_MAX_RESOLVE max. nových lokalit Sbazaru přeložených na souřadnice za běh (výchozí 400)
+//   KOLOMAPA_MIN_PRICE          nové inzeráty s cenou pod touto hranicí se ignorují (výchozí 200 Kč – levná dětská kola)
 //   KOLOMAPA_GONE_KEEP_DAYS     jak dlouho držet zmizelé inzeráty v DB (historie cen pro učení, výchozí 365)
 //   KOLOMAPA_BROWSER            cesta k Chromiu pro Cyklobazar (výchozí: Chromium z balíčku playwright)
 //   KOLOMAPA_BROWSER_ARGS       další argumenty prohlížeče oddělené mezerou
@@ -104,9 +106,10 @@ function loadConfig(env = process.env) {
     runOnStart: envBool(env.KOLOMAPA_RUN_ON_START, true),
     delayMs: envInt(env.KOLOMAPA_DELAY_MS, 1200, { min: 0, max: 60000 }),
     maxPages: envInt(env.KOLOMAPA_MAX_PAGES, 400, { min: 1, max: 100000 }),
-    maxDetails: envInt(env.KOLOMAPA_MAX_DETAILS, 1500, { min: 0, max: 1000000 }),
+    maxDetails: envInt(env.KOLOMAPA_MAX_DETAILS, null, { min: 0, max: 1000000 }),
     fullScanDays: envInt(env.KOLOMAPA_FULL_SCAN_DAYS, 1, { min: 1, max: 60 }),
-    minPrice: envNumber(env.KOLOMAPA_MIN_PRICE, 500, { min: 0 }),
+    minPrice: envNumber(env.KOLOMAPA_MIN_PRICE, 200, { min: 0 }),
+    sbazarMaxResolve: envInt(env.KOLOMAPA_SBAZAR_MAX_RESOLVE, 400, { min: 0, max: 100000 }),
     goneKeepDays: envInt(env.KOLOMAPA_GONE_KEEP_DAYS, 365, { min: 1, max: 10000 }),
     browserPath: envStr(env.KOLOMAPA_BROWSER),
     browserArgs: (envStr(env.KOLOMAPA_BROWSER_ARGS) || '').split(/\s+/).filter(Boolean),

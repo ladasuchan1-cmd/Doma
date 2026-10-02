@@ -37,3 +37,10 @@ test('scrubContacts: skryje telefony a e-maily, ceny a roky nechá', () => {
   assert.ok(s.includes('12 500 Kč') && s.includes('2021') && s.includes('150 000 Kč'));
   assert.equal(t.scrubContacts(null), null);
 });
+
+test('scrubContacts: číslo inzerátu ani PSČ nejsou telefon', () => {
+  const s = t.scrubContacts('Inzerát 224568683, PSČ 39301, tel: 224568683, mobil 777123456');
+  assert.ok(s.startsWith('Inzerát 224568683, PSČ 39301'));
+  assert.ok(s.includes('tel: [telefon skryt]'));
+  assert.ok(s.endsWith('mobil [telefon skryt]'));
+});

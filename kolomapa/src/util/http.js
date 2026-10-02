@@ -17,6 +17,14 @@ class HttpError extends Error {
   }
 }
 
+/** Registrovatelná doména pro šetrné pauzy: „sport.bazos.cz“ → „bazos.cz“, „d46-a.sdn.cz“ → „sdn.cz“. */
+function siteOf(url) {
+  const h = new URL(url).hostname.toLowerCase();
+  if (/^[\d.]+$/.test(h) || h === 'localhost' || h.includes(':')) return h;
+  const parts = h.split('.');
+  return parts.slice(-2).join('.');
+}
+
 const sleep = (ms, signal) =>
   new Promise((resolve, reject) => {
     if (signal?.aborted) return reject(signal.reason || new Error('Přerušeno'));
@@ -44,7 +52,7 @@ function createHttp(opts = {}) {
   const log = opts.log;
   const fetchImpl = opts.fetchImpl || fetch;
   const sleepFn = opts.sleepImpl || sleep;
-  const lastAt = new Map(); // host → čas posledního požadavku
+  const lastAt = new Map(); // doména (bazos.cz) → čas posledního požadavku – sport.bazos.cz a www.bazos.cz jsou jeden web
   let requests = 0;
 
   async function waitTurn(host, signal) {
@@ -62,7 +70,7 @@ function createHttp(opts = {}) {
    */
   async function request(url, o = {}) {
     const signal = o.signal || opts.signal;
-    const host = new URL(url).host;
+    const host = siteOf(url);
     let attempt = 0;
     for (;;) {
       await waitTurn(host, signal);
@@ -141,4 +149,4 @@ function createHttp(opts = {}) {
   };
 }
 
-module.exports = { createHttp, HttpError, sleep, DEFAULT_UA };
+module.exports = { createHttp, HttpError, sleep, siteOf, DEFAULT_UA };

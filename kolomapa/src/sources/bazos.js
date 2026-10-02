@@ -11,9 +11,15 @@
 //          – plný popis, PSČ, přibližné souřadnice (≈ těžiště PSČ), všechny fotky, počet inzerátů prodejce;
 //            smazaný inzerát → HTTP 410 {"status":"deleted"}.
 // HTML výpis (https://sport.bazos.cz/horska/20/ …, 20 inzerátů na stránku, odkaz „Další“) je záloha:
-//   - když API pro kategorii vůbec neodpoví, projde se výpis přes HTML,
+//   - když API pro kategorii vůbec neodpoví (nebo vrátí prázdnou 1. stránku), projde se výpis přes HTML,
 //   - v celém průchodu se po konci API stáhne 1 HTML stránka na konci výpisu – kdyby API někdy vracelo jen část
 //     výpisu (má „Další“), pokračuje se HTML stránkami až na konec.
+// Zvláštnosti ověřené živě (2. 10. 2026), na kterých stojí pojistky „úplného“ průchodu:
+//   - API pro neznámou kategorii vrací [] se stavem 200,
+//   - HTML stránka za koncem výpisu = HTTP 404 s hlavičkou „Zobrazeno … z N“ a bez inzerátů,
+//   - neexistující HTML kategorie = HTTP 404, ale s výpisem CELÉ sekce Sport a „Další“ na /20/.
+// Úplný průchod (→ pipeline označí neviděné inzeráty jako zmizelé) proto nikdy není prázdná kategorie, 404 na začátku
+// výpisu, výrazně méně inzerátů, než uvádí web, ani prázdná stránka API hned po plné bez potvrzení přes HTML.
 // Bazoš nemá strukturované parametry (velikost rámu, rok …) – ty se vytěží z textu v src/classify.
 // Osobní údaje (jméno, telefon, e-mail, ID prodejce) se nikdy nečtou ani neukládají.
 
@@ -272,7 +278,8 @@ function validCoord(lat, lon) {
   const b = Number(String(lon ?? '').replace(',', '.'));
   // jen ČR (hrubý obdélník) – zahraniční / nulové souřadnice ignorovat
   if (!Number.isFinite(a) || !Number.isFinite(b) || a < 48.4 || a > 51.2 || b < 11.9 || b > 19.1) return null;
-  return { lat: a, lon: b };
+  // Bazoš dává střed PSČ (ne přesné místo) → piny se v mapě rozptýlí
+  return { lat: a, lon: b, latLonPrecision: 'psc' };
 }
 
 // ---------------------------------------------------------------- parsery
@@ -527,10 +534,10 @@ function inCategoryList(u, cat) {
 
 /**
  * Projde HTML stránky výpisu od startOffset (záloha za API / ověření konce výpisu). Vrací {complete, pages, ok, total}.
- * @param {{verify?: boolean, apiEndedShort?: boolean, pagesUsed?: number}} o verify = ověřovací stránka po API:
- *   když selže, platí výsledek API – ale jen pokud API skončilo přirozeně kratší stránkou (apiEndedShort)
+ * @param {{verify?: boolean, apiEndedShort?: boolean, apiPositions?: number, pagesUsed?: number}} o verify = ověřovací
+ *   stránka po API: když selže, platí výsledek API – ale jen pokud API skončilo přirozeně kratší stránkou (apiEndedShort)
  */
-async function scanHtml(ctx, cat, run, startOffset, { verify = false, apiEndedShort = false, pagesUsed = 0 } = {}) {
+async function scanHtml(ctx, cat, run, startOffset, { verify = false, apiEndedShort = false, apiPositions = 0, pagesUsed = 0 } = {}) {
   const full = ctx.mode === 'full';
   const maxPages = Math.min(Number(ctx.maxPages) > 0 ? Number(ctx.maxPages) : HARD_MAX_PAGES, HARD_MAX_PAGES);
   let url = htmlListUrl(cat, startOffset);
@@ -599,7 +606,11 @@ async function scanHtml(ctx, cat, run, startOffset, { verify = false, apiEndedSh
     }
     ctx.log?.debug?.(`Bazoš ${cat.label}: HTML stránka`, { url, items: page.items.length, fresh, total: page.total });
     if (verify && pages === 1 && page.next) {
-      ctx.log?.warn?.(`Bazoš ${cat.label}: API nevrátilo celý výpis (web uvádí ${page.total ?? '?'} inzerátů) – pokračuji HTML stránkami`);
+      // Pár inzerátů navíc = přibyly během průchodu (stačí 1–2 HTML stránky); víc = API vrací jen část výpisu.
+      const capped = page.total == null || page.total > apiPositions + HTML_PAGE_SIZE;
+      ctx.log?.[capped ? 'warn' : 'debug']?.(
+        `Bazoš ${cat.label}: ${capped ? 'API nevrátilo celý výpis' : 'výpis se během průchodu posunul'} (API ${apiPositions}, web uvádí ${page.total ?? '?'} inzerátů) – pokračuji HTML stránkami`
+      );
     }
     if (!full && nonTop > 0) {
       stale = nonTopKnown === nonTop ? stale + 1 : 0;
@@ -632,7 +643,7 @@ async function scanCategory(ctx, cat, run) {
   } else if (ctx.mode === 'full' && api.complete) {
     // Ověření konce: HTML stránka, kde API skončilo. Má-li „Další“, API vrátilo jen část výpisu → pokračovat HTML.
     const start = Math.max(0, Math.floor((api.positions - 1) / HTML_PAGE_SIZE) * HTML_PAGE_SIZE);
-    html = await scanHtml(ctx, cat, run, start, { verify: true, apiEndedShort: !!api.endedShort, pagesUsed: api.pages });
+    html = await scanHtml(ctx, cat, run, start, { verify: true, apiEndedShort: !!api.endedShort, apiPositions: api.positions, pagesUsed: api.pages });
     complete = html.complete;
   }
   // Pojistky proti „úplnému“ průchodu, který ve skutečnosti úplný není (pipeline by pak označila živé inzeráty jako
@@ -727,6 +738,8 @@ async function confirmGone(ctx, listing) {
 
 module.exports = {
   key: 'bazos',
+  /** Detailů za běh (API detail je lehký; prvotní dočtení ~33 tis. inzerátů trvá několik nocí). */
+  defaultMaxDetails: 4000,
   label: 'Bazoš',
   homepage: 'https://www.bazos.cz',
   requiresBrowser: false,

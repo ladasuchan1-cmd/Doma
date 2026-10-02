@@ -33,9 +33,9 @@ const MIGRATIONS = [
     psc TEXT,
     okres TEXT,
     kraj TEXT,                         -- kód kraje (PHA, STC, JHC, PLK, KVK, ULK, LBK, HKK, PAK, VYS, JHM, OLK, ZLK, MSK)
-    lat REAL,
+    lat REAL,                          -- zobrazená poloha (výsledek geolokace; viz src_lat/src_lon z v3)
     lon REAL,
-    geo_precision TEXT,                -- exact | psc | city | okres | kraj | NULL
+    geo_precision TEXT,                -- exact | city | psc | okres | kraj | NULL
     photo_url TEXT,                    -- 1 hlavní fotka
     photo_count INTEGER,
     params TEXT NOT NULL DEFAULT '{}', -- strukturované údaje z webu (velikost rámu, rok, stav …)
@@ -110,6 +110,14 @@ const MIGRATIONS = [
   // v2 – počítadlo celých průchodů, ve kterých inzerát chyběl (zmizelý = chybí 2× nebo web potvrdí smazání)
   `
   ALTER TABLE listings ADD COLUMN missed_scans INTEGER NOT NULL DEFAULT 0;
+  `,
+  // v3 – souřadnice dodané webem odděleně od zobrazených (lat/lon = výsledek geolokace) + jejich přesnost.
+  // Weby dávají často jen střed PSČ / obce – 'exact' by vypnulo rozptyl pinů a piny by ležely na sobě.
+  `
+  ALTER TABLE listings ADD COLUMN src_lat REAL;
+  ALTER TABLE listings ADD COLUMN src_lon REAL;
+  ALTER TABLE listings ADD COLUMN src_geo_precision TEXT;
+  UPDATE listings SET src_lat = lat, src_lon = lon, src_geo_precision = 'exact' WHERE geo_precision = 'exact';
   `,
 ];
 

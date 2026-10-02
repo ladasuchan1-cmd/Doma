@@ -102,8 +102,9 @@ function makeCtx(http, o = {}) {
   return { ctx, emitted, logs };
 }
 
-/** Po jednom inzerátu v pásmu Kola od 5 000 Kč a v kategoriích 437 a 291 (prázdný segment = neúplný výpis). */
+/** Po jednom inzerátu v obou pásmech kategorie Kola a v kategoriích 437 a 291 (prázdný segment = neúplný výpis). */
 const others = () => [
+  ...synth(1, { cat: 628, idBase: 930000000, price: () => 2000 }),
   ...synth(1, { cat: 628, idBase: 940000000, price: () => 12000 }),
   ...synth(1, { cat: 437, idBase: 950000000, price: () => 9000 }),
   ...synth(1, { cat: 291, idBase: 960000000, price: () => 2500 }),
@@ -148,7 +149,7 @@ test('normalizeListItem: url, titulek, cena, datum, lokalita, PSČ, fotka, kateg
     okres: 'Hodonín',
     kraj: 'Jihomoravský kraj',
     photoUrl: 'https://d46-a.sdn.cz/d_46/c_img_qG_A/kcKfrMAkFMsuhNraH7xVQq/63c1.jpeg?fl=exf|res,1024,768,1|wrm,/watermark/sbazar.png,10,10|webp,75',
-    params: {},
+    params: { Rezervováno: null, 'Ochrana kupujícího': null },
     sellerType: 'private',
     detailComplete: false,
   });
@@ -167,14 +168,14 @@ test('normalizeListItem: url, titulek, cena, datum, lokalita, PSČ, fotka, kateg
   // dětský bazar
   assert.equal(sbazar.normalizeListItem(byId(L437, 234505983)).categorySrc, 'Dětský bazar › Kola a koloběžky');
   // rezervace jako údaj webu
-  assert.deepEqual(sbazar.normalizeListItem(byId(L628, 234471468)).params, { Rezervováno: 'ano' });
+  assert.deepEqual(sbazar.normalizeListItem(byId(L628, 234471468)).params, { Rezervováno: 'ano', 'Ochrana kupujícího': null });
 });
 
 test('normalizeListItem: firemní profil, ochrana kupujícího, neúplná položka, bez osobních údajů', () => {
   const r = { ...clone(byId(L628, 234515967)), premise: { id: 5, name: 'Cyklo s.r.o.' }, buyer_protection: true, user: { id: 42, user_service: { shop_url: 'x', shop_name: 'Jan' } } };
   const n = sbazar.normalizeListItem(r);
   assert.equal(n.sellerType, 'company');
-  assert.deepEqual(n.params, { 'Ochrana kupujícího': 'ano' });
+  assert.deepEqual(n.params, { Rezervováno: null, 'Ochrana kupujícího': 'ano' });
   assert.doesNotMatch(JSON.stringify(n), /Jan|shop|user|Cyklo s\.r\.o\./);
   assert.equal(sbazar.normalizeListItem({ ...r, name: '  ' }), null);
   assert.equal(sbazar.normalizeListItem({ ...r, id: 'abc' }), null);
@@ -321,8 +322,8 @@ test('scan full: pásmo nad limitem 10 000 se rekurzivně rozdělí podle ceny, 
   const { ctx, emitted, logs } = makeCtx(srv.http, { minPrice: 0, config: { sbazarMaxResolve: 0 } });
   const res = await sbazar.scan(ctx);
   assert.equal(res.complete, true);
-  assert.equal(emitted.length, 10103);
-  assert.equal(new Set(emitted.map((i) => i.sourceId)).size, 10103);
+  assert.equal(emitted.length, 10104);
+  assert.equal(new Set(emitted.map((i) => i.sourceId)).size, 10104);
   assert.ok(logs.warn.some((m) => /dělím na do 2 499 Kč a 2 500–4 999 Kč/.test(m)), logs.warn.join('\n'));
   for (const u of srv.searches()) {
     const q = new URL(u).searchParams;
@@ -338,14 +339,14 @@ test('scan full: pásmo, které už nejde dělit (jedna cena), projde jen do lim
   const { ctx, emitted, logs } = makeCtx(srv.http, { minPrice: 0, config: { sbazarMaxResolve: 0 } });
   const res = await sbazar.scan(ctx);
   assert.equal(res.complete, false);
-  assert.equal(emitted.length, 10003);
+  assert.equal(emitted.length, 10004);
   assert.ok(logs.warn.some((m) => /nejde dál dělit/.test(m)));
   assert.ok(srv.searches().every((u) => Number(new URL(u).searchParams.get('offset')) <= 9500));
   // 9 700 inzerátů za jednu cenu: dělit nejde, ale pod limitem 10 000 projde pásmo celé → úplné
   const srv2 = fakeSbazar({ items: [...synth(9700, { price: () => 1000, idBase: 610000000 }), ...others()], locs: {} });
   const r2 = makeCtx(srv2.http, { minPrice: 0, config: { sbazarMaxResolve: 0 } });
   assert.equal((await sbazar.scan(r2.ctx)).complete, true);
-  assert.equal(r2.emitted.length, 9703);
+  assert.equal(r2.emitted.length, 9704);
 });
 
 test('scan full: limit stránek platí pro každý segment zvlášť → neúplné', async () => {
@@ -362,6 +363,103 @@ test('scan full: limit stránek platí pro každý segment zvlášť → neúpln
   ]);
   assert.equal(emitted.length, 1000);
   assert.ok(logs.warn.some((m) => /limit 1 stránek/.test(m)));
+});
+
+/** Odpověď výpisu z pole položek (pro testy, které obcházejí filtrování falešného serveru). */
+const listBody = (all, offset, limit, total = all.length) => ({ pagination: { limit, offset, total }, results: all.slice(offset, offset + limit), status_code: 200 });
+
+test('scan full: API přestane filtrovat podle category_id → pásmo selže, cizí inzeráty se neuloží, neúplné', async () => {
+  const foreign = synth(300, { cat: 1234, price: () => 9000, idBase: 970000000 });
+  const own = [...synth(100, { price: () => 9000 }), ...others()];
+  const srv = fakeSbazar({
+    items: own,
+    override: (u) => {
+      if (!u.pathname.endsWith('/search')) return null;
+      const all = [...own.filter((r) => r.category.id === Number(u.searchParams.get('category_id'))), ...foreign];
+      return { status: 200, body: listBody(all, Number(u.searchParams.get('offset')), Number(u.searchParams.get('limit'))) };
+    },
+  });
+  const { ctx, emitted, logs } = makeCtx(srv.http, { config: { sbazarMaxResolve: 0 } });
+  await assert.rejects(sbazar.scan(ctx), /vrací inzeráty jiných kategorií/);
+  assert.ok(emitted.length > 0 && emitted.every((i) => !i.sourceId.startsWith('97')), 'žádný inzerát cizí kategorie');
+  assert.ok(logs.warn.some((m) => /jiných kategorií/.test(m)));
+  // jednotlivý inzerát jiné kategorie (přesunutý během průchodu) se jen přeskočí
+  const moved = clone(own[0]);
+  moved.category = { id: 630, name: 'Koloběžky' };
+  const srv2 = fakeSbazar({
+    items: own.slice(1),
+    override: (u) => {
+      if (!u.pathname.endsWith('/search') || u.searchParams.get('price_from') !== '5000') return null;
+      const all = [moved, ...own.slice(1).filter((r) => r.category.id === 628 && r.price >= 5000)];
+      return { status: 200, body: listBody(all, Number(u.searchParams.get('offset')), Number(u.searchParams.get('limit'))) };
+    },
+  });
+  const r2 = makeCtx(srv2.http, { config: { sbazarMaxResolve: 0 } });
+  assert.equal((await sbazar.scan(r2.ctx)).complete, true);
+  assert.ok(!r2.emitted.some((i) => i.sourceId === String(moved.id)));
+});
+
+test('scan full: prázdný segment (0 inzerátů) → neúplné, ať pipeline nemaže živé inzeráty', async () => {
+  const srv = fakeSbazar({ items: synth(50, { price: () => 9000 }), locs: {} }); // 437 a 291 i Kola do 4 999 Kč prázdné
+  const { ctx, logs } = makeCtx(srv.http, { config: { sbazarMaxResolve: 0 } });
+  const res = await sbazar.scan(ctx);
+  assert.equal(res.complete, false);
+  assert.ok(logs.warn.some((m) => /Odrážedla \(všechny ceny\) – API vrátilo 0 inzerátů/.test(m)), logs.warn.join('\n'));
+  // úplně prázdná odpověď všude → neúplné, nic nevyhodí
+  const empty = fakeSbazar({ items: [], locs: {} });
+  assert.equal((await sbazar.scan(makeCtx(empty.http).ctx)).complete, false);
+});
+
+test('scan full: API ignoruje offset (pořád první stránka) → neúplné', async () => {
+  const upper = synth(1200, { price: () => 9000 });
+  const srv = fakeSbazar({
+    items: [...upper, ...others()],
+    override: (u) => (u.pathname.endsWith('/search') && u.searchParams.get('price_from') === '5000' ? { status: 200, body: listBody(upper, 0, 500) } : null),
+  });
+  const { ctx, emitted, logs } = makeCtx(srv.http, { config: { sbazarMaxResolve: 0 } });
+  const res = await sbazar.scan(ctx);
+  assert.equal(res.complete, false);
+  assert.ok(logs.warn.some((m) => /přišlo 500 různých z 1200/.test(m)), logs.warn.join('\n'));
+  assert.equal(emitted.filter((i) => i.priceCzk === 9000).length, 500 + 1);
+});
+
+test('scan full: API vrací kratší stránky, než je limit → offset podle skutečného počtu, výpis úplný', async () => {
+  const real = fakeSbazar({ items: [...synth(1200, { price: () => 9000 }), ...others()], locs: {} });
+  // obal falešného serveru, který limit stáhne na 200 (jako by API snížilo maximum)
+  const capped = {
+    async request(url, o) {
+      const u = new URL(url);
+      if (u.pathname.endsWith('/search')) u.searchParams.set('limit', String(Math.min(200, Number(u.searchParams.get('limit')))));
+      return real.http.request(u.toString(), o);
+    },
+  };
+  const { ctx, emitted } = makeCtx(capped, { config: { sbazarMaxResolve: 0 } });
+  const res = await sbazar.scan(ctx);
+  assert.equal(res.complete, true);
+  assert.equal(emitted.length, 1204);
+  const offs = real.searches().filter((u) => new URL(u).searchParams.get('price_from') === '5000').map((u) => Number(new URL(u).searchParams.get('offset')));
+  assert.deepEqual(offs, [0, 200, 400, 600, 800, 1000, 1200]); // 1 201 inzerátů od 5 000 Kč
+});
+
+test('scan: API lokalit nefunguje (400 / 404 na všechno) → nic se neuloží jako „bez bodu“, překlad se zastaví', async () => {
+  const items = [];
+  for (let i = 0; i < 30; i++) {
+    const [r] = synth(1, { price: () => 9000, idBase: 980000000 + i * 10 });
+    r.locality = { ...r.locality, entity_type: 'municipality', entity_id: 5000 + i };
+    items.push(r);
+  }
+  for (const status of [400, 404]) {
+    const cache = mapCache();
+    const srv = fakeSbazar({
+      items: [...items, ...others()],
+      override: (u) => (u.pathname.endsWith('/resolve') ? { status, body: { status_code: status, status_message: 'Not found' } } : null),
+    });
+    const { ctx, logs } = makeCtx(srv.http, { cache });
+    await sbazar.scan(ctx);
+    assert.ok(srv.resolves().length <= 10, `${status}: ${srv.resolves().length} požadavků`);
+    assert.equal([...cache.store.keys()].filter((k) => k.startsWith('loc:')).length, 0, `${status}: nic v cache`);
+    assert.ok(logs.warn.some((m) => /lokalit/.test(m)), `${status}: varování`);
+  }
 });
 
 test('scan incremental: konec na stránce jen se známými inzeráty staršími než nejnovější známý − 1 den', async () => {

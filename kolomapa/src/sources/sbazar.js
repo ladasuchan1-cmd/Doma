@@ -223,10 +223,13 @@ function localityKey(loc) {
 }
 
 /** Údaje, které web o inzerátu skutečně uvádí (žádné odhady z textu – ty dělá src/classify). */
-function siteFacts(r) {
+function siteFacts(r, { forDetail = false } = {}) {
   const params = {};
-  if (r?.is_reserved === true) params['Rezervováno'] = 'ano';
-  if (r?.buyer_protection === true) params['Ochrana kupujícího'] = 'ano';
+  // null = klíč smazat (pipeline slévá parametry z výpisu) – po zrušení rezervace zmizí „Rezervováno“
+  params['Rezervováno'] = r?.is_reserved === true ? 'ano' : null;
+  params['Ochrana kupujícího'] = r?.buyer_protection === true ? 'ano' : null;
+  // detail nahrazuje parametry celé → prázdné klíče vynechat
+  if (forDetail) for (const k of Object.keys(params)) if (params[k] === null) delete params[k];
   return params;
 }
 
@@ -296,7 +299,7 @@ function normalizeDetail(r) {
   if (!id) return null;
   const images = Array.isArray(r.images) ? r.images.map(imageUrl).filter(Boolean) : [];
   const { priceCzk, priceNote } = priceInfo(r, true);
-  const params = siteFacts(r);
+  const params = siteFacts(r, { forDetail: true });
   const validTo = czDate(r.valid_to);
   if (validTo) params['Platnost do'] = validTo;
   const main = (Array.isArray(r.localities) ? r.localities.find((l) => l?.main) : null)?.locality || r.locality;
@@ -729,6 +732,7 @@ async function scan(ctx) {
     if (c) {
       item.lat = c.lat;
       item.lon = c.lon;
+      item.latLonPrecision = 'city'; // střed obce / části obce
     }
     if (item.sellerType !== 'company') {
       if (e.uid && st.users.get(e.uid) >= SHOP_MIN_LISTINGS) item.sellerType = 'company';
@@ -807,6 +811,7 @@ async function confirmGone(ctx, listing) {
 
 module.exports = {
   key: 'sbazar',
+  defaultMaxDetails: 2000,
   label: 'Sbazar',
   homepage: BASE,
   requiresBrowser: false,

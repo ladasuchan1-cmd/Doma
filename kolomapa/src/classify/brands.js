@@ -105,7 +105,7 @@ const BRANDS = [
       ['\\b(trail neo|trail neo s)\\b', 'ebike_mtb'],
       ['\\b(tesoro neo|quick neo|canvas neo|adventure neo|mavaro)\\b', 'ebike_trekking'],
       ['\\b(synapse neo|topstone neo|supersix neo)\\b', 'ebike_road'],
-      ['\\b(scalpel ht)\\b', 'mtb_hardtail'],
+      ['\\b(scalpel ht|habit ht)\\b', 'mtb_hardtail'],
       ['\\b(habit|jekyll|scalpel|trigger|claymore|rize|rush|prophet|moto|gemini|perp)\\b', 'mtb_full'],
       ['\\b(trail|f si|fsi|cujo|catalyst|beast of the east|chase|flash|f series)\\b', 'mtb_hardtail'],
       ['\\b(supersix|caad|synapse|systemsix|slice|lab71|r600|r800|six13)\\b', 'road'],

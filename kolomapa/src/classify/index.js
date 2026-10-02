@@ -412,6 +412,8 @@ function classifyListing(input, opts = {}) {
   }
   if (isBike === null && brand && brandFrom === 'title') {
     if (K.NONBIKE_BRAND_RE.test(title.f.slice(0, brandHit.idx))) return nonBike('příslušenství / díl (značka)');
+    // jen značka bez modelu a za pár stovek mimo kategorii kol = spíš doplněk (helma Kellys Dare, dres Author …)
+    if (price != null && price < 500 && cat.kind !== 'bike' && brand.kind !== 'vintage' && !(hint && !hint.generic) && !weak) return nonBike('neurčeno (jen značka, nízká cena)');
     isBike = true;
     reason = 'kolo (značka)';
   }
@@ -513,10 +515,13 @@ function classifyListing(input, opts = {}) {
   else if (titleType) {
     bikeType = titleType;
     // „Horské kolo Trek Slash“ → upřesnit podle modelu
-    if (/^mtb_/.test(titleType) && hintType && /mtb_|ebike_mtb/.test(hintType)) bikeType = hintType.replace(/^ebike_/, '');
+    if (/^mtb_/.test(titleType) && hintType && /mtb/.test(hintType)) {
+      bikeType = /full/.test(hintType) ? 'mtb_full' : 'mtb_hardtail';
+      if (/\b(ht|hardtail)\b/.test(tMask)) bikeType = 'mtb_hardtail';
+    }
     else if (titleType === 'mtb_hardtail' && hintType && ['dirt', 'fatbike'].includes(hintType)) bikeType = hintType;
     else if (['cross', 'city', 'trekking'].includes(titleType) && hintType && ['gravel', 'road', 'cyclocross'].includes(hintType)) bikeType = hintType;
-  } else if (hintType) bikeType = hintType.replace(/^ebike_/, '') === 'kids' ? 'kids' : hintType;
+  } else if (hintType) bikeType = hintType === 'ebike_kids' ? 'kids' : hintType;
   else if (brand && brand.kind === 'road') bikeType = 'road';
   else if (brand && brand.kind === 'bmx') bikeType = 'bmx';
   else if (brand && brand.kind === 'folding') bikeType = 'folding';

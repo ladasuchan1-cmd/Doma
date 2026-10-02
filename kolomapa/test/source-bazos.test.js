@@ -614,6 +614,36 @@ test('scan: viděno výrazně méně inzerátů, než uvádí web (API vrací du
   assert.ok(warns.some((w) => /viděno jen \d+ z 100/.test(w)), warns.join('\n'));
 });
 
+test('scan: inzeráty smazané během průchodu → ověřovací stránka je za koncem (HTTP 404 s hlavičkou, jak vrací web) = konec', async () => {
+  const lists = withAll({ 256: synthItems(41) });
+  const site = fakeSite({ lists });
+  const { http, calls } = makeHttp((url) => {
+    // po konci API (offset 41 → []) zmizí 2 inzeráty → HTML stránka od 40 je za koncem výpisu (39 inzerátů)
+    if (url === bazos.apiListUrl(CAT.horska, 41)) lists[256] = lists[256].slice(2);
+    return site(url);
+  });
+  const { ctx, warns } = makeCtx(http, { mode: 'full' });
+  assert.equal((await bazos.scan(ctx)).complete, true);
+  assert.ok(calls.includes('https://sport.bazos.cz/horska/40/'));
+  assert.deepEqual(warns, []);
+});
+
+test('scan: přerušení (AbortSignal) → okamžitý konec bez dalších požadavků', async () => {
+  const ac = new AbortController();
+  const lists = withAll({ 256: synthItems(100) });
+  const site = fakeSite({ lists });
+  const { http, calls } = makeHttp((url) => {
+    if (calls.length === 2) ac.abort(new Error('Přerušeno uživatelem'));
+    return site(url);
+  });
+  const { ctx } = makeCtx(http, { mode: 'full' });
+  ctx.signal = ac.signal;
+  await assert.rejects(bazos.scan(ctx), /Přerušeno uživatelem/);
+  assert.equal(calls.length, 2);
+  await assert.rejects(bazos.detail(ctx, { source_id: '224568683' }), /Přerušeno uživatelem/);
+  assert.equal(calls.length, 2);
+});
+
 test('API: chybový JSON „too many requests“ = blokace; detail s místním časem se nečte v pásmu serveru', async () => {
   const { http, calls } = makeHttp(fakeSite({ lists: withAll({ 256: LIST }), routes: { [bazos.apiListUrl(CAT.horska, 0)]: { body: { error: 'Too many requests, try later' } } } }));
   const { ctx } = makeCtx(http);

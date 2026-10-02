@@ -118,13 +118,18 @@ function truncate(s, n) {
 
 /**
  * Skryje kontakty, které prodávající napsali do textu inzerátu (telefony, e-maily) – neukládáme osobní údaje.
- * Telefon: 9 číslic (volitelně +420/00420, mezery/tečky/pomlčky po trojicích); ceny ani roky to nezasáhne.
+ * Telefon = předvolba +420/00420, NEBO 9 číslic po trojicích (777 123 456, 777-123-456), NEBO souvislých 9 číslic
+ * začínajících 6/7 (mobil) či uvedených slovem tel/mobil/volejte. Čísla inzerátů (224568683), ceny a roky zůstanou.
  */
 function scrubContacts(s) {
   if (s == null) return s;
+  const PHONE = '[telefon skryt]';
   return String(s)
     .replace(/[\w.+-]+@[\w-]+(\.[\w-]+)+/g, '[e-mail skryt]')
-    .replace(/(?<![\d\w])(?:(?:\+|00)\s?42[01][\s.-]?)?[1-9]\d{2}[\s.-]?\d{3}[\s.-]?\d{3}(?![\d])/g, '[telefon skryt]');
+    .replace(/(?<![\d\w])(?:\+|00)\s?42[01][\s.-]?\d{3}[\s.-]?\d{3}[\s.-]?\d{3}(?!\d)/g, PHONE)
+    .replace(/(?<![\d\w])[2-9]\d{2}[\s.-]\d{3}[\s.-]\d{3}(?![\d])/g, PHONE)
+    .replace(/(?<![\d\w])[67]\d{8}(?!\d)/g, PHONE)
+    .replace(/\b(tel\.?|telefon|mobil|mob\.|volejte|kontakt)(\s*[:.]?\s*)\d{9}(?!\d)/gi, `$1$2${PHONE}`);
 }
 
 module.exports = { decodeEntities, htmlToText, fold, keyOf, parseCzk, parseCzDate, parsePsc, hash, truncate, scrubContacts };

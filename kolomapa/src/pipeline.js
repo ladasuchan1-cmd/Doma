@@ -33,8 +33,9 @@ const FIELD_MAP = {
   psc: 'psc',
   okres: 'okres',
   kraj: 'kraj',
-  lat: 'lat',
-  lon: 'lon',
+  lat: 'src_lat',
+  lon: 'src_lon',
+  latLonPrecision: 'src_geo_precision',
   photoUrl: 'photo_url',
   photoCount: 'photo_count',
   params: 'params',
@@ -42,9 +43,17 @@ const FIELD_MAP = {
   views: 'views',
 };
 
+// Parametry, které se mění bez změny kola (konec aukce, platnost, rezervace) – nemění otisk obsahu,
+// aby se kvůli nim znovu neklasifikovalo a hlavně znovu neplatilo AI nacenění.
+const VOLATILE_PARAMS = new Set(['Konec', 'Typ nabídky', 'Platnost do', 'Rezervováno', 'Ochrana kupujícího']);
+
 function contentHash(row) {
-  return hash([row.title, row.price_czk, row.description, JSON.stringify(row.params || {})].join('\u0001'));
+  const params = Object.fromEntries(Object.entries(row.params || {}).filter(([k]) => !VOLATILE_PARAMS.has(k)));
+  return hash([row.title, row.price_czk, row.description, JSON.stringify(params)].join('\u0001'));
 }
+
+// Pole, která zdroj uvádí vždy celá: null je platná hodnota (cena „Dohodou“ smaže dřívější číselnou cenu).
+const AUTHORITATIVE = new Set(['price_czk', 'price_note']);
 
 /**
  * Uloží (vloží / aktualizuje) položku ze zdroje. Vrací {id, isNew, changed}.
@@ -62,6 +71,7 @@ function upsertItem(db, source, item, at, { fromDetail = false } = {}) {
     row[col] = v;
   }
   if (!existing) {
+    if (row.params !== undefined) row.params = JSON.stringify(Object.fromEntries(Object.entries(parseJson(row.params, {})).filter(([, v]) => v !== null)));
     row.source = source;
     row.source_id = String(item.sourceId);
     row.first_seen_at = at;
@@ -81,8 +91,34 @@ function upsertItem(db, source, item, at, { fromDetail = false } = {}) {
     const stem = cur.replace(/\s*(…|\.\.\.)\s*$/, '');
     if (prev.length >= cur.length && prev.startsWith(stem.slice(0, Math.max(0, stem.length - 3)))) delete row.description;
   }
+  // Parametry: z detailu se nahradí celé; z výpisu se slijí do uložených (hodnota null klíč smaže –
+  // např. „Rezervováno“ po zrušení rezervace), aby výpis nesmazal údaje, které umí jen detail.
+  if (row.params !== undefined && !fromDetail && !item.detailComplete) {
+    const merged = { ...parseJson(existing.params, {}) };
+    for (const [k, v] of Object.entries(parseJson(row.params, {}))) {
+      if (v === null) delete merged[k];
+      else merged[k] = v;
+    }
+    row.params = JSON.stringify(merged);
+    if (row.params === existing.params) delete row.params;
+  } else if (row.params !== undefined) {
+    const clean = Object.fromEntries(Object.entries(parseJson(row.params, {})).filter(([, v]) => v !== null));
+    row.params = JSON.stringify(clean);
+  }
   // Prázdné hodnoty nemažou známé údaje
-  for (const col of Object.keys(row)) if (row[col] == null || row[col] === '' || row[col] === '{}') delete row[col];
+  for (const col of Object.keys(row)) {
+    if (AUTHORITATIVE.has(col)) {
+      if (row[col] === '') row[col] = null;
+      continue;
+    }
+    if (row[col] == null || row[col] === '' || (row[col] === '{}' && col !== 'params')) delete row[col];
+  }
+  // priceCzk bez priceNote (číselná cena po „Dohodou“) → poznámku smazat
+  if (row.price_czk != null && item.priceNote === undefined && existing.price_note != null) row.price_note = null;
+  // Web dodal nové souřadnice → geolokace je musí přepočítat
+  if (row.src_lat !== undefined && row.src_lon !== undefined && (row.src_lat !== existing.src_lat || row.src_lon !== existing.src_lon)) {
+    row.geo_precision = null;
+  }
   const merged = { ...existing, ...row, params: parseJson(row.params ?? existing.params, {}) };
   const newHash = contentHash(merged);
   const changed = newHash !== existing.content_hash;
@@ -153,30 +189,35 @@ function classifyPending(db, { all = false } = {}) {
   return n;
 }
 
-/** Geolokace inzerátů bez souřadnic (nebo s nižší přesností, pokud web mezitím přidal PSČ/souřadnice). */
-function geocodePending(db) {
+/**
+ * Geolokace aktivních inzerátů. Souřadnice z webu (src_lat/src_lon) mají přednost a dostanou přesnost, kterou zdroj
+ * uvedl (src_geo_precision; bez uvedení 'exact'); jinak PSČ + text lokality. Zapisuje jen změny.
+ */
+function geocodePending(db, { all = false } = {}) {
   const rows = db
-    .prepare('SELECT id, location_text, psc, okres, kraj, lat, lon, geo_precision FROM listings WHERE gone_at IS NULL AND (geo_precision IS NULL OR geo_precision NOT IN (\'exact\'))')
+    .prepare(
+      `SELECT id, location_text, psc, okres, kraj, lat, lon, geo_precision, src_lat, src_lon, src_geo_precision
+       FROM listings WHERE gone_at IS NULL ${all ? '' : 'AND (geo_precision IS NULL OR src_lat IS NOT NULL OR geo_precision NOT IN (\'exact\', \'city\'))'}`
+    )
     .all();
   const upd = db.prepare('UPDATE listings SET lat = ?, lon = ?, kraj = ?, okres = ?, geo_precision = ? WHERE id = ?');
   let n = 0;
   tx(db, () => {
     for (const r of rows) {
-      // Souřadnice z webu (lat/lon) mají přednost; jinak PSČ + text lokality.
-      const hasExact = r.lat != null && r.lon != null && (r.geo_precision == null || r.geo_precision === 'exact');
       const g = resolveLocation({
-        lat: hasExact ? r.lat : null,
-        lon: hasExact ? r.lon : null,
+        lat: r.src_lat,
+        lon: r.src_lon,
         psc: r.psc,
         locationText: r.location_text,
         okres: r.okres,
         kraj: r.kraj,
       });
+      if (g.precision === 'exact' && r.src_geo_precision) g.precision = r.src_geo_precision;
       if (!g.precision) {
         if (r.geo_precision != null) upd.run(null, null, r.kraj, r.okres, null, r.id);
         continue;
       }
-      if (g.precision === r.geo_precision && g.lat === r.lat && g.lon === r.lon) continue;
+      if (g.precision === r.geo_precision && g.lat === r.lat && g.lon === r.lon && g.kraj === r.kraj) continue;
       upd.run(g.lat, g.lon, g.kraj, g.okres || r.okres || null, g.precision, r.id);
       n++;
     }
@@ -282,11 +323,16 @@ async function runPipeline(o) {
         status = 'partial';
         log?.warn?.(`${src.label}: výpis selhal`, { error: e.message });
       }
-      // Detaily: nové / změněné inzeráty, nejnovější první, s limitem na běh.
-      if (src.detail && config.maxDetails > 0 && !o.signal?.aborted) {
+      // Detaily: nové / změněné inzeráty, nejnovější první, s limitem na běh. Napřed se klasifikuje podle výpisu,
+      // aby se detaily nestahovaly u zjevných nekol (díly, oblečení, poptávky).
+      const maxDetails = config.maxDetails ?? src.defaultMaxDetails ?? 1500;
+      if (src.detail && maxDetails > 0 && !o.signal?.aborted) {
+        classifyPending(db);
         const todo = db
-          .prepare('SELECT * FROM listings WHERE source = ? AND gone_at IS NULL AND detail_at IS NULL ORDER BY COALESCE(posted_at, first_seen_at) DESC LIMIT ?')
-          .all(src.key, config.maxDetails);
+          .prepare(
+            'SELECT * FROM listings WHERE source = ? AND gone_at IS NULL AND detail_at IS NULL AND (is_bike IS NULL OR is_bike = 1) ORDER BY COALESCE(posted_at, first_seen_at) DESC LIMIT ?'
+          )
+          .all(src.key, maxDetails);
         if (todo.length) progress(`${src.label}: stahuji detaily ${todo.length} inzerátů…`);
         for (const row of todo) {
           if (o.signal?.aborted) break;
@@ -350,4 +396,4 @@ async function runPipeline(o) {
   return { runId, status, stats, error };
 }
 
-module.exports = { runPipeline, upsertItem, classifyPending, geocodePending, contentHash, markMissing, makeCache };
+module.exports = { runPipeline, upsertItem, classifyPending, geocodePending, contentHash, markMissing, makeCache, VOLATILE_PARAMS };

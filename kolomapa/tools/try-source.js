@@ -11,7 +11,7 @@
 //   --mode      incremental (výchozí) | full – režim průchodu výpisu, jak ho dostane zdroj
 //   --show      kolik položek z výpisu vypsat (výchozí 5)
 //   --json      vypsat vše jako JSON (položky z výpisu i detaily)
-//   --delay     pauza mezi požadavky na jeden web v ms (výchozí KOLOMAPA_DELAY_MS, jinak 1200)
+//   --delay     pauza mezi požadavky na jeden web v ms (výchozí KOLOMAPA_DELAY_MS, jinak 1200; nejméně 1000)
 // Návratový kód: 0 = výpis i detaily bez chyby, 1 = chyba.
 
 const { loadConfig, ALL_SOURCES } = require('../src/config');
@@ -108,7 +108,8 @@ async function main(argv) {
     pages = intArg(args.pages, 'pages', 1);
     details = intArg(args.details, 'details', 3);
     show = intArg(args.show, 'show', 5);
-    delayMs = intArg(args.delay, 'delay', config.delayMs);
+    // Živé weby třetích stran: nikdy rychleji než 1 požadavek za sekundu (i kdyby --delay / KOLOMAPA_DELAY_MS bylo menší).
+    delayMs = Math.max(1000, intArg(args.delay, 'delay', config.delayMs));
     if (args.mode !== undefined && !['incremental', 'full'].includes(args.mode)) throw new Error('--mode musí být incremental nebo full');
   } catch (e) {
     console.error(e.message);

@@ -49,3 +49,10 @@ test('pauza mezi požadavky na stejný web', async () => {
   assert.equal(waits.length, 1);
   assert.ok(waits[0] > 900 && waits[0] <= 1250);
 });
+
+test('siteOf: pauza se počítá pro celý web (sport.bazos.cz = www.bazos.cz)', () => {
+  const { siteOf } = require('../src/util/http');
+  assert.equal(siteOf('https://sport.bazos.cz/horska/'), 'bazos.cz');
+  assert.equal(siteOf('https://www.bazos.cz/api/v1/ads.php'), 'bazos.cz');
+  assert.equal(siteOf('http://127.0.0.1:8090/x'), '127.0.0.1');
+});

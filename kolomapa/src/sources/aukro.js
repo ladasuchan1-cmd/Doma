@@ -650,6 +650,8 @@ async function confirmGone(ctx, listing) {
 
 module.exports = {
   key: 'aukro',
+  /** Aukro: minimální provoz (robots.txt blokuje ClaudeBota) – detailů za běh jen pár set. */
+  defaultMaxDetails: 300,
   label: 'Aukro',
   homepage: 'https://aukro.cz',
   requiresBrowser: false,

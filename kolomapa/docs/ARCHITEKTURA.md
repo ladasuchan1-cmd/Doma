@@ -42,10 +42,11 @@ kolomapa/
 | `locationText` | string | město / lokalita tak, jak ji uvádí web |
 | `psc` | string | 5 číslic bez mezery, je-li k dispozici |
 | `okres`, `kraj` | string | text z webu (kraj se normalizuje v geo) |
-| `lat`, `lon` | number | jen skutečné souřadnice z webu |
+| `lat`, `lon` | number | jen souřadnice dodané webem (ukládají se do `src_lat/src_lon`) |
+| `latLonPrecision` | `exact` \| `city` \| `psc` | jak přesné souřadnice webu jsou (střed obce / PSČ → piny se rozptýlí); výchozí `exact` |
 | `photoUrl` | string | JEDNA hlavní fotka, velikost ~800–1200 px, musí se načíst bez cookies |
 | `photoCount` | number | |
-| `params` | object | strukturované údaje webu (`{"Velikost rámu": "L", "Rok výroby": "2021", …}`) |
+| `params` | object | strukturované údaje webu (`{"Velikost rámu": "L", "Rok výroby": "2021", …}`); z výpisu se slévají do uložených, `null` klíč smaže, z detailu se nahradí celé |
 | `sellerType` | `private` \| `company` \| null | |
 | `views` | number | |
 | `detailComplete` | boolean | položka už obsahuje vše, co by dal detail |
@@ -57,6 +58,7 @@ kolomapa/
 ```js
 module.exports = {
   key: 'bazos', label: 'Bazoš', homepage: 'https://www.bazos.cz', requiresBrowser: false,
+  defaultMaxDetails: 4000, // detailů za běh, pokud není nastaveno KOLOMAPA_MAX_DETAILS
   async scan(ctx) { /* … await ctx.emit(item) … */ return { complete: true }; },
   async detail(ctx, listing) { return { description, params, photoUrl, … } /* nebo null = inzerát zmizel */ },
   async confirmGone(ctx, listing) { return true /* smazán */ | false /* existuje */ | null /* nevím */; }, // volitelné
