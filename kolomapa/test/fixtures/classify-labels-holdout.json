@@ -1,0 +1,1139 @@
+{
+ "_doc": "Odložený (holdout) ručně označený vzorek – klasifikátor na něm NEBYL laděn. 100 titulků z Bazoš „Ostatní cyklistika“ + 30 z „Horská kola“, „Silniční kola“, „Elektrokola“ (seed 777). bikeType „any“ = typ nelze z titulku určit (akceptuje se jakýkoli), „ebike“ = jakýkoli ebike_*.",
+ "labels": {
+  "Cyklonosiče včetně zahrádky": {
+   "isBike": false,
+   "bikeType": null,
+   "price": "Nabídněte",
+   "category": "Ostatní cyklistika"
+  },
+  "Brašna na kolo": {
+   "isBike": false,
+   "bikeType": null,
+   "price": "300 Kč",
+   "category": "Ostatní cyklistika"
+  },
+  "Weehoo i-Go": {
+   "isBike": false,
+   "bikeType": null,
+   "price": "4 000 Kč",
+   "category": "Ostatní cyklistika"
+  },
+  "Cyklosedačka": {
+   "isBike": false,
+   "bikeType": null,
+   "price": "300 Kč",
+   "category": "Ostatní cyklistika"
+  },
+  "Držák do garáže pro jízdní kolo": {
+   "isBike": false,
+   "bikeType": null,
+   "price": "200 Kč",
+   "category": "Ostatní cyklistika"
+  },
+  "Vodící tyč Trailgator na dětské kolo": {
+   "isBike": false,
+   "bikeType": null,
+   "price": "999 Kč",
+   "category": "Ostatní cyklistika"
+  },
+  "Dětská sedačka Hamax": {
+   "isBike": false,
+   "bikeType": null,
+   "price": "750 Kč",
+   "category": "Ostatní cyklistika"
+  },
+  "Decathlon bmx 20\" wipe": {
+   "isBike": true,
+   "bikeType": "bmx",
+   "price": "3 700 Kč",
+   "category": "Ostatní cyklistika"
+  },
+  "Staré kola favorit Ukrajina a závodní speciál": {
+   "isBike": true,
+   "bikeType": "any",
+   "price": "700 Kč",
+   "category": "Ostatní cyklistika"
+  },
+  "Brašna s držákem na sedlovku": {
+   "isBike": false,
+   "bikeType": null,
+   "price": "400 Kč",
+   "category": "Ostatní cyklistika"
+  },
+  "Prodám adaptér Thule 9281 -": {
+   "isBike": false,
+   "bikeType": null,
+   "price": "3 700 Kč",
+   "category": "Ostatní cyklistika"
+  },
+  "Držák na kolo Thule 3x": {
+   "isBike": false,
+   "bikeType": null,
+   "price": "5 000 Kč",
+   "category": "Ostatní cyklistika"
+  },
+  "Freestyle BMX kolo - WE THE PEOPLE Thrillseeker 21\"": {
+   "isBike": true,
+   "bikeType": "bmx",
+   "price": "13 000 Kč",
+   "category": "Ostatní cyklistika"
+  },
+  "Kolo AUTHOR PRIME 18“": {
+   "isBike": true,
+   "bikeType": "any",
+   "price": "800 Kč",
+   "category": "Ostatní cyklistika"
+  },
+  "2 x nosič na jízdní kola na příčníky automobilu": {
+   "isBike": false,
+   "bikeType": null,
+   "price": "599 Kč",
+   "category": "Ostatní cyklistika"
+  },
+  "Sensor": {
+   "isBike": false,
+   "bikeType": null,
+   "price": "350 Kč",
+   "category": "Ostatní cyklistika"
+  },
+  "Cyklo dres Tinkoff Saxo": {
+   "isBike": false,
+   "bikeType": null,
+   "price": "99 Kč",
+   "category": "Ostatní cyklistika"
+  },
+  "Čistič hnacího ústrojí SYNCROS + dlouhá hadička s aplikátor": {
+   "isBike": false,
+   "bikeType": null,
+   "price": "1 000 Kč",
+   "category": "Ostatní cyklistika"
+  },
+  "Díly na historické kola": {
+   "isBike": false,
+   "bikeType": null,
+   "price": "400 Kč",
+   "category": "Ostatní cyklistika"
+  },
+  "Dětské kolo Woom 4": {
+   "isBike": true,
+   "bikeType": "kids",
+   "price": "9 000 Kč",
+   "category": "Ostatní cyklistika"
+  },
+  "Tretry NW": {
+   "isBike": false,
+   "bikeType": null,
+   "price": "Zdarma",
+   "category": "Ostatní cyklistika"
+  },
+  "Prodam detskou sedacku na kolo": {
+   "isBike": false,
+   "bikeType": null,
+   "price": "600 Kč",
+   "category": "Ostatní cyklistika"
+  },
+  "Dětská sedačka na kolo": {
+   "isBike": false,
+   "bikeType": null,
+   "price": "400 Kč",
+   "category": "Ostatní cyklistika"
+  },
+  "Dětské kolo Author Jet 12\"": {
+   "isBike": true,
+   "bikeType": "kids",
+   "price": "400 Kč",
+   "category": "Ostatní cyklistika"
+  },
+  "Brašna na řídítka": {
+   "isBike": false,
+   "bikeType": null,
+   "price": "150 Kč",
+   "category": "Ostatní cyklistika"
+  },
+  "Tlumič Fox Specialized": {
+   "isBike": false,
+   "bikeType": null,
+   "price": "2 900 Kč",
+   "category": "Ostatní cyklistika"
+  },
+  "celorozepínací cyklodres - (vel.XS-S)": {
+   "isBike": false,
+   "bikeType": null,
+   "price": "240 Kč",
+   "category": "Ostatní cyklistika"
+  },
+  "Sena Expand Mesh – bezdrôtový outdoor interkom / headset": {
+   "isBike": false,
+   "bikeType": null,
+   "price": "1 700 Kč",
+   "category": "Ostatní cyklistika"
+  },
+  "Dětská přilba - Crivit - vel.49 - 54 cm": {
+   "isBike": false,
+   "bikeType": null,
+   "price": "90 Kč",
+   "category": "Ostatní cyklistika"
+  },
+  "Kolo skládačka": {
+   "isBike": true,
+   "bikeType": "folding",
+   "price": "2 000 Kč",
+   "category": "Ostatní cyklistika"
+  },
+  "Cyklotrenažer inSPORTline inCondi S1000i": {
+   "isBike": false,
+   "bikeType": null,
+   "price": "10 000 Kč",
+   "category": "Ostatní cyklistika"
+  },
+  "prodam detske odrazedlo Galaxy": {
+   "isBike": true,
+   "bikeType": "balance",
+   "price": "1 600 Kč",
+   "category": "Ostatní cyklistika"
+  },
+  "Prodám tohle upravené BMX CTM POP": {
+   "isBike": true,
+   "bikeType": "bmx",
+   "price": "5 300 Kč",
+   "category": "Ostatní cyklistika"
+  },
+  "Croozer for kids 2 s DOGY odpružením": {
+   "isBike": false,
+   "bikeType": null,
+   "price": "5 990 Kč",
+   "category": "Ostatní cyklistika"
+  },
+  "Nový SP Connect Bike Bundle II Universal držák na kolo": {
+   "isBike": false,
+   "bikeType": null,
+   "price": "569 Kč",
+   "category": "Ostatní cyklistika"
+  },
+  "Starší kolo": {
+   "isBike": true,
+   "bikeType": "any",
+   "price": "300 Kč",
+   "category": "Ostatní cyklistika"
+  },
+  "Městské kolo": {
+   "isBike": true,
+   "bikeType": "city",
+   "price": "4 900 Kč",
+   "category": "Ostatní cyklistika"
+  },
+  "Dětské kolo velikost 20 značka mc kenzie": {
+   "isBike": true,
+   "bikeType": "kids",
+   "price": "500 Kč",
+   "category": "Ostatní cyklistika"
+  },
+  "Dívčí cyklistická helma": {
+   "isBike": false,
+   "bikeType": null,
+   "price": "300 Kč",
+   "category": "Ostatní cyklistika"
+  },
+  "Dres na kolo, běhání, sport...NOVÝ": {
+   "isBike": false,
+   "bikeType": null,
+   "price": "299 Kč",
+   "category": "Ostatní cyklistika"
+  },
+  "Děská helma na kolo - dinosaurus": {
+   "isBike": false,
+   "bikeType": null,
+   "price": "150 Kč",
+   "category": "Ostatní cyklistika"
+  },
+  "Specialized S-Works 6": {
+   "isBike": false,
+   "bikeType": null,
+   "price": "990 Kč",
+   "category": "Ostatní cyklistika"
+  },
+  "Držak na telefon": {
+   "isBike": false,
+   "bikeType": null,
+   "price": "150 Kč",
+   "category": "Ostatní cyklistika"
+  },
+  "Rotoped": {
+   "isBike": false,
+   "bikeType": null,
+   "price": "700 Kč",
+   "category": "Ostatní cyklistika"
+  },
+  "Dětská sedačka na kolo Polisport Groovy": {
+   "isBike": false,
+   "bikeType": null,
+   "price": "500 Kč",
+   "category": "Ostatní cyklistika"
+  },
+  "prodám cyklo helmu Bell 4 Forty": {
+   "isBike": false,
+   "bikeType": null,
+   "price": "500 Kč",
+   "category": "Ostatní cyklistika"
+  },
+  "TOP STAV: Dětská cyklosedačka Polisport Koolah (9–22 kg)": {
+   "isBike": false,
+   "bikeType": null,
+   "price": "1 200 Kč",
+   "category": "Ostatní cyklistika"
+  },
+  "Sedlo na kolo Force Aerion": {
+   "isBike": false,
+   "bikeType": null,
+   "price": "400 Kč",
+   "category": "Ostatní cyklistika"
+  },
+  "Historické - Zlatá Praha": {
+   "isBike": true,
+   "bikeType": "any",
+   "price": "28 900 Kč",
+   "category": "Ostatní cyklistika"
+  },
+  "VHS Golden Bike od Pepy Dresslera": {
+   "isBike": false,
+   "bikeType": null,
+   "price": "50 Kč",
+   "category": "Ostatní cyklistika"
+  },
+  "Dětská helma": {
+   "isBike": false,
+   "bikeType": null,
+   "price": "100 Kč",
+   "category": "Ostatní cyklistika"
+  },
+  "Držák jízdních kol Škoda": {
+   "isBike": false,
+   "bikeType": null,
+   "price": "3 000 Kč",
+   "category": "Ostatní cyklistika"
+  },
+  "Nové zimní rukavice na kolo CRAFT": {
+   "isBike": false,
+   "bikeType": null,
+   "price": "900 Kč",
+   "category": "Ostatní cyklistika"
+  },
+  "Cruiser Felt Claire": {
+   "isBike": true,
+   "bikeType": "city",
+   "price": "10 000 Kč",
+   "category": "Ostatní cyklistika"
+  },
+  "Helma na kolo nová nepoužitá": {
+   "isBike": false,
+   "bikeType": null,
+   "price": "150 Kč",
+   "category": "Ostatní cyklistika"
+  },
+  "cyklotašky Crivit": {
+   "isBike": false,
+   "bikeType": null,
+   "price": "200 Kč",
+   "category": "Ostatní cyklistika"
+  },
+  "Pedály kovové Wellgo": {
+   "isBike": false,
+   "bikeType": null,
+   "price": "199 Kč",
+   "category": "Ostatní cyklistika"
+  },
+  "Nová přilba FORCE AVES MTB S-M": {
+   "isBike": false,
+   "bikeType": null,
+   "price": "990 Kč",
+   "category": "Ostatní cyklistika"
+  },
+  "Dámské zimní tretry na kolo": {
+   "isBike": false,
+   "bikeType": null,
+   "price": "900 Kč",
+   "category": "Ostatní cyklistika"
+  },
+  "Helma na kolo": {
+   "isBike": false,
+   "bikeType": null,
+   "price": "350 Kč",
+   "category": "Ostatní cyklistika"
+  },
+  "Různá kola": {
+   "isBike": true,
+   "bikeType": "any",
+   "price": "1 Kč",
+   "category": "Ostatní cyklistika"
+  },
+  "Prodej skládacího kola": {
+   "isBike": true,
+   "bikeType": "folding",
+   "price": "3 500 Kč",
+   "category": "Ostatní cyklistika"
+  },
+  "Cyklisticka přilba Giro": {
+   "isBike": false,
+   "bikeType": null,
+   "price": "300 Kč",
+   "category": "Ostatní cyklistika"
+  },
+  "Wahoo KICKR CORE 2 | Zwift Cog a Click": {
+   "isBike": false,
+   "bikeType": null,
+   "price": "11 499 Kč",
+   "category": "Ostatní cyklistika"
+  },
+  "Pánský cyklodres SCOTT": {
+   "isBike": false,
+   "bikeType": null,
+   "price": "900 Kč",
+   "category": "Ostatní cyklistika"
+  },
+  "Dámské, dívčí kolo": {
+   "isBike": true,
+   "bikeType": "any",
+   "price": "1 500 Kč",
+   "category": "Ostatní cyklistika"
+  },
+  "Cyklistický tachometr a hodinky polar": {
+   "isBike": false,
+   "bikeType": null,
+   "price": "3 000 Kč",
+   "category": "Ostatní cyklistika"
+  },
+  "Prodám 3 střešní nosiče kol s příčníky zn. Compass": {
+   "isBike": false,
+   "bikeType": null,
+   "price": "4 500 Kč",
+   "category": "Ostatní cyklistika"
+  },
+  "Městské kolo Leaderfox": {
+   "isBike": true,
+   "bikeType": "city",
+   "price": "5 000 Kč",
+   "category": "Ostatní cyklistika"
+  },
+  "Roadster historické kolo": {
+   "isBike": true,
+   "bikeType": "any",
+   "price": "3 000 Kč",
+   "category": "Ostatní cyklistika"
+  },
+  "Fotochromatické brýle Laceto radido": {
+   "isBike": false,
+   "bikeType": null,
+   "price": "500 Kč",
+   "category": "Ostatní cyklistika"
+  },
+  "Weber stojan": {
+   "isBike": false,
+   "bikeType": null,
+   "price": "500 Kč",
+   "category": "Ostatní cyklistika"
+  },
+  "Gravel Canyon Grizl CF SL 6 AXS vel. S": {
+   "isBike": true,
+   "bikeType": "gravel",
+   "price": "40 000 Kč",
+   "category": "Ostatní cyklistika"
+  },
+  "Dresy Adidas": {
+   "isBike": false,
+   "bikeType": null,
+   "price": "2 400 Kč",
+   "category": "Ostatní cyklistika"
+  },
+  "Rudy Project Protera Plus helma vel. L": {
+   "isBike": false,
+   "bikeType": null,
+   "price": "2 100 Kč",
+   "category": "Ostatní cyklistika"
+  },
+  "BMX Galaxy za super cenu": {
+   "isBike": true,
+   "bikeType": "bmx",
+   "price": "5 590 Kč",
+   "category": "Ostatní cyklistika"
+  },
+  "Nosič na páté dveře": {
+   "isBike": false,
+   "bikeType": null,
+   "price": "700 Kč",
+   "category": "Ostatní cyklistika"
+  },
+  "Dětská helma na kolo": {
+   "isBike": false,
+   "bikeType": null,
+   "price": "600 Kč",
+   "category": "Ostatní cyklistika"
+  },
+  "Yupee Odrážedlo Enduro Zelená": {
+   "isBike": true,
+   "bikeType": "balance",
+   "price": "99 Kč",
+   "category": "Ostatní cyklistika"
+  },
+  "Helma Giro Phase vel. M": {
+   "isBike": false,
+   "bikeType": null,
+   "price": "500 Kč",
+   "category": "Ostatní cyklistika"
+  },
+  "Gravel Karbon Cervélo Aspero 5 Sram Force": {
+   "isBike": true,
+   "bikeType": "gravel",
+   "price": "97 000 Kč",
+   "category": "Ostatní cyklistika"
+  },
+  "funkční rotoped německé kvality": {
+   "isBike": false,
+   "bikeType": null,
+   "price": "400 Kč",
+   "category": "Ostatní cyklistika"
+  },
+  "Queridoo Kidgoo 1 + kompletní příslušenství + přilba": {
+   "isBike": false,
+   "bikeType": null,
+   "price": "5 900 Kč",
+   "category": "Ostatní cyklistika"
+  },
+  "Brzdové destičky": {
+   "isBike": false,
+   "bikeType": null,
+   "price": "300 Kč",
+   "category": "Ostatní cyklistika"
+  },
+  "dres na kolo Nový": {
+   "isBike": false,
+   "bikeType": null,
+   "price": "299 Kč",
+   "category": "Ostatní cyklistika"
+  },
+  "Cyklistický vozík pro děti": {
+   "isBike": false,
+   "bikeType": null,
+   "price": "2 000 Kč",
+   "category": "Ostatní cyklistika"
+  },
+  "ESI grips, extra chunky": {
+   "isBike": false,
+   "bikeType": null,
+   "price": "350 Kč",
+   "category": "Ostatní cyklistika"
+  },
+  "Computer cateye": {
+   "isBike": false,
+   "bikeType": null,
+   "price": "1 200 Kč",
+   "category": "Ostatní cyklistika"
+  },
+  "pateřak na kolo": {
+   "isBike": false,
+   "bikeType": null,
+   "price": "1 500 Kč",
+   "category": "Ostatní cyklistika"
+  },
+  "Dětská cyklistická helma vel. 55-58 cm": {
+   "isBike": false,
+   "bikeType": null,
+   "price": "10 Kč",
+   "category": "Ostatní cyklistika"
+  },
+  "Cyklistická helma přilba dětská": {
+   "isBike": false,
+   "bikeType": null,
+   "price": "200 Kč",
+   "category": "Ostatní cyklistika"
+  },
+  "Sedátko na kolo": {
+   "isBike": false,
+   "bikeType": null,
+   "price": "50 Kč",
+   "category": "Ostatní cyklistika"
+  },
+  "Zámek Abus": {
+   "isBike": false,
+   "bikeType": null,
+   "price": "1 500 Kč",
+   "category": "Ostatní cyklistika"
+  },
+  "Prodám helmu POC Tectal": {
+   "isBike": false,
+   "bikeType": null,
+   "price": "1 000 Kč",
+   "category": "Ostatní cyklistika"
+  },
+  "Prodam tasku, brasnu na nosic kola": {
+   "isBike": false,
+   "bikeType": null,
+   "price": "500 Kč",
+   "category": "Ostatní cyklistika"
+  },
+  "Šedý nastavitelný sedák na kolo s opěrkou": {
+   "isBike": false,
+   "bikeType": null,
+   "price": "450 Kč",
+   "category": "Ostatní cyklistika"
+  },
+  "Pumpička na bombičky": {
+   "isBike": false,
+   "bikeType": null,
+   "price": "300 Kč",
+   "category": "Ostatní cyklistika"
+  },
+  "Cyklisticka helma": {
+   "isBike": false,
+   "bikeType": null,
+   "price": "800 Kč",
+   "category": "Ostatní cyklistika"
+  },
+  "Prodám helmu na kolo zn. Etape": {
+   "isBike": false,
+   "bikeType": null,
+   "price": "500 Kč",
+   "category": "Ostatní cyklistika"
+  },
+  "Kross Level 1.0 (29) Black/Orange 2023 vel. S": {
+   "isBike": true,
+   "bikeType": "mtb_hardtail",
+   "price": "5 500 Kč",
+   "category": "Horská kola"
+  },
+  "Celoodpružené horské kolo Trek Slash 8": {
+   "isBike": true,
+   "bikeType": "mtb_full",
+   "price": "50 000 Kč",
+   "category": "Horská kola"
+  },
+  "Prodám Kolo Kross 27.5 M": {
+   "isBike": true,
+   "bikeType": "any",
+   "price": "4 700 Kč",
+   "category": "Horská kola"
+  },
+  "YT wicked 650b": {
+   "isBike": true,
+   "bikeType": "mtb_full",
+   "price": "30 000 Kč",
+   "category": "Horská kola"
+  },
+  "Dres Rocday XL": {
+   "isBike": false,
+   "bikeType": null,
+   "price": "499 Kč",
+   "category": "Horská kola"
+  },
+  "Dámske jízdni kolo Author- super stav": {
+   "isBike": true,
+   "bikeType": "any",
+   "price": "10 900 Kč",
+   "category": "Horská kola"
+  },
+  "Horské kolo Rockrider 520 27,5\" rám L 170-184cm Decathlon.": {
+   "isBike": true,
+   "bikeType": "mtb_hardtail",
+   "price": "4 900 Kč",
+   "category": "Horská kola"
+  },
+  "Dětské kolo Woom 3": {
+   "isBike": true,
+   "bikeType": "kids",
+   "price": "8 000 Kč",
+   "category": "Horská kola"
+  },
+  "Dětské kolo Superior paint 20": {
+   "isBike": true,
+   "bikeType": "kids",
+   "price": "2 000 Kč",
+   "category": "Horská kola"
+  },
+  "29\" celoodpružené horské hliníkové kolo CUBE, rám L": {
+   "isBike": true,
+   "bikeType": "mtb_full",
+   "price": "27 999 Kč",
+   "category": "Horská kola"
+  },
+  "Gary Fisher": {
+   "isBike": true,
+   "bikeType": "any",
+   "price": "2 000 Kč",
+   "category": "Horská kola"
+  },
+  "Dětské horské kolo 20": {
+   "isBike": true,
+   "bikeType": "kids",
+   "price": "4 000 Kč",
+   "category": "Horská kola"
+  },
+  "Dětské kolo Cube 20": {
+   "isBike": true,
+   "bikeType": "kids",
+   "price": "1 100 Kč",
+   "category": "Horská kola"
+  },
+  "Dětské kolo Author kingkong 24": {
+   "isBike": true,
+   "bikeType": "kids",
+   "price": "7 500 Kč",
+   "category": "Horská kola"
+  },
+  "duralové kolo": {
+   "isBike": true,
+   "bikeType": "any",
+   "price": "1 999 Kč",
+   "category": "Horská kola"
+  },
+  "Horské kolo LaPierre": {
+   "isBike": true,
+   "bikeType": "any",
+   "price": "14 500 Kč",
+   "category": "Horská kola"
+  },
+  "Horské kolo Cygnus 24": {
+   "isBike": true,
+   "bikeType": "kids",
+   "price": "3 000 Kč",
+   "category": "Horská kola"
+  },
+  "Chlapecké horské kolo": {
+   "isBike": true,
+   "bikeType": "kids",
+   "price": "3 000 Kč",
+   "category": "Horská kola"
+  },
+  "Dětská integrální helma": {
+   "isBike": false,
+   "bikeType": null,
+   "price": "1 700 Kč",
+   "category": "Horská kola"
+  },
+  "Horské kolo Olpran 29\" , L/XL": {
+   "isBike": true,
+   "bikeType": "mtb_hardtail",
+   "price": "16 990 Kč",
+   "category": "Horská kola"
+  },
+  "Giant Reign Advanced 2": {
+   "isBike": true,
+   "bikeType": "mtb_full",
+   "price": "83 000 Kč",
+   "category": "Horská kola"
+  },
+  "Horské kolo Merida Matts 80 20\"": {
+   "isBike": true,
+   "bikeType": "any",
+   "price": "2 990 Kč",
+   "category": "Horská kola"
+  },
+  "BMC sportelite two": {
+   "isBike": true,
+   "bikeType": "mtb_hardtail",
+   "price": "9 000 Kč",
+   "category": "Horská kola"
+  },
+  "MTB Rockrider Feel 900 S (velikost M) ✅ ZÁRUKA": {
+   "isBike": true,
+   "bikeType": "mtb_full",
+   "price": "48 000 Kč",
+   "category": "Horská kola"
+  },
+  "Author matrix SL": {
+   "isBike": true,
+   "bikeType": "any",
+   "price": "3 500 Kč",
+   "category": "Horská kola"
+  },
+  "Prodám kolo nálezový stav 3": {
+   "isBike": true,
+   "bikeType": "any",
+   "price": "300 Kč",
+   "category": "Horská kola"
+  },
+  "Trekingové kolo": {
+   "isBike": true,
+   "bikeType": "trekking",
+   "price": "4 000 Kč",
+   "category": "Horská kola"
+  },
+  "Superior 969": {
+   "isBike": true,
+   "bikeType": "any",
+   "price": "24 000 Kč",
+   "category": "Horská kola"
+  },
+  "Detske kolo Pells Razzer 24": {
+   "isBike": true,
+   "bikeType": "kids",
+   "price": "1 900 Kč",
+   "category": "Horská kola"
+  },
+  "Prodám dětské kolo SCIROCCO 16": {
+   "isBike": true,
+   "bikeType": "kids",
+   "price": "2 000 Kč",
+   "category": "Horská kola"
+  },
+  "Silniční kolo Centurion": {
+   "isBike": true,
+   "bikeType": "road",
+   "price": "12 000 Kč",
+   "category": "Silniční kola"
+  },
+  "Predám detský bicykel slovenský 18\"": {
+   "isBike": true,
+   "bikeType": "kids",
+   "price": "1 000 Kč",
+   "category": "Silniční kola"
+  },
+  "Kolo Eska": {
+   "isBike": true,
+   "bikeType": "any",
+   "price": "499 Kč",
+   "category": "Silniční kola"
+  },
+  "Kolo Favorit": {
+   "isBike": true,
+   "bikeType": "any",
+   "price": "1 800 Kč",
+   "category": "Silniční kola"
+  },
+  "Jízdní kola Favorit": {
+   "isBike": true,
+   "bikeType": "any",
+   "price": "500 Kč",
+   "category": "Silniční kola"
+  },
+  "Starší rám kola Favorit": {
+   "isBike": true,
+   "bikeType": "any",
+   "price": "350 Kč",
+   "category": "Silniční kola"
+  },
+  "Winora Racer": {
+   "isBike": true,
+   "bikeType": "any",
+   "price": "6 500 Kč",
+   "category": "Silniční kola"
+  },
+  "Panske kolo Author": {
+   "isBike": true,
+   "bikeType": "any",
+   "price": "Dohodou",
+   "category": "Silniční kola"
+  },
+  "Kolo pánské Heidemann": {
+   "isBike": true,
+   "bikeType": "any",
+   "price": "Nabídněte",
+   "category": "Silniční kola"
+  },
+  "Jízdní kolo Favorit": {
+   "isBike": true,
+   "bikeType": "any",
+   "price": "2 500 Kč",
+   "category": "Silniční kola"
+  },
+  "Prodám": {
+   "isBike": true,
+   "bikeType": "any",
+   "price": "3 000 Kč",
+   "category": "Silniční kola"
+  },
+  "Dětské kolo (velikost 18)": {
+   "isBike": true,
+   "bikeType": "kids",
+   "price": "1 000 Kč",
+   "category": "Silniční kola"
+  },
+  "Pánské kolo": {
+   "isBike": true,
+   "bikeType": "any",
+   "price": "200 Kč",
+   "category": "Silniční kola"
+  },
+  "Single speed": {
+   "isBike": true,
+   "bikeType": "any",
+   "price": "3 000 Kč",
+   "category": "Silniční kola"
+  },
+  "Cyklistické tretry vel. 38 bílé": {
+   "isBike": false,
+   "bikeType": null,
+   "price": "590 Kč",
+   "category": "Silniční kola"
+  },
+  "skládací kolo ,skládačka za 1000kč": {
+   "isBike": true,
+   "bikeType": "folding",
+   "price": "1 000 Kč",
+   "category": "Silniční kola"
+  },
+  "Prodám nepoužitý představec Uno Plus 3D Lite": {
+   "isBike": false,
+   "bikeType": null,
+   "price": "Dohodou",
+   "category": "Silniční kola"
+  },
+  "Favorit a Eska": {
+   "isBike": true,
+   "bikeType": "any",
+   "price": "Nabídněte",
+   "category": "Silniční kola"
+  },
+  "Dětské ultralehké kolo Academy Grade 3": {
+   "isBike": true,
+   "bikeType": "kids",
+   "price": "5 999 Kč",
+   "category": "Silniční kola"
+  },
+  "Kolo Premier Eska": {
+   "isBike": true,
+   "bikeType": "any",
+   "price": "500 Kč",
+   "category": "Silniční kola"
+  },
+  "Wilier Twin Blade /S/ Red eTap / Bora Ultra / keramika": {
+   "isBike": true,
+   "bikeType": "road",
+   "price": "69 900 Kč",
+   "category": "Silniční kola"
+  },
+  "Elektrokolo": {
+   "isBike": true,
+   "bikeType": "ebike",
+   "price": "4 000 Kč",
+   "category": "Silniční kola"
+  },
+  "Lehké dámské krosové kolo Acstar Ontario 28\" (ALU) + tachom": {
+   "isBike": true,
+   "bikeType": "cross",
+   "price": "1 800 Kč",
+   "category": "Silniční kola"
+  },
+  "Lehké karbonové kolo Ravo Allegro": {
+   "isBike": true,
+   "bikeType": "road",
+   "price": "23 000 Kč",
+   "category": "Silniční kola"
+  },
+  "Prodám stavbu kola na rámu Favorit": {
+   "isBike": true,
+   "bikeType": "any",
+   "price": "7 500 Kč",
+   "category": "Silniční kola"
+  },
+  "Kolo Favorit retro": {
+   "isBike": true,
+   "bikeType": "any",
+   "price": "800 Kč",
+   "category": "Silniční kola"
+  },
+  "Vicini Cromvelato 54 cm": {
+   "isBike": true,
+   "bikeType": "road",
+   "price": "40 000 Kč",
+   "category": "Silniční kola"
+  },
+  "Retro jízdní kolo Eska Unicykl": {
+   "isBike": true,
+   "bikeType": "any",
+   "price": "500 Kč",
+   "category": "Silniční kola"
+  },
+  "jízdní kolo eska": {
+   "isBike": true,
+   "bikeType": "any",
+   "price": "Nabídněte",
+   "category": "Silniční kola"
+  },
+  "Focus paralane": {
+   "isBike": true,
+   "bikeType": "road",
+   "price": "26 000 Kč",
+   "category": "Silniční kola"
+  },
+  "Elektrokolo Mondraker Scree RR": {
+   "isBike": true,
+   "bikeType": "ebike",
+   "price": "130 000 Kč",
+   "category": "Elektrokola"
+  },
+  "Elektrokolo Leader Fox Acron 2024": {
+   "isBike": true,
+   "bikeType": "ebike",
+   "price": "53 000 Kč",
+   "category": "Elektrokola"
+  },
+  "Cannondale Moterra SL 2 Carbon | Nová baterie Gen 2 | Full 2": {
+   "isBike": true,
+   "bikeType": "ebike_mtb_full",
+   "price": "Dohodou",
+   "category": "Elektrokola"
+  },
+  "Electrokolo Nathaniel 20\" Nové": {
+   "isBike": true,
+   "bikeType": "ebike",
+   "price": "44 500 Kč",
+   "category": "Elektrokola"
+  },
+  "Prodám elektrokolo Lectron Voyager MRS": {
+   "isBike": true,
+   "bikeType": "ebike",
+   "price": "12 000 Kč",
+   "category": "Elektrokola"
+  },
+  "elektro Babeta": {
+   "isBike": false,
+   "bikeType": null,
+   "price": "9 000 Kč",
+   "category": "Elektrokola"
+  },
+  "Městské dámské el.kolo Specialized": {
+   "isBike": true,
+   "bikeType": "ebike",
+   "price": "15 000 Kč",
+   "category": "Elektrokola"
+  },
+  "Mondraker crafty r": {
+   "isBike": true,
+   "bikeType": "ebike_mtb_full",
+   "price": "89 999 Kč",
+   "category": "Elektrokola"
+  },
+  "elektrokolo Haibike": {
+   "isBike": true,
+   "bikeType": "ebike",
+   "price": "25 000 Kč",
+   "category": "Elektrokola"
+  },
+  "Prodám Nové a nepoužité pláště včetně brzdových destiček": {
+   "isBike": false,
+   "bikeType": null,
+   "price": "1 900 Kč",
+   "category": "Elektrokola"
+  },
+  "Celopero karbon Twitter vel 16.5 Bafang 510": {
+   "isBike": true,
+   "bikeType": "ebike_mtb_full",
+   "price": "40 999 Kč",
+   "category": "Elektrokola"
+  },
+  "Elektrokolo Apache Hawk": {
+   "isBike": true,
+   "bikeType": "ebike",
+   "price": "15 000 Kč",
+   "category": "Elektrokola"
+  },
+  "Elektrokoloběžka MTF 2 Max - výborný stav": {
+   "isBike": false,
+   "bikeType": null,
+   "price": "8 000 Kč",
+   "category": "Elektrokola"
+  },
+  "elektrokolo haibike sduro": {
+   "isBike": true,
+   "bikeType": "ebike",
+   "price": "40 000 Kč",
+   "category": "Elektrokola"
+  },
+  "elektrokolo eSilence": {
+   "isBike": true,
+   "bikeType": "ebike",
+   "price": "9 500 Kč",
+   "category": "Elektrokola"
+  },
+  "BMS pro Bosch Powertube 500wh 625wh": {
+   "isBike": false,
+   "bikeType": null,
+   "price": "1 999 Kč",
+   "category": "Elektrokola"
+  },
+  "Apache Hupahu MX1": {
+   "isBike": true,
+   "bikeType": "ebike",
+   "price": "32 000 Kč",
+   "category": "Elektrokola"
+  },
+  "Řídící jednotka": {
+   "isBike": false,
+   "bikeType": null,
+   "price": "1 Kč",
+   "category": "Elektrokola"
+  },
+  "Elektrokolo CRUSSIS e-City – pěkný stav": {
+   "isBike": true,
+   "bikeType": "ebike",
+   "price": "8 500 Kč",
+   "category": "Elektrokola"
+  },
+  "Elektrokolo Trek Rail+ 8 Gen 5 (Dark Star)": {
+   "isBike": true,
+   "bikeType": "ebike_mtb_full",
+   "price": "159 000 Kč",
+   "category": "Elektrokola"
+  },
+  "Elektrokolo APACHE Matta 3 Bosch Cross (M) černá": {
+   "isBike": true,
+   "bikeType": "ebike",
+   "price": "32 990 Kč",
+   "category": "Elektrokola"
+  },
+  "MRX MTB 29\" E-Bike eMerix Alivio 1x9 , vel M": {
+   "isBike": true,
+   "bikeType": "ebike_mtb",
+   "price": "25 990 Kč",
+   "category": "Elektrokola"
+  },
+  "Haibike 27,5 (velikost rámu L)": {
+   "isBike": true,
+   "bikeType": "ebike",
+   "price": "21 900 Kč",
+   "category": "Elektrokola"
+  },
+  "PUSH MAXI 16 PRO:Dětská elektrická motorka": {
+   "isBike": false,
+   "bikeType": null,
+   "price": "9 500 Kč",
+   "category": "Elektrokola"
+  },
+  "Horské elektrokolo⚡ROCKRIDER E-ST 500 ✨zánovní": {
+   "isBike": true,
+   "bikeType": "ebike_mtb",
+   "price": "19 999 Kč",
+   "category": "Elektrokola"
+  },
+  "Horské elektrokolo Cube Stereo Hybrid 140 HPC SL 750 29": {
+   "isBike": true,
+   "bikeType": "ebike_mtb_full",
+   "price": "84 999 Kč",
+   "category": "Elektrokola"
+  },
+  "Dámské elektrokolo": {
+   "isBike": true,
+   "bikeType": "ebike",
+   "price": "13 500 Kč",
+   "category": "Elektrokola"
+  },
+  "Cyklohelma MTB": {
+   "isBike": false,
+   "bikeType": null,
+   "price": "1 900 Kč",
+   "category": "Elektrokola"
+  },
+  "Trek Bafang BBS02": {
+   "isBike": true,
+   "bikeType": "ebike",
+   "price": "9 999 Kč",
+   "category": "Elektrokola"
+  },
+  "Prodám elektrokolo 26 \",36V": {
+   "isBike": true,
+   "bikeType": "ebike",
+   "price": "4 500 Kč",
+   "category": "Elektrokola"
+  }
+ }
+}

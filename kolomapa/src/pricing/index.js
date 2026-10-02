@@ -15,7 +15,9 @@
 // (BAZAR, medián skutečná / odhad) kombinovanou s apriorním poměrem kb.askToSale.
 // Rozpětí (low/high) a jistota vycházejí z rozdělení chyb na odložených datech (3násobná křížová validace při
 // tréninku) podle „třídy důkazů“ (značka? model? rok? srovnatelné?). Jistota = odhadnutá pravděpodobnost, že
-// skutečná cena leží v ±25 % odhadu.
+// inzerovaná cena srovnatelného kola leží v ±35 % odhadu (CONF_TOLERANCE). Inzerované ceny samy kolísají, takže
+// ±35 % proti inzerátům odpovídá zhruba ±25 % proti skutečné hodnotě; práh UI 0,45 tak odděluje identifikovaná
+// kola (značka + model / rok / srovnatelné) od obecných inzerátů („Dámské kolo“).
 
 const fs = require('node:fs');
 const path = require('node:path');
@@ -26,6 +28,8 @@ const { toCsr, huberRidge, median } = require('./ridge');
 const KB = require('./kb.json');
 
 const MODEL_VERSION = 1;
+/** Tolerance pro jistotu odhadu (viz výše). */
+const CONF_TOLERANCE = 0.35;
 /** Pod tento počet použitelných kol se model neučí a naceňuje se jen podle pravidel. */
 const MIN_TRAIN = 300;
 const TRAINING_SALES_FILE = path.join(__dirname, '..', '..', 'training', 'koloshop-prodeje.json');
@@ -317,10 +321,6 @@ function rawFeatures(it) {
   const toks = titleTokens(it.title);
   const w = toks.length ? 1 / Math.sqrt(Math.max(1, toks.length / 4)) : 0;
   for (const t of toks) out.push([`tok:${t}`, w, 'tok']);
-  if (process.env.KM_BIGRAMS) {
-    const seq = keyOf(it.title).split(' ').filter((t) => t && !TOKEN_STOP.has(t));
-    for (let i = 0; i + 1 < seq.length; i++) out.push([`bi:${seq[i]}_${seq[i + 1]}`, w, 'tok']);
-  }
   const mt = modelTokens(it);
   if (f.brand && mt.first) out.push([`bm:${keyOf(f.brand)}|${mt.first}`, 1, 'bm']);
   return out;
@@ -409,7 +409,8 @@ function findCompEntries(index, it, n = 12) {
     if (e.ebike !== ebike || e.kids !== kids || e.frame !== frame) continue;
     let score = 3;
     for (const t of mt.toks) if (t !== mt.first && e.toks.has(t)) score += 1;
-    for (const t of e.toks) if (t !== mt.first && !mt.toks.includes(t) && /\d|^(s|works|sworks|pro|expert|comp|elite|team|sl|race|base|sport|evo)$/.test(t)) score -= 0.5;
+    // jiná výbava / úroveň modelu (9.6 × 9.9, Comp × S-Works) je podstatný rozdíl
+    for (const t of e.toks) if (t !== mt.first && !mt.toks.includes(t) && /\d|^(s|works|sworks|pro|expert|comp|elite|team|sl|slr|race|base|sport|evo|carbon|cf|al)$/.test(t)) score -= 1;
     if (year && e.year) {
       const dy = Math.abs(year - e.year);
       if (dy > 4) continue;
@@ -533,14 +534,14 @@ function spreadStats(records) {
   for (const [k, arr] of groups) {
     if (arr.length < 25 && k !== '*') continue;
     const s = arr.slice().sort((a, b) => a - b);
-    const within = arr.filter((r) => Math.abs(Math.exp(r) - 1) <= 0.25).length / arr.length;
-    out[k] = { n: arr.length, q10: quantile(s, 0.1), q90: quantile(s, 0.9), med: quantile(s, 0.5), within25: within };
+    const within = arr.filter((r) => Math.abs(Math.exp(r) - 1) <= CONF_TOLERANCE).length / arr.length;
+    out[k] = { n: arr.length, q10: quantile(s, 0.1), q90: quantile(s, 0.9), med: quantile(s, 0.5), within };
   }
   return out;
 }
 
 function spreadFor(stats, key) {
-  return stats[key] || stats[`${key[0]}${key[3] === 'C' ? 'C' : '-'}`] || stats['*'] || { q10: -0.45, q90: 0.4, med: 0, within25: 0.35, n: 0 };
+  return stats[key] || stats[`${key[0]}${key[3] === 'C' ? 'C' : '-'}`] || stats['*'] || { q10: -0.45, q90: 0.4, med: 0, within: 0.4, n: 0 };
 }
 
 /**
@@ -592,7 +593,7 @@ function trainFromRows(rawItems, o = {}) {
     // málo dat: srovnatelné jen z cen (bez modelu), rozpětí z pravidel
     model.core = { comps: buildCompIndex(items.map((it) => compEntry(it, 0))), vocab: null, beta: null };
     const recs = items.map((it) => ({ key: evidenceKey(it, 0), resid: Math.log(it.price) - Math.log(rulesEstimate(it, kb).value) }));
-    model.spread = recs.length >= 25 ? spreadStats(recs) : { '*': { q10: -0.55, q90: 0.5, med: 0, within25: 0.3, n: recs.length } };
+    model.spread = recs.length >= 25 ? spreadStats(recs) : { '*': { q10: -0.55, q90: 0.5, med: 0, within: 0.35, n: recs.length } };
   }
   // kalibrace na vlastní prodeje + výkupní poměr
   model.calibration = calibrate(model, o.sales || [], kb);
@@ -734,7 +735,7 @@ function estimate(model, listing) {
   const est = Math.exp(lp);
   const low = Math.exp(lp + Math.min(-0.08, sp.q10));
   const high = Math.exp(lp + Math.max(0.08, sp.q90));
-  let confidence = sp.within25;
+  let confidence = sp.within;
   if (model.mode === 'rules') confidence = Math.min(confidence, 0.4);
   if (f.isMulti) confidence *= 0.5;
   if (f.isFrameOnly) confidence *= 0.8;
@@ -904,6 +905,7 @@ module.exports = {
   roundCzk,
   MIN_TRAIN,
   MODEL_VERSION,
+  CONF_TOLERANCE,
   TYPE_LABEL,
   COND_LABEL,
   // pro evaluaci

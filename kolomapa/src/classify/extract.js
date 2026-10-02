@@ -48,7 +48,7 @@ function param(p, ...keys) {
 // Rok modelu
 
 const NEG_YEAR_CTX = /(servis|baterii|baterie|baterka|zaruk|zaruc|stk|vymen|vymeni|plast|sezon|tlumic|vidlic|retez|naposledy|platnost|do konce|kupon|faktur[ay]? z|prohlidk|garancn|repas|nove brzdy|nova|nove|novy|novou)\W{0,12}$/;
-const UNIT_AFTER = /^\s*(km|kc|,-|mm|cm|wh|w\b|nm|g\b|kg|ks|x\d|eur|€|cykl|let|hod|m\b|mah|ah|v\b|\.\d|,\d|\d|\/\d{2}\b|-\d)/;
+const UNIT_AFTER = /^\s*(km|kc|,-|mm|cm|wh|w\b|nm|g\b|kg|ks|x\d|eur|€|cykl|let|hod|mah|ah|v\b|\.\d|,\d|\d|\/\d{2}\b|-\d|m\s*n\.?\s*m|metr)/;
 
 /**
  * Rok modelu: params > výslovně („r.v. 2021“, „model 2022“, „MY23“) > titulek > „koupeno 2020“ > popis u slov o kole.
@@ -115,7 +115,15 @@ function extractYear(title, desc, p, now) {
     const y = Number(m[2]);
     if (ok(y)) return { modelYear: y, yearSource: 'purchase' };
   }
-  // 4) holý rok v popisu blízko slov o kole
+  // 4) „asi 7 let staré“, „staré cca 2 roky“
+  for (const t of [title.f, desc.f]) {
+    const m = t.match(/\b(?:je\s+)?(?:asi|cca|zhruba|priblizne|okolo|max\.?)?\s*(\d{1,2})\s*(let|roky|rok|leta)\s+(star\w*)/) || t.match(/\bstar\w*\s+(?:asi|cca|zhruba|priblizne|okolo)?\s*(\d{1,2})\s*(let|roky|rok)\b/);
+    if (m) {
+      const age = Number(m[1]);
+      if (age >= 0 && age <= cur - 2005) return { modelYear: cur - age, yearSource: 'age' };
+    }
+  }
+  // 5) holý rok v popisu blízko slov o kole
   const BIKECTX = /(kolo|kola|ram|model|elektrokolo|bike|verze|edice|sezon)/;
   for (const m of desc.f.matchAll(/(?<![\d.,/:-])(20[0-3]\d)(?![\d])/g)) {
     const y = Number(m[1]);
@@ -172,7 +180,11 @@ function extractWheel(title, desc, p, { kidsHint = false } = {}) {
     // „kola 29“, „ráfky 26\"“, „pláště 27,5“, „průměr kol 28“
     for (const m of t.matchAll(/\b(?:kola|kol|kolo|rafky|rafek|rafk\w*|plaste|plast|pneu\w*|prumer kol\w*|velikost kol\w*|wheels?)\s*(?:o\s+prumeru\s+)?[:\-]?\s*(12|14|16|18|20|24|26|27[.,]5|28|29|650\s*b|700\s*c?)(?![\d.,]\d)/g)) add(m.index + m[0].length - m[1].length, m[1], 3);
     // pneu rozměr „29x2.35“, „700x28c“, „26 x 2,1“
-    for (const m of t.matchAll(/(?<![\d.,])(12|14|16|18|20|24|26|27[.,]5|28|29|700)\s*x\s*\d/g)) add(m.index, m[1], 3);
+    // (osy „12x148“, „15x110“ nejsou pneu → druhé číslo musí být šířka pláště: ≤ 5" nebo 18–65 mm)
+    for (const m of t.matchAll(/(?<![\d.,])(12|14|16|18|20|24|26|27[.,]5|28|29|700)\s*x\s*(\d+(?:[.,]\d+)?)/g)) {
+      const w2 = Number(m[2].replace(',', '.'));
+      if (w2 <= 5 || (w2 >= 18 && w2 <= 65)) add(m.index, m[1], 3);
+    }
     // „29er“, „27,5+“
     for (const m of t.matchAll(/(?<![\d.,])(26|27[.,]5|29)\s*(?:er\b|\+)/g)) add(m.index, m[1], 3);
     // dětská kola: „velikost 16“, „vel. 20“
@@ -194,7 +206,8 @@ function extractWheel(title, desc, p, { kidsHint = false } = {}) {
       if (/(ram\w*|vel\w*|velikost|size|frame|vyska\w*)\s*[:.]?\s*$/.test(before)) continue;
       const w = normWheel(m[1]);
       if (!w) continue;
-      if (['12', '14', '16', '20', '24'].includes(w) && !kidsHint && !/\b(detsk|kids|junior|bmx|odraz|chlapeck|divci|holcic|klucic)/.test(title.f + ' ' + desc.f.slice(0, 200))) continue;
+      const atEnd = /^\s*$/.test(title.f.slice(m.index + m[0].length));
+      if (['12', '14', '16', '20', '24'].includes(w) && !kidsHint && !(w === '24' && atEnd) && !/\b(detsk|kids|junior|bmx|odraz|chlapeck|divci|holcic|klucic)/.test(title.f + ' ' + desc.f.slice(0, 200))) continue;
       cands.push({ w, weight: 1, idx: m.index, src: 'title' });
     }
   }
@@ -588,7 +601,7 @@ const COND_PATTERNS = [
   [/\b(dobry\s+stav|dobrem\s+stavu|bezne\s+(opotreben\w*|znamky|stopy|oderky|skrab\w*)|drobne\s+(oderky|skrab\w*|vady|kosmet\w*|odreniny)|kosmetick\w*\s+(vady|oderky|skrab\w*)|plne\s+funkcni|funkcni|pojizdn\w*|stav\s+dle\s+foto|znamky\s+pouzivani|stopy\s+pouzivani|pouzivan\w*|jezden\w*)/, 'good'],
   [/\b(velmi\s+dobr\w*\s+stav\w*|vyborn\w*\s+stav\w*|velmi\s+pekn\w*\s+stav\w*|pekn\w*\s+stav\w*|krasn\w*\s+stav\w*|super\s+stav\w*|zachoval\w*|velmi\s+zachoval\w*|bez\s+(skrab\w*|oderek|vad\b|vady|poskozeni|investic)|malo\s+(jezden\w*|pouzivan\w*|jete)|bezvadn\w*\s+stav\w*|bezvadn\w*|udrzovan\w*|pravidelne\s+servis\w*|v\s+pekn\w*\s+stavu)/, 'very_good'],
   [/\b(jako\s+nov\w*|zanovn\w*|temer\s+nov\w*|skoro\s+nov\w*|takrka\s+nov\w*|prakticky\s+nov\w*|minimalne\s+(jezden\w*|pouzivan\w*|jete)|top\s+stav\w*|perfektn\w*\s+stav\w*|stav\s+nove\w*|nejezden\w*|nejete|neojet\w*|najet\w*\s+(jen\s+|pouze\s+|cca\s+|asi\s+|max\.?\s+)?\d{1,3}\s*km|ujet\w*\s+(jen\s+|pouze\s+|cca\s+)?\d{1,3}\s*km|par\s+km|nekolik\s+km|1\s*x\s+jet\w*|temer\s+nejet\w*|temer\s+nepouzit\w*)/, 'like_new'],
-  [/\b(zcela\s+nov\w*|uplne\s+nov\w*|nove,?\s+nepouzit\w*|nepouzit\w*|nerozbalen\w*|v\s+puvodnim\s+baleni|v\s+originalnim\s+baleni|zabalen\w*|kolo\s+je\s+nove|nove\s+kolo|novy\s+bicykl|nove\s+elektrokolo|nove\s+v\s+krabici|nova\s+kola|novinka\s+20\d\d|skladem)/, 'new'],
+  [/\b(zcela\s+nov\w*|uplne\s+nov\w*|nove,?\s+nepouzit\w*|nepouzit\w*|nepouzivan\w*|nerozbalen\w*|v\s+puvodnim\s+baleni|v\s+originalnim\s+baleni|zabalen\w*|kolo\s+je\s+nove|nove\s+kolo|novy\s+bicykl|nove\s+elektrokolo|nove\s+v\s+krabici|nova\s+kola|novinka\s+20\d\d|skladem)/, 'new'],
 ];
 
 const PARAM_COND = [
@@ -621,6 +634,10 @@ function extractCondition(title, desc, p) {
       const g = new RegExp(re.source, 'g');
       for (const m of t.matchAll(g)) {
         if (negated(t, m.index)) continue;
+        if (lvl === 'new' && /(prakticky|temer|skoro|takrka|podstate|minimalne|jako)\s*$/.test(t.slice(Math.max(0, m.index - 14), m.index))) {
+          hits.add('like_new');
+          continue;
+        }
         // „nové pláště / nový řetěz“ není stav kola; „nové kolo“ ano – vzory pro 'new' jsou úzké
         hits.add(lvl);
       }

@@ -147,7 +147,7 @@ function main() {
       else cm.tn++;
       if (lab.isBike && c.isBike) {
         tN++;
-        if (c.bikeType === lab.bikeType || (lenient[lab.bikeType] || []).includes(c.bikeType)) tOk++;
+        if (c.bikeType === lab.bikeType || lab.bikeType === 'any' || (lab.bikeType === 'ebike' && /^ebike_/.test(c.bikeType)) || (lenient[lab.bikeType] || []).includes(c.bikeType)) tOk++;
         else misses.push(`typ ${lab.bikeType} → ${c.bikeType}: ${title}`);
       }
     }
@@ -168,6 +168,7 @@ function main() {
   // --- 3) Křížová validace nacenění (inzerované ceny)
   const bikeRows = rows.filter((r) => r.is_bike === 1 && r.price_czk != null);
   const items = bikeRows.map(pricing.normItem).filter((it) => P.trainable(it));
+  const withDesc = new Set(bikeRows.filter((r) => r.description && r.description.length > 30).map((r) => r.id));
   console.log(`\n=== Nacenění: ${FOLDS}× křížová validace na inzerovaných cenách (${items.length} použitelných kol z ${bikeRows.length}) ===`);
   const fold = (it) => parseInt(hash(String(it.id)), 16) % FOLDS;
   const variants = {
@@ -194,13 +195,13 @@ function main() {
         'jen pravidla (kb.json)': { lp: Math.log(pricing.rulesEstimate(it).value), comps: [] },
       };
       for (const [name, r] of Object.entries(out)) {
-        (res[name] ||= []).push({ type: it.bikeType, ape: Math.abs(Math.exp(r.lp - truth) - 1), comps: r.comps.length, brand: !!it.f.brand });
+        (res[name] ||= []).push({ type: it.bikeType, ape: Math.abs(Math.exp(r.lp - truth) - 1), comps: r.comps.length, brand: !!it.f.brand, model: !!it.f.model, desc: withDesc.has(it.id) });
       }
       // pokrytí rozpětí a kalibrace jistoty (na úrovni inzerovaných cen → bez kalibrační konstanty)
       const e = pricing.estimate({ ...model, calibration: { factor: 1 } }, it);
       const lowA = e.low;
       const highA = e.high;
-      covRecs.push({ conf: e.confidence, within: Math.abs(it.price / Math.exp(out['model+srovnatelné'].lp) - 1) <= 0.25, covered: it.price >= lowA && it.price <= highA, method: e.method });
+      covRecs.push({ conf: e.confidence, within: Math.abs(Math.exp(out['model+srovnatelné'].lp) / it.price - 1) <= pricing.CONF_TOLERANCE, covered: it.price >= lowA && it.price <= highA, method: e.method });
     }
     process.stdout.write(`  fold ${k + 1}/${FOLDS} hotov\r`);
   }
@@ -222,16 +223,20 @@ function main() {
   const withC = res['model+srovnatelné'].filter((x) => x.comps >= 3);
   const withC1 = res['model+srovnatelné'].filter((x) => x.comps >= 1 && x.comps < 3);
   const noBrand = res['model+srovnatelné'].filter((x) => !x.brand);
-  console.log(`\nPodle důkazů: ≥3 srovnatelné ${withC.length}× MdAPE ${pctS(summarize(withC).mdape)} (±25 %: ${pctS(summarize(withC).w25)}); 1–2 srovnatelné ${withC1.length}× ${pctS(summarize(withC1).mdape)}; bez značky ${noBrand.length}× ${pctS(summarize(noBrand).mdape)}`);
+  const bm = res['model+srovnatelné'].filter((x) => x.brand && x.model);
+  const dsc = res['model+srovnatelné'].filter((x) => x.desc);
+  const dscNo = res['jen model'].filter((x) => x.desc);
+  console.log(`\nPodle důkazů (model+srovnatelné): ≥3 srovnatelné ${withC.length}× MdAPE ${pctS(summarize(withC).mdape)} (±25 %: ${pctS(summarize(withC).w25)}); 1–2 srovnatelné ${withC1.length}× ${pctS(summarize(withC1).mdape)}; značka+model ${bm.length}× ${pctS(summarize(bm).mdape)}; bez značky ${noBrand.length}× ${pctS(summarize(noBrand).mdape)}`);
+  console.log(`S plným popisem (detail): ${dsc.length}× MdAPE ${pctS(summarize(dsc).mdape)} (±25 %: ${pctS(summarize(dsc).w25)}); jen model ${pctS(summarize(dscNo).mdape)}`);
   // pokrytí intervalu a kalibrace jistoty
   const cov = covRecs.filter((r) => r.covered).length / covRecs.length;
   console.log(`Pokrytí rozpětí low–high (cíl 80 %): ${pctS(cov)}`);
-  console.log('Kalibrace jistoty (jistota ≈ pravděpodobnost chyby do ±25 %):');
+  console.log(`Kalibrace jistoty (jistota ≈ pravděpodobnost, že inzerovaná cena leží v ±${pricing.CONF_TOLERANCE * 100} % odhadu); podíl s jistotou ≥ 0,45: ${pctS(covRecs.filter((r) => r.conf >= 0.45).length / covRecs.length)}`);
   for (const [a, b] of [[0, 0.3], [0.3, 0.45], [0.45, 0.6], [0.6, 0.75], [0.75, 1.01]]) {
     const g = covRecs.filter((r) => r.conf >= a && r.conf < b);
     if (!g.length) continue;
     const meanConf = g.reduce((s, r) => s + r.conf, 0) / g.length;
-    console.log(`   jistota ${a.toFixed(2)}–${Math.min(1, b).toFixed(2)}: ${lpad(g.length, 5)}× průměr ${meanConf.toFixed(2)}, skutečně v ±25 %: ${pctS(g.filter((r) => r.within).length / g.length)}`);
+    console.log(`   jistota ${a.toFixed(2)}–${Math.min(1, b).toFixed(2)}: ${lpad(g.length, 5)}× průměr ${meanConf.toFixed(2)}, skutečně v toleranci: ${pctS(g.filter((r) => r.within).length / g.length)}`);
   }
 
   // --- 4) Vlastní prodeje obchodu (skutečné prodejní ceny)
@@ -242,16 +247,18 @@ function main() {
   const cal = full.calibration;
   console.log(`Kalibrace: medián skutečná / inzerovaná-odhad u BAZAR = ${cal.shopRatio?.toFixed(3)} (n = ${cal.n}), apriorno ${cal.prior}, výsledný faktor ×${cal.factor.toFixed(3)}; výkupní poměr ${full.buyRatio.toFixed(3)}`);
   const rowsOut = [];
-  for (const kind of ['bazar', 'provereno']) {
+  for (const kind of ['bazar', 'provereno', 'provereno+kontext']) {
     const apes = [];
     const apesAsk = [];
     for (let i = 0; i < sales.length; i++) {
       const s = sales[i];
-      if (s.kind !== kind) continue;
+      if (s.kind !== kind.replace('+kontext', '')) continue;
       const title = s.size ? `${s.title} vel. ${s.size}` : s.title;
       const c = classifyListing({ title, priceCzk: null });
       if (!c.isBike) continue;
-      const it = pricing.normItem({ title, features: c.features, bike_type: c.bikeType, is_bike: 1 });
+      // PROVĚŘENO = předváděcí / půjčovní kola z minulé sezóny ve stavu „jako nové“ – to by stálo v inzerátu
+      const feats = kind.endsWith('+kontext') ? { ...c.features, condition: 'like_new', modelYear: Number(String(s.date).slice(0, 4)) - 1, ageYears: 1 } : c.features;
+      const it = pricing.normItem({ title, features: feats, bike_type: c.bikeType, is_bike: 1 });
       const asking = Math.exp(P.askingLog(full, it).lp);
       // leave-one-out kalibrace (bez tohoto prodeje)
       const others = sales.filter((_, j) => j !== i);
@@ -259,7 +266,7 @@ function main() {
       const pred = asking * calLoo;
       apes.push(Math.abs(pred / s.priceCzk - 1));
       apesAsk.push(Math.abs(asking / s.priceCzk - 1));
-      rowsOut.push(`${pad(kind, 9)} ${lpad(s.priceCzk, 7)} ${lpad(Math.round(pred), 7)} ${lpad(`${((pred / s.priceCzk - 1) * 100).toFixed(0)} %`, 6)} | ${s.title.slice(0, 55)} [${c.bikeType}${c.features.modelYear ? ` ${c.features.modelYear}` : ''}]`);
+      if (kind !== 'provereno+kontext') rowsOut.push(`${pad(kind, 9)} ${lpad(s.priceCzk, 7)} ${lpad(Math.round(pred), 7)} ${lpad(`${((pred / s.priceCzk - 1) * 100).toFixed(0)} %`, 6)} | ${s.title.slice(0, 55)} [${c.bikeType}${c.features.modelYear ? ` ${c.features.modelYear}` : ''}]`);
     }
     console.log(`${kind.toUpperCase()}: ${apes.length} kol, MdAPE ${pctS(med(apes))} (bez kalibrace ${pctS(med(apesAsk))}), v ±25 %: ${pctS(apes.filter((a) => a <= 0.25).length / apes.length)}`);
   }

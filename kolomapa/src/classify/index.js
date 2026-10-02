@@ -77,7 +77,7 @@ function modelHint(brand, text) {
 const MODEL_STOP = new Set(
   ('vel velikost velikosti ram ramu ramem kolo kola kol horske horsky horska silnicni elektrokolo elektrokola ebike e bike damske panske detske ' +
     'juniorske prodam prodej prodavam nabizim nove novy nova novou zanovni top super stav cena model r rv rok roku sleva zaruka zarukou vc vcetne s se na ' +
-    'pro a i v z za do po jako bez mtb celoodpruzene celoodpruzeny hardtail kolo kolu bike biky velikost vel. size frame + nebo vymenim vymena ' +
+    'a i v z za do po jako bez mtb celoodpruzene celoodpruzeny hardtail kolo kolu bike biky velikost vel. size frame + nebo vymenim vymena ' +
     'pansky damsky detsky cerna cerne cerny bila bile bily modra modre modry cervena cervene cerveny zelena zelene zeleny seda sede sedy zluta zlute zluty oranzova ' +
     'oranzove fialova fialove ruzova ruzove stribrna stribrne black white red blue green grey gray silver yellow orange purple matt matte gloss lesk mat ' +
     'jen pouze levne levně akce elektro elektricke krosove trekingove trekove mestske gravelove skladaci dalsi vic info')
@@ -97,6 +97,7 @@ function extractModel(t, hit) {
     const k = keyOf(tok);
     if (!k) break;
     if (MODEL_STOP.has(k) || /^vel\b|^vel\s?\d|^velikost/.test(k)) break;
+    if (k === 'pro' && /^\s*(deti|dite|ditko|kluka|holku|holcicku|dceru|syna|juniora|zacatecnik\w*|senior\w*|damu|muze|zenu|dospel\w*|postavu|vysku)\b/.test(keyOf(s.slice(s.indexOf(raw) + raw.length, s.indexOf(raw) + raw.length + 20)) + ' ')) break;
     if (/^(19|20)\d\d$/.test(k)) break;
     if (/^(r v|rv|my)(\s?\d|$)/.test(k)) break;
     if (/^\d{2,3}\s?(cm|mm|kg|km|wh|nm)$/.test(k)) break;
@@ -169,11 +170,11 @@ const TYPE_WORDS = [
   ['folding', /\b(skladac\w*|skladack\w*|folding|brompton|dahon)\b/],
   ['cyclocross', /\b(cyklokros\w*|cyclocross|cyklo\s+kros\w*)\b/],
   ['gravel', /\b(gravel\w*|gravl\w*|allroad|all\s*road)\b/],
-  ['road', /\b(silnicni|silnick[ayu]|silnicak\w*|road\s*bike|triatlon\w*|casovk\w*|aero\s+kol\w*|zavodni\s+kol\w*|drahov\w*|beran\w*\s+riditk\w*)\b/],
+  ['road', /\b(silnicni|silnick[ayu]|silnicak\w*|road\s*bike|triatlon\w*|casovk\w*|aero\s+kol\w*|zavodn\w*\s+kol\w*|drahov\w*|beran\w*\s+riditk\w*)\b/],
   ['mtb_full', /\b(celoodpruz\w*|celo\s*odpruz\w*|celoperov\w*|celopero|fully|full\s*suspension|enduro|downhill|freeride|dh|all\s*mountain|allmountain|sjezd\w*)\b/],
   ['mtb_hardtail', /\b(hardtail\w*|ht|horsk\w*|mtb|horak\w*|xc|cross\s*country|29er)\b/],
   ['trekking', /\b(treking\w*|trekking\w*|trekov\w*|cestovn\w*|touring|turistick\w*)\b/],
-  ['cross', /\b(krosov\w*|crossov\w*|crosov\w*|kros|cross|fitness|hybrid\w*|crosstrail)\b/],
+  ['cross', /\b(krosov\w*|crossov\w*|crosov\w*|kros|cross|fitness|crosstrail)\b/],
   ['city', /\b(mestsk\w*|city|holandsk\w*|dutch|cruiser|kosik\w*|singlespeed|single\s*speed|fixie|fixed\s*gear|komfortn\w*|nizk\w*\s+nastup\w*|retro|veteran\w*|historick\w*)\b/],
 ];
 
@@ -223,7 +224,7 @@ function typeFromParams(p) {
 }
 
 const KIDS_RE = /\b(detsk\w*|pro\s+det\w*|dite|deti|junior\w*|juniorsk\w*|kids?|chlapeck\w*|divci|holcic\w*|klucic\w*|pro\s+(kluka|holku|holcicku|chlapce|divku|kluky|holky|syna|dceru)|(od|pro|do)\s+\d{1,2}\s*(let|roku)|\d{1,2}\s*-\s*\d{1,2}\s*let)\b/;
-const DESC_KIDS_RE = /\b(detsk\w*\s+kol\w*|pro\s+deti|(od|pro)\s+\d{1,2}\s*(let|roku)|\d{1,2}\s*-\s*\d{1,2}\s*let|vek\w*\s+\d{1,2}\s*-\s*\d{1,2}|vyska\s+(ditete|postavy)\s+\d{2,3}\s*-\s*1[0-4]\d\s*cm)\b/;
+const DESC_KIDS_RE = /\b(detsk\w*\s+((jizdni|horsk\w*|lehk\w*|krosov\w*|mestsk\w*)\s+)?kol\w*|pro\s+deti|(od|pro)\s+\d{1,2}\s*(let|roku)|\d{1,2}\s*-\s*\d{1,2}\s*let|vek\w*\s+\d{1,2}\s*-\s*\d{1,2}|vyska\s+(ditete|postavy)\s+\d{2,3}\s*-\s*1[0-4]\d\s*cm)\b/;
 
 function ebikeVariant(base, hints) {
   switch (base) {
@@ -262,7 +263,9 @@ function ebikeVariant(base, hints) {
 // Pomocníci pro rozhodnutí kolo × nekolo
 
 function maskNeutral(f) {
-  return f.replace(K.NEUTRAL_RE, (m) => ' '.repeat(m.length));
+  return f
+    .replace(K.NEUTRAL_RE, (m) => ' '.repeat(m.length))
+    .replace(/\b(na|pro|jen\s+na|pouze\s+na)\s+(nahradni\s+)?dil\w*|\bna\s+nd\b/g, (m) => ' '.repeat(m.length));
 }
 
 function firstNonBike(f) {
@@ -288,9 +291,9 @@ function anyWeak(f) {
 }
 
 const FRAME_HEAD_RE = /^\s*[!*\s]*((prodam|prodej|prodavam|nabizim|predam|top|super|novy|nova|nove|zanovni|karbonovy|karbonovy|carbonovy|carbon|hlinikovy|alu|ocelovy|titanovy|mtb|silnicni|gravelovy|gravel|enduro|downhill|dh|xc|trail|horsky|celoodpruzeny|dirtovy|dirt|bmx|cyklokrosovy)\s+){0,3}(ram|ramy|ramova\s+sada|ramovou\s+sadu|ram\s+kola|frameset|frame)\b/;
-const FRAME_ANY_RE = /\b(ramova\s+sada|ramovou\s+sadu|frameset|ram\s*\+\s*vidlice|ram\s+s\s+vidlici|ram\s+a\s+vidlice|ram\s+vcetne\s+(vidlice|tlumice)|samotny\s+ram|pouze\s+ram|jen\s+ram|ram\s+bez\s+komponent\w*|ram\s+\+\s+tlumic)\b/;
+const FRAME_ANY_RE = /\b((karbon\w*|carbon\w*|hlinik\w*|alu|ocel\w*|titan\w*|cf)\s+ram(\s+(vel\w*\.?\s*)?\w{1,3})?\s*$|ramova\s+sada|ramovou\s+sadu|frameset|ram\s*\+\s*vidlice|ram\s+s\s+vidlici|ram\s+a\s+vidlice|ram\s+vcetne\s+(vidlice|tlumice)|samotny\s+ram|pouze\s+ram|jen\s+ram|ram\s+bez\s+komponent\w*|ram\s+\+\s+tlumic)\b/;
 
-const MULTI_RE = /\b((2|3|4|5|6|dve|tri|ctyri|par)\s*(x\s*|ks\s+)?(jizdni\s+|detsk\w*\s+|horsk\w*\s+)?(kola|kol|elektrokola|bicykly)|kola\s+\d\s*ks|(pansk|damsk|detsk|chlapeck|divci)\w*\s+(a|\+|i|,)\s+(pansk|damsk|detsk|chlapeck|divci)\w*\s+kol\w*|jizdni\s+kola|kola\s*-\s*\d|sada\s+kol\s+pro\s+rodinu|kola\s+(damska|panska|detska)|vice\s+kol)\b/;
+const MULTI_RE = /\b((2|3|4|5|6|dve|tri|ctyri|par)\s*(x\s*|ks\s+)?(jizdni\s+|detsk\w*\s+|horsk\w*\s+)?(kola|kol|elektrokola|bicykly)|(2|3|4|5|6)\s*(x|ks|kusy)\s*(\w+\s+){0,2}(kolo|kola|elektrokol\w*)|kola\s+\d\s*ks|(pansk|damsk|detsk|chlapeck|divci)\w*\s+(a|\+|i|,)\s+(pansk|damsk|detsk|chlapeck|divci)\w*\s+kol\w*|jizdni\s+kola|kola\s*-\s*\d|sada\s+kol\s+pro\s+rodinu|kola\s+(damska|panska|detska)|vice\s+kol)\b/;
 
 const EBIKE_STRONG_RE = /\b(elektrokol\w*|elektro\s*kol\w*|e\s?-?\s?bike\w*|ebike\w*|e\s?-?\s?kolo|el\s?\.?\s?kol\w*|elektricke\s+kolo|elektricky\s+bicykl|pedelec|e\s?-?\s?mtb|emtb|elektro|s\s+motorem|motor\s+(bosch|shimano|yamaha|brose|bafang|panasonic)|e\s?-?\s?gravel)\b/;
 const EBIKE_NEG_RE = /\b(neni\s+elektr\w*|nejedna\s+se\s+o\s+elektr\w*|bez\s+motoru|neni\s+(to\s+)?e\s?-?\s?bike|zadne\s+elektro|neelektricke)\b/;
@@ -401,6 +404,8 @@ function classifyListing(input, opts = {}) {
     if (adjLike && nb.idx > strong.idx && nb.idx - (strong.idx + strong.word.length) <= 14 && !/\b(kolo|kola|elektrokol\w*)\b/.test(tMask.slice(strong.idx, nb.idx))) {
       return nonBike(nb.label, { nonBikeGroup: nb.group });
     }
+    // anglické „bike“ v názvu výrobku („SP Connect Bike Bundle … držák“) samo o sobě kolo neznamená
+    if (strong && strong.idx === strongIdx && /^(bike|biky|bikes)$/.test(strong.word.trim())) return nonBike(nb.label, { nonBikeGroup: nb.group });
     if (strongIdx != null && strongIdx < nb.idx) {
       isBike = true;
       reason = 'kolo (titulek)';
@@ -413,7 +418,7 @@ function classifyListing(input, opts = {}) {
   if (isBike === null && brand && brandFrom === 'title') {
     if (K.NONBIKE_BRAND_RE.test(title.f.slice(0, brandHit.idx))) return nonBike('příslušenství / díl (značka)');
     // jen značka bez modelu a za pár stovek mimo kategorii kol = spíš doplněk (helma Kellys Dare, dres Author …)
-    if (price != null && price < 500 && cat.kind !== 'bike' && brand.kind !== 'vintage' && !(hint && !hint.generic) && !weak) return nonBike('neurčeno (jen značka, nízká cena)');
+    if (price != null && price < (brand.tier >= 4 ? 1000 : 500) && cat.kind !== 'bike' && brand.kind !== 'vintage' && brand.kind !== 'kids' && !(hint && !hint.generic) && !weak) return nonBike('neurčeno (jen značka, nízká cena)');
     isBike = true;
     reason = 'kolo (značka)';
   }
@@ -487,8 +492,9 @@ function classifyListing(input, opts = {}) {
   // kola, typ
   const tKids = tMask.replace(/\bdetsk\w*\s+(cyklo)?(sedack|helm|prilb|sedadl|vozik|tyc|nosic|kresilk)\w*/g, ' ');
   const adultWheel = /\b(damsk|pansk)\w*/.test(title.f) && /(?<![\d.,])(26|27[.,]5|28|29)(?![\d])/.test(title.f);
+  const descKids = DESC_KIDS_RE.test(dMask.slice(0, 300)) && !/\b(pansk|damsk|dospel)\w*\s+kol/.test(dMask.slice(0, 300));
   const kidsWords = (KIDS_RE.test(tKids) && !adultWheel) || /detsk/.test(fold(X.param(p, 'urceni', 'pro koho', 'typ') || '')) || cat.kids;
-  const wheel = X.extractWheel(title, desc, p, { kidsHint: kidsWords || (brand && brand.kind === 'kids') || (hint && (hint.type === 'kids' || hint.type === 'balance')) });
+  const wheel = X.extractWheel(title, desc, p, { kidsHint: kidsWords || descKids || (brand && brand.kind === 'kids') || (hint && (hint.type === 'kids' || hint.type === 'balance')) });
   if (wheel.wheelSize) features.wheelSize = wheel.wheelSize;
   if (wheel.mullet) features.mullet = true;
   const susp = X.extractSuspension(title, desc, p);
@@ -500,15 +506,16 @@ function classifyListing(input, opts = {}) {
   const hintType = hint ? hint.type : null;
   const special = ['bmx', 'dirt', 'fatbike', 'tandem', 'cargo', 'folding', 'balance'];
   const ws = wheel.wheelSize ? Number(wheel.wheelSize) : null;
-  const smallWheel = ws != null && ws <= 20;
+  const adultHint = hintType && !['kids', 'balance', 'ebike_kids', 'bmx', 'dirt', 'folding'].includes(hintType) && !hint.generic;
+  const smallWheel = ws != null && ws <= 20 && !(adultHint && !kidsWords);
   let kids =
     kidsWords ||
     (brand && brand.kind === 'kids') ||
     hintType === 'kids' ||
     hintType === 'ebike_kids' ||
     (smallWheel && !['bmx', 'dirt', 'folding', 'cargo', 'tandem'].includes(titleType || hintType || paramType)) ||
-    (ws === 24 && !titleType && !['mtb_full', 'road', 'gravel', 'city', 'trekking', 'cross', 'folding', 'bmx'].includes(hintType)) ||
-    (!titleType && !hintType && DESC_KIDS_RE.test(desc.f.slice(0, 600)));
+    (ws === 24 && (!titleType || titleType === 'mtb_hardtail') && !/\b(damsk|pansk|dospel)\w*/.test(title.f) && !['mtb_full', 'road', 'gravel', 'city', 'trekking', 'cross', 'folding', 'bmx'].includes(hintType) && !(price != null && price > 25000)) ||
+    (!titleType && descKids && !(adultHint && price != null && price > 30000));
   if (titleType === 'balance' || hintType === 'balance' || paramType === 'balance' || cat.type === 'balance') bikeType = 'balance';
   else if (titleType && special.includes(titleType)) bikeType = titleType;
   else if (kids) bikeType = 'kids';
@@ -521,15 +528,17 @@ function classifyListing(input, opts = {}) {
     }
     else if (titleType === 'mtb_hardtail' && hintType && ['dirt', 'fatbike'].includes(hintType)) bikeType = hintType;
     else if (['cross', 'city', 'trekking'].includes(titleType) && hintType && ['gravel', 'road', 'cyclocross'].includes(hintType)) bikeType = hintType;
-  } else if (hintType) bikeType = hintType === 'ebike_kids' ? 'kids' : hintType;
+  } else if (hintType && !hint.generic) bikeType = hintType === 'ebike_kids' ? 'kids' : hintType;
   else if (brand && brand.kind === 'road') bikeType = 'road';
   else if (brand && brand.kind === 'bmx') bikeType = 'bmx';
   else if (brand && brand.kind === 'folding') bikeType = 'folding';
   else if (paramType) bikeType = paramType;
   else if (descType) bikeType = descType;
+  else if (hintType) bikeType = hintType === 'ebike_kids' ? 'kids' : hintType;
   else if (cat.type && !(cat.weakType && cat.type === 'road')) bikeType = cat.type;
   else bikeType = 'other';
   if (bikeType === 'kids' && ws === 24 && /\b(bmx)\b/.test(all)) bikeType = 'bmx';
+  if (bikeType === 'other' && /\bgrx\b/.test(all)) bikeType = 'gravel';
   if (bikeType === 'mtb_hardtail' && susp === 'full') bikeType = 'mtb_full';
   if (bikeType === 'other' && susp === 'full') bikeType = 'mtb_full';
   if (isEbike) {
