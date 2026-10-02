@@ -300,6 +300,7 @@ test('route: obrázky, písma a reklamy se nestahují, dokumenty, skripty a Clou
   assert.equal(await run(`${ORIGIN}/uploads/items/2026/10/2/1/250_x.jpg`, 'image'), 'abort');
   assert.equal(await run(`${ORIGIN}/dist/fonts/a.woff2`, 'font'), 'abort');
   assert.equal(await run('https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js', 'script'), 'abort');
+  assert.equal(await run(`${ORIGIN}/?do=cookieBar-hide`, 'fetch'), 'abort'); // signály Nette zakazuje robots.txt
   assert.equal(await run(`${ORIGIN}/`, 'document'), 'continue');
   assert.equal(await run(`${ORIGIN}/dist/main.js`, 'script'), 'continue');
   assert.equal(await run(`${ORIGIN}/cdn-cgi/challenge-platform/scripts/jsd/main.js`, 'script'), 'continue');

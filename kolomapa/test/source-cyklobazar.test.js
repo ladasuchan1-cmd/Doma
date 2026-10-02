@@ -6,8 +6,30 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 
+const Module = require('node:module');
+
 const cb = require('../src/sources/cyklobazar');
 const { loadConfig, DEFAULT_SOURCES, ALL_SOURCES } = require('../src/config');
+const { openDb } = require('../src/db');
+
+// Pipeline s jednoduchými náhradami klasifikace a nacenění (testují se zvlášť) – jako v pipeline.test.js.
+const stubs = {
+  [path.join(__dirname, '..', 'src', 'classify')]: {
+    CLASSIFIER_VERSION: 'test-1',
+    classifyListing: () => ({ isBike: true, bikeType: 'mtb_hardtail', reason: 'test', features: {} }),
+  },
+  [path.join(__dirname, '..', 'src', 'pricing')]: { trainModel: () => ({ summary: { stub: true } }), priceAll: () => 0 },
+};
+const origLoad = Module._load;
+Module._load = function (request, parent, isMain) {
+  if (parent && parent.filename && parent.filename.includes(`${path.sep}src${path.sep}pipeline.js`)) {
+    const resolved = path.resolve(path.dirname(parent.filename), request);
+    if (stubs[resolved]) return stubs[resolved];
+  }
+  return origLoad.apply(this, arguments);
+};
+const { runPipeline } = require('../src/pipeline');
+Module._load = origLoad;
 
 const FIX = path.join(__dirname, 'fixtures', 'cyklobazar');
 const read = (f) => fs.readFileSync(path.join(FIX, f), 'utf8');
@@ -687,4 +709,113 @@ test('nové inzeráty pod minimální cenou se přeskočí, známé ne; u znám�
   assert.equal(known.description, undefined);
   assert.equal(known.categorySrc, undefined);
   assert.equal(known.priceCzk, 101);
+});
+
+// ---------------------------------------------------------------- celý běh pipeline (skutečná DB, falešný web)
+
+test('pipeline: první plnění, detaily, zmizelé podle sitemapy, změna podle lastmod, ověření → pauza bez dalších požadavků', async () => {
+  const db = openDb(':memory:');
+  const now = Date.now();
+  const age = (h) => ({ ageFrom: h, step: 0.5, now });
+  const kola = [pageItems('Ka', 10, age(0.1)), pageItems('Kb', 10, age(12))];
+  const elektro = [pageItems('Ea', 5, age(1))];
+  const all = [...kola.flat(), ...elektro.flat()];
+  const DETAIL_TPL = read('detail_mtb_hardtail_private.html');
+  const OLD_URL = `${BASE}/inzerat/84OemEXXQ4paM/merida-matts-j-champion-26`;
+  // detail ze vzorku, ale se stejným názvem a cenou jako ve výpisu (jako na webu)
+  const detailFor = (ad, url) =>
+    DETAIL_TPL.split(OLD_URL)
+      .join(url)
+      .split('Merida Matts J. Champion 26\\"')
+      .join(ad.title)
+      .replace(/<h1>[^<]*<\/h1>/, `<h1>${ad.title}</h1>`)
+      .replace('"price": 12500', `"price": ${ad.price}`)
+      .replace('12 500&nbsp;<small>Kč</small>', `${fmtCzk(ad.price)}&nbsp;<small>Kč</small>`);
+  let sitemapItems = all.map((x) => ({ id: x.id, lastmod: now - 5 * H }));
+  let challenge = false;
+  const site = fakeSite((url) => {
+    if (challenge) return { status: 403, html: '', challenged: true };
+    if (url === cb.SITEMAP_URL) return renderSitemap([...fillers(6000), ...sitemapItems]);
+    const m = /\/(kola|elektrokola)(?:\?vp-page=(\d+))?$/.exec(url);
+    if (m) {
+      const pages = m[1] === 'kola' ? kola : elektro;
+      const n = Number(m[2] || 1);
+      return pages[n - 1] ? renderList(`/${m[1]}`, n, pages.length, pages[n - 1]) : null;
+    }
+    const ad = all.find((x) => url === `${BASE}/inzerat/${x.id}/kolo-${x.id.toLowerCase()}`);
+    if (ad) return detailFor(ad, url);
+    return null;
+  });
+  const config = { ...loadConfig({}), fullScanDays: 0, maxDetails: 100, ai: { enabled: false }, cyklobazarMaxListPages: 60 };
+  const run = () => runPipeline({ db, config, sources: [cb], trigger: 'test', getBrowser: async () => site.browser });
+
+  // 1. běh: sitemapa + celý výpis (postupný průchod od začátku) + detaily všech
+  const r1 = await run();
+  assert.equal(r1.status, 'ok', JSON.stringify(r1.stats.sources));
+  const s1 = r1.stats.sources.cyklobazar;
+  assert.equal(s1.new, 25);
+  assert.equal(s1.details, 25);
+  assert.equal(s1.complete, true);
+  assertPolite(site);
+  const row = db.prepare("SELECT * FROM listings WHERE source = 'cyklobazar' AND source_id = 'Kai00xyz'").get();
+  assert.equal(row.url, `${BASE}/inzerat/Kai00xyz/kolo-kai00xyz`);
+  assert.equal(row.price_czk, 15000);
+  assert.equal(row.title, 'Kolo Ka 0');
+  assert.match(row.description, /^Prodám kolo Merida Matts/); // plný popis z detailu
+  assert.equal(row.okres, 'Břeclav');
+  assert.equal(row.location_text, 'Březí');
+  assert.equal(row.seller_type, 'private');
+  assert.equal(JSON.parse(row.params)['Výrobce'], 'Merida');
+  assert.ok(row.detail_at);
+  const dump = JSON.stringify(db.prepare("SELECT * FROM listings WHERE source = 'cyklobazar'").all());
+  assert.ok(!dump.includes(SENTINEL) && !dump.includes('/u/'), 'žádná jména ani profily prodejců v DB');
+
+  // 2. běh: Kai01 zmizel ze sitemapy (známe ho > 2 h) → zmizelý; Kbi00 upravený po našem detailu → nový detail
+  db.prepare("UPDATE listings SET first_seen_at = ? WHERE source_id = 'Kai01xyz'").run(new Date(now - 25 * H).toISOString());
+  sitemapItems = sitemapItems.filter((x) => x.id !== 'Kai01xyz').map((x) => (x.id === 'Kbi00xyz' ? { ...x, lastmod: Date.now() + 60e3 } : x));
+  kola[0] = kola[0].filter((x) => x.id !== 'Kai01xyz');
+  site.requests.length = 0;
+  const r2 = await run();
+  assert.equal(r2.status, 'ok');
+  assert.ok(db.prepare("SELECT gone_at FROM listings WHERE source_id = 'Kai01xyz'").get().gone_at);
+  assert.equal(db.prepare('SELECT COUNT(*) AS n FROM listings WHERE gone_at IS NOT NULL').get().n, 1);
+  const detailReqs = site.urls().filter((u) => u.includes('/inzerat/'));
+  assert.deepEqual(detailReqs, [`${BASE}/inzerat/Kbi00xyz/kolo-kbi00xyz`]);
+
+  // 3. běh: Cloudflare žádá ověření hned u sitemapy → zdroj končí, pauza, detail se už nezkouší
+  db.prepare("UPDATE listings SET detail_at = NULL WHERE source_id = 'Kai02xyz'").run();
+  challenge = true;
+  site.requests.length = 0;
+  const r3 = await run();
+  assert.equal(r3.status, 'partial');
+  assert.match(r3.stats.sources.cyklobazar.error, /Cloudflare žádá ověření/);
+  assert.deepEqual(site.urls(), [cb.SITEMAP_URL]);
+  assert.equal(db.prepare('SELECT COUNT(*) AS n FROM listings WHERE gone_at IS NOT NULL').get().n, 1); // nic nového nezmizelo
+  const cd = JSON.parse(db.prepare("SELECT value FROM settings WHERE key = 'cache:cyklobazar:cooldownUntil'").get().value);
+  assert.ok(Date.parse(cd) > Date.now() + 11 * H);
+
+  // 4. běh během pauzy: na web nejde vůbec nic
+  challenge = false;
+  site.requests.length = 0;
+  const r4 = await run();
+  assert.deepEqual(site.requests, []);
+  assert.equal(r4.stats.sources.cyklobazar.complete, false);
+});
+
+test('opakované chyby webu (5xx / síť) → zdroj pro běh skončí, bez pauzy', async () => {
+  const site = fakeSite((url) => (url === cb.SITEMAP_URL ? { status: 502, html: '' } : { status: 503, html: '' }));
+  const ctx = makeCtx({ site, cache: new Map([['newHorizonAt', JSON.stringify(new Date(NOW - 24 * H).toISOString())]]) });
+  await assert.rejects(() => cb.scan(ctx), /část průchodu selhala/);
+  // sitemapa 502, kola 503 → 2 chyby; detail 503 → 3. chyba → konec, další detail už nic nestáhne
+  await assert.rejects(() => cb.detail(ctx, { source_id: 'Kai00xyz', url: `${BASE}/inzerat/Kai00xyz/kolo-kai00xyz` }), /HTTP 503/);
+  await assert.rejects(() => cb.detail(ctx, { source_id: 'Kai01xyz', url: `${BASE}/inzerat/Kai01xyz/kolo-kai01xyz` }), /3× po sobě neodpověděl/);
+  assert.equal(site.requests.length, 3);
+  assert.equal(ctx._cache.has('cooldownUntil'), false);
+  // síťová chyba prohlížeče se počítá taky
+  let n = 0;
+  const flaky = { fetchHtml: async () => (++n, Promise.reject(new Error('Stažení selhalo: Failed to fetch'))) };
+  const c2 = makeCtx({ getBrowser: async () => flaky });
+  for (let i = 0; i < 3; i++) await assert.rejects(() => cb.detail(c2, { source_id: 'Kai00xyz', url: `${BASE}/inzerat/Kai00xyz/kolo-kai00xyz` }), /Failed to fetch/);
+  await assert.rejects(() => cb.detail(c2, { source_id: 'Kai00xyz', url: `${BASE}/inzerat/Kai00xyz/kolo-kai00xyz` }), /po sobě neodpověděl/);
+  assert.equal(n, 3);
 });

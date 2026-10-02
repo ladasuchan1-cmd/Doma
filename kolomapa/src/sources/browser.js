@@ -16,8 +16,9 @@
 //    „Potvrďte, že jste člověk“), vrátí fetchHtml challenged: true, origin se pro zbytek běhu uzavře (další požadavky
 //    na něj už nejdou) a zdroj musí skončit. Ověření se nikdy neřeší ani neobchází.
 //  - Šetrnost: mezi požadavky na jeden origin drží pauzu minIntervalMs (zadává zdroj – Cyklobazar 20 s; úvodní
-//    stránka se počítá taky). Obrázky, média, písma a reklamy se nestahují (route.abort – jen menší zátěž webu, nic
-//    neskrývá); skripty a kontroly Cloudflare (/cdn-cgi/, challenges.cloudflare.com) se nikdy neblokují.
+//    stránka se počítá taky). Obrázky, média, písma, reklamy a signály ?do= se nestahují (route.abort – jen menší
+//    zátěž webu a ohled na robots.txt, nic neskrývá); kontroly Cloudflare (/cdn-cgi/, challenges.cloudflare.com) se
+//    nikdy neblokují.
 //
 // Postup: pro každý origin jednou otevře úvodní stránku (jako člověk v prohlížeči) a počká, až se ustálí (titulek
 // přestane být „Just a moment…“ / „Okamžik…“, nejvýš ~20 s – nic se neklikne ani nevyplní). Další HTML stahuje
@@ -41,6 +42,9 @@ const FORBIDDEN_ARG_RX = /AutomationControlled|^--user-agent(=|$)|^--disable-web
 const SKIP_RESOURCE_TYPES = new Set(['image', 'media', 'font']);
 const AD_RX = /googlesyndication|doubleclick|googletagmanager|google-analytics|googleadservices|adservice\.google|fundingchoicesmessages|facebook\.(net|com)|connect\.facebook|hotjar|\.seznam\.cz\/(ssp|rs)|ssp\.seznam|imedia\.cz/i;
 const CLOUDFLARE_RX = /^https:\/\/challenges\.cloudflare\.com\/|\/cdn-cgi\//i;
+// Signály Nette (?do=… – telefon, sdílení, AI souhrn) zakazuje robots.txt Cyklobazaru; stránka je při zahřátí
+// nepotřebuje, takže je neodešle ani její vlastní JavaScript.
+const DISALLOWED_REQUEST_RX = /[?&]do=/i;
 
 // Rozpoznání ověřovací stránky Cloudflare. Pozor: běžné stránky Cyklobazaru obsahují skript
 // /cdn-cgi/challenge-platform/scripts/jsd/main.js i formulář s Turnstile („Potvrďte prosím, že nejste robot“) –
@@ -235,7 +239,6 @@ function createBrowser(opts = {}) {
   const origins = new Map(); // origin → {page, warm, challenged, challengeStatus, lastAt, queue}
   let launching = null;
   let browser = null;
-  let context = null;
   let closed = false;
 
   function routeHandler(route) {
@@ -248,7 +251,8 @@ function createBrowser(opts = {}) {
     } catch {
       /* požadavek už neexistuje */
     }
-    const p = !CLOUDFLARE_RX.test(url) && (SKIP_RESOURCE_TYPES.has(type) || AD_RX.test(url)) ? route.abort() : route.continue();
+    const skip = !CLOUDFLARE_RX.test(url) && (SKIP_RESOURCE_TYPES.has(type) || AD_RX.test(url) || DISALLOWED_REQUEST_RX.test(url));
+    const p = skip ? route.abort() : route.continue();
     return Promise.resolve(p).catch(() => {});
   }
 
@@ -266,7 +270,6 @@ function createBrowser(opts = {}) {
         browser = b;
         const c = await b.newContext({ locale: 'cs-CZ' });
         if (typeof c.route === 'function') await c.route('**/*', routeHandler);
-        context = c;
         log?.debug?.('Prohlížeč (Chromium) spuštěn');
         return c;
       })();
@@ -387,10 +390,15 @@ function createBrowser(opts = {}) {
       } catch {
         /* neplatný referer se nepošle */
       }
-      const r = await raceAbort(
-        Promise.resolve(st.page.evaluate(inPageFetch, { url: u.href, referer, accept: o.accept || ACCEPT_HTML, timeoutMs: o.timeoutMs || fetchTimeoutMs })),
-        signal
-      );
+      let r;
+      try {
+        r = await raceAbort(
+          Promise.resolve(st.page.evaluate(inPageFetch, { url: u.href, referer, accept: o.accept || ACCEPT_HTML, timeoutMs: o.timeoutMs || fetchTimeoutMs })),
+          signal
+        );
+      } finally {
+        st.lastAt = now(); // pauza do dalšího požadavku až od konce tohoto (velká sitemapa se stahuje déle)
+      }
       if (!r || r.error) {
         if (st.page && typeof st.page.isClosed === 'function' && st.page.isClosed()) {
           st.page = null;
@@ -415,7 +423,6 @@ function createBrowser(opts = {}) {
     closed = true;
     const b = browser;
     browser = null;
-    context = null;
     origins.clear();
     if (!b && launching) {
       try {

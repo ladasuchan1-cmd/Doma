@@ -61,6 +61,8 @@ veřejný, takže i mapa s odhady a výkupními cenami by byla veřejná.
 | `KOLOMAPA_SCHEDULE` | čas denního běhu `HH:MM`, `off` = vypnout | `05:30` |
 | `KOLOMAPA_DELAY_MS` | pauza mezi dotazy na jeden web | `1200` |
 | `KOLOMAPA_MAX_DETAILS` | max. detailů inzerátů na zdroj za běh | podle zdroje (Bazoš 4000, Sbazar 2000, Aukro 300, Cyklobazar 120) |
+| `KOLOMAPA_CYKLOBAZAR_DELAY_MS` | pauza mezi stránkami Cyklobazaru (nejméně 10 s) | `20000` |
+| `KOLOMAPA_CYKLOBAZAR_MAX_LIST_PAGES` | max. stránek výpisu Cyklobazaru za běh (celý výpis ~445 stránek se projde postupně) | `60` |
 | `ANTHROPIC_API_KEY` | zapne AI nacenění podle fotek | – |
 | `KOLOMAPA_AI_MODEL` | model pro AI nacenění | `claude-opus-5-5` |
 | `KOLOMAPA_AI_MAX_PER_RUN` | max. AI nacenění za den (hlídá útratu) | `150` |

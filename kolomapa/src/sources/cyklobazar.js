@@ -77,6 +77,8 @@ const GONE_GRACE_MS = 2 * 3600e3;
 /** Rezerva obzoru novinek (posun hodin u nás a na webu, zpoždění webu). */
 const HORIZON_BUFFER_MS = 3600e3;
 const DAY_MS = 86400e3;
+/** Po tolika chybách webu po sobě (síť, HTTP 5xx) zdroj pro běh skončí – nezatěžovat web, který má potíže. */
+const MAX_CONSECUTIVE_FAILURES = 3;
 
 // ---------------------------------------------------------------- robots.txt a osobní údaje
 
@@ -124,7 +126,7 @@ const states = new WeakMap(); // ctx → stav běhu
 function stateOf(ctx) {
   let st = states.get(ctx);
   if (!st) {
-    st = { sitemap: null, sitemapOk: false, sitemapAtMs: 0, stopped: null, browser: null, browserError: null, requests: 0, seen: new Set() };
+    st = { sitemap: null, sitemapOk: false, sitemapAtMs: 0, stopped: null, browser: null, browserError: null, requests: 0, failures: 0, seen: new Set() };
     states.set(ctx, st);
   }
   return st;
@@ -225,9 +227,26 @@ async function fetchPage(ctx, st, url, { referer } = {}) {
   if (until) throw (st.stopped = pauseError(until));
   const browser = await browserOf(ctx, st);
   st.requests++;
-  const r = (await browser.fetchHtml(href, { referer, minIntervalMs: delayOf(ctx), signal: ctx.signal })) || {};
+  let r;
+  try {
+    r = (await browser.fetchHtml(href, { referer, minIntervalMs: delayOf(ctx), signal: ctx.signal })) || {};
+  } catch (e) {
+    if (!ctx.signal?.aborted) noteFailure(ctx, st, e.message);
+    throw e;
+  }
   if (r.challenged || r.status === 403 || r.status === 429) throw stopForChallenge(ctx, st, href, r);
+  if (Number(r.status) >= 500 || !Number(r.status)) noteFailure(ctx, st, `HTTP ${r.status || '?'}`);
+  else st.failures = 0;
   return { status: Number(r.status) || 0, html: String(r.html ?? ''), url: r.url || href };
+}
+
+/** Chyba webu (síť, 5xx): po MAX_CONSECUTIVE_FAILURES po sobě zdroj pro tento běh skončí (bez pauzy). */
+function noteFailure(ctx, st, why) {
+  st.failures++;
+  if (st.failures >= MAX_CONSECUTIVE_FAILURES && !st.stopped) {
+    st.stopped = Object.assign(new Error(`Cyklobazar: web ${st.failures}× po sobě neodpověděl (${why}) – pro tento běh končím`), { fatal: true });
+    ctx.log?.warn?.(st.stopped.message);
+  }
 }
 
 // ---------------------------------------------------------------- pomocníci
