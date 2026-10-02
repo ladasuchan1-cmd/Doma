@@ -14,6 +14,7 @@
     "import-sales": "node --disable-warning=ExperimentalWarning tools/import-sales.js",
     "demo": "node --disable-warning=ExperimentalWarning tools/demo-data.js",
     "build-geo": "node tools/build-geo.js",
+    "ui-smoke": "node --disable-warning=ExperimentalWarning tools/ui-smoke.js",
     "test": "node --disable-warning=ExperimentalWarning --test \"test/**/*.test.js\""
   },
   "optionalDependencies": {

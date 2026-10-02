@@ -657,16 +657,16 @@ a {
 
 .cluster__deals {
   position: absolute;
-  top: -4px;
-  right: -6px;
-  min-width: 19px;
-  height: 19px;
+  top: -8px;
+  right: -11px;
+  min-width: 18px;
+  height: 18px;
   padding: 0 5px;
   border-radius: 999px;
   background: var(--good);
   color: #fff;
-  font-size: 11px;
-  line-height: 19px;
+  font-size: 10.5px;
+  line-height: 18px;
   text-align: center;
   box-shadow: 0 0 0 2px var(--pin-ring);
 }
@@ -1349,6 +1349,10 @@ a {
   font-size: 18px;
   line-height: 1.3;
   overflow-wrap: anywhere;
+}
+
+#detail-title:focus {
+  outline: none; /* cíl programového přesunu fokusu, ne ovládací prvek */
 }
 
 .detail__where {

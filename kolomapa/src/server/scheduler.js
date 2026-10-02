@@ -175,8 +175,9 @@ async function runOnce(o) {
       ({ loadSources } = require('../sources'));
       ({ createHttp } = require('../util/http'));
     } catch (e) {
-      log.error('Nelze načíst moduly pro stahování', { error: e.message });
-      return recordFailedRun(db, trigger, `Nelze načíst moduly pro stahování: ${e.message}`);
+      const msg = String(e.message).split('\n')[0]; // bez „Require stack“
+      log.error('Nelze načíst moduly pro stahování', { error: msg });
+      return recordFailedRun(db, trigger, `Nelze načíst moduly pro stahování: ${msg}`);
     }
     const sources = loadSources(keys, log);
     if (!sources.length) return recordFailedRun(db, trigger, `Žádný ze zdrojů (${keys.join(', ') || '–'}) nejde načíst.`);

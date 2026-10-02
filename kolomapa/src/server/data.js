@@ -198,7 +198,8 @@ function lastFinishedRun(db) {
  * stažení tak nejsou všechny „nové“.
  */
 function newSinceIso(db, now) {
-  const windowStart = now.getTime() - NEW_HOURS * 3600 * 1000;
+  // zaokrouhleno na 10 minut dolů – přehled se pak mezi požadavky nemění (ETag / 304)
+  const windowStart = Math.floor((now.getTime() - NEW_HOURS * 3600 * 1000) / 600000) * 600000;
   const first = db.prepare("SELECT finished_at FROM runs WHERE status IN ('ok', 'partial') AND finished_at IS NOT NULL ORDER BY id ASC LIMIT 1").get();
   const baseline = first ? Date.parse(first.finished_at) : NaN;
   return new Date(Number.isFinite(baseline) ? Math.max(windowStart, baseline) : windowStart).toISOString();

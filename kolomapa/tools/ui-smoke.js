@@ -61,9 +61,22 @@ async function startLocalServer() {
   const db = openDb(dbFile);
   seedDemo(db, { count: 400, seed: 7 });
   const log = require('../src/util/log').createLogger({ level: 'warn' });
-  const inst = await start({ db, log, port: 0, host: '127.0.0.1', password: null, scheduler: false, publicDir: path.join(__dirname, '..', 'public') });
+  // Simulovaný běh pro tlačítko „Stáhnout teď“ (žádná síť): průběh → zápis běhu → konec.
+  const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+  const runFn = async (o) => {
+    const startedAt = new Date().toISOString();
+    o.onProgress('Bazoš: stahuji výpis (jen novinky)…');
+    await sleep(3500);
+    o.onProgress('Naceňuji…');
+    await sleep(800);
+    const stats = JSON.stringify({ sources: { bazos: { scanned: 120, new: 4 } } });
+    const id = Number(o.db.prepare("INSERT INTO runs (started_at, finished_at, status, trigger, stats) VALUES (?, ?, 'ok', ?, ?)").run(startedAt, new Date().toISOString(), o.trigger, stats).lastInsertRowid);
+    return { runId: id, status: 'ok' };
+  };
+  const inst = await start({ db, log, runFn, port: 0, host: '127.0.0.1', password: null, scheduler: false, publicDir: path.join(__dirname, '..', 'public') });
   return {
     url: inst.url,
+    local: true,
     async stop() {
       await inst.stop();
       db.close();
@@ -83,7 +96,7 @@ async function checkOverflow(page, where) {
   if (o.sw > o.w + 1) problem(where, `vodorovné přetečení stránky (${o.sw} > ${o.w} px)`);
 }
 
-async function runScenario(browser, base, vp, scheme) {
+async function runScenario(browser, base, vp, scheme, { local = false } = {}) {
   const tag = `${vp.name}-${scheme}`;
   const ctx = await browser.newContext({
     viewport: { width: vp.width, height: vp.height },
@@ -170,6 +183,16 @@ async function runScenario(browser, base, vp, scheme) {
   await page.keyboard.press('Escape');
   await page.waitForSelector('#detail[hidden]', { state: 'attached' });
 
+  // tlačítko „Stáhnout teď“ (jen vlastní server se simulovaným během)
+  if (local && vp.name === 'desktop') {
+    await page.locator('.btn--run').click();
+    await page.waitForSelector('.pill--running', { timeout: 8000 });
+    if (scheme === 'light') files.push(await shot(page, `${tag}-8-stahovani`));
+    await page.waitForSelector('.pill--ok', { timeout: 20000 });
+    const toastText = await page.locator('#toast').textContent();
+    if (!/dokončeno/.test(toastText || '')) problem(tag, `po doběhnutí chybí hlášení (toast: ${toastText})`);
+  }
+
   // zpět na celou ČR a otevření nejvýhodnější nabídky z přehledu
   await page.locator('.phead .back').click();
   await page.waitForSelector('.tabs');
@@ -199,7 +222,7 @@ async function main() {
     for (const vp of VIEWPORTS) {
       for (const scheme of SCHEMES) {
         try {
-          files.push(...(await runScenario(browser, base, vp, scheme)));
+          files.push(...(await runScenario(browser, base, vp, scheme, { local: !!server })));
         } catch (e) {
           problem(`${vp.name}-${scheme}`, `scénář selhal: ${e.message.split('\n')[0]}`);
         }

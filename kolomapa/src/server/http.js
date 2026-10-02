@@ -179,13 +179,17 @@ function createApp({ db, config, log = defaultLog, runner = null }) {
       etag: extra.etag,
     });
 
-  const sendData = (req, res, obj) =>
-    send(req, res, {
-      status: 200,
-      headers: { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-cache' },
-      body: Buffer.from(JSON.stringify(obj)),
-      etag: true,
-    });
+  // ETag se počítá z obsahu bez generatedAt (čas sestavení se mění s každým požadavkem) → 304, když se data nezměnila.
+  async function sendData(req, res, obj) {
+    const tag = etagOf(Buffer.from(JSON.stringify({ ...obj, generatedAt: null })));
+    const headers = { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-cache', ETag: tag };
+    if (etagMatches(req.headers['if-none-match'], tag)) {
+      res.writeHead(304, { ...SECURITY_HEADERS, ...headers });
+      res.end();
+      return;
+    }
+    return send(req, res, { status: 200, headers, body: Buffer.from(JSON.stringify(obj)) });
+  }
 
   async function serveStatic(req, res, pathname) {
     if (!publicDir) throw new HttpError(404, 'Nenalezeno.');

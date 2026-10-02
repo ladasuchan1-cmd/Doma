@@ -364,6 +364,33 @@
   const markers = new Map(); // id → L.Marker
   const krajLayers = new Map(); // kód → vrstva polygonu
   let hoverKraj = null;
+  let pinsReady = Promise.resolve(); // dokončení (postupného) přidávání pinů do shluků
+  let pinsReadyResolve = null;
+
+  const nextFrame = () => new Promise((r) => requestAnimationFrame(() => r()));
+
+  /**
+   * Počká, až mapa doanimuje (Leaflet během animace zoomu další požadavky na zoom tiše zahodí). Animace začíná až
+   * v dalším snímku (requestAnimationFrame), proto nejdřív jeden snímek počkat.
+   */
+  async function whenMapIdle() {
+    await nextFrame();
+    return new Promise((resolve) => {
+      if (!map._animatingZoom && !(map._panAnim && map._panAnim._inProgress)) return resolve();
+      const done = () => {
+        clearTimeout(t);
+        map.off('moveend', done);
+        resolve();
+      };
+      const t = setTimeout(done, 900);
+      map.on('moveend', done);
+    });
+  }
+
+  /** Změna pohledu mapy až po doběhnutí rozběhnuté animace. */
+  function fitTo(bounds, padding) {
+    whenMapIdle().then(() => map.fitBounds(bounds, { padding }));
+  }
 
   function initMap() {
     map = L.map('map', {
@@ -393,9 +420,16 @@
 
     cluster = L.markerClusterGroup({
       maxClusterRadius: (z) => (z >= 13 ? 34 : 48),
+      disableClusteringAtZoom: 16, // na úrovni ulic už jednotlivé piny (a „ukázat pin“ nezoomuje až na 18)
       showCoverageOnHover: false,
       spiderfyOnMaxZoom: true,
       chunkedLoading: true,
+      chunkProgress(done, total) {
+        if (done >= total && pinsReadyResolve) {
+          pinsReadyResolve();
+          pinsReadyResolve = null;
+        }
+      },
       iconCreateFunction: clusterIcon,
     });
     map.addLayer(cluster);
@@ -589,8 +623,17 @@
 
   function renderPins() {
     cluster.clearLayers();
-    if (!state.kraj) return;
-    const list = state.filtered.filter((l) => l.la != null && l.lo != null).map(getMarker);
+    pinsReadyResolve?.();
+    pinsReadyResolve = null;
+    const list = state.kraj ? state.filtered.filter((l) => l.la != null && l.lo != null).map(getMarker) : [];
+    if (!list.length) {
+      pinsReady = Promise.resolve();
+      return;
+    }
+    pinsReady = new Promise((resolve) => {
+      pinsReadyResolve = resolve;
+      setTimeout(resolve, 4000); // pojistka
+    });
     cluster.addLayers(list);
   }
 
@@ -626,10 +669,14 @@
     map.panBy([0, pt.y - target], { animate: true });
   }
 
-  function focusListingOnMap(l) {
+  async function focusListingOnMap(l) {
+    await pinsReady;
+    await whenMapIdle();
+    if (state.selectedId !== l.id) return;
     const m = markers.get(l.id);
-    if (m && cluster.hasLayer(m)) {
+    if (m && cluster.hasLayer(m) && m.__parent) {
       cluster.zoomToShowLayer(m, () => {
+        if (state.selectedId !== l.id) return;
         setSelectedPin(l.id);
         keepVisible(m.getLatLng());
       });
@@ -721,7 +768,8 @@
       box.append(el('span', { class: 'pill pill--running', text: 'Stahuji' }), el('span', { class: 'run-text', text: run.progress || 'Spouštím…' }));
     } else {
       const lr = s.lastRun;
-      if (s.demo) box.append(el('span', { class: 'pill pill--demo', title: 'Ukázková data vložená nástrojem tools/demo-data.js', text: 'Demo data' }));
+      // na úzkém displeji jen jeden štítek (upozornění na demo data je i v panelu)
+      if (s.demo) box.append(el('span', { class: 'pill pill--demo' + (lr ? ' hide-xs' : ''), title: 'Ukázková data vložená nástrojem tools/demo-data.js', text: 'Demo data' }));
       if (lr) {
         const label = { ok: 'Aktuální', partial: 'Částečně', error: 'Chyba' }[lr.status] || lr.status;
         const errs = Object.entries(lr.stats?.sources || {})
@@ -1509,7 +1557,7 @@
     $('btn-cr').hidden = false;
     renderLegend();
     const layer = krajLayers.get(code);
-    if (layer) map.fitBounds(layer.getBounds(), { padding: isMobile() ? [12, 12] : [28, 28] });
+    if (layer) fitTo(layer.getBounds(), isMobile() ? [12, 12] : [28, 28]);
     layer?.closeTooltip();
     renderKrajPanel(true);
     $('panel').scrollTop = 0;
@@ -1541,7 +1589,7 @@
     if (!map.hasLayer(labelLayer)) map.addLayer(labelLayer);
     $('btn-cr').hidden = true;
     renderLegend();
-    map.fitBounds(CR_BOUNDS, { padding: [8, 8] });
+    fitTo(CR_BOUNDS, [8, 8]);
     state.byId = new Map();
     renderOverview();
   }
