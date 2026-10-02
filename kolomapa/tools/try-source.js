@@ -135,7 +135,8 @@ async function main(argv) {
     http,
     getBrowser,
     log,
-    config,
+    // zkušební běh: jen pár překladů lokalit Sbazaru (jinak až 400 dotazů s prázdnou cache)
+    config: { ...config, sbazarMaxResolve: Math.min(config.sbazarMaxResolve ?? 3, 3) },
     signal: controller.signal,
     mode,
     maxPages: pages,
