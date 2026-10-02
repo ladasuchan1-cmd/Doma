@@ -317,6 +317,10 @@ function rawFeatures(it) {
   const toks = titleTokens(it.title);
   const w = toks.length ? 1 / Math.sqrt(Math.max(1, toks.length / 4)) : 0;
   for (const t of toks) out.push([`tok:${t}`, w, 'tok']);
+  if (process.env.KM_BIGRAMS) {
+    const seq = keyOf(it.title).split(' ').filter((t) => t && !TOKEN_STOP.has(t));
+    for (let i = 0; i + 1 < seq.length; i++) out.push([`bi:${seq[i]}_${seq[i + 1]}`, w, 'tok']);
+  }
   const mt = modelTokens(it);
   if (f.brand && mt.first) out.push([`bm:${keyOf(f.brand)}|${mt.first}`, 1, 'bm']);
   return out;
