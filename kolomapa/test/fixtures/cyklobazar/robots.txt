@@ -1,0 +1,15 @@
+User-agent: *
+Disallow: *changes?event=*
+Disallow: */tisk*
+Disallow: *?do=*
+Disallow: /sign/
+Disallow: /lost-password/
+Disallow: /muj-ucet/
+Disallow: /create/
+Disallow: *condition=new*
+Disallow: *email-protection*
+Disallow: *type=buy*
+Disallow: *type=sell*
+Disallow: *sort=*
+
+Sitemap: https://cyklobazar.cz/sitemap.xml
