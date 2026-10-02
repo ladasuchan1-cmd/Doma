@@ -76,25 +76,57 @@ chybí ve dvou úplných průchodech po sobě (offsetové stránkování se běh
 
 ## Klasifikace (`src/classify`)
 
-`classifyListing({source, title, description, params, categorySrc, priceCzk, sellerType})` →
+`classifyListing({source, title, description, params, categorySrc, priceCzk, sellerType}, {now?})` →
 `{isBike, bikeType, reason, features}`; export `CLASSIFIER_VERSION` (zvýšit při změně logiky → překlasifikuje se vše).
+Soubory: `index.js` (rozhodnutí + typ), `extract.js` (rok, kola, rám, materiál, motor, baterie, sada, stav, původní cena…),
+`keywords.js` (nekola, služby, poptávky), `brands.js` (≈ 220 značek: tier, aliasy/překlepy, nápovědy typu podle modelu).
+
+Rozhodnutí kolo × nekolo stojí na titulku: fráze „na kolo / pro kola / za kolo / na díly / s košíkem“ se zamaskují,
+pak vyhrává to, co je v titulku dřív – „nekolo“ podstatné jméno (helma, sedačka, nosič, vidlice, trenažér, koloběžka,
+motorka …) nebo silný důkaz kola (kolo, elektrokolo, MTB, BMX, odrážedlo, značka + známý model). „Koupím / sháním“ →
+`isBike: false, reason: 'poptávka'`; půjčovna/servis → služba; „zapletená / přední kola“ → díl; „Rám …“ → kolo s
+`isFrameOnly`. Bez důkazů v titulku rozhoduje začátek popisu a kategorie webu („Ostatní“ = spíš nekolo).
+`params` (Cyklobazar, Aukro, Sbazar) mají přednost; klíče se porovnávají bez diakritiky a velikosti písmen
+(`Velikost rámu`, `Rok výroby`, `Stav`/`Stav zboží`, `Značka`, `Model`, `Materiál rámu`, `Průměr kol`, `Odpružení` …).
 
 `bikeType`: `mtb_hardtail | mtb_full | road | gravel | cyclocross | trekking | cross | city | kids | balance | bmx | dirt | fatbike | folding | cargo | tandem | ebike_mtb | ebike_mtb_full | ebike_trekking | ebike_city | ebike_road | ebike_cargo | ebike_kids | other`.
 
-`features` (vše volitelné): `brand`, `brandTier` (1–5), `model`, `modelYear`, `ageYears`, `wheelSize`, `frameSize`,
-`material` (`carbon|alu|steel|titanium`), `suspension` (`rigid|hardtail|full`), `isEbike`, `motor`, `batteryWh`,
-`groupset`, `groupsetTier`, `condition` (`new|like_new|very_good|good|fair|poor|parts`), `originalPriceCzk`,
-`hasReceipt`, `warranty`, `isShop`, `isFrameOnly`, `kidsWheel`, `warnings` (pole českých textů).
+`features` (vše volitelné): `brand`, `brandTier` (1–5), `model`, `modelYear` (2005–letos+1), `ageYears`, `yearSource`
+(`params|explicit|title|purchase|age|text`), `vintageYear` + `isVintage` (retro), `wheelSize` (`12…29`, `27.5`; 650b → 27.5,
+700c → 28), `mullet`, `kidsWheel`, `frameSize` (`XS…XXL`, normalizované z cm/palců/S1–S6) + `frameSizeRaw`,
+`material` (`carbon|alu|steel|titanium`), `suspension` (`rigid|hardtail|full`), `isEbike`, `motor`, `motorClass`
+(`premium|mid|hub`), `batteryWh`, `groupset`, `groupsetTier` (1–6, +0,5 za Di2/AXS), `electronicShifting`, `condition`
+(`new|like_new|very_good|good|fair|poor|parts`, s negací „není poškozené“), `originalPriceCzk`, `hasReceipt`, `warranty`,
+`isShop`, `isFrameOnly`, `isMulti` (více kol v inzerátu), `pricePlaceholder` (cena < 300 Kč), `nonBikeGroup` (u nekol),
+`warnings` (české texty: „Možná ukradené – chybí doklad a cena je podezřele nízká“, „Prasklý rám“, „Nutný servis“,
+„Cena je za díly“, „Prodává se jen rám“, „Více kol v jednom inzerátu…“, „Bez baterie“ …).
 
 ## Nacenění (`src/pricing`)
 
-- `trainModel(db, {config, log})` → model (pravidla z `kb.json` + naučené koeficienty z tržních dat + kalibrace na vlastní
-  prodeje) s `summary` pro statistiky běhu.
-- `estimate(model, listing)` → `{estCzk, low, high, confidence (0–1), method, factors: [české texty]}`.
-- `priceAll(db, model, {config})` zapíše `est_*`, `deal_ratio = price_czk / est_czk`, `max_buy_czk`.
-- AI (`ai.js`, jen s `ANTHROPIC_API_KEY`): pro nejzajímavější inzeráty pošle Claude titulek, popis, parametry, fotku,
-  odhad modelu a srovnatelné inzeráty → strukturovaný JSON `{estimate_czk, low_czk, high_czk, condition, notes}`;
-  výsledek se uloží do `ai_*` a má přednost v UI.
+- `trainModel(db, {config, log})` → model s `summary` (`mode: 'model'|'rules'`, počty, `calibration`, `buyRatio`, `ms`).
+  Robustní (Huberova) ridge regrese log(ceny) nad inzeráty kol z DB (aktivní i zmizelé; zmizelé = pravděpodobně prodané,
+  váha 1,3; placeholdery, „více kol“ a extrémy se vynechají). Příznaky: typ, tier, značka, sada, stáří, materiál, motor a
+  baterie e-kol, velikost kol, stav, původní cena, příznaky (rám, obchod, retro …) a slova z titulků (modely). Pod 300
+  použitelných kol jen pravidla z `kb.json`. Kalibrace inzerovaná → skutečná cena: medián skutečná/odhad u BAZAR prodejů
+  (tabulka `sales`, jinak `training/koloshop-prodeje.json`) kombinovaný s `kb.askToSale` (0,9), oříznutý na 0,6–1,1.
+- `estimate(model, listing)` → `{estCzk, low, high, confidence, method: 'comps'|'model'|'rules', factors}`. Odhad =
+  model + posun podle srovnatelných inzerátů (stejná značka a model ± rok) + malá váha pravidel; `low/high` = 10./90.
+  percentil chyb na odložených datech (interní 3× CV) podle třídy důkazů; `confidence` = odhadnutá pravděpodobnost, že
+  inzerovaná cena srovnatelného kola leží v ±35 % odhadu (≈ ±25 % proti skutečné hodnotě) → práh 0,45 odděluje
+  identifikovaná kola (značka + model / rok / srovnatelné) od obecných inzerátů.
+- `priceAll(db, model, {config})` zapíše `est_*`, `est_at`; `deal_ratio = price_czk / ref` a `max_buy_czk = ref × výkupní
+  poměr`, kde `ref` = `ai_czk`, pokud je AI odhad aktuální (`ai_input_hash = content_hash`), jinak `est_czk`. Výkupní poměr
+  = 1 − `KOLOMAPA_BUY_MARGIN`, jinak medián cost/price BAZAR prodejů (≈ 0,65). U placeholder cen a „více kol“ se
+  `deal_ratio` nepočítá; nekolům se odhady smažou. `refreshDeal(db, id)` přepočítá jeden inzerát (volá ho AI).
+- `comparables(model, listing, n)` → srovnatelné inzeráty `{title, price, url, sold, year}` (pro AI a UI).
+- AI (`ai.js`, jen s `ANTHROPIC_API_KEY` a `npm install @anthropic-ai/sdk`): `valuatePending(db, {config, log, signal, model})`
+  vybere aktivní kola s fotkou a cenou ≥ `KOLOMAPA_AI_MIN_PRICE`, jejichž obsah se změnil (`ai_input_hash ≠ content_hash`),
+  nejdřív potenciálně výhodné (nízký `deal_ratio`) a čerstvé, max. `KOLOMAPA_AI_MAX_PER_RUN`, 3 souběžně. Pošle Claude
+  (výchozí `claude-opus-5-5`, effort low, JSON schéma, system prompt s tabulkou vlastních prodejů v cache, server-side
+  fallback při odmítnutí) titulek, popis, parametry, fotku, vytěžené údaje, odhad modelu a srovnatelné inzeráty →
+  `{estimate_czk, low_czk, high_czk, condition, condition_from_photo, notes, is_bike, bike_type}`; uloží `ai_*`
+  (+ `ai_model`, `ai_at`, `ai_input_hash`) a přepočítá `deal_ratio`/`max_buy_czk`. `est_*` zůstává odhadem modelu.
+- `tools/eval-pricing.js` – evaluace klasifikátoru a nacenění na stažených datech (5× CV, vlastní prodeje).
 
 ## API serveru (stejné tvary vrací statický export)
 

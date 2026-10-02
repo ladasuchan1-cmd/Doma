@@ -473,6 +473,8 @@ const BRANDS = [
   { name: 'Fantic', tier: 4, aliases: ['fantic'], kind: 'ebike', models: [['.', 'ebike_mtb_full']] },
   { name: 'Bultaco', tier: 3, aliases: ['bultaco'], kind: 'ebike', models: [['.', 'ebike_mtb_full']] },
   { name: 'M1 Sporttechnik', tier: 4, aliases: ['m1 sporttechnik', 'm1 sterzing', 'm1 spitzing', 'm1 erzberg'], kind: 'ebike', models: [['.', 'ebike_mtb_full']] },
+  { name: 'Lectron', tier: 1, aliases: ['lectron'], kind: 'ebike' },
+  { name: 'AZUB', tier: 4, aliases: ['azub'], models: [['.', 'other']] },
   { name: 'Leon', tier: 2, aliases: ['leon cycle'], kind: 'ebike' },
 
   // --- české a slovenské značky ---

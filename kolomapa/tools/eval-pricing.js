@@ -247,18 +247,16 @@ function main() {
   const cal = full.calibration;
   console.log(`Kalibrace: medián skutečná / inzerovaná-odhad u BAZAR = ${cal.shopRatio?.toFixed(3)} (n = ${cal.n}), apriorno ${cal.prior}, výsledný faktor ×${cal.factor.toFixed(3)}; výkupní poměr ${full.buyRatio.toFixed(3)}`);
   const rowsOut = [];
-  for (const kind of ['bazar', 'provereno', 'provereno+kontext']) {
+  for (const kind of ['bazar', 'provereno']) {
     const apes = [];
     const apesAsk = [];
     for (let i = 0; i < sales.length; i++) {
       const s = sales[i];
-      if (s.kind !== kind.replace('+kontext', '')) continue;
+      if (s.kind !== kind) continue;
       const title = s.size ? `${s.title} vel. ${s.size}` : s.title;
       const c = classifyListing({ title, priceCzk: null });
       if (!c.isBike) continue;
-      // PROVĚŘENO = předváděcí / půjčovní kola z minulé sezóny ve stavu „jako nové“ – to by stálo v inzerátu
-      const feats = kind.endsWith('+kontext') ? { ...c.features, condition: 'like_new', modelYear: Number(String(s.date).slice(0, 4)) - 1, ageYears: 1 } : c.features;
-      const it = pricing.normItem({ title, features: feats, bike_type: c.bikeType, is_bike: 1 });
+      const it = pricing.normItem({ title, features: c.features, bike_type: c.bikeType, is_bike: 1 });
       const asking = Math.exp(P.askingLog(full, it).lp);
       // leave-one-out kalibrace (bez tohoto prodeje)
       const others = sales.filter((_, j) => j !== i);
@@ -266,7 +264,7 @@ function main() {
       const pred = asking * calLoo;
       apes.push(Math.abs(pred / s.priceCzk - 1));
       apesAsk.push(Math.abs(asking / s.priceCzk - 1));
-      if (kind !== 'provereno+kontext') rowsOut.push(`${pad(kind, 9)} ${lpad(s.priceCzk, 7)} ${lpad(Math.round(pred), 7)} ${lpad(`${((pred / s.priceCzk - 1) * 100).toFixed(0)} %`, 6)} | ${s.title.slice(0, 55)} [${c.bikeType}${c.features.modelYear ? ` ${c.features.modelYear}` : ''}]`);
+      rowsOut.push(`${pad(kind, 9)} ${lpad(s.priceCzk, 7)} ${lpad(Math.round(pred), 7)} ${lpad(`${((pred / s.priceCzk - 1) * 100).toFixed(0)} %`, 6)} | ${s.title.slice(0, 55)} [${c.bikeType}${c.features.modelYear ? ` ${c.features.modelYear}` : ''}]`);
     }
     console.log(`${kind.toUpperCase()}: ${apes.length} kol, MdAPE ${pctS(med(apes))} (bez kalibrace ${pctS(med(apesAsk))}), v ±25 %: ${pctS(apes.filter((a) => a <= 0.25).length / apes.length)}`);
   }

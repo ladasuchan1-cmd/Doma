@@ -110,7 +110,7 @@ function extractModel(t, hit) {
     if (out.length >= 4) break;
   }
   let model = out.join(' ').replace(/[\s.,:-]+$/, '').trim();
-  if (!model || model.length < 2) return null;
+  if (!model || (model.length < 2 && !/^\d$/.test(model))) return null;
   if (model === model.toUpperCase() && /[A-Z]{4,}/.test(model)) {
     // „STUMPJUMPER COMP“ → „Stumpjumper Comp“ (zkratky do 3 znaků ponecháme)
     model = model
@@ -262,10 +262,15 @@ function ebikeVariant(base, hints) {
 // ---------------------------------------------------------------------------------------------------------------
 // Pomocníci pro rozhodnutí kolo × nekolo
 
+const WITH_PART_RE = /\b(s|se|vc|vcetne|plus)\s+(\w+\s+)?(prehazovac\w*|nosic\w*|kosik\w*|blatnik\w*|svetl\w*|stojan\w*|stojank\w*|tachometr\w*|sedack\w*|kolecky|brzd\w*|bateri\w*|motorem|odpruzen\w*|vidlic\w*|tlumic\w*|helm\w*|prilb\w*|zamk\w*|zamkem|pumpick\w*|brasn\w*|zvonk\w*|sedl\w*|riditk\w*|pedal\w*)\b/g;
+const NEW_PART_RE = /([,–—\-(]|\S\s)\s*\b(nov\w*|vymenen\w*|repasovan\w*|servisovan\w*)\s+(bateri\w*|motor\w*|plast\w*|retez\w*|brzd\w*|dus\w*|pneu\w*|dil\w*|komponent\w*|sedl\w*|pedal\w*)\b/g;
+
 function maskNeutral(f) {
   return f
     .replace(K.NEUTRAL_RE, (m) => ' '.repeat(m.length))
-    .replace(/\b(na|pro|jen\s+na|pouze\s+na)\s+(nahradni\s+)?dil\w*|\bna\s+nd\b/g, (m) => ' '.repeat(m.length));
+    .replace(/\b(na|pro|jen\s+na|pouze\s+na)\s+(nahradni\s+)?dil\w*|\bna\s+nd\b/g, (m) => ' '.repeat(m.length))
+    .replace(WITH_PART_RE, (m) => ' '.repeat(m.length))
+    .replace(NEW_PART_RE, (m, lead) => lead + ' '.repeat(m.length - lead.length));
 }
 
 function firstNonBike(f) {
@@ -373,7 +378,7 @@ function classifyListing(input, opts = {}) {
   const trike = /\b(trikolk\w*|trojkolk\w*|tricykl\w*|trikolov\w*)\b/.test(title.f);
 
   if (trike && !(nb && nb.group === 'scooter')) {
-    if (/\b(senior\w*|dospel\w*|elektr\w*|nakladn\w*|cargo)\b|(?<![\d.,])(24|26|28)(?![\d.,]?\d)/.test(title.f + ' ' + desc.f.slice(0, 300)) && !/\b(drift\w*|hrack\w*|detsk\w*\s+trikolk\w*)\b/.test(title.f)) {
+    if (/\b(senior\w*|dospel\w*|elektr\w*|nakladn\w*|cargo|lehokol\w*|azub|recumbent)\b|(?<![\d.,])(24|26|28)(?![\d.,]?\d)/.test(title.f + ' ' + desc.f.slice(0, 300)) && !/\b(drift\w*|hrack\w*|detsk\w*\s+trikolk\w*)\b/.test(title.f)) {
       isBike = true;
       reason = 'tříkolka pro dospělé';
     } else return nonBike('tříkolka / hračka');
@@ -400,7 +405,7 @@ function classifyListing(input, opts = {}) {
   }
   if (isBike === null && nb) {
     // „MTB boty“, „Freeride kalhoty“, „Enduro helma“, „Gravel brašna“ – typové slovo jako přívlastek nekola
-    const adjLike = strong && strong.idx === strongIdx && /^(mtb|e\s?-?\s?mtb|emtb|freeride\w*|enduro|downhill\w*|gravel\w*|gravl\w*|bmx\w*|dirt\w*|silnick\w*|fully|e\s?-?\s?bike\w*|ebike\w*|bike|biky|bikes|celoodpruz\w*|hardtail\w*|cyklokros\w*|triatlonov\w*|casovkov\w*|tandem\w*)$/.test(strong.word.trim());
+    const adjLike = strong && strong.idx === strongIdx && /^(mtb|e\s?-?\s?mtb|emtb|freeride\w*|enduro|downhill\w*|gravel\w*|gravl\w*|bmx\w*|dirt\w*|fully|e\s?-?\s?bike\w*|ebike\w*|bike|biky|bikes|celoodpruz\w*|hardtail\w*|cyklokros\w*|triatlonov\w*|casovkov\w*|tandem\w*)$/.test(strong.word.trim());
     if (adjLike && nb.idx > strong.idx && nb.idx - (strong.idx + strong.word.length) <= 14 && !/\b(kolo|kola|elektrokol\w*)\b/.test(tMask.slice(strong.idx, nb.idx))) {
       return nonBike(nb.label, { nonBikeGroup: nb.group });
     }
@@ -554,6 +559,9 @@ function classifyListing(input, opts = {}) {
   if (!BIKE_TYPES.includes(bikeType)) bikeType = 'other';
   if (bikeType === 'kids' || bikeType === 'balance' || bikeType === 'ebike_kids') {
     if (wheel.wheelSize) features.kidsWheel = wheel.wheelSize;
+    // Woom 1–6 = 12/14/16/20/24/26"
+    const wm = brand && brand.name === 'Woom' && (title.f.match(/\bwoom\s*(?:off\s*|up\s*)?([1-6])\b/) || []);
+    if (wm && wm[1] && !features.kidsWheel) features.kidsWheel = ['12', '14', '16', '20', '24', '26'][Number(wm[1]) - 1];
   }
 
   // značka, model
@@ -642,7 +650,7 @@ function classifyListing(input, opts = {}) {
     const age = features.ageYears;
     const susOrig = orig && price < orig * 0.25 && (age == null || age <= 4);
     const adult = !['kids', 'balance', 'ebike_kids'].includes(bikeType);
-    const susBrand = adult && brand && brand.tier >= 4 && (age == null ? false : age <= 4) && price < (isEbike ? 15000 : 8000);
+    const susBrand = adult && brand && brand.tier >= 4 && (age == null ? false : age <= 3) && price < (isEbike ? 12000 : 5000);
     const susEbike = isEbike && adult && age != null && age <= 3 && price < 8000 && (!brand || brand.tier >= 2) && brand?.kind !== 'cheap_ebike';
     if (susOrig || susBrand || susEbike) warnings.push(WARN.stolen);
     else if (features.hasReceipt === false && brand && brand.tier >= 4) warnings.push(WARN.noReceipt);

@@ -216,7 +216,8 @@ function modelTokens(it) {
   const m = keyOf(it.f.model || '');
   if (!m) return { first: null, toks: [] };
   const toks = m.split(' ').filter(Boolean);
-  const first = toks.find((t) => !MODEL_GENERIC.has(t) && !/^\d+$/.test(t)) || null;
+  // základ modelu: první neobecné slovo („stumpjumper“); u čistě číselných modelů („Woom 4“, „Superior 969“) číslo
+  const first = toks.find((t) => !MODEL_GENERIC.has(t) && !/^\d+$/.test(t)) || toks.find((t) => /^\d+$/.test(t)) || null;
   return { first, toks };
 }
 
@@ -667,8 +668,8 @@ function buyRatioFrom(sales, config, kb = KB) {
 /** Prodeje obchodu: tabulka sales, jinak training/koloshop-prodeje.json. */
 function loadSales(db) {
   try {
-    const rows = db.prepare('SELECT kind, title, size, brand, price_czk, cost_czk FROM sales').all();
-    if (rows.length) return rows.map((r) => ({ kind: r.kind, title: r.title, size: r.size, brand: r.brand, priceCzk: r.price_czk, costCzk: r.cost_czk }));
+    const rows = db.prepare('SELECT kind, date, title, size, brand, price_czk, cost_czk FROM sales ORDER BY date, id').all();
+    if (rows.length) return rows.map((r) => ({ kind: r.kind, date: r.date, title: r.title, size: r.size, brand: r.brand, priceCzk: r.price_czk, costCzk: r.cost_czk }));
   } catch {
     // tabulka nemusí existovat (starší DB) – použije se soubor
   }
@@ -879,7 +880,17 @@ function priceAll(db, model, { config } = {}) {
       const { dealRatio, maxBuy } = dealFields(row, ref, buyRatio);
       const f = parseJson(row.features, {});
       const factors = e.factors.slice();
-      if (dealRatio != null && dealRatio < 0.45 && f.hasReceipt !== true && (f.brandTier || 0) >= 3 && familyOf(row.bike_type) !== 'kids' && f.condition !== 'parts') factors.unshift(SUSPICIOUS);
+      if (
+        dealRatio != null &&
+        dealRatio < 0.45 &&
+        e.confidence >= 0.4 &&
+        f.hasReceipt !== true &&
+        (f.brandTier || 0) >= 3 &&
+        familyOf(row.bike_type) !== 'kids' &&
+        !['parts', 'poor'].includes(f.condition) &&
+        !f.isFrameOnly
+      )
+        factors.unshift(SUSPICIOUS);
       upd.run(e.estCzk, e.low, e.high, e.confidence, e.method, JSON.stringify(factors), at, dealRatio, maxBuy, row.id);
       n++;
     }

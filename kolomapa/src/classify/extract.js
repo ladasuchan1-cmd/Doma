@@ -3,7 +3,7 @@
 // Všechny regulární výrazy pracují nad „složeným“ textem (malá písmena, bez diakritiky, stejná délka jako originál –
 // viz prep()), takže pozice shody platí i v původním textu (potřebné např. pro velikost rámu „M“ jen velkým písmenem).
 
-const { fold, keyOf, parseCzk } = require('../util/text');
+const { fold, keyOf } = require('../util/text');
 
 /**
  * Připraví text: NFC, složení znaků po jednom (stejná délka), sjednocené uvozovky/palce.
@@ -751,5 +751,4 @@ module.exports = {
   MOTORS,
   GROUPSETS,
   FULL_RE,
-  parseCzk,
 };
