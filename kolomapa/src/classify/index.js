@@ -15,7 +15,7 @@ const K = require('./keywords');
 const X = require('./extract');
 
 /** Zvýšit při změně logiky → pipeline překlasifikuje všechny inzeráty. */
-const CLASSIFIER_VERSION = '2026-10-02.2';
+const CLASSIFIER_VERSION = '2026-10-02.3';
 
 const BIKE_TYPES = [
   'mtb_hardtail', 'mtb_full', 'road', 'gravel', 'cyclocross', 'trekking', 'cross', 'city', 'kids', 'balance', 'bmx', 'dirt', 'fatbike',
@@ -361,6 +361,8 @@ function classifyListing(input, opts = {}) {
 
   const base = { brand: brand ? brand.name : undefined, brandTier: brand ? brand.tier : undefined };
   const nonBike = (reason, extra = {}) => ({ isBike: false, bikeType: null, reason, features: clean({ ...base, ...extra }) });
+  // Web sám řadí inzerát mimo kola (Cyklobazar: kategorie Komponenty / Oblečení …) → nekolo bez ohledu na titulek.
+  if (/^(ano|1|true)$/i.test(String(X.param(p, 'mimo kategorii kol') || ''))) return nonBike('mimo kategorii kol (podle webu)');
 
   // 1) poptávka, služba
   if (K.WANTED_RE.test(title.f) || /^\s*(koupim|kupim|shanim|hledam|poptavam|vykoupim)\b/.test(desc.f)) return nonBike('poptávka');

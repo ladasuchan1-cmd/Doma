@@ -88,3 +88,11 @@ test('resolveLocation: okresní štítek Bazoše + PSČ → PSČ', () => {
   assert.equal(r.kraj, 'STC');
   assert.equal(r.precision, 'psc');
 });
+
+test('resolveLocation: zahraniční okres (Slovensko) se neumístí na českou obec stejného jména', () => {
+  const r = resolveLocation({ locationText: 'Žilina', okres: 'Žilina' });
+  assert.equal(r.precision, null);
+  assert.equal(r.foreign, true);
+  assert.equal(resolveLocation({ locationText: 'Březí', okres: 'Břeclav' }).kraj, 'JHM');
+  assert.equal(resolveLocation({ locationText: 'Praha 9', okres: 'Hlavní město Praha' }).kraj, 'PHA');
+});

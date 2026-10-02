@@ -74,6 +74,10 @@ inzeráty bez změny ceny – pozor na topované inzeráty nahoře), `maxPages`,
 označí neviděné inzeráty jako zmizelé (prodané/smazané): hned, pokud to zdroj potvrdí přes `confirmGone`, jinak až když
 chybí ve dvou úplných průchodech po sobě (offsetové stránkování se během průchodu posouvá).
 
+Trvalá cache zdrojů (`ctx.cache`, tabulka settings, klíče `cache:<zdroj>:…`): Sbazar ukládá přeložené lokality
+(`loc:<typ>:<id>`), Cyklobazar `cooldownUntil` (pauza 12 h po ověření Cloudflare), `newHorizonAt`, `newestPostedAt`,
+`sweep`, `sweepDoneAt`, `sitemapCount`, `sitemapLow`.
+
 ## Klasifikace (`src/classify`)
 
 `classifyListing({source, title, description, params, categorySrc, priceCzk, sellerType}, {now?})` →

@@ -249,3 +249,10 @@ test('ručně označené titulky z „Ostatní cyklistika“: přesnost ≥ 95 %
   assert.ok(n >= 150);
   assert.ok(ok / n >= 0.95, `přesnost ${ok}/${n}`);
 });
+
+test('web řadí inzerát mimo kola (Cyklobazar „Mimo kategorii kol“) → nekolo i se silným titulkem', () => {
+  const { classifyListing } = require('../src/classify');
+  const r = classifyListing({ source: 'cyklobazar', title: 'Horské kolo Trek – sada kol zapletená', params: { 'Mimo kategorii kol': 'ano' } });
+  assert.equal(r.isBike, false);
+  assert.match(r.reason, /mimo kategorii/);
+});

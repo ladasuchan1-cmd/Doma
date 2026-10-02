@@ -45,7 +45,7 @@ const FIELD_MAP = {
 
 // Parametry, které se mění bez změny kola (konec aukce, platnost, rezervace) – nemění otisk obsahu,
 // aby se kvůli nim znovu neklasifikovalo a hlavně znovu neplatilo AI nacenění.
-const VOLATILE_PARAMS = new Set(['Konec', 'Typ nabídky', 'Platnost do', 'Rezervováno', 'Ochrana kupujícího']);
+const VOLATILE_PARAMS = new Set(['Konec', 'Typ nabídky', 'Platnost do', 'Rezervováno', 'Ochrana kupujícího', 'Upraveno']);
 
 function contentHash(row) {
   const params = Object.fromEntries(Object.entries(row.params || {}).filter(([k]) => !VOLATILE_PARAMS.has(k)));

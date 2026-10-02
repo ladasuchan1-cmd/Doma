@@ -218,3 +218,10 @@ test('ctx.markSeen: aktivní podle sitemapy → není zmizelý; refreshDetail vy
   assert.equal(db.prepare('SELECT COUNT(*) AS n FROM listings WHERE gone_at IS NOT NULL').get().n, 0);
   assert.deepEqual(src.detailCalls.sort(), ['1:a', '1:b', '2:b']);
 });
+
+test('contentHash: čas úpravy („Upraveno“) nemění otisk (žádné zbytečné AI přecenění)', () => {
+  const { contentHash } = require('../src/pipeline');
+  const base = { title: 'Kolo', price_czk: 1000, description: 'x' };
+  assert.equal(contentHash({ ...base, params: { Upraveno: '1. 10. 2026' } }), contentHash({ ...base, params: { Upraveno: '2. 10. 2026' } }));
+  assert.notEqual(contentHash({ ...base, params: { Velikost: 'M' } }), contentHash({ ...base, params: { Velikost: 'L' } }));
+});

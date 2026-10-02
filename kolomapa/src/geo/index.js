@@ -254,6 +254,11 @@ function resolveLocation(loc = {}) {
     const k = krajAt(lat, lon);
     if (k) return { lat, lon, kraj: k, okres: loc.okres || null, precision: 'exact', place: loc.locationText || null };
   }
+  // Okres, který v ČR neexistuje (Cyklobazar: „Žilina, okres Žilina“) → zahraničí; neumisťovat na českou obec
+  // stejného jména. Praha a „Hlavní město Praha“ jsou v pořádku.
+  if (loc.okres && !/praha/i.test(String(loc.okres)) && !okresSeat.has(placeKey(String(loc.okres).replace(/\bokres\b/gi, ' ')))) {
+    return { lat: null, lon: null, kraj: null, okres: String(loc.okres), precision: null, foreign: true };
+  }
   let krajHint = krajFromText(loc.kraj) || null;
   // Části textu, které jsou jen názvem kraje („Brno, Jihomoravský kraj“, „Kraj Vysočina“), použijeme jako nápovědu.
   let rawText = String(loc.locationText || '');
