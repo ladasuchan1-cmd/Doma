@@ -7,7 +7,8 @@ test('výchozí konfigurace', () => {
   const c = loadConfig({});
   assert.equal(c.port, 8090);
   assert.equal(c.host, '127.0.0.1');
-  assert.deepEqual(c.sources, ['bazos', 'sbazar']);
+  // výchozí jen Bazoš (robots.txt Sbazaru zakazuje všem robotům, Aukro/Cyklobazar na vyžádání)
+  assert.deepEqual(c.sources, ['bazos']);
   assert.deepEqual(c.schedule, { hour: 5, minute: 30 });
   assert.equal(c.ai.enabled, false);
   assert.equal(c.ai.model, 'claude-opus-5-5');
@@ -60,8 +61,8 @@ test('zdroje: diakritika, velká písmena a domény; překlep → varování, ni
   assert.deepEqual(loadConfig({ KOLOMAPA_SOURCES: 'Bazoš; www.Sbazar.cz' }).sources, ['bazos', 'sbazar']);
   assert.deepEqual(loadConfig({ KOLOMAPA_SOURCES: 'Cyklobazar' }).sources, ['cyklobazar']);
   const typo = loadConfig({ KOLOMAPA_SOURCES: 'cyklobazr' });
-  assert.deepEqual(typo.sources, ['bazos', 'sbazar']); // dřív [] → každý běh „Žádný ze zdrojů nejde načíst“
-  assert.match(typo.warnings.join('\n'), /neznám „cyklobazr“.*Stahuji z: bazos, sbazar/);
+  assert.deepEqual(typo.sources, ['bazos']); // dřív [] → každý běh „Žádný ze zdrojů nejde načíst“
+  assert.match(typo.warnings.join('\n'), /neznám „cyklobazr“.*Stahuji z: bazos/);
   const mixed = loadConfig({ KOLOMAPA_SOURCES: 'aukro, bazos, nic' });
   assert.deepEqual(mixed.sources, ['bazos', 'aukro']);
   assert.match(mixed.warnings[0], /„nic“/);

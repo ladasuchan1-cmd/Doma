@@ -1,32 +1,28 @@
 'use strict';
 // Bazoš (bazos.cz) – inzeráty kol.
 //
-// Data bereme z neveřejného JSON API mobilní aplikace Bazoše (robots.txt /api/ nezakazuje, bez cookies a přihlášení):
-//   výpis  https://www.bazos.cz/api/v1/ads.php?offset=0&limit=200&section=sp&category=256
-//          – nejnovější první, placené TOP inzeráty na začátku (a pár dalších roztroušeně), `topped` je ŘETĚZEC,
-//          – stránkuje se offsetem až do konce kategorie (ověřeno 2. 10. 2026: horská kola 11 943 inzerátů = stejně
-//            jako HTML výpis; za koncem vrací []). Stránka může mít i méně než `limit` položek (např. 199) –
-//            konec poznáme až podle prázdné stránky.
-//   detail https://www.bazos.cz/api/v1/ad-detail-2.php?ad_id=224568683
+// Pravidla webu (robots.txt www/sport/deti.bazos.cz, ověřeno 2. 10. 2026) zakazují mimo jiné adresy s parametry
+// category=, order=, hledat=, cenaod=, cenado=, rubriky=, type=, idphone=, idmail= a skripty search.php, ad-phone.php …
+// Proto (a každý požadavek hlídá assertAllowed):
+//   výpis  HTML stránky kategorií https://sport.bazos.cz/horska/, /horska/20/, … (20 inzerátů na stránku, odkaz
+//          „Další“; dětská kola https://deti.bazos.cz/kola/) – nejnovější první, placené TOP inzeráty nahoře;
+//          JSON výpis mobilního API (ads.php?…&category=…) se NEPOUŽÍVÁ – parametr category= robots.txt zakazuje.
+//   detail https://www.bazos.cz/api/v1/ad-detail-2.php?ad_id=224568683 (žádný zakázaný parametr)
 //          – plný popis, PSČ, přibližné souřadnice (≈ těžiště PSČ), všechny fotky, počet inzerátů prodejce;
 //            smazaný inzerát → HTTP 410 {"status":"deleted"}.
-// HTML výpis (https://sport.bazos.cz/horska/20/ …, 20 inzerátů na stránku, odkaz „Další“) je záloha:
-//   - když API pro kategorii vůbec neodpoví (nebo vrátí prázdnou 1. stránku), projde se výpis přes HTML,
-//   - v celém průchodu se po konci API stáhne 1 HTML stránka na konci výpisu – kdyby API někdy vracelo jen část
-//     výpisu (má „Další“), pokračuje se HTML stránkami až na konec.
+// Celý průchod HTML (~1 700 stránek, ~35 min) jednou za 7 dní (defaultFullScanDays), mezi tím jen novinky
+// (pár stránek na kategorii) – šetrné k webu.
 // Zvláštnosti ověřené živě (2. 10. 2026), na kterých stojí pojistky „úplného“ průchodu:
-//   - API pro neznámou kategorii vrací [] se stavem 200,
-//   - HTML stránka za koncem výpisu = HTTP 404 s hlavičkou „Zobrazeno … z N“ a bez inzerátů,
-//   - neexistující HTML kategorie = HTTP 404, ale s výpisem CELÉ sekce Sport a „Další“ na /20/.
+//   - stránka za koncem výpisu = HTTP 404 s hlavičkou „Zobrazeno … z N“ a bez inzerátů,
+//   - neexistující kategorie = HTTP 404, ale s výpisem CELÉ sekce Sport a „Další“ na /20/.
 // Úplný průchod (→ pipeline označí neviděné inzeráty jako zmizelé) proto nikdy není prázdná kategorie, 404 na začátku
-// výpisu, výrazně méně inzerátů, než uvádí web, ani prázdná stránka API hned po plné bez potvrzení přes HTML.
+// výpisu, přesměrování jinam, nesouhlasné stránkování ani výrazně méně inzerátů, než uvádí web.
 // Bazoš nemá strukturované parametry (velikost rámu, rok …) – ty se vytěží z textu v src/classify.
 // Osobní údaje (jméno, telefon, e-mail, ID prodejce) se nikdy nečtou ani neukládají.
 
 const { decodeEntities, htmlToText, fold, parseCzk, parseCzDate, parsePsc } = require('../util/text');
 
 const API = 'https://www.bazos.cz/api/v1';
-const API_LIMIT = 200;
 const HTML_PAGE_SIZE = 20;
 /** Inkrementální režim: skončit po tolika stránkách po sobě, kde jsou všechny ne-TOP inzeráty známé a beze změny. */
 const STALE_PAGES_TO_STOP = 2;
@@ -35,20 +31,50 @@ const HARD_MAX_PAGES = 2000;
 
 /**
  * Kategorie s koly. Vynechané: koloběžky (sp/450) a součástky.
- * section = sekce API, id = kategorie API, host + path = HTML výpis.
+ * id = číslo kategorie, jak ho uvádí detail API (category.id); host + path = HTML výpis.
  */
 const CATEGORIES = [
-  { key: 'horska', label: 'Horská kola', section: 'sp', id: '256', host: 'sport.bazos.cz', path: '/horska/' },
-  { key: 'elektrokola', label: 'Elektrokola', section: 'sp', id: '465', host: 'sport.bazos.cz', path: '/elektrokola/' },
-  { key: 'silnicni', label: 'Silniční kola', section: 'sp', id: '257', host: 'sport.bazos.cz', path: '/silnicni/' },
-  { key: 'cyklistika', label: 'Ostatní cyklistika', section: 'sp', id: '259', host: 'sport.bazos.cz', path: '/cyklistika/' },
-  { key: 'detska', label: 'Dětská kola', section: 'de', id: '456', host: 'deti.bazos.cz', path: '/kola/' },
+  { key: 'horska', label: 'Horská kola', id: '256', host: 'sport.bazos.cz', path: '/horska/' },
+  { key: 'elektrokola', label: 'Elektrokola', id: '465', host: 'sport.bazos.cz', path: '/elektrokola/' },
+  { key: 'silnicni', label: 'Silniční kola', id: '257', host: 'sport.bazos.cz', path: '/silnicni/' },
+  { key: 'cyklistika', label: 'Ostatní cyklistika', id: '259', host: 'sport.bazos.cz', path: '/cyklistika/' },
+  { key: 'detska', label: 'Dětská kola', id: '456', host: 'deti.bazos.cz', path: '/kola/' },
 ];
 const CAT_BY_ID = new Map(CATEGORIES.map((c) => [c.id, c]));
 
-const apiListUrl = (cat, offset) => `${API}/ads.php?offset=${offset}&limit=${API_LIMIT}&section=${cat.section}&category=${cat.id}`;
 const apiDetailUrl = (id) => `${API}/ad-detail-2.php?ad_id=${encodeURIComponent(id)}`;
 const htmlListUrl = (cat, offset) => `https://${cat.host}${cat.path}${offset > 0 ? `${offset}/` : ''}`;
+
+// ---------------------------------------------------------------- robots.txt
+
+/** Cesty a parametry, které robots.txt Bazoše (User-agent: *) zakazuje – nikdy na ně nechodit. */
+const ROBOTS_DISALLOWED = [
+  /^\/search\.php/i,
+  /hledat=/i,
+  /hlokalita=/i,
+  /humkreis/i,
+  /order=/i,
+  /cenaod=/i,
+  /cenado=/i,
+  /rubriky=/i,
+  /type=/i,
+  /category=/i,
+  /idphone=/i,
+  /idmail=/i,
+  /idtrans=/i,
+  /^\/(hodnoceni|hodnotit|report|report2|doporucit|suggest|suggestpsc|suggestpscinsert|ad-phone|ad-mail|agent|agentcancel|obnovit|doklad|comgateok|comgate2)\.php/i,
+];
+
+/** Vyhodí chybu, pokud by adresa porušila robots.txt Bazoše (pojistka proti budoucí změně kódu). */
+function assertAllowed(url) {
+  const u = new URL(url);
+  if (!/(^|\.)bazos\.cz$/i.test(u.hostname)) throw new Error(`Bazoš: adresa mimo bazos.cz (${url})`);
+  const target = u.pathname + u.search;
+  for (const rx of ROBOTS_DISALLOWED) {
+    if (rx.test(rx.source.startsWith('^') ? u.pathname : target)) throw new Error(`Bazoš: adresu ${url} zakazuje robots.txt webu – nestahuji`);
+  }
+  return true;
+}
 
 // ---------------------------------------------------------------- chyby a blokace
 
@@ -90,6 +116,7 @@ function throwIfAborted(ctx) {
 
 /** GET přes sdílený ctx.http (šetrné pauzy, opakování). HTTP 403/429 = blokace. */
 async function fetchText(ctx, url, { okStatuses = [], accept } = {}) {
+  assertAllowed(url);
   const st = stateOf(ctx);
   if (st.blocked) throw st.blocked;
   throwIfAborted(ctx);
@@ -135,7 +162,7 @@ function toInt(v) {
   return d ? Number(d) : null;
 }
 
-/** Titulek: dekódované entity, jedna mezera mezi slovy (stejně pro API výpis, detail i HTML → bez falešných změn). */
+/** Titulek: dekódované entity, jedna mezera mezi slovy (stejně pro HTML výpis i detail → bez falešných změn). */
 function cleanTitle(s) {
   return decodeEntities(String(s ?? ''))
     .replace(/[\s\u00a0]+/g, ' ')
@@ -239,7 +266,7 @@ function parsePrice(formatted, { price, priceType, currency } = {}) {
   return { priceCzk: null, priceNote: (word && word[1]) || PRICE_TYPE_NOTE[type] || text || null };
 }
 
-/** Fotka v plné velikosti (~1200×900): /img/1m/… (API výpis) i /img/1t/… (HTML výpis) → /img/1/…; bez fotky → null. */
+/** Fotka v plné velikosti (~1200×900): /img/1m/… i /img/1t/… (náhledy) → /img/1/…; bez fotky → null. */
 function fullPhotoUrl(u) {
   const s = String(u ?? '').trim();
   if (!/^https?:\/\//i.test(s) || /empty\.gif|nofoto|\/obrazky\//i.test(s)) return null;
@@ -283,41 +310,6 @@ function validCoord(lat, lon) {
 }
 
 // ---------------------------------------------------------------- parsery
-
-/**
- * Výpis z API (ads.php) → [{item, isTop}]. Neplatné položky se přeskočí.
- * @param {any} data rozparsovaný JSON
- * @param {{label: string}} cat
- */
-function parseApiList(data, cat) {
-  if (!Array.isArray(data)) throw new Error(`Bazoš API: výpis ${cat.label} není pole (${typeof data})`);
-  const out = [];
-  for (const x of data) {
-    if (!x || typeof x !== 'object') continue;
-    const sourceId = validId(x.id);
-    const url = validAdUrl(x.url, sourceId);
-    const title = cleanTitle(x.title);
-    if (!sourceId || !url || !title) continue;
-    const isTop = toBool(x.topped);
-    const item = {
-      sourceId,
-      url,
-      title,
-      ...parsePrice(x.price_formatted, { currency: x.currency }),
-      categorySrc: cat.label,
-      locationText: cleanTitle(x.locality) || undefined,
-      views: toInt(x.views) ?? undefined,
-      detailComplete: false,
-    };
-    // U TOP inzerátů je „from“ čas požadavku / posledního topování → nepoužitelné (a nesmí přepsat známé datum).
-    if (!isTop) item.postedAt = pragueLocalToIso(x.from) || rfcToIso(x.from) || undefined;
-    const photo = fullPhotoUrl(x.image_thumbnail);
-    if (photo) item.photoUrl = photo;
-    else if (/empty\.gif/i.test(String(x.image_thumbnail ?? ''))) item.photoCount = 0;
-    out.push({ item, isTop });
-  }
-  return out;
-}
 
 /**
  * Detail z API (ad-detail-2.php) → {gone: true} | {gone: false, item, categoryId}.
@@ -454,90 +446,22 @@ async function emitItem(ctx, run, item) {
   return { emitted: true, known: !!r && r.isNew === false && !r.changed };
 }
 
-/**
- * Projde stránky jedné kategorie přes API. Vrací {complete, pages, positions, endedShort, apiFailed}.
- * apiFailed = API neodpovědělo hned na 1. stránce nebo ji vrátilo prázdnou (→ zkusit HTML).
- * endedShort = poslední neprázdná stránka byla kratší než limit (přirozený konec výpisu; prázdná stránka hned po
- * plné stránce může být i omezení ze strany webu).
- */
-async function scanApi(ctx, cat, run) {
-  const full = ctx.mode === 'full';
-  const maxPages = Math.min(Number(ctx.maxPages) > 0 ? Number(ctx.maxPages) : HARD_MAX_PAGES, HARD_MAX_PAGES);
-  let offset = 0;
-  let pages = 0;
-  let stale = 0;
-  let lastLen = 0;
-  let noFresh = 0;
-  for (;;) {
-    throwIfAborted(ctx);
-    if (pages >= maxPages) {
-      ctx.log?.[full ? 'warn' : 'debug']?.(`Bazoš ${cat.label}: dosažen limit ${maxPages} stránek výpisu (KOLOMAPA_MAX_PAGES)`);
-      return { complete: false, pages, positions: offset, stoppedEarly: !full };
-    }
-    const url = apiListUrl(cat, offset);
-    let raw;
-    let list;
-    try {
-      const res = await fetchText(ctx, url, { accept: 'application/json' });
-      raw = parseApiJson(ctx, res.text, url);
-      list = parseApiList(raw, cat); // jiný JSON než pole → chyba
-      if (raw.length && !list.length) throw new Error(`Bazoš API: výpis ${cat.label} má neznámý formát položek`);
-      // Neznámá (přečíslovaná) kategorie vrací [] se stavem 200 (ověřeno živě) – kategorie s koly prázdná nebývá.
-      if (pages === 0 && !raw.length) throw new Error(`Bazoš API: prázdný výpis kategorie ${cat.label}`);
-    } catch (e) {
-      if (isBlocked(e) || ctx.signal?.aborted) throw e;
-      if (pages === 0) return { complete: false, pages, positions: 0, apiFailed: e };
-      throw e;
-    }
-    pages++;
-    // Posun o skutečný počet vrácených pozic (stránka může mít i méně než limit) – konec až u prázdné stránky.
-    offset += raw.length;
-    if (!raw.length) return { complete: true, pages, positions: offset, endedShort: lastLen < API_LIMIT };
-    lastLen = raw.length;
-    let fresh = 0;
-    let nonTop = 0;
-    let nonTopKnown = 0;
-    for (const { item, isTop } of list) {
-      if (run.seen.has(item.sourceId)) continue; // TOP inzerát už viděný výš v této kategorii
-      fresh++;
-      const r = await emitItem(ctx, run, item);
-      if (!isTop && r.emitted) {
-        nonTop++;
-        if (r.known) nonTopKnown++;
-      }
-    }
-    ctx.log?.debug?.(`Bazoš ${cat.label}: API stránka ${pages}`, { offset, items: list.length, fresh, nonTop, nonTopKnown });
-    if (!fresh) {
-      // Krátká stránka samých viděných ID = posun výpisu (během průchodu přibyly nové inzeráty nahoře) → pokračovat.
-      // Velká nebo opakovaná = API ignoruje offset / zacyklilo se → raději neúplný průchod.
-      if (raw.length >= 50 || ++noFresh >= 2) {
-        ctx.log?.warn?.(`Bazoš ${cat.label}: API vrací stále stejné inzeráty (offset ${offset}) – končím kategorii`);
-        return { complete: false, pages, positions: offset };
-      }
-    } else noFresh = 0;
-    if (!full && nonTop > 0) {
-      stale = nonTopKnown === nonTop ? stale + 1 : 0;
-      if (stale >= STALE_PAGES_TO_STOP) return { complete: false, pages, positions: offset, stoppedEarly: true };
-    }
-  }
-}
-
 /** Leží URL ve výpisu dané kategorie (stejný host, cesta pod cat.path)? */
 function inCategoryList(u, cat) {
   try {
     const x = new URL(u);
-    return x.host === cat.host && x.pathname.startsWith(cat.path);
+    // bez parametrů v adrese (?order=, ?hledat= … zakazuje robots.txt)
+    return x.host === cat.host && x.pathname.startsWith(cat.path) && x.search === '';
   } catch {
     return false;
   }
 }
 
 /**
- * Projde HTML stránky výpisu od startOffset (záloha za API / ověření konce výpisu). Vrací {complete, pages, ok, total}.
- * @param {{verify?: boolean, apiEndedShort?: boolean, apiPositions?: number, pagesUsed?: number}} o verify = ověřovací
- *   stránka po API: když selže, platí výsledek API – ale jen pokud API skončilo přirozeně kratší stránkou (apiEndedShort)
+ * Projde HTML stránky výpisu kategorie od startOffset. Vrací {complete, pages, ok, total}.
+ * complete = došel až na konec výpisu (žádný „Další“ / stránka za koncem) bez chyby.
  */
-async function scanHtml(ctx, cat, run, startOffset, { verify = false, apiEndedShort = false, apiPositions = 0, pagesUsed = 0 } = {}) {
+async function scanHtml(ctx, cat, run, startOffset, { pagesUsed = 0 } = {}) {
   const full = ctx.mode === 'full';
   const maxPages = Math.min(Number(ctx.maxPages) > 0 ? Number(ctx.maxPages) : HARD_MAX_PAGES, HARD_MAX_PAGES);
   let url = htmlListUrl(cat, startOffset);
@@ -546,47 +470,33 @@ async function scanHtml(ctx, cat, run, startOffset, { verify = false, apiEndedSh
   let total = null;
   while (url) {
     throwIfAborted(ctx);
-    // Jedna ověřovací stránka po API se do limitu nepočítá.
-    if (!(verify && pages === 0) && pagesUsed + pages >= maxPages) {
+    if (pagesUsed + pages >= maxPages) {
       ctx.log?.[full ? 'warn' : 'debug']?.(`Bazoš ${cat.label}: dosažen limit ${maxPages} stránek výpisu (KOLOMAPA_MAX_PAGES)`);
       return { complete: false, pages, ok: true, total };
     }
     const offset = offsetOfHtmlUrl(url);
-    let page;
-    let status;
-    try {
-      const res = await fetchText(ctx, url, { okStatuses: [404] });
-      status = res.status;
-      // Přesměrování mimo výpis kategorie (zrušená / přejmenovaná kategorie) → cizí inzeráty nebrat.
-      if (!inCategoryList(res.url, cat)) throw new Error(`Bazoš: výpis ${cat.label} přesměrován jinam (${res.url})`);
-      page = parseListHtml(res.text, url, cat);
-      if (status === 404) {
-        // 404 za koncem výpisu: hlavička „Zobrazeno … z N“ s N ≤ offset a žádné inzeráty (ověřeno živě).
-        // Neexistující kategorie vrací 404 s inzeráty CELÉ sekce (a „Další“ na /20/) → nikdy je nepřebírat.
-        if (offset === 0 || page.items.length || (page.total != null && page.total > offset)) {
-          throw new Error(`Bazoš: výpis ${cat.label} neexistuje (HTTP 404 ${url})`);
-        }
-      } else if (!page.ok) {
-        if (BLOCK_RX.test(res.text)) throw markBlocked(ctx, 'captcha / ověření místo výpisu', url);
-        throw new Error(`Bazoš: stránka výpisu ${url} nemá očekávanou podobu (změna webu?)`);
+    // Chyby (včetně blokace a přerušení) propadají k volajícímu.
+    const res = await fetchText(ctx, url, { okStatuses: [404] });
+    const status = res.status;
+    // Přesměrování mimo výpis kategorie (zrušená / přejmenovaná kategorie) → cizí inzeráty nebrat.
+    if (!inCategoryList(res.url, cat)) throw new Error(`Bazoš: výpis ${cat.label} přesměrován jinam (${res.url})`);
+    const page = parseListHtml(res.text, url, cat);
+    if (status === 404) {
+      // 404 za koncem výpisu: hlavička „Zobrazeno … z N“ s N ≤ offset a žádné inzeráty (ověřeno živě).
+      // Neexistující kategorie vrací 404 s inzeráty CELÉ sekce (a „Další“ na /20/) → nikdy je nepřebírat.
+      if (offset === 0 || page.items.length || (page.total != null && page.total > offset)) {
+        throw new Error(`Bazoš: výpis ${cat.label} neexistuje (HTTP 404 ${url})`);
       }
-    } catch (e) {
-      if (isBlocked(e) || ctx.signal?.aborted) throw e;
-      if (verify && pages === 0) {
-        ctx.log?.warn?.(
-          `Bazoš ${cat.label}: kontrola konce výpisu přes HTML selhala – ${apiEndedShort ? 'beru výsledek API' : 'API skončilo podezřele (prázdná stránka po plné), průchod beru jako neúplný'}`,
-          { url, error: e.message }
-        );
-        return { complete: apiEndedShort, pages, ok: false, total };
-      }
-      throw e;
+    } else if (!page.ok) {
+      if (BLOCK_RX.test(res.text)) throw markBlocked(ctx, 'captcha / ověření místo výpisu', url);
+      throw new Error(`Bazoš: stránka výpisu ${url} nemá očekávanou podobu (změna webu?)`);
     }
     pages++;
     if (page.total != null) total = page.total;
     if (status === 404) return { complete: true, pages, ok: true, total }; // za koncem výpisu
     if (page.first != null && page.items.length && page.first !== offset + 1) {
       ctx.log?.warn?.(`Bazoš ${cat.label}: HTML stránkování nesouhlasí (čekal jsem ${offset + 1}, web ukazuje ${page.first})`, { url });
-      return { complete: verify && pages === 1 && !page.next, pages, ok: false, total };
+      return { complete: false, pages, ok: false, total };
     }
     let fresh = 0;
     let nonTop = 0;
@@ -605,13 +515,6 @@ async function scanHtml(ctx, cat, run, startOffset, { verify = false, apiEndedSh
       }
     }
     ctx.log?.debug?.(`Bazoš ${cat.label}: HTML stránka`, { url, items: page.items.length, fresh, total: page.total });
-    if (verify && pages === 1 && page.next) {
-      // Pár inzerátů navíc = přibyly během průchodu (stačí 1–2 HTML stránky); víc = API vrací jen část výpisu.
-      const capped = page.total == null || page.total > apiPositions + HTML_PAGE_SIZE;
-      ctx.log?.[capped ? 'warn' : 'debug']?.(
-        `Bazoš ${cat.label}: ${capped ? 'API nevrátilo celý výpis' : 'výpis se během průchodu posunul'} (API ${apiPositions}, web uvádí ${page.total ?? '?'} inzerátů) – pokračuji HTML stránkami`
-      );
-    }
     if (!full && nonTop > 0) {
       stale = nonTopKnown === nonTop ? stale + 1 : 0;
       if (stale >= STALE_PAGES_TO_STOP) return { complete: false, pages, ok: true, total };
@@ -633,19 +536,8 @@ const MIN_SEEN_RATIO = 0.9;
 async function scanCategory(ctx, cat, run) {
   const before = run.emitted;
   const seenBefore = run.seen.size;
-  const api = await scanApi(ctx, cat, run);
-  let complete = api.complete;
-  let html = null;
-  if (api.apiFailed) {
-    ctx.log?.warn?.(`Bazoš ${cat.label}: API nefunguje (${api.apiFailed.message}) – zkouším HTML výpis`);
-    html = await scanHtml(ctx, cat, run, 0, { pagesUsed: 0 });
-    complete = html.complete;
-  } else if (ctx.mode === 'full' && api.complete) {
-    // Ověření konce: HTML stránka, kde API skončilo. Má-li „Další“, API vrátilo jen část výpisu → pokračovat HTML.
-    const start = Math.max(0, Math.floor((api.positions - 1) / HTML_PAGE_SIZE) * HTML_PAGE_SIZE);
-    html = await scanHtml(ctx, cat, run, start, { verify: true, apiEndedShort: !!api.endedShort, apiPositions: api.positions, pagesUsed: api.pages });
-    complete = html.complete;
-  }
+  const html = await scanHtml(ctx, cat, run, 0, { pagesUsed: 0 });
+  let complete = html.complete;
   // Pojistky proti „úplnému“ průchodu, který ve skutečnosti úplný není (pipeline by pak označila živé inzeráty jako
   // zmizelé): kategorie s koly není nikdy prázdná a počet viděných inzerátů musí odpovídat počtu na webu.
   const seenCat = run.seen.size - seenBefore;
@@ -653,14 +545,13 @@ async function scanCategory(ctx, cat, run) {
     if (!seenCat) {
       ctx.log?.warn?.(`Bazoš ${cat.label}: průchod nenašel žádný inzerát – beru jako neúplný`);
       complete = false;
-    } else if (html?.total && seenCat < html.total * MIN_SEEN_RATIO) {
+    } else if (html.total && seenCat < html.total * MIN_SEEN_RATIO) {
       ctx.log?.warn?.(`Bazoš ${cat.label}: viděno jen ${seenCat} z ${html.total} inzerátů, které uvádí web – beru jako neúplný průchod`);
       complete = false;
     }
   }
   ctx.log?.info?.(`Bazoš ${cat.label}: ${run.emitted - before} inzerátů`, {
-    apiPages: api.pages,
-    htmlPages: html ? html.pages : 0,
+    pages: html.pages,
     complete: ctx.mode === 'full' ? complete : undefined,
   });
   return { complete };
@@ -740,6 +631,8 @@ module.exports = {
   key: 'bazos',
   /** Detailů za běh (API detail je lehký; prvotní dočtení ~33 tis. inzerátů trvá několik nocí). */
   defaultMaxDetails: 4000,
+  /** Celý HTML průchod (~1 700 stránek) jednou týdně; denně jen novinky. Zmizelé se pak ověří přes detail (410). */
+  defaultFullScanDays: 7,
   label: 'Bazoš',
   homepage: 'https://www.bazos.cz',
   requiresBrowser: false,
@@ -749,10 +642,10 @@ module.exports = {
   // pro testy a ladění
   CATEGORIES,
   BazosBlockedError,
-  apiListUrl,
   apiDetailUrl,
+  assertAllowed,
+  ROBOTS_DISALLOWED,
   htmlListUrl,
-  parseApiList,
   parseApiDetail,
   parseListHtml,
   parsePrice,

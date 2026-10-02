@@ -12,17 +12,19 @@
 //   KOLOMAPA_ALLOWED_HOSTS      další jména serveru povolená bez hesla (čte server.js; ochrana proti DNS rebinding)
 //   KOLOMAPA_DB                 soubor databáze (výchozí <projekt>/data/kolomapa.db; ':memory:' pro testy)
 //   KOLOMAPA_PUBLIC_DIR         adresář s UI (výchozí <projekt>/public)
-//   KOLOMAPA_SOURCES            zapnuté zdroje, čárkou (výchozí bazos,sbazar). Na vyžádání: aukro (robots.txt blokuje
-//                               ClaudeBota) a cyklobazar (Cloudflare omezuje roboty; potřebuje Playwright, jde velmi
-//                               pomalu a při ověření „jste člověk?“ se zastaví) – rozhodnutí je na provozovateli.
+//   KOLOMAPA_SOURCES            zapnuté zdroje, čárkou (výchozí jen bazos – jediný web, jehož robots.txt potřebné stránky
+//                               povoluje). Na vyžádání (rozhodnutí provozovatele): sbazar (robots.txt zakazuje všem
+//                               robotům kromě vyhledávačů), aukro (robots.txt blokuje ClaudeBota), cyklobazar
+//                               (Cloudflare omezuje roboty; potřebuje Playwright, jde velmi pomalu a při ověření se zastaví).
 //   KOLOMAPA_SCHEDULE           čas denního běhu „HH:MM“ (i „5.30“) v místním čase (výchozí 05:30); „off“ = bez plánovače
 //   KOLOMAPA_RUN_ON_START       1 = při startu serveru hned spustit stahování, pokud dnes ještě neproběhlo (výchozí 1)
 //   KOLOMAPA_DELAY_MS           pauza mezi požadavky na jeden web v ms (výchozí 1200 – šetrné k webům)
-//   KOLOMAPA_MAX_PAGES          max. stránek výpisu na kategorii za běh (výchozí 400; ochrana před nekonečným během)
+//   KOLOMAPA_MAX_PAGES          max. stránek výpisu na kategorii za běh (výchozí 1000 – horská kola na Bazoši mají ~600 stránek)
 //   KOLOMAPA_MAX_DETAILS        max. detailů inzerátů na zdroj za běh (výchozí podle zdroje: Bazoš 4000, Sbazar 2000,
 //                               Aukro 300, Cyklobazar 120 – zbytek se dočte další dny; nastavení platí pro všechny,
 //                               Cyklobazar ale nikdy víc než 300 za běh)
-//   KOLOMAPA_FULL_SCAN_DAYS     jak často projít výpis celý (kvůli odhalení prodaných/smazaných) – dny (výchozí 1)
+//   KOLOMAPA_FULL_SCAN_DAYS     jak často projít výpis celý (kvůli odhalení prodaných/smazaných) – dny (výchozí podle
+//                               zdroje: Bazoš 7 – mezitím se zmizelé ověřují přes detail; ostatní 1)
 //   KOLOMAPA_SBAZAR_MAX_RESOLVE max. nových lokalit Sbazaru přeložených na souřadnice za běh (výchozí 400)
 //   KOLOMAPA_MIN_PRICE          nové inzeráty s cenou pod touto hranicí se ignorují (výchozí 200 Kč – levná dětská kola)
 //   KOLOMAPA_GONE_KEEP_DAYS     jak dlouho držet zmizelé inzeráty v DB (historie cen pro učení, výchozí 365)
@@ -42,6 +44,7 @@
 //                               prodejů, jinak 0.35)
 //   KOLOMAPA_STATIC_DIR         kam „npm run export“ zapíše statickou verzi mapy (výchozí <projekt>/dist)
 //   KOLOMAPA_EXPORT_AFTER_RUN   1 = po každém běhu (server i tools/run.js) zapsat i statickou verzi (výchozí 0)
+//   KOLOMAPA_USER_AGENT         identifikace robota v dotazech (výchozí „Mozilla/5.0 (compatible; Kolomapa/1.0; +…)“)
 //   KOLOMAPA_PASSWORD           heslo pro přístup k webu (HTTP Basic, jméno libovolné); prázdné = bez hesla
 //   KOLOMAPA_EVAL_DIR           data pro tools/eval-pricing.js (výchozí data/eval)
 //   LOG_LEVEL                   debug | info | warn | error | silent
@@ -54,7 +57,7 @@ const path = require('node:path');
 
 const PROJECT_DIR = path.join(__dirname, '..');
 const ALL_SOURCES = ['bazos', 'sbazar', 'aukro', 'cyklobazar'];
-const DEFAULT_SOURCES = ['bazos', 'sbazar'];
+const DEFAULT_SOURCES = ['bazos'];
 const DEFAULT_SETTINGS_FILE = path.join(PROJECT_DIR, 'nastaveni.txt');
 
 /** Všechny proměnné, kterým Kolomapa rozumí (kvůli upozornění na překlepy v nastaveni.txt). */
@@ -68,6 +71,7 @@ const KNOWN_KEYS = new Set([
   'KOLOMAPA_STATIC_DIR',
   'KOLOMAPA_EXPORT_AFTER_RUN',
   'KOLOMAPA_PASSWORD',
+  'KOLOMAPA_USER_AGENT',
   'KOLOMAPA_SOURCES',
   'KOLOMAPA_SCHEDULE',
   'KOLOMAPA_RUN_ON_START',
@@ -385,14 +389,16 @@ function loadConfig(env = process.env) {
     publicDir: dir('KOLOMAPA_PUBLIC_DIR', path.join(PROJECT_DIR, 'public')),
     staticDir: dir('KOLOMAPA_STATIC_DIR', path.join(PROJECT_DIR, 'dist')),
     exportAfterRun: bool('KOLOMAPA_EXPORT_AFTER_RUN', false),
-    password: envStr(env.KOLOMAPA_PASSWORD),
+    // heslo se neořezává – mezery na začátku/konci jsou jeho součástí (jen prázdné = bez hesla)
+    password: env.KOLOMAPA_PASSWORD != null && String(env.KOLOMAPA_PASSWORD) !== '' ? String(env.KOLOMAPA_PASSWORD) : null,
+    userAgent: envStr(env.KOLOMAPA_USER_AGENT),
     sources,
     schedule,
     runOnStart: bool('KOLOMAPA_RUN_ON_START', true),
     delayMs: int('KOLOMAPA_DELAY_MS', 1200, { min: 0, max: 60000 }),
-    maxPages: int('KOLOMAPA_MAX_PAGES', 400, { min: 1, max: 100000 }),
+    maxPages: int('KOLOMAPA_MAX_PAGES', 1000, { min: 1, max: 100000 }),
     maxDetails: int('KOLOMAPA_MAX_DETAILS', null, { min: 0, max: 1000000 }),
-    fullScanDays: int('KOLOMAPA_FULL_SCAN_DAYS', 1, { min: 1, max: 60 }),
+    fullScanDays: int('KOLOMAPA_FULL_SCAN_DAYS', null, { min: 1, max: 60 }),
     minPrice: num('KOLOMAPA_MIN_PRICE', 200, { min: 0 }),
     sbazarMaxResolve: int('KOLOMAPA_SBAZAR_MAX_RESOLVE', 400, { min: 0, max: 100000 }),
     goneKeepDays: int('KOLOMAPA_GONE_KEEP_DAYS', 365, { min: 1, max: 10000 }),

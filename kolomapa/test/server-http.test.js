@@ -244,7 +244,8 @@ test('checkBasicAuth', () => {
 
 test('config: KOLOMAPA_PASSWORD a KOLOMAPA_EXPORT_AFTER_RUN', () => {
   assert.equal(loadConfig({}).password, null);
-  assert.equal(loadConfig({ KOLOMAPA_PASSWORD: ' heslo ' }).password, 'heslo');
+  // heslo se neořezává (mezery jsou součástí hesla; v nastaveni.txt je lze zachovat uvozovkami)
+  assert.equal(loadConfig({ KOLOMAPA_PASSWORD: ' heslo ' }).password, ' heslo ');
   assert.equal(loadConfig({}).exportAfterRun, false);
   assert.equal(loadConfig({ KOLOMAPA_EXPORT_AFTER_RUN: '1' }).exportAfterRun, true);
 });

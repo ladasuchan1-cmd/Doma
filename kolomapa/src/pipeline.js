@@ -328,10 +328,12 @@ async function runPipeline(o) {
       // Celý průchod jednou za fullScanDays: podle uplynulého času, ale i podle místního kalendářního dne – denní běh
       // v 05:30 po běhu při startu serveru včera v 15:00 (jen 14,5 h) musí být celý, jinak se zmizelé inzeráty
       // dohledají až o den později.
+      // Frekvence: KOLOMAPA_FULL_SCAN_DAYS (platí pro všechny), jinak výchozí hodnota zdroje (Bazoš přes HTML: 7), jinak 1.
+      const fullDays = config.fullScanDays ?? src.defaultFullScanDays ?? 1;
       const fullDue =
         !lastFullAt ||
-        Date.parse(startedAt) - Date.parse(lastFullAt) >= (config.fullScanDays * 24 - 2) * 3600 * 1000 ||
-        localDay(startedAt) - localDay(lastFullAt) >= config.fullScanDays;
+        Date.parse(startedAt) - Date.parse(lastFullAt) >= (fullDays * 24 - 2) * 3600 * 1000 ||
+        localDay(startedAt) - localDay(lastFullAt) >= fullDays;
       s.mode = fullDue ? 'full' : 'incremental';
       const seenIds = new Set();
       const ctx = {

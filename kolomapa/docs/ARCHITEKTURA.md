@@ -66,6 +66,7 @@ kolomapa/
 module.exports = {
   key: 'bazos', label: 'Bazoš', homepage: 'https://www.bazos.cz', requiresBrowser: false,
   defaultMaxDetails: 4000, // detailů za běh, pokud není nastaveno KOLOMAPA_MAX_DETAILS
+  defaultFullScanDays: 7,  // jak často celý průchod, pokud není nastaveno KOLOMAPA_FULL_SCAN_DAYS (jinak 1)
   async scan(ctx) { /* … await ctx.emit(item) … */ return { complete: true }; },
   async detail(ctx, listing) { return { description, params, photoUrl, … } /* nebo null = inzerát zmizel */ },
   async confirmGone(ctx, listing) { return true /* smazán */ | false /* existuje */ | null /* nevím */; }, // volitelné

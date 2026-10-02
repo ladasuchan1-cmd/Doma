@@ -181,7 +181,7 @@ async function runOnce(o) {
     }
     const sources = loadSources(keys, log);
     if (!sources.length) return recordFailedRun(db, trigger, `Žádný ze zdrojů (${keys.join(', ') || '–'}) nejde načíst.`);
-    const http = createHttp({ delayMs: config.delayMs, log, signal });
+    const http = createHttp({ delayMs: config.delayMs, userAgent: config.userAgent || undefined, log, signal });
     const getBrowser = async () => {
       if (!browserMod) {
         try {

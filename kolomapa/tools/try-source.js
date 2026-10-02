@@ -126,7 +126,7 @@ async function main(argv) {
 
   const controller = new AbortController();
   process.once('SIGINT', () => controller.abort(new Error('Přerušeno (SIGINT)')));
-  const http = createHttp({ delayMs, log, signal: controller.signal });
+  const http = createHttp({ delayMs, userAgent: config.userAgent || undefined, log, signal: controller.signal });
   let browserMod = null;
   const getBrowser = async () => {
     browserMod ||= require('../src/sources/browser');

@@ -95,19 +95,15 @@ function detailFor(x, catId = '256') {
 }
 
 /**
- * Falešný web: lists = {kategorieApi: [položky]}, apiCap = API vrací jen prvních N položek kategorie,
- * pageSize = kolik položek API vrátí na stránku (méně než limit 200 → test posunu offsetu), routes = přepsané URL.
+ * Falešný web: lists = {idKategorie: [položky]} → HTML výpisy kategorií (20 na stránku, 404 s hlavičkou za koncem)
+ * a detail API; details = přepsané odpovědi detailu podle ID, routes = přepsané odpovědi podle celé URL.
+ * Výpis mobilního API (ads.php?…&category=…) zakazuje robots.txt – falešný web ho vůbec nezná.
  */
-function fakeSite({ lists = {}, apiCap = Infinity, pageSize = 20, details = {}, routes = {} } = {}) {
+function fakeSite({ lists = {}, details = {}, routes = {} } = {}) {
   return (url) => {
     if (routes[url] !== undefined) return typeof routes[url] === 'function' ? routes[url](url) : routes[url];
     const u = new URL(url);
-    if (u.pathname === '/api/v1/ads.php') {
-      const all = (lists[u.searchParams.get('category')] || []).slice(0, apiCap);
-      const off = Number(u.searchParams.get('offset'));
-      assert.equal(u.searchParams.get('limit'), '200');
-      return { body: all.slice(off, off + pageSize) };
-    }
+    assert.notEqual(u.pathname, '/api/v1/ads.php', 'výpis API (category=) zakazuje robots.txt');
     if (u.pathname === '/api/v1/ad-detail-2.php') {
       const id = u.searchParams.get('ad_id');
       if (details[id] !== undefined) return details[id];
@@ -145,6 +141,7 @@ function makeHttp(handler) {
     retries: 0,
     sleepImpl: async () => {},
     fetchImpl: async (url) => {
+      bazos.assertAllowed(url); // každý požadavek musí projít pravidly robots.txt
       calls.push(url);
       const r = (await handler(url)) || { status: 404, body: 'Not found' };
       const isText = typeof r.body === 'string';
@@ -187,8 +184,8 @@ function makeCtx(http, { mode = 'full', maxPages = 400, minPrice = 500, known = 
   return { ctx, emitted, known, warns };
 }
 
-const apiCalls = (calls, catId) => calls.filter((u) => u.includes('/api/v1/ads.php') && u.endsWith(`category=${catId}`));
-const htmlCalls = (calls) => calls.filter((u) => !u.includes('/api/'));
+/** Požadavky na HTML výpis dané kategorie (v pořadí). */
+const listCalls = (calls, cat) => calls.filter((u) => u.startsWith(`https://${cat.host}${cat.path}`));
 
 // ---------------------------------------------------------------- parsery
 
@@ -225,62 +222,6 @@ test('pragueLocalToIso: pražský čas → UTC včetně přechodů letního čas
     const iso = bazos.pragueLocalToIso(local);
     assert.equal(pragueStr(Date.parse(iso)), local, `${local} → ${iso}`);
   }
-});
-
-test('parseApiList: reálný výpis – TOP bez data, ceny, fotky v plné velikosti, žádné osobní údaje', () => {
-  const rows = bazos.parseApiList(LIST, CAT.horska);
-  assert.equal(rows.length, LIST.length);
-  const tops = rows.filter((r) => r.isTop);
-  assert.equal(tops.length, 6);
-  for (const r of tops) assert.equal(r.item.postedAt, undefined, 'TOP inzerát nesmí mít postedAt (from = čas požadavku)');
-  const first = rows.find((r) => r.item.sourceId === '224568683').item;
-  assert.deepEqual(
-    { ...first },
-    {
-      sourceId: '224568683',
-      url: 'https://sport.bazos.cz/inzerat/224568683/horske-kolo-giant-talon-1-ge.php',
-      title: 'horské kolo Giant Talon 1 GE',
-      priceCzk: 3000,
-      priceNote: null,
-      categorySrc: 'Horská kola',
-      locationText: 'Brno venkov',
-      views: first.views,
-      detailComplete: false,
-      postedAt: '2026-10-02T13:23:16.000Z',
-      photoUrl: first.photoUrl,
-    }
-  );
-  assert.match(first.photoUrl, /^https:\/\/www\.bazos\.cz\/img\/1\/683\/224568683\.jpg/);
-  const notes = rows.map((r) => r.item.priceNote).filter(Boolean);
-  for (const n of ['Dohodou', 'Nabídněte', 'V textu', 'Nerozhoduje', 'Zdarma']) assert.ok(notes.includes(n), n);
-  assert.ok(notes.some((n) => /1 Kč/.test(n)));
-  const noPhoto = rows.find((r) => r.item.photoCount === 0);
-  assert.ok(noPhoto && !noPhoto.item.photoUrl, 'empty.gif → bez fotky');
-  for (const r of rows) {
-    assert.equal(typeof r.item.views, 'number');
-    for (const k of PERSONAL) assert.equal(r.item[k], undefined);
-    if (!r.isTop) assert.match(r.item.postedAt, /^2026-\d\d-\d\dT\d\d:\d\d:\d\d\.000Z$/);
-  }
-});
-
-test('parseApiList: odolnost vůči změnám typů (topped bool/řetězec, čísla, chybějící pole)', () => {
-  const base = LIST.find((x) => x.topped === 'false');
-  const rows = bazos.parseApiList(
-    [
-      { ...base, id: Number(base.id), topped: true, views: 12 }, // číselné ID, bool topped
-      { ...base, topped: 'false', views: undefined },
-      { ...base, id: 'abc' }, // neplatné ID → vynechat
-      { ...base, url: 'https://example.com/inzerat/1/x.php' }, // cizí doména → vynechat
-      null,
-    ],
-    CAT.horska
-  );
-  assert.equal(rows.length, 2);
-  assert.equal(rows[0].isTop, true);
-  assert.equal(rows[0].item.views, 12);
-  assert.equal(rows[0].item.postedAt, undefined);
-  assert.equal(rows[1].item.views, undefined);
-  assert.throws(() => bazos.parseApiList({ error: 'x' }, CAT.horska), /není pole/);
 });
 
 test('parseApiDetail: reálné detaily – popis, PSČ, souřadnice, fotky, prodejce; smazaný → gone', () => {
@@ -377,47 +318,56 @@ test('parseListHtml: reálné stránky – 1. stránka (TOP, „Další“) a po
 
 // ---------------------------------------------------------------- průchod výpisu
 
-test('scan (celý průchod): API po stránkách až do prázdné stránky + ověření konce přes HTML', async () => {
+test('assertAllowed: jen bazos.cz a nic, co zakazuje robots.txt (výpis API s category= ani hledání)', () => {
+  const ok = [
+    bazos.htmlListUrl(CAT.horska, 0),
+    bazos.htmlListUrl(CAT.horska, 40),
+    bazos.htmlListUrl(CAT.detska, 20),
+    bazos.apiDetailUrl('224568683'),
+    'https://sport.bazos.cz/inzerat/224568683/kolo.php',
+  ];
+  for (const u of ok) assert.equal(bazos.assertAllowed(u), true, u);
+  const bad = [
+    'https://www.bazos.cz/api/v1/ads.php?offset=0&limit=200&section=sp&category=256',
+    'https://sport.bazos.cz/horska/?order=1',
+    'https://sport.bazos.cz/horska/?hledat=kolo&cenaod=1000',
+    'https://www.bazos.cz/search.php?hledat=kolo',
+    'https://www.bazos.cz/ad-phone.php?id=1',
+    'https://sport.bazos.cz/hodnoceni.php?idmail=1',
+    'https://example.com/horska/',
+    'https://bazos.cz.example.com/horska/',
+  ];
+  for (const u of bad) assert.throws(() => bazos.assertAllowed(u), /robots|mimo bazos/, u);
+});
+
+test('scan (celý průchod): HTML stránky kategorií až na konec, jen adresy povolené robots.txt', async () => {
   const kids = synthItems(7, { firstId: 224500000, tops: 1, cat: CAT.detska });
   const { http, calls } = makeHttp(fakeSite({ lists: withAll({ 256: LIST, 456: kids }) }));
   const { ctx, emitted, warns } = makeCtx(http, { mode: 'full', minPrice: 500 });
   const res = await bazos.scan(ctx);
   assert.deepEqual(res, { complete: true });
-  // horská: 31 položek po 20 → offset 0, 20, 31 (prázdná) – posun o skutečný počet položek
-  assert.deepEqual(apiCalls(calls, 256).map((u) => new URL(u).searchParams.get('offset')), ['0', '20', '31']);
-  for (const c of bazos.CATEGORIES) assert.ok(apiCalls(calls, c.id).length >= 1, c.label);
-  // ověřovací HTML stránka na konci každé kategorie (horská od 20, dětská od 0)
-  assert.ok(htmlCalls(calls).includes('https://sport.bazos.cz/horska/20/'));
-  assert.ok(htmlCalls(calls).includes('https://deti.bazos.cz/kola/'));
-  assert.equal(htmlCalls(calls).length, bazos.CATEGORIES.length);
+  // horská: 31 inzerátů po 20 → 2 stránky podle odkazu „Další“; dětská 1 stránka; za konec se nechodí
+  assert.deepEqual(listCalls(calls, CAT.horska), ['https://sport.bazos.cz/horska/', 'https://sport.bazos.cz/horska/20/']);
+  assert.deepEqual(listCalls(calls, CAT.detska), ['https://deti.bazos.cz/kola/']);
+  assert.equal(calls.length, bazos.CATEGORIES.length + 1);
+  for (const u of calls) {
+    assert.ok(!u.includes('ads.php') && !u.includes('?'), `bez výpisu API a parametrů: ${u}`);
+    assert.equal(bazos.assertAllowed(u), true);
+  }
   // 499 Kč je pod minimální cenou → přeskočeno; 1 Kč (cena neuvedena) zůstává
   const ids = emitted.map((x) => x.sourceId);
   assert.equal(new Set(ids).size, ids.length, 'žádné duplicity');
   assert.equal(ids.length, LIST.length - 1 + kids.length + FILLER(['256', '456']));
   assert.ok(!emitted.some((x) => x.priceCzk === 499));
   assert.ok(emitted.some((x) => /1 Kč/.test(x.priceNote || '')));
-  assert.ok(emitted.filter((x) => x.categorySrc === 'Dětská kola').length === 7);
+  assert.equal(emitted.filter((x) => x.categorySrc === 'Dětská kola').length, 7);
   assert.ok(emitted.every((x) => x.url && x.title && x.detailComplete === false));
+  const k = emitted.find((x) => x.sourceId === kids[3].id);
+  assert.equal(k.psc, '60200', 'HTML výpis dává PSČ');
+  assert.match(k.description, /…$/, 'zkrácený popis z výpisu');
+  assert.equal(k.postedAt, bazos.pragueLocalToIso(`${kids[3].from.slice(0, 10)} 00:00:00`), 'nový ne-TOP inzerát dostane datum (den)');
+  assert.equal(emitted.find((x) => x.sourceId === kids[0].id).postedAt, undefined, 'TOP bez data');
   assert.deepEqual(warns, []);
-});
-
-test('scan (celý průchod): API vrátí jen část výpisu → pokračuje HTML stránkami až na konec', async () => {
-  const items = synthItems(95, { tops: 5 });
-  const { http, calls } = makeHttp(fakeSite({ lists: withAll({ 256: items }), apiCap: 40 }));
-  const { ctx, emitted, warns } = makeCtx(http, { mode: 'full' });
-  const res = await bazos.scan(ctx);
-  assert.equal(res.complete, true);
-  assert.deepEqual(
-    htmlCalls(calls).filter((u) => u.includes('/horska/')),
-    ['https://sport.bazos.cz/horska/20/', 'https://sport.bazos.cz/horska/40/', 'https://sport.bazos.cz/horska/60/', 'https://sport.bazos.cz/horska/80/']
-  );
-  const horska = emitted.filter((x) => x.categorySrc === 'Horská kola');
-  assert.equal(horska.length, 95);
-  const fromHtml = horska.find((x) => x.sourceId === items[60].id);
-  assert.equal(fromHtml.psc, '60200', 'HTML výpis dává PSČ');
-  assert.match(fromHtml.description, /…$/);
-  assert.ok(fromHtml.postedAt, 'nový ne-TOP inzerát z HTML dostane datum (den)');
-  assert.ok(warns.some((w) => /API nevrátilo celý výpis/.test(w)));
 });
 
 test('scan (jen novinky): skončí po 2 stránkách samých známých inzerátů, TOP nahoře se nepočítají', async () => {
@@ -436,15 +386,14 @@ test('scan (jen novinky): skončí po 2 stránkách samých známých inzerátů
   const res = await bazos.scan(ctx);
   assert.equal(res.complete, false, 'inkrementální průchod nikdy není úplný');
   // stránka 1: 6 TOP + 5 nových + 9 známých → ne; 2 a 3: samé známé → konec
-  assert.equal(apiCalls(calls, 256).length, 3);
-  assert.equal(htmlCalls(calls).length, 0, 'bez HTML ověření');
+  assert.equal(listCalls(calls, CAT.horska).length, 3);
   for (const f of fresh) assert.ok(emitted.some((x) => x.sourceId === f.id));
   // změna ceny známého inzerátu na 2. stránce → stránka se nepočítá jako „stará“
   const changed = next.map((x, i) => (i === 25 ? { ...x, price_formatted: '1 234 Kč' } : x));
   const h2 = makeHttp(fakeSite({ lists: withAll({ 256: changed }) }));
   const c2 = makeCtx(h2.http, { mode: 'incremental', known });
   await bazos.scan(c2.ctx);
-  assert.equal(apiCalls(h2.calls, 256).length, 4);
+  assert.equal(listCalls(h2.calls, CAT.horska).length, 4);
 });
 
 test('scan: respektuje ctx.maxPages (neúplný průchod)', async () => {
@@ -453,14 +402,14 @@ test('scan: respektuje ctx.maxPages (neúplný průchod)', async () => {
   const { ctx, emitted, warns } = makeCtx(http, { mode: 'full', maxPages: 2 });
   const res = await bazos.scan(ctx);
   assert.equal(res.complete, false);
-  assert.equal(apiCalls(calls, 256).length, 2);
+  assert.equal(listCalls(calls, CAT.horska).length, 2);
   assert.equal(emitted.filter((x) => x.categorySrc === 'Horská kola').length, 40);
   assert.ok(warns.some((w) => /limit 2 stránek/.test(w)));
 });
 
-test('scan: captcha / „Příliš mnoho dotazů“ místo JSONu → okamžitý konec s českou hláškou, žádné další požadavky', async () => {
+test('scan: captcha / „Příliš mnoho dotazů“ místo výpisu → okamžitý konec s českou hláškou, žádné další požadavky', async () => {
   const blockPage = '<html><body><h1>Příliš mnoho dotazů</h1><p>Ověření, že nejste robot: <div class="g-recaptcha"></div></p></body></html>';
-  const { http, calls } = makeHttp(fakeSite({ lists: { 256: LIST }, routes: { [bazos.apiListUrl(CAT.horska, 20)]: { body: blockPage } } }));
+  const { http, calls } = makeHttp(fakeSite({ lists: { 256: LIST }, routes: { 'https://sport.bazos.cz/horska/20/': { body: blockPage } } }));
   const { ctx, emitted } = makeCtx(http);
   await assert.rejects(bazos.scan(ctx), (e) => e instanceof bazos.BazosBlockedError && /zablokoval/.test(e.message));
   assert.equal(calls.length, 2, 'po blokaci už žádná další kategorie');
@@ -476,25 +425,21 @@ test('scan: HTTP 403 = blokace', async () => {
   await assert.rejects(bazos.scan(ctx), /zablokoval.*HTTP 403/);
 });
 
-test('scan: API kategorie nefunguje → záloha přes HTML výpis; chyba jiné kategorie nezastaví ostatní', async () => {
-  const ebikes = synthItems(30, { firstId: 224400000, tops: 3 });
-  const silnicni = synthItems(45, { firstId: 224300000 });
+test('scan: výpadek jedné kategorie (HTTP 500 uprostřed) nezastaví ostatní, průchod pak není úplný', async () => {
+  const ebikes = synthItems(30, { firstId: 224400000, tops: 3, cat: CAT.elektrokola });
+  const silnicni = synthItems(45, { firstId: 224300000, cat: CAT.silnicni });
   const site = fakeSite({
-    lists: { 465: ebikes, 257: silnicni, 256: LIST },
-    routes: {
-      [bazos.apiListUrl(CAT.elektrokola, 0)]: { status: 404, body: '<html>Not found</html>' }, // API pryč → HTML
-      [bazos.apiListUrl(CAT.silnicni, 20)]: { status: 500, body: 'Internal error' }, // výpadek uprostřed
-    },
+    lists: withAll({ 465: ebikes, 257: silnicni, 256: LIST }),
+    routes: { 'https://sport.bazos.cz/silnicni/20/': { status: 500, body: 'Internal error' } },
   });
-  const { http, calls } = makeHttp(site);
+  const { http } = makeHttp(site);
   const { ctx, emitted, warns } = makeCtx(http, { mode: 'full' });
   await assert.rejects(bazos.scan(ctx), /Silniční kola: HTTP 500/);
-  assert.equal(emitted.filter((x) => x.categorySrc === 'Elektrokola').length, 30, 'elektrokola celá z HTML');
-  assert.deepEqual(htmlCalls(calls).filter((u) => u.includes('elektrokola')), ['https://sport.bazos.cz/elektrokola/', 'https://sport.bazos.cz/elektrokola/20/']);
+  assert.equal(emitted.filter((x) => x.categorySrc === 'Elektrokola').length, 30);
   assert.equal(emitted.filter((x) => x.categorySrc === 'Silniční kola').length, 20);
-  assert.ok(emitted.some((x) => x.categorySrc === 'Ostatní cyklistika') || apiCalls(calls, 259).length === 1, 'pokračuje dalšími kategoriemi');
-  assert.ok(emitted.filter((x) => x.categorySrc === 'Horská kola').length > 0);
-  assert.ok(warns.some((w) => /API nefunguje/.test(w)));
+  assert.ok(emitted.some((x) => x.categorySrc === 'Ostatní cyklistika'), 'pokračuje dalšími kategoriemi');
+  assert.ok(emitted.some((x) => x.categorySrc === 'Dětská kola'));
+  assert.ok(warns.some((w) => /Silniční kola: výpis selhal/.test(w)));
 });
 
 // ---------------------------------------------------------------- pojistky proti falešně „úplnému“ průchodu
@@ -506,55 +451,48 @@ const sectionPage404 = () => ({
   body: renderListHtml(synthItems(20, { firstId: 199000000 }).map((x) => ({ ...x, title: `Lyže ${x.id}` })), 0, 86074, { path: '/' }),
 });
 
-test('scan: neexistující kategorie (API [] se stavem 200, HTML 404 s výpisem celé sekce) → chyba, cizí inzeráty se neuloží', async () => {
-  for (const api of [{ body: [] }, { status: 404, body: '<html>Not found</html>' }]) {
-    const lists = withAll({ 256: LIST });
-    const { http, calls } = makeHttp(
-      fakeSite({ lists, routes: { [bazos.apiListUrl(CAT.horska, 0)]: api, 'https://sport.bazos.cz/horska/': sectionPage404() } })
-    );
-    const { ctx, emitted } = makeCtx(http, { mode: 'full' });
-    await assert.rejects(bazos.scan(ctx), /Horská kola: .*neexistuje \(HTTP 404/);
-    assert.equal(emitted.filter((x) => x.categorySrc === 'Horská kola').length, 0, 'inzeráty celé sekce Sport se nesmí uložit jako horská kola');
-    assert.ok(!calls.includes('https://sport.bazos.cz/20/'), '„Další“ mimo kategorii se nenásleduje');
-    assert.ok(emitted.some((x) => x.categorySrc === 'Elektrokola'), 'ostatní kategorie pokračují');
-  }
+test('scan: neexistující kategorie (HTTP 404 s výpisem celé sekce) → chyba, cizí inzeráty se neuloží', async () => {
+  const { http, calls } = makeHttp(fakeSite({ lists: withAll({ 256: LIST }), routes: { 'https://sport.bazos.cz/horska/': sectionPage404() } }));
+  const { ctx, emitted } = makeCtx(http, { mode: 'full' });
+  await assert.rejects(bazos.scan(ctx), /Horská kola: .*neexistuje \(HTTP 404/);
+  assert.equal(emitted.filter((x) => x.categorySrc === 'Horská kola').length, 0, 'inzeráty celé sekce Sport se nesmí uložit jako horská kola');
+  assert.ok(!calls.includes('https://sport.bazos.cz/20/'), '„Další“ mimo kategorii se nenásleduje');
+  assert.ok(emitted.some((x) => x.categorySrc === 'Elektrokola'), 'ostatní kategorie pokračují');
   // prostá 404 bez inzerátů na začátku výpisu také není „konec výpisu“
-  const { http } = makeHttp(
-    fakeSite({ lists: withAll({ 256: LIST }), routes: { [bazos.apiListUrl(CAT.horska, 0)]: { body: [] }, 'https://sport.bazos.cz/horska/': { status: 404, body: '<html>Stránka nenalezena</html>' } } })
-  );
-  await assert.rejects(bazos.scan(makeCtx(http, { mode: 'full' }).ctx), /neexistuje \(HTTP 404/);
+  const h2 = makeHttp(fakeSite({ lists: withAll({ 256: LIST }), routes: { 'https://sport.bazos.cz/horska/': { status: 404, body: '<html>Stránka nenalezena</html>' } } }));
+  await assert.rejects(bazos.scan(makeCtx(h2.http, { mode: 'full' }).ctx), /neexistuje \(HTTP 404/);
 });
 
-test('scan: prázdná 1. stránka API → záloha přes HTML i v režimu jen novinky', async () => {
-  const ebikes = synthItems(30, { firstId: 224400000, tops: 3, cat: CAT.elektrokola });
-  const { http, calls } = makeHttp(fakeSite({ lists: withAll({ 465: ebikes }), routes: { [bazos.apiListUrl(CAT.elektrokola, 0)]: { body: [] } } }));
-  const { ctx, emitted } = makeCtx(http, { mode: 'incremental' });
-  await bazos.scan(ctx);
-  assert.equal(emitted.filter((x) => x.categorySrc === 'Elektrokola').length, 30);
-  assert.deepEqual(htmlCalls(calls), ['https://sport.bazos.cz/elektrokola/', 'https://sport.bazos.cz/elektrokola/20/']);
-});
-
-test('scan: „Další“ nebo přesměrování mimo výpis kategorie → nenásledovat, průchod neúplný', async () => {
-  const ebikes = synthItems(30, { firstId: 224400000, cat: CAT.elektrokola });
-  const page0 = renderListHtml(ebikes.slice(0, 20), 0, 30, CAT.elektrokola).replace('href="/elektrokola/20/"', 'href="/20/"');
+test('scan: prázdná kategorie nebo stránka bez podoby výpisu → neúplný průchod / chyba', async () => {
   {
-    const { http, calls } = makeHttp(
-      fakeSite({ lists: withAll({ 465: ebikes }), routes: { [bazos.apiListUrl(CAT.elektrokola, 0)]: { status: 404, body: 'x' }, 'https://sport.bazos.cz/elektrokola/': { body: page0 } } })
-    );
+    const { http } = makeHttp(fakeSite({ lists: withAll({ 465: [] }) }));
     const { ctx, warns } = makeCtx(http, { mode: 'full' });
-    assert.equal((await bazos.scan(ctx)).complete, false);
+    assert.equal((await bazos.scan(ctx)).complete, false, 'kategorie s koly není nikdy prázdná');
+    assert.ok(warns.some((w) => /Elektrokola: průchod nenašel žádný inzerát/.test(w)));
+  }
+  {
+    const { http } = makeHttp(fakeSite({ lists: withAll({}), routes: { 'https://sport.bazos.cz/elektrokola/': { body: '<html><body>Údržba webu</body></html>' } } }));
+    await assert.rejects(bazos.scan(makeCtx(http, { mode: 'full' }).ctx), /Elektrokola: .*nemá očekávanou podobu/);
+  }
+});
+
+test('scan: „Další“ mimo výpis kategorie / s parametry nebo přesměrování jinam → nenásledovat, průchod neúplný', async () => {
+  const ebikes = synthItems(30, { firstId: 224400000, cat: CAT.elektrokola });
+  for (const href of ['/20/', '/elektrokola/20/?order=1', '/elektrokola/']) {
+    const page0 = renderListHtml(ebikes.slice(0, 20), 0, 30, CAT.elektrokola).replace('href="/elektrokola/20/"', `href="${href}"`);
+    const { http, calls } = makeHttp(fakeSite({ lists: withAll({ 465: ebikes }), routes: { 'https://sport.bazos.cz/elektrokola/': { body: page0 } } }));
+    const { ctx, warns } = makeCtx(http, { mode: 'full' });
+    assert.equal((await bazos.scan(ctx)).complete, false, href);
+    assert.equal(listCalls(calls, CAT.elektrokola).length, 1, href);
     assert.ok(!calls.includes('https://sport.bazos.cz/20/'));
-    assert.ok(warns.some((w) => /nevede dál ve výpisu kategorie/.test(w)));
+    assert.ok(warns.some((w) => /nevede dál ve výpisu kategorie/.test(w)), href);
   }
   {
     // přesměrování zrušené kategorie na úvod sekce (200) → chyba, nic se neuloží
     const { http } = makeHttp(
       fakeSite({
         lists: withAll({ 465: ebikes }),
-        routes: {
-          [bazos.apiListUrl(CAT.elektrokola, 0)]: { status: 404, body: 'x' },
-          'https://sport.bazos.cz/elektrokola/': { body: renderListHtml(ebikes.slice(0, 20), 0, 86074, { path: '/' }), finalUrl: 'https://sport.bazos.cz/' },
-        },
+        routes: { 'https://sport.bazos.cz/elektrokola/': { body: renderListHtml(ebikes.slice(0, 20), 0, 86074, { path: '/' }), finalUrl: 'https://sport.bazos.cz/' } },
       })
     );
     const { ctx, emitted } = makeCtx(http, { mode: 'full' });
@@ -563,21 +501,14 @@ test('scan: „Další“ nebo přesměrování mimo výpis kategorie → nenás
   }
 });
 
-test('scan: prázdná stránka API hned po plné stránce + selhané ověření přes HTML → neúplný; po kratší stránce platí API', async () => {
-  const items = synthItems(300);
-  const verifyUrl = 'https://sport.bazos.cz/horska/180/';
-  // API vrátí 200 položek a pak [] (např. omezení ze strany webu), HTML ověření selže 503
-  const a = makeHttp(fakeSite({ lists: withAll({ 256: items }), apiCap: 200, pageSize: 200, routes: { [verifyUrl]: { status: 503, body: 'Service Unavailable' } } }));
-  const ca = makeCtx(a.http, { mode: 'full' });
-  assert.equal((await bazos.scan(ca.ctx)).complete, false);
-  assert.ok(a.calls.includes(verifyUrl));
-  assert.ok(ca.warns.some((w) => /podezřele/.test(w)));
-  // přirozený konec (poslední stránka kratší než limit) a nedostupné HTML → výsledek API platí
-  const short = items.slice(0, 190);
-  const b = makeHttp(fakeSite({ lists: withAll({ 256: short }), pageSize: 200, routes: { [verifyUrl]: { status: 503, body: 'Service Unavailable' } } }));
-  const cb = makeCtx(b.http, { mode: 'full' });
-  assert.equal((await bazos.scan(cb.ctx)).complete, true);
-  assert.ok(cb.warns.some((w) => /beru výsledek API/.test(w)));
+test('scan: web ignoruje stránkování (vrací pořád 1. stránku) → neúplný, žádná smyčka', async () => {
+  const items = synthItems(70);
+  const first = renderListHtml(items.slice(0, 20), 0, 70, CAT.horska);
+  const { http, calls } = makeHttp(fakeSite({ lists: withAll({ 256: items }), routes: { 'https://sport.bazos.cz/horska/20/': { body: first } } }));
+  const { ctx, warns } = makeCtx(http, { mode: 'full' });
+  assert.equal((await bazos.scan(ctx)).complete, false);
+  assert.equal(listCalls(calls, CAT.horska).length, 2);
+  assert.ok(warns.some((w) => /stránkování nesouhlasí/.test(w)));
 });
 
 test('scan: nové inzeráty během průchodu posunou výpis – krátká poslední stránka samých viděných ID není anomálie', async () => {
@@ -585,27 +516,25 @@ test('scan: nové inzeráty během průchodu posunou výpis – krátká posledn
   const site = fakeSite({ lists });
   let n = 0;
   const { http, calls } = makeHttp((url) => {
-    // před 3. stránkou přibude nahoře nový inzerát → stránka od offsetu 40 vrátí jen už viděný inzerát č. 40
-    if (url.includes('/api/v1/ads.php') && url.endsWith('category=256') && ++n === 3) lists[256] = [...synthItems(1, { firstId: 224700000 }), ...lists[256]];
+    // před 2. stránkou přibude nahoře nový inzerát → výpis má 41 položek, stránka od 40 ukáže jen už viděný inzerát
+    if (url.startsWith('https://sport.bazos.cz/horska/') && ++n === 2) lists[256] = [...synthItems(1, { firstId: 224700000 }), ...lists[256]];
     return site(url);
   });
   const { ctx, warns } = makeCtx(http, { mode: 'full' });
   assert.equal((await bazos.scan(ctx)).complete, true);
-  assert.deepEqual(apiCalls(calls, 256).map((u) => new URL(u).searchParams.get('offset')), ['0', '20', '40', '41']);
+  assert.deepEqual(listCalls(calls, CAT.horska), ['https://sport.bazos.cz/horska/', 'https://sport.bazos.cz/horska/20/', 'https://sport.bazos.cz/horska/40/']);
   assert.deepEqual(warns, []);
 });
 
-test('scan: viděno výrazně méně inzerátů, než uvádí web (API vrací duplicity) → neúplný průchod', async () => {
+test('scan: viděno výrazně méně inzerátů, než uvádí web (stránky se překrývají) → neúplný průchod', async () => {
   const items = synthItems(100);
-  // API: každá stránka vrátí polovinu nových a polovinu už viděných položek → offset dojde na konec, ale ID chybí
-  const lists = withAll({ 256: items });
-  const site = fakeSite({ lists });
+  const site = fakeSite({ lists: withAll({ 256: items }) });
   const { http } = makeHttp((url) => {
+    // každá stránka vrátí polovinu nových a polovinu už viděných položek → stránkování dojde na konec, ale ID chybí
     const u = new URL(url);
-    if (u.pathname === '/api/v1/ads.php' && u.searchParams.get('category') === '256') {
-      const off = Number(u.searchParams.get('offset'));
-      if (off >= 100) return { body: [] };
-      return { body: [...items.slice(off / 2, off / 2 + 10), ...items.slice(Math.max(0, off / 2 - 10), off / 2)] };
+    if (u.host === CAT.horska.host && u.pathname.startsWith(CAT.horska.path)) {
+      const off = Number((/\/(\d+)\/$/.exec(u.pathname) || [])[1] || 0);
+      return { body: renderListHtml([...items.slice(off / 2, off / 2 + 10), ...items.slice(Math.max(0, off / 2 - 10), off / 2)], off, 100, CAT.horska) };
     }
     return site(url);
   });
@@ -614,13 +543,14 @@ test('scan: viděno výrazně méně inzerátů, než uvádí web (API vrací du
   assert.ok(warns.some((w) => /viděno jen \d+ z 100/.test(w)), warns.join('\n'));
 });
 
-test('scan: inzeráty smazané během průchodu → ověřovací stránka je za koncem (HTTP 404 s hlavičkou, jak vrací web) = konec', async () => {
+test('scan: inzeráty smazané během průchodu → další stránka je za koncem (HTTP 404 s hlavičkou, jak vrací web) = konec', async () => {
   const lists = withAll({ 256: synthItems(41) });
   const site = fakeSite({ lists });
   const { http, calls } = makeHttp((url) => {
-    // po konci API (offset 41 → []) zmizí 2 inzeráty → HTML stránka od 40 je za koncem výpisu (39 inzerátů)
-    if (url === bazos.apiListUrl(CAT.horska, 41)) lists[256] = lists[256].slice(2);
-    return site(url);
+    const r = site(url);
+    // po stažení 2. stránky (s odkazem „Další“ na /40/) zmizí 2 inzeráty → stránka od 40 je za koncem výpisu (39 inzerátů)
+    if (url === 'https://sport.bazos.cz/horska/20/') lists[256] = lists[256].slice(2);
+    return r;
   });
   const { ctx, warns } = makeCtx(http, { mode: 'full' });
   assert.equal((await bazos.scan(ctx)).complete, true);
@@ -644,11 +574,13 @@ test('scan: přerušení (AbortSignal) → okamžitý konec bez dalších požad
   assert.equal(calls.length, 2);
 });
 
-test('API: chybový JSON „too many requests“ = blokace; detail s místním časem se nečte v pásmu serveru', async () => {
-  const { http, calls } = makeHttp(fakeSite({ lists: withAll({ 256: LIST }), routes: { [bazos.apiListUrl(CAT.horska, 0)]: { body: { error: 'Too many requests, try later' } } } }));
+test('API detailu: chybový JSON „too many requests“ = blokace; místní čas se nečte v pásmu serveru', async () => {
+  const { http, calls } = makeHttp(fakeSite({ lists: withAll({ 256: LIST }), details: { 224568683: { body: { error: 'Too many requests, try later' } } } }));
   const { ctx } = makeCtx(http);
-  await assert.rejects(bazos.scan(ctx), (e) => e instanceof bazos.BazosBlockedError);
+  await assert.rejects(bazos.detail(ctx, { source_id: '224568683' }), (e) => e instanceof bazos.BazosBlockedError);
   assert.equal(calls.length, 1);
+  await assert.rejects(bazos.scan(ctx), (e) => e instanceof bazos.BazosBlockedError);
+  assert.equal(calls.length, 1, 'po blokaci ani výpis');
   const d = bazos.parseApiDetail({ ...DETAIL_TPL, from: '2026-10-02 15:22:25' }, DETAIL_TPL.id).item;
   assert.equal(d.postedAt, '2026-10-02T13:22:25.000Z');
 });

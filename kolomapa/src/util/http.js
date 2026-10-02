@@ -5,7 +5,8 @@
 //  - timeout na požadavek, přerušení přes AbortSignal,
 //  - posílá běžný prohlížečový User-Agent a češtinu v Accept-Language.
 
-const DEFAULT_UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36';
+// Poctivá identifikace robota (žádné vydávání se za prohlížeč) – weby podle ní mohou uplatnit svá pravidla.
+const DEFAULT_UA = 'Mozilla/5.0 (compatible; Kolomapa/1.0; +https://github.com/ladasuchan1-cmd/Doma)';
 
 class HttpError extends Error {
   constructor(message, { status = 0, url = '', body = '' } = {}) {
@@ -48,7 +49,7 @@ function createHttp(opts = {}) {
   const delayMs = opts.delayMs ?? 1200;
   const timeoutMs = opts.timeoutMs ?? 30000;
   const retries = opts.retries ?? 3;
-  const ua = opts.userAgent || DEFAULT_UA;
+  const ua = opts.userAgent || process.env.KOLOMAPA_USER_AGENT || DEFAULT_UA;
   const log = opts.log;
   const fetchImpl = opts.fetchImpl || fetch;
   const sleepFn = opts.sleepImpl || sleep;
