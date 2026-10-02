@@ -2,9 +2,11 @@
 #
 # VYPNUTO, dokud to výslovně nepovolíte: v repozitáři Settings → Secrets and variables → Actions → Variables
 # přidejte proměnnou KOLOMAPA_PAGES = true a v Settings → Pages zvolte „Source: GitHub Actions“.
-# Pozor: repozitář je veřejný → mapa (včetně odhadů cen a výkupních cen) bude veřejná pro každého, kdo zná adresu.
+# Pozor: repozitář je veřejný → mapa (inzeráty a odhady cen) bude veřejná pro každého, kdo zná adresu. Max. výkupní
+# ceny, poznámky AI a kalibrace na vlastní prodeje se do veřejné statické verze nezapisují.
 #
-# Volitelně (Variables): KOLOMAPA_SOURCES (výchozí bazos,sbazar; cyklobazar doinstaluje prohlížeč),
+# Volitelně (Variables): KOLOMAPA_SOURCES (výchozí bazos – ostatní weby to zakazují v robots.txt nebo jsou za
+# Cloudflare, viz README; cyklobazar doinstaluje prohlížeč),
 # KOLOMAPA_MAX_DETAILS (výchozí 1500 detailů na web za běh – první běh se tak vejde do časového limitu, zbytek
 # se dočte další dny), KOLOMAPA_AI_MAX_PER_RUN. Secret ANTHROPIC_API_KEY zapne AI nacenění podle fotek (placené).
 #
@@ -37,7 +39,7 @@ jobs:
         working-directory: kolomapa
     env:
       KOLOMAPA_DB: data/kolomapa.db
-      KOLOMAPA_SOURCES: ${{ vars.KOLOMAPA_SOURCES || 'bazos,sbazar' }}
+      KOLOMAPA_SOURCES: ${{ vars.KOLOMAPA_SOURCES || 'bazos' }}
       KOLOMAPA_MAX_DETAILS: ${{ vars.KOLOMAPA_MAX_DETAILS || '1500' }}
       ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
       KOLOMAPA_AI_MAX_PER_RUN: ${{ vars.KOLOMAPA_AI_MAX_PER_RUN || '100' }}
@@ -65,12 +67,12 @@ jobs:
       - name: Prohlížeč pro Cyklobazar (jen když je zapnutý)
         if: contains(env.KOLOMAPA_SOURCES, 'cyklobazar') || contains(env.KOLOMAPA_SOURCES, 'all')
         run: |
-          npm install --no-save --no-package-lock --no-audit --no-fund playwright
+          npm install --no-save --no-package-lock --no-audit --no-fund "playwright@^1.56.0"
           npx playwright install --with-deps chromium
 
       - name: Claude SDK (jen s ANTHROPIC_API_KEY)
         if: env.ANTHROPIC_API_KEY != ''
-        run: npm install --no-save --no-package-lock --no-audit --no-fund @anthropic-ai/sdk
+        run: npm install --no-save --no-package-lock --no-audit --no-fund "@anthropic-ai/sdk@^0.131.0"
 
       # Krok má vlastní limit, aby po něm vždy zbyl čas uložit databázi (při vypršení limitu celé úlohy by se
       # uložení nemuselo stihnout). Přerušený běh nic nepokazí – co se stáhlo, je v DB, zbytek dočte další den.

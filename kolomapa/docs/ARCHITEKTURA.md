@@ -82,6 +82,12 @@ inzeráty bez změny ceny – pozor na topované inzeráty nahoře), `maxPages`,
 označí neviděné inzeráty jako zmizelé (prodané/smazané): hned, pokud to zdroj potvrdí přes `confirmGone`, jinak až když
 chybí ve dvou úplných průchodech po sobě (offsetové stránkování se během průchodu posouvá).
 
+Pravidla webů: zdroj stahuje jen adresy, které povoluje `robots.txt` webu (Bazoš i Cyklobazar to hlídají funkcí
+`assertAllowed(url)` před každým požadavkem), představuje se poctivým User-Agentem (`KOLOMAPA_USER_AGENT`, výchozí
+`Kolomapa/1.0` s odkazem na projekt) a ověření „nejste robot“ nikdy neobchází (blokace → konec zdroje pro běh).
+Ve výchozím stavu je zapnutý jen Bazoš (`KOLOMAPA_SOURCES`); Sbazar (`Disallow: /` pro všechny), Aukro (blokuje
+ClaudeBot) a Cyklobazar (Cloudflare) zapíná provozovatel.
+
 Trvalá cache zdrojů (`ctx.cache`, tabulka settings, klíče `cache:<zdroj>:…`): Sbazar ukládá přeložené lokality
 (`loc:<typ>:<id>`), Cyklobazar `cooldownUntil` (pauza 12 h po ověření Cloudflare), `newHorizonAt`, `newestPostedAt`,
 `sweep`, `sweepDoneAt`, `sitemapCount`, `sitemapLow`.
@@ -148,6 +154,8 @@ motorka …) nebo silný důkaz kola (kolo, elektrokolo, MTB, BMX, odrážedlo, 
 - `GET /data/kraj/<KOD>.json` – `{kraj, name, generatedAt, listings: [kompaktní inzeráty]}`; kompaktní klíče viz
   `src/server/data.js` (`id, s, u, t, p, pn, la, lo, g, c, k, ph, bt, b, m, y, ws, fs, mat, eb, mo, wh, gs, cond,
   e, el, eh, ec, em, d, mb, ai, fx, w, f, ps, v, st, de, pa`)
+  Statický export (`tools/export-static.js`) je ve výchozím stavu veřejný: bez `mb`, `ai.n` a faktoru kalibrace na
+  vlastní prodeje (`publicListing` v `src/server/data.js`); `--interni` / `KOLOMAPA_STATIC_INTERNAL=1` je ponechá.
 - `GET /data/kraje.geojson`
 - `GET /api/listing/:id` – plný detail + historie cen (jen server)
 - `POST /api/run` – spustit běh hned (jen server; vyžaduje hlavičku `X-Requested-With: kolomapa` – ochrana proti CSRF),

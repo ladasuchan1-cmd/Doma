@@ -10,8 +10,9 @@
 #KOLOMAPA_HOST=0.0.0.0
 #KOLOMAPA_PASSWORD=zvolte-heslo
 
-# Weby: bazos,sbazar (výchozí), all = všechny. cyklobazar a aukro viz README.md.
-#KOLOMAPA_SOURCES=bazos,sbazar
+# Weby: bazos (výchozí). sbazar, cyklobazar a aukro jsou vypnuté kvůli pravidlům webů (robots.txt, Cloudflare) –
+# zapnutí je vaše rozhodnutí, viz README.md (Zdroje, šetrnost a pravidla). all = všechny.
+#KOLOMAPA_SOURCES=bazos
 
 # Čas denního stahování (HH:MM). Stahujete-li přes Plánovač úloh (stahnout.cmd), dejte off.
 #KOLOMAPA_SCHEDULE=05:30
