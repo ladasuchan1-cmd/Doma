@@ -1,0 +1,341 @@
+{
+ "attributes": [
+  {
+   "attributeId": 16,
+   "attributeKey": "3",
+   "attributeLandingPage": true,
+   "attributeName": "Určení",
+   "attributeSeoUrl": "detska",
+   "attributeValue": "Dětská",
+   "position": 0
+  },
+  {
+   "attributeId": 48,
+   "attributeKey": "2",
+   "attributeLandingPage": true,
+   "attributeName": "Stav zboží",
+   "attributeSeoUrl": "pouzite",
+   "attributeValue": "Použité",
+   "attributeValueAdditionalDescription": "delší doba používání, funkční produkt",
+   "position": 0
+  },
+  {
+   "attributeId": 106,
+   "attributeKey": "3",
+   "attributeLandingPage": true,
+   "attributeName": "Odpružení",
+   "attributeSeoUrl": "bezodpruzeni",
+   "attributeValue": "Bezodpružení",
+   "position": 0
+  },
+  {
+   "attributeId": 108,
+   "attributeKey": "1",
+   "attributeLandingPage": true,
+   "attributeName": "Materíál rámu",
+   "attributeSeoUrl": "hlinik",
+   "attributeValue": "Hliník",
+   "position": 0
+  },
+  {
+   "attributeId": 109,
+   "attributeKey": "18",
+   "attributeLandingPage": true,
+   "attributeName": "Průměr kol",
+   "attributeSeoUrl": "24-palcu",
+   "attributeValue": "24″",
+   "position": 0
+  },
+  {
+   "attributeId": 110,
+   "attributeKey": "1",
+   "attributeLandingPage": true,
+   "attributeName": "Barva kola",
+   "attributeSeoUrl": "cerna",
+   "attributeValue": "Černá",
+   "position": 0
+  },
+  {
+   "attributeId": 110,
+   "attributeKey": "6",
+   "attributeLandingPage": true,
+   "attributeName": "Barva kola",
+   "attributeSeoUrl": "bila",
+   "attributeValue": "Bílá",
+   "position": 0
+  },
+  {
+   "attributeId": 8820,
+   "attributeKey": "4",
+   "attributeLandingPage": false,
+   "attributeName": "Doba dodání (od obdržení platby)",
+   "attributeSeoUrl": "7-10-dni",
+   "attributeValue": "7-10 dní",
+   "position": 0
+  },
+  {
+   "attributeId": 129782,
+   "attributeKey": "33",
+   "attributeLandingPage": true,
+   "attributeName": "Značka",
+   "attributeSeoUrl": "ostatni",
+   "attributeValue": "Ostatní",
+   "position": 0
+  }
+ ],
+ "aukroFreePriorityList": false,
+ "bargainingAvailable": true,
+ "bestOfferEnabled": true,
+ "bidNoMinimumLimit": false,
+ "biddersCount": 0,
+ "biddersCountRelative": 0,
+ "buyNowActive": false,
+ "buyNowPrice": {
+  "amount": 0,
+  "currency": "CZK"
+ },
+ "category": [
+  {
+   "id": 17533,
+   "shortName": "Sport a turistika",
+   "name": "Sport a turistika",
+   "seoUrl": "sport-a-turistika",
+   "level": 0,
+   "active": true
+  },
+  {
+   "id": 17570,
+   "shortName": "Cyklistika",
+   "name": "Cyklistika",
+   "seoUrl": "cyklistika",
+   "level": 1,
+   "active": true
+  },
+  {
+   "id": 17590,
+   "shortName": "Kola",
+   "name": "Cyklobazar",
+   "seoUrl": "jizdni-kola",
+   "level": 2,
+   "active": true
+  },
+  {
+   "id": 17592,
+   "shortName": "Dětská",
+   "name": "Dětská kola",
+   "seoUrl": "detska-kola",
+   "level": 3,
+   "itemCount": 413,
+   "active": true
+  }
+ ],
+ "charity": false,
+ "descriptionInHtml": "<html><head></head><body><div class=\"aukro-offer-default\"><div data-layout=\"text\"><div>Prodám krásné kolo pro děti od cca 6let do cca 13let Maxbike Tambori 13”. Nemá odpruženou vydlici (u dětí okolo 20-30kg stejně zcela bez efektu), tak se s ní nemusí tahat. Funkční, řadí, brzdí,… stačí lehce promáznout a dofouknout. 3x7 rychlostí. <br>Pouze osobní odběr. Buď Cvikov (vikend) nebo Praha (přes týden), nebo města a vesnice po trase (CL, MB, LB, ME, ..) - některou neděli večer po nákupu.</div></div></div></body></html>",
+ "descriptionStripped": "Prodám krásné kolo pro děti od cca 6let do cca 13let Maxbike Tambori 13”. Nemá odpruženou vydlici (u dětí okolo 20-30kg stejně zcela bez efektu), tak se s ní nemusí tahat. Funkční, řadí, brzdí,… stačí lehce promáznout a dofouknout. 3x7 rychlostí. Pouze osobní odběr. Buď Cvikov (vikend) nebo Praha (přes týden), nebo města a vesnice po trase (CL, MB, LB, ME, ..) - některou neděli večer po nákupu.",
+ "descriptionTranslated": false,
+ "displayedCount": 20,
+ "endingTime": "2026-10-05T20:54:07+02:00",
+ "endingTimeText": "3 dny",
+ "exposeDomain": "CZ",
+ "hidden": false,
+ "highestBidderAnonymizedLogin": "REDACTED_LOGIN",
+ "id": 7122702822,
+ "infiniteOrder": true,
+ "itemArchived": false,
+ "itemDetailType": "BASIC",
+ "itemId": 7122702822,
+ "itemImages": [
+  {
+   "position": 0,
+   "sizes": {
+    "SMALL": {
+     "url": "https://cdn.aukro.cz/images/sk1780857825227/73x73/junior-kolo-maxbike-tambori-13-ram-24-kola-277618391.jpeg"
+    },
+    "ORIGINAL": {
+     "url": "https://cdn.aukro.cz/images/sk1780857825227/junior-kolo-maxbike-tambori-13-ram-24-kola-277618391.jpeg"
+    },
+    "MEDIUM": {
+     "url": "https://cdn.aukro.cz/images/sk1780857825227/400x300/junior-kolo-maxbike-tambori-13-ram-24-kola-277618391.jpeg"
+    },
+    "LARGE": {
+     "url": "https://cdn.aukro.cz/images/sk1780857825227/730x548/junior-kolo-maxbike-tambori-13-ram-24-kola-277618391.jpeg"
+    },
+    "MEDIUM_PREVIEW": {
+     "url": "https://cdn.aukro.cz/images/sk1780857825227/thumbnail/junior-kolo-maxbike-tambori-13-ram-24-kola-277618391.jpeg"
+    }
+   }
+  },
+  {
+   "position": 1,
+   "sizes": {
+    "SMALL": {
+     "url": "https://cdn.aukro.cz/images/sk1780857825366/73x73/junior-kolo-maxbike-tambori-13-ram-24-kola-277618392.jpeg"
+    },
+    "ORIGINAL": {
+     "url": "https://cdn.aukro.cz/images/sk1780857825366/junior-kolo-maxbike-tambori-13-ram-24-kola-277618392.jpeg"
+    },
+    "MEDIUM": {
+     "url": "https://cdn.aukro.cz/images/sk1780857825366/400x300/junior-kolo-maxbike-tambori-13-ram-24-kola-277618392.jpeg"
+    },
+    "LARGE": {
+     "url": "https://cdn.aukro.cz/images/sk1780857825366/730x548/junior-kolo-maxbike-tambori-13-ram-24-kola-277618392.jpeg"
+    },
+    "MEDIUM_PREVIEW": {
+     "url": "https://cdn.aukro.cz/images/sk1780857825366/400x300/junior-kolo-maxbike-tambori-13-ram-24-kola-277618392.jpeg"
+    }
+   }
+  },
+  {
+   "position": 2,
+   "sizes": {
+    "SMALL": {
+     "url": "https://cdn.aukro.cz/images/sk1780857825513/73x73/junior-kolo-maxbike-tambori-13-ram-24-kola-277618393.jpeg"
+    },
+    "ORIGINAL": {
+     "url": "https://cdn.aukro.cz/images/sk1780857825513/junior-kolo-maxbike-tambori-13-ram-24-kola-277618393.jpeg"
+    },
+    "MEDIUM": {
+     "url": "https://cdn.aukro.cz/images/sk1780857825513/400x300/junior-kolo-maxbike-tambori-13-ram-24-kola-277618393.jpeg"
+    },
+    "LARGE": {
+     "url": "https://cdn.aukro.cz/images/sk1780857825513/730x548/junior-kolo-maxbike-tambori-13-ram-24-kola-277618393.jpeg"
+    },
+    "MEDIUM_PREVIEW": {
+     "url": "https://cdn.aukro.cz/images/sk1780857825513/400x300/junior-kolo-maxbike-tambori-13-ram-24-kola-277618393.jpeg"
+    }
+   }
+  },
+  {
+   "position": 3,
+   "sizes": {
+    "SMALL": {
+     "url": "https://cdn.aukro.cz/images/sk1780857825623/73x73/junior-kolo-maxbike-tambori-13-ram-24-kola-277618394.jpeg"
+    },
+    "ORIGINAL": {
+     "url": "https://cdn.aukro.cz/images/sk1780857825623/junior-kolo-maxbike-tambori-13-ram-24-kola-277618394.jpeg"
+    },
+    "MEDIUM": {
+     "url": "https://cdn.aukro.cz/images/sk1780857825623/400x300/junior-kolo-maxbike-tambori-13-ram-24-kola-277618394.jpeg"
+    },
+    "LARGE": {
+     "url": "https://cdn.aukro.cz/images/sk1780857825623/730x548/junior-kolo-maxbike-tambori-13-ram-24-kola-277618394.jpeg"
+    },
+    "MEDIUM_PREVIEW": {
+     "url": "https://cdn.aukro.cz/images/sk1780857825623/400x300/junior-kolo-maxbike-tambori-13-ram-24-kola-277618394.jpeg"
+    }
+   }
+  },
+  {
+   "position": 4,
+   "sizes": {
+    "SMALL": {
+     "url": "https://cdn.aukro.cz/images/sk1780857825730/73x73/junior-kolo-maxbike-tambori-13-ram-24-kola-277618395.jpeg"
+    },
+    "ORIGINAL": {
+     "url": "https://cdn.aukro.cz/images/sk1780857825730/junior-kolo-maxbike-tambori-13-ram-24-kola-277618395.jpeg"
+    },
+    "MEDIUM": {
+     "url": "https://cdn.aukro.cz/images/sk1780857825730/400x300/junior-kolo-maxbike-tambori-13-ram-24-kola-277618395.jpeg"
+    },
+    "LARGE": {
+     "url": "https://cdn.aukro.cz/images/sk1780857825730/730x548/junior-kolo-maxbike-tambori-13-ram-24-kola-277618395.jpeg"
+    },
+    "MEDIUM_PREVIEW": {
+     "url": "https://cdn.aukro.cz/images/sk1780857825730/400x300/junior-kolo-maxbike-tambori-13-ram-24-kola-277618395.jpeg"
+    }
+   }
+  },
+  {
+   "position": 5,
+   "sizes": {
+    "SMALL": {
+     "url": "https://cdn.aukro.cz/images/sk1780857825865/73x73/junior-kolo-maxbike-tambori-13-ram-24-kola-277618396.jpeg"
+    },
+    "ORIGINAL": {
+     "url": "https://cdn.aukro.cz/images/sk1780857825865/junior-kolo-maxbike-tambori-13-ram-24-kola-277618396.jpeg"
+    },
+    "MEDIUM": {
+     "url": "https://cdn.aukro.cz/images/sk1780857825865/400x300/junior-kolo-maxbike-tambori-13-ram-24-kola-277618396.jpeg"
+    },
+    "LARGE": {
+     "url": "https://cdn.aukro.cz/images/sk1780857825865/730x548/junior-kolo-maxbike-tambori-13-ram-24-kola-277618396.jpeg"
+    },
+    "MEDIUM_PREVIEW": {
+     "url": "https://cdn.aukro.cz/images/sk1780857825865/400x300/junior-kolo-maxbike-tambori-13-ram-24-kola-277618396.jpeg"
+    }
+   }
+  },
+  {
+   "position": 6,
+   "sizes": {
+    "SMALL": {
+     "url": "https://cdn.aukro.cz/images/sk1785655303962/73x73/junior-kolo-maxbike-tambori-13-ram-24-kola-288581725.jpeg"
+    },
+    "ORIGINAL": {
+     "url": "https://cdn.aukro.cz/images/sk1785655303962/junior-kolo-maxbike-tambori-13-ram-24-kola-288581725.jpeg"
+    },
+    "MEDIUM": {
+     "url": "https://cdn.aukro.cz/images/sk1785655303962/400x300/junior-kolo-maxbike-tambori-13-ram-24-kola-288581725.jpeg"
+    },
+    "LARGE": {
+     "url": "https://cdn.aukro.cz/images/sk1785655303962/730x548/junior-kolo-maxbike-tambori-13-ram-24-kola-288581725.jpeg"
+    },
+    "MEDIUM_PREVIEW": {
+     "url": "https://cdn.aukro.cz/images/sk1785655303962/400x300/junior-kolo-maxbike-tambori-13-ram-24-kola-288581725.jpeg"
+    }
+   }
+  }
+ ],
+ "itemLocation": "Praha 1, Česká republika",
+ "itemQuantityTypeEnum": "PIECES",
+ "itemType": "BIDDING",
+ "metaDescription": "Junior kolo Maxbike Tambori 13” (rám), 24” (kola). Aukce od 3 999 Kč. Bezpečná Aukro platba. Vyhrajte aukci a ušetřete na Aukru.",
+ "name": "Junior kolo Maxbike Tambori 13” (rám), 24” (kola)",
+ "newEditor": true,
+ "nextBidMinAmount": {
+  "amount": 3999,
+  "currency": "CZK"
+ },
+ "pepperLevel": 0,
+ "postCode": "11000",
+ "postponingEnd": true,
+ "ppPriorityList": true,
+ "price": {
+  "amount": 3999,
+  "currency": "CZK"
+ },
+ "quantity": 1,
+ "retailPrice": {
+  "amount": 0,
+  "currency": "CZK"
+ },
+ "seller": {
+  "accountActivated": true,
+  "aukroPlus": false,
+  "companyAccount": false,
+  "favouritedByCount": 1,
+  "feedbackUniqueUserCount": 33,
+  "location": "Praha 1",
+  "positiveFeedbackPercentage": 1,
+  "rating": 33,
+  "registrationDomain": "CZ",
+  "showName": "REDACTED_NAME",
+  "starType": "WHITE",
+  "userId": 1
+ },
+ "sellerExpertReviewEnabled": true,
+ "sellerHasAdditionalInformation": false,
+ "seoUrl": "junior-kolo-maxbike-tambori-13-ram-24-kola",
+ "shortDescription": "Prodám krásné kolo pro děti od cca 6let do cca 13let Maxbike Tambori 13”. Nemá odpruženou vydlici (u dětí okolo 20-30kg stejně zcela bez efektu), tak se s ní nemusí tahat. Funkční, řadí, brzdí,… stačí lehce promáznout a dofouknout. 3x7 rychlostí. Pouze osobní odběr. Buď Cvikov (vikend) nebo Praha (přes týden), nebo mě…",
+ "showAds": true,
+ "soldQuantity": 0,
+ "startingQuantity": 1,
+ "startingTime": "2026-09-30T20:56:01+02:00",
+ "state": "ACTIVE",
+ "statusAdultContent": false,
+ "translatedName": false,
+ "unverifiedBuyerAllowed": true,
+ "version": 1,
+ "visibilityType": "OK",
+ "watchingUserCount": 2
+}

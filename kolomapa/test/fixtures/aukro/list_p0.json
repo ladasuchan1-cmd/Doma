@@ -1,0 +1,3894 @@
+{
+ "categoryPath": [
+  {
+   "id": 17533,
+   "level": 0,
+   "name": "Sport a turistika",
+   "shortName": "Sport a turistika",
+   "fullName": "Sport a turistika",
+   "seoUrl": "sport-a-turistika",
+   "active": true,
+   "itemCategoryId": 17533
+  },
+  {
+   "id": 17570,
+   "level": 1,
+   "name": "Cyklistika",
+   "shortName": "Cyklistika",
+   "fullName": "Sport a turistika | Cyklistika",
+   "seoUrl": "cyklistika",
+   "active": true,
+   "parentId": 17533,
+   "itemCategoryId": 17570
+  },
+  {
+   "id": 17590,
+   "level": 2,
+   "name": "Cyklobazar",
+   "shortName": "Kola",
+   "fullName": "Sport a turistika | Cyklistika | Kola",
+   "seoUrl": "jizdni-kola",
+   "active": true,
+   "parentId": 17570,
+   "itemCategoryId": 17590
+  }
+ ],
+ "content": [
+  {
+   "itemId": 7123865595,
+   "itemName": "Author Traction – horské kolo 26\", rám 19\", modré + zadní nosič",
+   "categoryPath": [
+    {
+     "id": 17533,
+     "name": "Sport a turistika",
+     "seoUrl": "sport-a-turistika"
+    },
+    {
+     "id": 17570,
+     "name": "Cyklistika",
+     "seoUrl": "cyklistika"
+    },
+    {
+     "id": 17590,
+     "name": "Cyklobazar",
+     "seoUrl": "jizdni-kola"
+    },
+    {
+     "id": 17594,
+     "name": "Horská (MTB) kola",
+     "seoUrl": "horska-mtb-kola"
+    }
+   ],
+   "startingTime": "2026-10-02T07:12:03+02:00",
+   "endingTime": "2026-10-09T07:10:51+02:00",
+   "buyNowActive": false,
+   "buyNowPrice": {
+    "amount": 0,
+    "currency": "CZK"
+   },
+   "quantity": 1,
+   "quantityType": "pieces",
+   "attributes": [
+    {
+     "attributeId": 48,
+     "attributeName": "Stav zboží",
+     "attributeValue": "Použité",
+     "attributeValueId": 2,
+     "position": 0
+    },
+    {
+     "attributeId": 16,
+     "attributeName": "Určení",
+     "attributeValue": "Pánská",
+     "attributeValueId": 1,
+     "position": 0
+    },
+    {
+     "attributeId": 8820,
+     "attributeName": "Doba dodání (od obdržení platby)",
+     "attributeValue": "1-2 dny",
+     "attributeValueId": 1,
+     "position": 0
+    },
+    {
+     "attributeId": 7113,
+     "attributeName": "Typ",
+     "attributeValue": "Pánské",
+     "attributeValueId": 2,
+     "position": 0
+    },
+    {
+     "attributeId": 106,
+     "attributeName": "Odpružení",
+     "attributeValue": "Odpružená přední vidlice",
+     "attributeValueId": 1,
+     "position": 0
+    },
+    {
+     "attributeId": 107,
+     "attributeName": "Hmotnost kola",
+     "attributeValue": "12 kg až 13 kg",
+     "attributeValueId": 5,
+     "position": 0
+    },
+    {
+     "attributeId": 25948,
+     "attributeName": "Značka",
+     "attributeValue": "Author",
+     "attributeValueId": 5,
+     "position": 1
+    },
+    {
+     "attributeId": 108,
+     "attributeName": "Materíál rámu",
+     "attributeValue": "Dural",
+     "attributeValueId": 2,
+     "position": 0
+    },
+    {
+     "attributeId": 109,
+     "attributeName": "Průměr kol",
+     "attributeValue": "26″",
+     "attributeValueId": 20,
+     "position": 0
+    },
+    {
+     "attributeId": 110,
+     "attributeName": "Barva kola",
+     "attributeValue": "Modrá",
+     "attributeValueId": 2,
+     "position": 0
+    }
+   ],
+   "price": {
+    "amount": 3200,
+    "currency": "CZK"
+   },
+   "priceWithShipping": {
+    "amount": 3375,
+    "currency": "CZK"
+   },
+   "titleImage": {
+    "position": 0,
+    "titleImage": false,
+    "url": "https://cdn.aukro.cz/images/sk1775402902070/thumbnail/author-traction-horske-kolo-26-ram-19-modre-zadni-nosic-267166002.jpeg"
+   },
+   "titleImageUrl": "https://cdn.aukro.cz/images/sk1775402902070/thumbnail/author-traction-horske-kolo-26-ram-19-modre-zadni-nosic-267166002.jpeg",
+   "seoUrl": "author-traction-horske-kolo-26-ram-19-modre-zadni-nosic",
+   "ppPriorityList": true,
+   "ppPriorityListSort": true,
+   "ppHighlight": false,
+   "ppBoldTitle": false,
+   "buyersCountRelative": 0,
+   "itemState": "ACTIVE",
+   "sellerLogin": "REDACTED_LOGIN",
+   "seller": {
+    "accountActivated": true,
+    "aukroPlus": false,
+    "companyAccount": false,
+    "favouritedByCount": 4,
+    "feedbackUniqueUserCount": 74,
+    "positiveFeedbackPercentage": 1,
+    "rating": 74,
+    "registrationDomain": "CZ",
+    "showName": "REDACTED_NAME",
+    "starType": "BRONZE",
+    "userId": 1
+   },
+   "userWatching": false,
+   "watchersCount": 6,
+   "pepperLevel": 0,
+   "personalPickup": true,
+   "location": "Zašová",
+   "postcode": "75651",
+   "aukroFreePriorityList": false,
+   "charity": false,
+   "paymentViaAukro": true,
+   "buyersProtectionAvailable": true,
+   "retailPrice": {
+    "amount": 0,
+    "currency": "CZK"
+   },
+   "adultContent": false,
+   "auction": true,
+   "aukroPlus": false,
+   "freeShipping": false,
+   "paymentOnline": false
+  },
+  {
+   "itemId": 7135771120,
+   "itemName": "Řidítka z období R-U na historické kolo",
+   "categoryPath": [
+    {
+     "id": 17533,
+     "name": "Sport a turistika",
+     "seoUrl": "sport-a-turistika"
+    },
+    {
+     "id": 17570,
+     "name": "Cyklistika",
+     "seoUrl": "cyklistika"
+    },
+    {
+     "id": 17590,
+     "name": "Cyklobazar",
+     "seoUrl": "jizdni-kola"
+    },
+    {
+     "id": 17598,
+     "name": "Historická kola",
+     "seoUrl": "historicka-kola"
+    }
+   ],
+   "startingTime": "2026-10-01T20:17:04.714+02:00",
+   "endingTime": "2026-10-11T20:16:51+02:00",
+   "buyNowActive": false,
+   "buyNowPrice": {
+    "amount": 0,
+    "currency": "CZK"
+   },
+   "quantity": 1,
+   "quantityType": "pieces",
+   "attributes": [
+    {
+     "attributeId": 48,
+     "attributeName": "Stav zboží",
+     "attributeValue": "Použité",
+     "attributeValueId": 2,
+     "position": 0
+    }
+   ],
+   "price": {
+    "amount": 1200,
+    "currency": "CZK"
+   },
+   "priceWithShipping": {
+    "amount": 1265,
+    "currency": "CZK"
+   },
+   "titleImage": {
+    "position": 0,
+    "titleImage": false,
+    "url": "https://cdn.aukro.cz/images/sk1790878297670/thumbnail/riditka-z-obdobi-r-u-na-historicke-kolo-299026212.jpeg"
+   },
+   "titleImageUrl": "https://cdn.aukro.cz/images/sk1790878297670/thumbnail/riditka-z-obdobi-r-u-na-historicke-kolo-299026212.jpeg",
+   "seoUrl": "riditka-z-obdobi-r-u-na-historicke-kolo",
+   "ppPriorityList": true,
+   "ppPriorityListSort": true,
+   "ppHighlight": false,
+   "ppBoldTitle": false,
+   "buyersCountRelative": 1,
+   "itemState": "ACTIVE",
+   "sellerLogin": "REDACTED_LOGIN",
+   "seller": {
+    "accountActivated": true,
+    "aukroPlus": false,
+    "companyAccount": false,
+    "favouritedByCount": 25,
+    "feedbackUniqueUserCount": 327,
+    "positiveFeedbackPercentage": 0.997,
+    "rating": 326,
+    "registrationDomain": "CZ",
+    "showName": "REDACTED_NAME",
+    "starType": "SILVER",
+    "userId": 1
+   },
+   "userWatching": false,
+   "watchersCount": 10,
+   "pepperLevel": 0,
+   "personalPickup": true,
+   "location": "Velká Skrovnice",
+   "postcode": "56201",
+   "aukroFreePriorityList": false,
+   "charity": false,
+   "paymentViaAukro": true,
+   "buyersProtectionAvailable": true,
+   "retailPrice": {
+    "amount": 0,
+    "currency": "CZK"
+   },
+   "adultContent": false,
+   "auction": true,
+   "aukroPlus": false,
+   "freeShipping": false,
+   "paymentOnline": false
+  },
+  {
+   "itemId": 7132393708,
+   "itemName": "Dětské kolo Author Signal",
+   "categoryPath": [
+    {
+     "id": 17533,
+     "name": "Sport a turistika",
+     "seoUrl": "sport-a-turistika"
+    },
+    {
+     "id": 17570,
+     "name": "Cyklistika",
+     "seoUrl": "cyklistika"
+    },
+    {
+     "id": 17590,
+     "name": "Cyklobazar",
+     "seoUrl": "jizdni-kola"
+    },
+    {
+     "id": 17592,
+     "name": "Dětská kola",
+     "seoUrl": "detska-kola"
+    }
+   ],
+   "startingTime": "2026-10-01T19:11:02+02:00",
+   "endingTime": "2026-10-08T19:09:25+02:00",
+   "buyNowActive": false,
+   "buyNowPrice": {
+    "amount": 0,
+    "currency": "CZK"
+   },
+   "quantity": 1,
+   "quantityType": "pieces",
+   "attributes": [
+    {
+     "attributeId": 48,
+     "attributeName": "Stav zboží",
+     "attributeValue": "Použité",
+     "attributeValueId": 2,
+     "position": 0
+    }
+   ],
+   "price": {
+    "amount": 599,
+    "currency": "CZK"
+   },
+   "priceWithShipping": {
+    "amount": 599,
+    "currency": "CZK"
+   },
+   "titleImage": {
+    "position": 0,
+    "titleImage": false,
+    "url": "https://cdn.aukro.cz/images/sk1788447492825/thumbnail/detske-kolo-author-signal-293863233.jpeg"
+   },
+   "titleImageUrl": "https://cdn.aukro.cz/images/sk1788447492825/thumbnail/detske-kolo-author-signal-293863233.jpeg",
+   "seoUrl": "detske-kolo-author-signal",
+   "ppPriorityList": true,
+   "ppPriorityListSort": true,
+   "ppHighlight": false,
+   "ppBoldTitle": false,
+   "buyersCountRelative": 0,
+   "itemState": "ACTIVE",
+   "sellerLogin": "REDACTED_LOGIN",
+   "seller": {
+    "accountActivated": true,
+    "aukroPlus": false,
+    "companyAccount": false,
+    "favouritedByCount": 1,
+    "feedbackUniqueUserCount": 8,
+    "positiveFeedbackPercentage": 1,
+    "rating": 8,
+    "registrationDomain": "CZ",
+    "showName": "REDACTED_NAME",
+    "starType": "WHITE",
+    "userId": 1
+   },
+   "userWatching": false,
+   "watchersCount": 5,
+   "pepperLevel": 0,
+   "personalPickup": true,
+   "location": "Praha 6",
+   "postcode": "16500",
+   "aukroFreePriorityList": false,
+   "charity": false,
+   "paymentViaAukro": true,
+   "buyersProtectionAvailable": true,
+   "retailPrice": {
+    "amount": 0,
+    "currency": "CZK"
+   },
+   "adultContent": false,
+   "auction": true,
+   "aukroPlus": false,
+   "freeShipping": false,
+   "paymentOnline": false
+  },
+  {
+   "itemId": 7135742784,
+   "itemName": "Silniční karbonové kolo Cube Agree GTC Race",
+   "categoryPath": [
+    {
+     "id": 17533,
+     "name": "Sport a turistika",
+     "seoUrl": "sport-a-turistika"
+    },
+    {
+     "id": 17570,
+     "name": "Cyklistika",
+     "seoUrl": "cyklistika"
+    },
+    {
+     "id": 17590,
+     "name": "Cyklobazar",
+     "seoUrl": "jizdni-kola"
+    },
+    {
+     "id": 17595,
+     "name": "Silniční kola",
+     "seoUrl": "silnicni-kola"
+    }
+   ],
+   "startingTime": "2026-10-01T15:27:03.194+02:00",
+   "endingTime": "2026-10-08T15:26:27+02:00",
+   "buyNowActive": true,
+   "buyNowPrice": {
+    "amount": 19000,
+    "currency": "CZK"
+   },
+   "quantity": 1,
+   "quantityType": "pieces",
+   "attributes": [
+    {
+     "attributeId": 48,
+     "attributeName": "Stav zboží",
+     "attributeValue": "Použité",
+     "attributeValueId": 2,
+     "position": 0
+    },
+    {
+     "attributeId": 25988,
+     "attributeName": "Značka",
+     "attributeValue": "Ostatní",
+     "attributeValueId": 22,
+     "position": 0
+    },
+    {
+     "attributeId": 107,
+     "attributeName": "Hmotnost kola",
+     "attributeValue": "Méně než 10 kg",
+     "attributeValueId": 8,
+     "position": 0
+    },
+    {
+     "attributeId": 108,
+     "attributeName": "Materíál rámu",
+     "attributeValue": "Karbon",
+     "attributeValueId": 3,
+     "position": 0
+    },
+    {
+     "attributeId": 110,
+     "attributeName": "Barva kola",
+     "attributeValue": "Bílá",
+     "attributeValueId": 6,
+     "position": 0
+    }
+   ],
+   "price": {
+    "amount": 17000,
+    "currency": "CZK"
+   },
+   "priceWithShipping": {
+    "amount": 17000,
+    "currency": "CZK"
+   },
+   "titleImage": {
+    "position": 0,
+    "titleImage": false,
+    "url": "https://cdn.aukro.cz/images/sk1790860862763/thumbnail/silnicni-karbonove-kolo-cube-agree-gtc-race-298974619.jpeg"
+   },
+   "titleImageUrl": "https://cdn.aukro.cz/images/sk1790860862763/thumbnail/silnicni-karbonove-kolo-cube-agree-gtc-race-298974619.jpeg",
+   "seoUrl": "silnicni-karbonove-kolo-cube-agree-gtc-race",
+   "ppPriorityList": true,
+   "ppPriorityListSort": true,
+   "ppHighlight": false,
+   "ppBoldTitle": false,
+   "buyersCountRelative": 0,
+   "itemState": "ACTIVE",
+   "sellerLogin": "REDACTED_LOGIN",
+   "seller": {
+    "accountActivated": true,
+    "aukroPlus": false,
+    "companyAccount": false,
+    "favouritedByCount": 0,
+    "feedbackUniqueUserCount": 2,
+    "positiveFeedbackPercentage": 1,
+    "rating": 2,
+    "registrationDomain": "CZ",
+    "showName": "REDACTED_NAME",
+    "starType": "GREEN",
+    "userId": 1
+   },
+   "userWatching": false,
+   "watchersCount": 0,
+   "pepperLevel": 0,
+   "personalPickup": true,
+   "location": "Janské Lázně",
+   "postcode": "54225",
+   "aukroFreePriorityList": true,
+   "charity": false,
+   "paymentViaAukro": true,
+   "buyersProtectionAvailable": true,
+   "retailPrice": {
+    "amount": 0,
+    "currency": "CZK"
+   },
+   "adultContent": false,
+   "auction": true,
+   "aukroPlus": false,
+   "freeShipping": false,
+   "paymentOnline": false
+  },
+  {
+   "itemId": 7135738253,
+   "itemName": "Giant Anthem X, MTB, vel. L, FOX, celoodpružené, kotoučové brzdy",
+   "categoryPath": [
+    {
+     "id": 17533,
+     "name": "Sport a turistika",
+     "seoUrl": "sport-a-turistika"
+    },
+    {
+     "id": 17570,
+     "name": "Cyklistika",
+     "seoUrl": "cyklistika"
+    },
+    {
+     "id": 17590,
+     "name": "Cyklobazar",
+     "seoUrl": "jizdni-kola"
+    },
+    {
+     "id": 17594,
+     "name": "Horská (MTB) kola",
+     "seoUrl": "horska-mtb-kola"
+    }
+   ],
+   "startingTime": "2026-10-01T14:32:03.189+02:00",
+   "endingTime": "2026-10-08T14:31:32+02:00",
+   "buyNowActive": false,
+   "buyNowPrice": {
+    "amount": 0,
+    "currency": "CZK"
+   },
+   "quantity": 1,
+   "quantityType": "pieces",
+   "attributes": [
+    {
+     "attributeId": 48,
+     "attributeName": "Stav zboží",
+     "attributeValue": "Použité",
+     "attributeValueId": 2,
+     "position": 0
+    },
+    {
+     "attributeId": 16,
+     "attributeName": "Určení",
+     "attributeValue": "Pánská",
+     "attributeValueId": 1,
+     "position": 0
+    },
+    {
+     "attributeId": 7113,
+     "attributeName": "Typ",
+     "attributeValue": "Pánské",
+     "attributeValueId": 2,
+     "position": 0
+    },
+    {
+     "attributeId": 106,
+     "attributeName": "Odpružení",
+     "attributeValue": "Celooodpružená",
+     "attributeValueId": 2,
+     "position": 0
+    },
+    {
+     "attributeId": 25948,
+     "attributeName": "Značka",
+     "attributeValue": "Giant",
+     "attributeValueId": 15,
+     "position": 1
+    },
+    {
+     "attributeId": 108,
+     "attributeName": "Materíál rámu",
+     "attributeValue": "Hliník",
+     "attributeValueId": 1,
+     "position": 0
+    },
+    {
+     "attributeId": 109,
+     "attributeName": "Průměr kol",
+     "attributeValue": "26″",
+     "attributeValueId": 20,
+     "position": 0
+    },
+    {
+     "attributeId": 110,
+     "attributeName": "Barva kola",
+     "attributeValue": "Černá",
+     "attributeValueId": 1,
+     "position": 0
+    }
+   ],
+   "price": {
+    "amount": 5000,
+    "currency": "CZK"
+   },
+   "priceWithShipping": {
+    "amount": 5175,
+    "currency": "CZK"
+   },
+   "titleImage": {
+    "position": 0,
+    "titleImage": false,
+    "url": "https://cdn.aukro.cz/images/sk1790857692436/thumbnail/giant-anthem-x-mtb-vel-l-fox-celoodpruzene-kotoucove-brzdy-298967547.jpeg"
+   },
+   "titleImageUrl": "https://cdn.aukro.cz/images/sk1790857692436/thumbnail/giant-anthem-x-mtb-vel-l-fox-celoodpruzene-kotoucove-brzdy-298967547.jpeg",
+   "seoUrl": "giant-anthem-x-mtb-vel-l-fox-celoodpruzene-kotoucove-brzdy",
+   "ppPriorityList": true,
+   "ppPriorityListSort": true,
+   "ppHighlight": true,
+   "ppBoldTitle": true,
+   "buyersCountRelative": 0,
+   "itemState": "ACTIVE",
+   "sellerLogin": "REDACTED_LOGIN",
+   "seller": {
+    "accountActivated": true,
+    "aukroPlus": false,
+    "companyAccount": false,
+    "favouritedByCount": 3,
+    "feedbackUniqueUserCount": 33,
+    "positiveFeedbackPercentage": 1,
+    "rating": 33,
+    "registrationDomain": "CZ",
+    "showName": "REDACTED_NAME",
+    "starType": "WHITE",
+    "userId": 1
+   },
+   "userWatching": false,
+   "watchersCount": 6,
+   "pepperLevel": 0,
+   "personalPickup": false,
+   "location": "Mnichovo Hradiště",
+   "postcode": "29501",
+   "aukroFreePriorityList": false,
+   "charity": false,
+   "paymentViaAukro": true,
+   "buyersProtectionAvailable": true,
+   "retailPrice": {
+    "amount": 0,
+    "currency": "CZK"
+   },
+   "adultContent": false,
+   "auction": true,
+   "aukroPlus": false,
+   "freeShipping": false,
+   "paymentOnline": false
+  },
+  {
+   "itemId": 7135638289,
+   "itemName": "Celoodpružené dámské horské kolo",
+   "categoryPath": [
+    {
+     "id": 17533,
+     "name": "Sport a turistika",
+     "seoUrl": "sport-a-turistika"
+    },
+    {
+     "id": 17570,
+     "name": "Cyklistika",
+     "seoUrl": "cyklistika"
+    },
+    {
+     "id": 17590,
+     "name": "Cyklobazar",
+     "seoUrl": "jizdni-kola"
+    },
+    {
+     "id": 17594,
+     "name": "Horská (MTB) kola",
+     "seoUrl": "horska-mtb-kola"
+    }
+   ],
+   "startingTime": "2026-10-01T09:45:02.048+02:00",
+   "endingTime": "2026-10-08T09:44:36+02:00",
+   "buyNowActive": false,
+   "buyNowPrice": {
+    "amount": 0,
+    "currency": "CZK"
+   },
+   "quantity": 1,
+   "quantityType": "pieces",
+   "attributes": [
+    {
+     "attributeId": 48,
+     "attributeName": "Stav zboží",
+     "attributeValue": "Zánovní",
+     "attributeValueId": 6,
+     "position": 0
+    },
+    {
+     "attributeId": 16,
+     "attributeName": "Určení",
+     "attributeValue": "Dámská",
+     "attributeValueId": 2,
+     "position": 0
+    }
+   ],
+   "price": {
+    "amount": 4900,
+    "currency": "CZK"
+   },
+   "priceWithShipping": {
+    "amount": 4900,
+    "currency": "CZK"
+   },
+   "titleImage": {
+    "position": 0,
+    "titleImage": false,
+    "url": "https://cdn.aukro.cz/images/sk1790840260341/thumbnail/celoodpruzene-damske-horske-kolo-298855367.jpeg"
+   },
+   "titleImageUrl": "https://cdn.aukro.cz/images/sk1790840260341/thumbnail/celoodpruzene-damske-horske-kolo-298855367.jpeg",
+   "seoUrl": "celoodpruzene-damske-horske-kolo",
+   "ppPriorityList": true,
+   "ppPriorityListSort": true,
+   "ppHighlight": false,
+   "ppBoldTitle": true,
+   "buyersCountRelative": 0,
+   "itemState": "ACTIVE",
+   "sellerLogin": "REDACTED_LOGIN",
+   "seller": {
+    "accountActivated": true,
+    "aukroPlus": false,
+    "companyAccount": false,
+    "favouritedByCount": 1,
+    "feedbackUniqueUserCount": 80,
+    "positiveFeedbackPercentage": 1,
+    "rating": 80,
+    "registrationDomain": "CZ",
+    "showName": "REDACTED_NAME",
+    "starType": "BRONZE",
+    "userId": 1
+   },
+   "userWatching": false,
+   "watchersCount": 2,
+   "pepperLevel": 0,
+   "personalPickup": true,
+   "location": "Olomouc",
+   "postcode": "77900",
+   "aukroFreePriorityList": false,
+   "charity": false,
+   "paymentViaAukro": true,
+   "buyersProtectionAvailable": true,
+   "retailPrice": {
+    "amount": 0,
+    "currency": "CZK"
+   },
+   "adultContent": false,
+   "auction": true,
+   "aukroPlus": false,
+   "freeShipping": false,
+   "paymentOnline": false
+  },
+  {
+   "itemId": 7122702822,
+   "itemName": "Junior kolo Maxbike Tambori 13” (rám), 24” (kola)",
+   "categoryPath": [
+    {
+     "id": 17533,
+     "name": "Sport a turistika",
+     "seoUrl": "sport-a-turistika"
+    },
+    {
+     "id": 17570,
+     "name": "Cyklistika",
+     "seoUrl": "cyklistika"
+    },
+    {
+     "id": 17590,
+     "name": "Cyklobazar",
+     "seoUrl": "jizdni-kola"
+    },
+    {
+     "id": 17592,
+     "name": "Dětská kola",
+     "seoUrl": "detska-kola"
+    }
+   ],
+   "startingTime": "2026-09-30T20:56:01+02:00",
+   "endingTime": "2026-10-05T20:54:07+02:00",
+   "buyNowActive": false,
+   "buyNowPrice": {
+    "amount": 0,
+    "currency": "CZK"
+   },
+   "quantity": 1,
+   "quantityType": "pieces",
+   "attributes": [
+    {
+     "attributeId": 48,
+     "attributeName": "Stav zboží",
+     "attributeValue": "Použité",
+     "attributeValueId": 2,
+     "position": 0
+    },
+    {
+     "attributeId": 16,
+     "attributeName": "Určení",
+     "attributeValue": "Dětská",
+     "attributeValueId": 3,
+     "position": 0
+    },
+    {
+     "attributeId": 8820,
+     "attributeName": "Doba dodání (od obdržení platby)",
+     "attributeValue": "7-10 dní",
+     "attributeValueId": 4,
+     "position": 0
+    },
+    {
+     "attributeId": 129782,
+     "attributeName": "Značka",
+     "attributeValue": "Ostatní",
+     "attributeValueId": 33,
+     "position": 0
+    },
+    {
+     "attributeId": 106,
+     "attributeName": "Odpružení",
+     "attributeValue": "Bezodpružení",
+     "attributeValueId": 3,
+     "position": 0
+    },
+    {
+     "attributeId": 108,
+     "attributeName": "Materíál rámu",
+     "attributeValue": "Hliník",
+     "attributeValueId": 1,
+     "position": 0
+    },
+    {
+     "attributeId": 109,
+     "attributeName": "Průměr kol",
+     "attributeValue": "24″",
+     "attributeValueId": 18,
+     "position": 0
+    },
+    {
+     "attributeId": 110,
+     "attributeName": "Barva kola",
+     "attributeValue": "Bílá, Černá",
+     "attributeValueId": 1,
+     "position": 0
+    }
+   ],
+   "price": {
+    "amount": 3999,
+    "currency": "CZK"
+   },
+   "priceWithShipping": {
+    "amount": 3999,
+    "currency": "CZK"
+   },
+   "titleImage": {
+    "position": 0,
+    "titleImage": false,
+    "url": "https://cdn.aukro.cz/images/sk1780857825227/thumbnail/junior-kolo-maxbike-tambori-13-ram-24-kola-277618391.jpeg"
+   },
+   "titleImageUrl": "https://cdn.aukro.cz/images/sk1780857825227/thumbnail/junior-kolo-maxbike-tambori-13-ram-24-kola-277618391.jpeg",
+   "seoUrl": "junior-kolo-maxbike-tambori-13-ram-24-kola",
+   "ppPriorityList": true,
+   "ppPriorityListSort": true,
+   "ppHighlight": false,
+   "ppBoldTitle": false,
+   "buyersCountRelative": 0,
+   "itemState": "ACTIVE",
+   "sellerLogin": "REDACTED_LOGIN",
+   "seller": {
+    "accountActivated": true,
+    "aukroPlus": false,
+    "companyAccount": false,
+    "favouritedByCount": 1,
+    "feedbackUniqueUserCount": 33,
+    "positiveFeedbackPercentage": 1,
+    "rating": 33,
+    "registrationDomain": "CZ",
+    "showName": "REDACTED_NAME",
+    "starType": "WHITE",
+    "userId": 1
+   },
+   "userWatching": false,
+   "watchersCount": 2,
+   "pepperLevel": 0,
+   "personalPickup": true,
+   "location": "Praha 1",
+   "postcode": "11000",
+   "aukroFreePriorityList": false,
+   "charity": false,
+   "paymentViaAukro": true,
+   "buyersProtectionAvailable": true,
+   "retailPrice": {
+    "amount": 0,
+    "currency": "CZK"
+   },
+   "adultContent": false,
+   "auction": true,
+   "aukroPlus": false,
+   "freeShipping": false,
+   "paymentOnline": false
+  },
+  {
+   "itemId": 7135472950,
+   "itemName": "Kolo Specialized crosstrail L",
+   "categoryPath": [
+    {
+     "id": 17533,
+     "name": "Sport a turistika",
+     "seoUrl": "sport-a-turistika"
+    },
+    {
+     "id": 17570,
+     "name": "Cyklistika",
+     "seoUrl": "cyklistika"
+    },
+    {
+     "id": 17590,
+     "name": "Cyklobazar",
+     "seoUrl": "jizdni-kola"
+    },
+    {
+     "id": 17595,
+     "name": "Silniční kola",
+     "seoUrl": "silnicni-kola"
+    }
+   ],
+   "startingTime": "2026-09-30T18:25:00.936+02:00",
+   "endingTime": "2026-10-07T18:25:00+02:00",
+   "buyNowActive": false,
+   "buyNowPrice": {
+    "amount": 0,
+    "currency": "CZK"
+   },
+   "quantity": 1,
+   "quantityType": "pieces",
+   "attributes": [
+    {
+     "attributeId": 48,
+     "attributeName": "Stav zboží",
+     "attributeValue": "Použité",
+     "attributeValueId": 2,
+     "position": 0
+    }
+   ],
+   "price": {
+    "amount": 4,
+    "currency": "CZK"
+   },
+   "priceWithShipping": {
+    "amount": 4,
+    "currency": "CZK"
+   },
+   "titleImage": {
+    "position": 0,
+    "titleImage": false,
+    "url": "https://cdn.aukro.cz/images/sk1790742165601/thumbnail/kolo-specialized-crosstrail-l-298584176.jpeg"
+   },
+   "titleImageUrl": "https://cdn.aukro.cz/images/sk1790742165601/thumbnail/kolo-specialized-crosstrail-l-298584176.jpeg",
+   "seoUrl": "kolo-specialized-crosstrail-l",
+   "ppPriorityList": true,
+   "ppPriorityListSort": true,
+   "ppHighlight": true,
+   "ppBoldTitle": true,
+   "buyersCountRelative": 3,
+   "itemState": "ACTIVE",
+   "sellerLogin": "REDACTED_LOGIN",
+   "seller": {
+    "accountActivated": true,
+    "aukroPlus": false,
+    "companyAccount": false,
+    "favouritedByCount": 17,
+    "feedbackUniqueUserCount": 87,
+    "positiveFeedbackPercentage": 0.9775,
+    "rating": 85,
+    "registrationDomain": "CZ",
+    "showName": "REDACTED_NAME",
+    "starType": "BRONZE",
+    "userId": 1
+   },
+   "userWatching": false,
+   "watchersCount": 13,
+   "pepperLevel": 1,
+   "personalPickup": true,
+   "location": "Týn nad Vltavou",
+   "postcode": "37501",
+   "aukroFreePriorityList": false,
+   "charity": false,
+   "paymentViaAukro": true,
+   "buyersProtectionAvailable": true,
+   "retailPrice": {
+    "amount": 0,
+    "currency": "CZK"
+   },
+   "adultContent": false,
+   "auction": true,
+   "aukroPlus": false,
+   "freeShipping": false,
+   "paymentOnline": false
+  },
+  {
+   "itemId": 7135534573,
+   "itemName": "Elektrokolo",
+   "categoryPath": [
+    {
+     "id": 17533,
+     "name": "Sport a turistika",
+     "seoUrl": "sport-a-turistika"
+    },
+    {
+     "id": 17570,
+     "name": "Cyklistika",
+     "seoUrl": "cyklistika"
+    },
+    {
+     "id": 17590,
+     "name": "Cyklobazar",
+     "seoUrl": "jizdni-kola"
+    },
+    {
+     "id": 147974,
+     "name": "Elektrokola",
+     "seoUrl": "elektrokola"
+    }
+   ],
+   "startingTime": "2026-09-30T17:38:01.28+02:00",
+   "endingTime": "2026-10-07T17:37:29+02:00",
+   "buyNowActive": false,
+   "buyNowPrice": {
+    "amount": 0,
+    "currency": "CZK"
+   },
+   "quantity": 1,
+   "quantityType": "pieces",
+   "attributes": [
+    {
+     "attributeId": 48,
+     "attributeName": "Stav zboží",
+     "attributeValue": "Zánovní",
+     "attributeValueId": 6,
+     "position": 0
+    }
+   ],
+   "price": {
+    "amount": 10000,
+    "currency": "CZK"
+   },
+   "priceWithShipping": {
+    "amount": 10000,
+    "currency": "CZK"
+   },
+   "titleImage": {
+    "position": 0,
+    "titleImage": false,
+    "url": "https://cdn.aukro.cz/images/sk1790782221101/thumbnail/elektrokolo-298666071.jpeg"
+   },
+   "titleImageUrl": "https://cdn.aukro.cz/images/sk1790782221101/thumbnail/elektrokolo-298666071.jpeg",
+   "seoUrl": "elektrokolo",
+   "ppPriorityList": true,
+   "ppPriorityListSort": true,
+   "ppHighlight": false,
+   "ppBoldTitle": false,
+   "buyersCountRelative": 0,
+   "itemState": "ACTIVE",
+   "sellerLogin": "REDACTED_LOGIN",
+   "seller": {
+    "accountActivated": true,
+    "aukroPlus": false,
+    "companyAccount": false,
+    "favouritedByCount": 0,
+    "feedbackUniqueUserCount": 0,
+    "positiveFeedbackPercentage": 0,
+    "rating": 0,
+    "registrationDomain": "CZ",
+    "showName": "REDACTED_NAME",
+    "starType": "NOTHING",
+    "userId": 1
+   },
+   "userWatching": false,
+   "watchersCount": 2,
+   "pepperLevel": 0,
+   "personalPickup": true,
+   "location": "Moravská Třebová",
+   "postcode": "57101",
+   "aukroFreePriorityList": true,
+   "charity": false,
+   "paymentViaAukro": true,
+   "buyersProtectionAvailable": true,
+   "retailPrice": {
+    "amount": 0,
+    "currency": "CZK"
+   },
+   "adultContent": false,
+   "auction": true,
+   "aukroPlus": false,
+   "freeShipping": false,
+   "paymentOnline": false
+  },
+  {
+   "itemId": 7135515514,
+   "itemName": "nahradni baterie engwe a dalsich ekol",
+   "categoryPath": [
+    {
+     "id": 17533,
+     "name": "Sport a turistika",
+     "seoUrl": "sport-a-turistika"
+    },
+    {
+     "id": 17570,
+     "name": "Cyklistika",
+     "seoUrl": "cyklistika"
+    },
+    {
+     "id": 17590,
+     "name": "Cyklobazar",
+     "seoUrl": "jizdni-kola"
+    },
+    {
+     "id": 147974,
+     "name": "Elektrokola",
+     "seoUrl": "elektrokola"
+    }
+   ],
+   "startingTime": "2026-09-30T14:26:01.003+02:00",
+   "endingTime": "2026-10-07T14:25:37+02:00",
+   "buyNowActive": true,
+   "buyNowPrice": {
+    "amount": 15000,
+    "currency": "CZK"
+   },
+   "quantity": 1,
+   "quantityType": "pieces",
+   "attributes": [
+    {
+     "attributeId": 48,
+     "attributeName": "Stav zboží",
+     "attributeValue": "Zánovní",
+     "attributeValueId": 6,
+     "position": 0
+    }
+   ],
+   "price": {
+    "amount": 15000,
+    "currency": "CZK"
+   },
+   "priceWithShipping": {
+    "amount": 15000,
+    "currency": "CZK"
+   },
+   "titleImage": {
+    "position": 0,
+    "titleImage": false,
+    "url": "https://cdn.aukro.cz/images/sk1790770140867/thumbnail/nahradni-baterie-engwe-a-dalsich-ekol-298638663.jpeg"
+   },
+   "titleImageUrl": "https://cdn.aukro.cz/images/sk1790770140867/thumbnail/nahradni-baterie-engwe-a-dalsich-ekol-298638663.jpeg",
+   "seoUrl": "nahradni-baterie-engwe-a-dalsich-ekol",
+   "ppPriorityList": true,
+   "ppPriorityListSort": true,
+   "ppHighlight": false,
+   "ppBoldTitle": false,
+   "buyersCountRelative": 0,
+   "itemState": "ACTIVE",
+   "sellerLogin": "REDACTED_LOGIN",
+   "seller": {
+    "accountActivated": false,
+    "aukroPlus": false,
+    "companyAccount": false,
+    "favouritedByCount": 0,
+    "feedbackUniqueUserCount": 0,
+    "positiveFeedbackPercentage": 0,
+    "rating": 0,
+    "registrationDomain": "CZ",
+    "showName": "REDACTED_NAME",
+    "starType": "NOTHING",
+    "userId": 1
+   },
+   "userWatching": false,
+   "watchersCount": 0,
+   "pepperLevel": 0,
+   "personalPickup": true,
+   "location": "olomouc",
+   "postcode": "77900",
+   "aukroFreePriorityList": true,
+   "charity": false,
+   "paymentViaAukro": true,
+   "buyersProtectionAvailable": true,
+   "retailPrice": {
+    "amount": 0,
+    "currency": "CZK"
+   },
+   "adultContent": false,
+   "auction": false,
+   "aukroPlus": false,
+   "freeShipping": false,
+   "paymentOnline": false
+  },
+  {
+   "itemId": 7135482859,
+   "itemName": "Specialized Chisel 2025 – téměř nové, záruka + doklad",
+   "categoryPath": [
+    {
+     "id": 17533,
+     "name": "Sport a turistika",
+     "seoUrl": "sport-a-turistika"
+    },
+    {
+     "id": 17570,
+     "name": "Cyklistika",
+     "seoUrl": "cyklistika"
+    },
+    {
+     "id": 17590,
+     "name": "Cyklobazar",
+     "seoUrl": "jizdni-kola"
+    },
+    {
+     "id": 17594,
+     "name": "Horská (MTB) kola",
+     "seoUrl": "horska-mtb-kola"
+    }
+   ],
+   "startingTime": "2026-09-30T08:43:01.939+02:00",
+   "endingTime": "2026-10-10T08:42:38+02:00",
+   "buyNowActive": true,
+   "buyNowPrice": {
+    "amount": 35000,
+    "currency": "CZK"
+   },
+   "quantity": 1,
+   "quantityType": "pieces",
+   "attributes": [
+    {
+     "attributeId": 48,
+     "attributeName": "Stav zboží",
+     "attributeValue": "Zánovní",
+     "attributeValueId": 6,
+     "position": 0
+    }
+   ],
+   "price": {
+    "amount": 25000,
+    "currency": "CZK"
+   },
+   "priceWithShipping": {
+    "amount": 25000,
+    "currency": "CZK"
+   },
+   "titleImage": {
+    "position": 0,
+    "titleImage": false,
+    "url": "https://cdn.aukro.cz/images/sk1790750060577/thumbnail/specialized-chisel-2025-temer-nove-zaruka-doklad-298594519.jpeg"
+   },
+   "titleImageUrl": "https://cdn.aukro.cz/images/sk1790750060577/thumbnail/specialized-chisel-2025-temer-nove-zaruka-doklad-298594519.jpeg",
+   "seoUrl": "specialized-chisel-2025-temer-nove-zaruka-doklad",
+   "ppPriorityList": true,
+   "ppPriorityListSort": true,
+   "ppHighlight": true,
+   "ppBoldTitle": true,
+   "buyersCountRelative": 0,
+   "itemState": "ACTIVE",
+   "sellerLogin": "REDACTED_LOGIN",
+   "seller": {
+    "accountActivated": true,
+    "aukroPlus": false,
+    "companyAccount": false,
+    "favouritedByCount": 0,
+    "feedbackUniqueUserCount": 4,
+    "positiveFeedbackPercentage": 1,
+    "rating": 4,
+    "registrationDomain": "CZ",
+    "showName": "REDACTED_NAME",
+    "starType": "GREEN",
+    "userId": 1
+   },
+   "userWatching": false,
+   "watchersCount": 3,
+   "pepperLevel": 0,
+   "personalPickup": true,
+   "location": "Ústí nad Labem",
+   "postcode": "40001",
+   "aukroFreePriorityList": false,
+   "charity": false,
+   "paymentViaAukro": true,
+   "buyersProtectionAvailable": true,
+   "retailPrice": {
+    "amount": 0,
+    "currency": "CZK"
+   },
+   "adultContent": false,
+   "auction": true,
+   "aukroPlus": false,
+   "freeShipping": false,
+   "paymentOnline": false
+  },
+  {
+   "itemId": 7135431666,
+   "itemName": "GT avalanche . horské kola MTB (hardtail)",
+   "categoryPath": [
+    {
+     "id": 17533,
+     "name": "Sport a turistika",
+     "seoUrl": "sport-a-turistika"
+    },
+    {
+     "id": 17570,
+     "name": "Cyklistika",
+     "seoUrl": "cyklistika"
+    },
+    {
+     "id": 17590,
+     "name": "Cyklobazar",
+     "seoUrl": "jizdni-kola"
+    },
+    {
+     "id": 17594,
+     "name": "Horská (MTB) kola",
+     "seoUrl": "horska-mtb-kola"
+    }
+   ],
+   "startingTime": "2026-09-29T23:35:01.113+02:00",
+   "endingTime": "2026-10-06T23:34:20+02:00",
+   "buyNowActive": true,
+   "buyNowPrice": {
+    "amount": 17000,
+    "currency": "CZK"
+   },
+   "quantity": 1,
+   "quantityType": "pieces",
+   "attributes": [
+    {
+     "attributeId": 48,
+     "attributeName": "Stav zboží",
+     "attributeValue": "Rozbaleno",
+     "attributeValueId": 3,
+     "position": 0
+    }
+   ],
+   "price": {
+    "amount": 14000,
+    "currency": "CZK"
+   },
+   "priceWithShipping": {
+    "amount": 14000,
+    "currency": "CZK"
+   },
+   "titleImage": {
+    "position": 0,
+    "titleImage": false,
+    "url": "https://cdn.aukro.cz/images/sk1790715885277/thumbnail/gt-avalanche-horske-kola-mtb-hardtail-298525145.jpeg"
+   },
+   "titleImageUrl": "https://cdn.aukro.cz/images/sk1790715885277/thumbnail/gt-avalanche-horske-kola-mtb-hardtail-298525145.jpeg",
+   "seoUrl": "gt-avalanche-horske-kola-mtb-hardtail",
+   "ppPriorityList": true,
+   "ppPriorityListSort": true,
+   "ppHighlight": false,
+   "ppBoldTitle": false,
+   "buyersCountRelative": 0,
+   "itemState": "ACTIVE",
+   "sellerLogin": "REDACTED_LOGIN",
+   "seller": {
+    "accountActivated": true,
+    "aukroPlus": false,
+    "companyAccount": false,
+    "favouritedByCount": 0,
+    "feedbackUniqueUserCount": 0,
+    "positiveFeedbackPercentage": 0,
+    "rating": 0,
+    "registrationDomain": "CZ",
+    "showName": "REDACTED_NAME",
+    "starType": "NOTHING",
+    "userId": 1
+   },
+   "userWatching": false,
+   "watchersCount": 1,
+   "pepperLevel": 0,
+   "personalPickup": true,
+   "location": "Ostrava",
+   "postcode": "70200",
+   "aukroFreePriorityList": true,
+   "charity": false,
+   "paymentViaAukro": true,
+   "buyersProtectionAvailable": true,
+   "retailPrice": {
+    "amount": 0,
+    "currency": "CZK"
+   },
+   "adultContent": false,
+   "auction": true,
+   "aukroPlus": false,
+   "freeShipping": false,
+   "paymentOnline": false
+  },
+  {
+   "itemId": 7135426719,
+   "itemName": "VZÁCNÝ PŘEDVÁLEČNÝ ŠTÍTEK_VELKÉ MEZIŘÍČÍ_ZANIKLÝ VÝROBCE_VELOCIPED VET",
+   "categoryPath": [
+    {
+     "id": 17533,
+     "name": "Sport a turistika",
+     "seoUrl": "sport-a-turistika"
+    },
+    {
+     "id": 17570,
+     "name": "Cyklistika",
+     "seoUrl": "cyklistika"
+    },
+    {
+     "id": 17590,
+     "name": "Cyklobazar",
+     "seoUrl": "jizdni-kola"
+    },
+    {
+     "id": 17598,
+     "name": "Historická kola",
+     "seoUrl": "historicka-kola"
+    }
+   ],
+   "startingTime": "2026-09-29T22:31:00.988+02:00",
+   "endingTime": "2026-10-09T22:30:22+02:00",
+   "buyNowActive": false,
+   "buyNowPrice": {
+    "amount": 0,
+    "currency": "CZK"
+   },
+   "quantity": 1,
+   "quantityType": "pieces",
+   "attributes": [
+    {
+     "attributeId": 48,
+     "attributeName": "Stav zboží",
+     "attributeValue": "Použité",
+     "attributeValueId": 2,
+     "position": 0
+    },
+    {
+     "attributeId": 8820,
+     "attributeName": "Doba dodání (od obdržení platby)",
+     "attributeValue": "1-2 dny",
+     "attributeValueId": 1,
+     "position": 0
+    }
+   ],
+   "price": {
+    "amount": 513,
+    "currency": "CZK"
+   },
+   "priceWithShipping": {
+    "amount": 602,
+    "currency": "CZK"
+   },
+   "titleImage": {
+    "position": 0,
+    "titleImage": false,
+    "url": "https://cdn.aukro.cz/images/sk1790712371238/thumbnail/vzacny-predvalecny-stitek-velke-mezirici-zanikly-vyrobce-velociped-vet-298518949.jpeg"
+   },
+   "titleImageUrl": "https://cdn.aukro.cz/images/sk1790712371238/thumbnail/vzacny-predvalecny-stitek-velke-mezirici-zanikly-vyrobce-velociped-vet-298518949.jpeg",
+   "seoUrl": "vzacny-predvalecny-stitek-velke-mezirici-zanikly-vyrobce-velociped-vet",
+   "ppPriorityList": true,
+   "ppPriorityListSort": true,
+   "ppHighlight": false,
+   "ppBoldTitle": true,
+   "buyersCountRelative": 6,
+   "itemState": "ACTIVE",
+   "sellerLogin": "REDACTED_LOGIN",
+   "seller": {
+    "accountActivated": true,
+    "aukroPlus": false,
+    "companyAccount": true,
+    "favouritedByCount": 909,
+    "feedbackUniqueUserCount": 1220,
+    "positiveFeedbackPercentage": 1,
+    "rating": 1221,
+    "registrationDomain": "CZ",
+    "showName": "REDACTED_NAME",
+    "starType": "SILVER",
+    "userId": 1
+   },
+   "userWatching": false,
+   "watchersCount": 26,
+   "pepperLevel": 0,
+   "personalPickup": true,
+   "location": "Slezsko_Sudety",
+   "postcode": "73961",
+   "aukroFreePriorityList": false,
+   "charity": false,
+   "paymentViaAukro": true,
+   "buyersProtectionAvailable": true,
+   "retailPrice": {
+    "amount": 0,
+    "currency": "CZK"
+   },
+   "adultContent": false,
+   "auction": true,
+   "aukroPlus": false,
+   "freeShipping": false,
+   "paymentOnline": false
+  },
+  {
+   "itemId": 7129434431,
+   "itemName": "MAXBIKE M509",
+   "categoryPath": [
+    {
+     "id": 17533,
+     "name": "Sport a turistika",
+     "seoUrl": "sport-a-turistika"
+    },
+    {
+     "id": 17570,
+     "name": "Cyklistika",
+     "seoUrl": "cyklistika"
+    },
+    {
+     "id": 17590,
+     "name": "Cyklobazar",
+     "seoUrl": "jizdni-kola"
+    },
+    {
+     "id": 17594,
+     "name": "Horská (MTB) kola",
+     "seoUrl": "horska-mtb-kola"
+    }
+   ],
+   "startingTime": "2026-09-28T20:05:02+02:00",
+   "endingTime": "2026-10-08T20:03:31+02:00",
+   "buyNowActive": false,
+   "buyNowPrice": {
+    "amount": 0,
+    "currency": "CZK"
+   },
+   "quantity": 1,
+   "quantityType": "pieces",
+   "attributes": [
+    {
+     "attributeId": 48,
+     "attributeName": "Stav zboží",
+     "attributeValue": "Zánovní",
+     "attributeValueId": 6,
+     "position": 0
+    }
+   ],
+   "price": {
+    "amount": 3999,
+    "currency": "CZK"
+   },
+   "priceWithShipping": {
+    "amount": 3999,
+    "currency": "CZK"
+   },
+   "titleImage": {
+    "position": 0,
+    "titleImage": false,
+    "url": "https://cdn.aukro.cz/images/sk1786298273460/thumbnail/maxbike-m509-289673715.jpeg"
+   },
+   "titleImageUrl": "https://cdn.aukro.cz/images/sk1786298273460/thumbnail/maxbike-m509-289673715.jpeg",
+   "seoUrl": "maxbike-m509",
+   "ppPriorityList": true,
+   "ppPriorityListSort": true,
+   "ppHighlight": false,
+   "ppBoldTitle": false,
+   "buyersCountRelative": 0,
+   "itemState": "ACTIVE",
+   "sellerLogin": "REDACTED_LOGIN",
+   "seller": {
+    "accountActivated": true,
+    "aukroPlus": false,
+    "companyAccount": false,
+    "favouritedByCount": 1,
+    "feedbackUniqueUserCount": 9,
+    "positiveFeedbackPercentage": 0.9,
+    "rating": 8,
+    "registrationDomain": "CZ",
+    "showName": "REDACTED_NAME",
+    "starType": "WHITE",
+    "userId": 1
+   },
+   "userWatching": false,
+   "watchersCount": 1,
+   "pepperLevel": 0,
+   "personalPickup": true,
+   "location": "Hradec Králové",
+   "postcode": "50009",
+   "aukroFreePriorityList": false,
+   "charity": false,
+   "paymentViaAukro": true,
+   "buyersProtectionAvailable": true,
+   "retailPrice": {
+    "amount": 0,
+    "currency": "CZK"
+   },
+   "adultContent": false,
+   "auction": true,
+   "aukroPlus": false,
+   "freeShipping": false,
+   "paymentOnline": false
+  },
+  {
+   "itemId": 7133547292,
+   "itemName": "Dámské kolo",
+   "categoryPath": [
+    {
+     "id": 17533,
+     "name": "Sport a turistika",
+     "seoUrl": "sport-a-turistika"
+    },
+    {
+     "id": 17570,
+     "name": "Cyklistika",
+     "seoUrl": "cyklistika"
+    },
+    {
+     "id": 17590,
+     "name": "Cyklobazar",
+     "seoUrl": "jizdni-kola"
+    },
+    {
+     "id": 17594,
+     "name": "Horská (MTB) kola",
+     "seoUrl": "horska-mtb-kola"
+    }
+   ],
+   "startingTime": "2026-09-28T10:16:01+02:00",
+   "endingTime": "2026-10-05T10:14:33+02:00",
+   "buyNowActive": true,
+   "buyNowPrice": {
+    "amount": 10000,
+    "currency": "CZK"
+   },
+   "quantity": 1,
+   "quantityType": "pieces",
+   "attributes": [
+    {
+     "attributeId": 48,
+     "attributeName": "Stav zboží",
+     "attributeValue": "Zánovní",
+     "attributeValueId": 6,
+     "position": 0
+    }
+   ],
+   "price": {
+    "amount": 8000,
+    "currency": "CZK"
+   },
+   "priceWithShipping": {
+    "amount": 8000,
+    "currency": "CZK"
+   },
+   "titleImage": {
+    "position": 0,
+    "titleImage": false,
+    "url": "https://cdn.aukro.cz/images/sk1788766367683/thumbnail/damske-kolo-294441970.jpeg"
+   },
+   "titleImageUrl": "https://cdn.aukro.cz/images/sk1788766367683/thumbnail/damske-kolo-294441970.jpeg",
+   "seoUrl": "damske-kolo",
+   "ppPriorityList": true,
+   "ppPriorityListSort": true,
+   "ppHighlight": true,
+   "ppBoldTitle": true,
+   "buyersCountRelative": 0,
+   "itemState": "ACTIVE",
+   "sellerLogin": "REDACTED_LOGIN",
+   "seller": {
+    "accountActivated": true,
+    "aukroPlus": false,
+    "companyAccount": false,
+    "favouritedByCount": 0,
+    "feedbackUniqueUserCount": 20,
+    "positiveFeedbackPercentage": 1,
+    "rating": 20,
+    "registrationDomain": "CZ",
+    "showName": "REDACTED_NAME",
+    "starType": "WHITE",
+    "userId": 1
+   },
+   "userWatching": false,
+   "watchersCount": 1,
+   "pepperLevel": 0,
+   "personalPickup": true,
+   "location": "Nový Malín",
+   "postcode": "78803",
+   "aukroFreePriorityList": false,
+   "charity": false,
+   "paymentViaAukro": true,
+   "buyersProtectionAvailable": true,
+   "retailPrice": {
+    "amount": 0,
+    "currency": "CZK"
+   },
+   "adultContent": false,
+   "auction": true,
+   "aukroPlus": false,
+   "freeShipping": false,
+   "paymentOnline": false
+  },
+  {
+   "itemId": 7122710433,
+   "itemName": "Dětské kolo tlapková patrola",
+   "categoryPath": [
+    {
+     "id": 17533,
+     "name": "Sport a turistika",
+     "seoUrl": "sport-a-turistika"
+    },
+    {
+     "id": 17570,
+     "name": "Cyklistika",
+     "seoUrl": "cyklistika"
+    },
+    {
+     "id": 17590,
+     "name": "Cyklobazar",
+     "seoUrl": "jizdni-kola"
+    },
+    {
+     "id": 17592,
+     "name": "Dětská kola",
+     "seoUrl": "detska-kola"
+    }
+   ],
+   "startingTime": "2026-09-27T21:43:02+02:00",
+   "endingTime": "2026-10-04T21:41:14+02:00",
+   "buyNowActive": false,
+   "buyNowPrice": {
+    "amount": 0,
+    "currency": "CZK"
+   },
+   "quantity": 1,
+   "quantityType": "pieces",
+   "attributes": [
+    {
+     "attributeId": 48,
+     "attributeName": "Stav zboží",
+     "attributeValue": "Zánovní",
+     "attributeValueId": 6,
+     "position": 0
+    }
+   ],
+   "price": {
+    "amount": 3500,
+    "currency": "CZK"
+   },
+   "priceWithShipping": {
+    "amount": 3500,
+    "currency": "CZK"
+   },
+   "titleImage": {
+    "position": 0,
+    "titleImage": false,
+    "url": "https://cdn.aukro.cz/images/sk1780861123725/thumbnail/detske-kolo-tlapkova-patrola-277630449.jpeg"
+   },
+   "titleImageUrl": "https://cdn.aukro.cz/images/sk1780861123725/thumbnail/detske-kolo-tlapkova-patrola-277630449.jpeg",
+   "seoUrl": "detske-kolo-tlapkova-patrola",
+   "ppPriorityList": true,
+   "ppPriorityListSort": true,
+   "ppHighlight": true,
+   "ppBoldTitle": true,
+   "buyersCountRelative": 0,
+   "itemState": "ACTIVE",
+   "sellerLogin": "REDACTED_LOGIN",
+   "seller": {
+    "accountActivated": true,
+    "aukroPlus": false,
+    "companyAccount": false,
+    "favouritedByCount": 0,
+    "feedbackUniqueUserCount": 5,
+    "positiveFeedbackPercentage": 1,
+    "rating": 5,
+    "registrationDomain": "CZ",
+    "showName": "REDACTED_NAME",
+    "starType": "GREEN",
+    "userId": 1
+   },
+   "userWatching": false,
+   "watchersCount": 0,
+   "pepperLevel": 0,
+   "personalPickup": true,
+   "location": "Unhošť",
+   "postcode": "27351",
+   "aukroFreePriorityList": false,
+   "charity": false,
+   "paymentViaAukro": true,
+   "buyersProtectionAvailable": true,
+   "retailPrice": {
+    "amount": 0,
+    "currency": "CZK"
+   },
+   "adultContent": false,
+   "auction": true,
+   "aukroPlus": false,
+   "freeShipping": false,
+   "paymentOnline": false
+  },
+  {
+   "itemId": 7135159629,
+   "itemName": "Velmi staré bezmufnové jízdní kolo ALCYON původní nálezový stav",
+   "categoryPath": [
+    {
+     "id": 17533,
+     "name": "Sport a turistika",
+     "seoUrl": "sport-a-turistika"
+    },
+    {
+     "id": 17570,
+     "name": "Cyklistika",
+     "seoUrl": "cyklistika"
+    },
+    {
+     "id": 17590,
+     "name": "Cyklobazar",
+     "seoUrl": "jizdni-kola"
+    },
+    {
+     "id": 17598,
+     "name": "Historická kola",
+     "seoUrl": "historicka-kola"
+    }
+   ],
+   "startingTime": "2026-09-27T20:47:03.909+02:00",
+   "endingTime": "2026-10-04T20:46:52+02:00",
+   "buyNowActive": false,
+   "buyNowPrice": {
+    "amount": 0,
+    "currency": "CZK"
+   },
+   "quantity": 1,
+   "quantityType": "pieces",
+   "attributes": [
+    {
+     "attributeId": 48,
+     "attributeName": "Stav zboží",
+     "attributeValue": "Použité",
+     "attributeValueId": 2,
+     "position": 0
+    }
+   ],
+   "price": {
+    "amount": 710,
+    "currency": "CZK"
+   },
+   "priceWithShipping": {
+    "amount": 1460,
+    "currency": "CZK"
+   },
+   "titleImage": {
+    "position": 0,
+    "titleImage": false,
+    "url": "https://cdn.aukro.cz/images/sk1790534540137/thumbnail/velmi-stare-bezmufnove-jizdni-kolo-alcyon-puvodni-nalezovy-stav-298082048.jpeg"
+   },
+   "titleImageUrl": "https://cdn.aukro.cz/images/sk1790534540137/thumbnail/velmi-stare-bezmufnove-jizdni-kolo-alcyon-puvodni-nalezovy-stav-298082048.jpeg",
+   "seoUrl": "velmi-stare-bezmufnove-jizdni-kolo-alcyon-puvodni-nalezovy-stav",
+   "ppPriorityList": true,
+   "ppPriorityListSort": true,
+   "ppHighlight": false,
+   "ppBoldTitle": true,
+   "buyersCountRelative": 12,
+   "itemState": "ACTIVE",
+   "sellerLogin": "REDACTED_LOGIN",
+   "seller": {
+    "accountActivated": true,
+    "aukroPlus": true,
+    "companyAccount": true,
+    "favouritedByCount": 649,
+    "feedbackUniqueUserCount": 1361,
+    "positiveFeedbackPercentage": 0.9956,
+    "rating": 1358,
+    "registrationDomain": "CZ",
+    "showName": "REDACTED_NAME",
+    "starType": "SILVER",
+    "userId": 1
+   },
+   "userWatching": false,
+   "watchersCount": 58,
+   "pepperLevel": 2,
+   "personalPickup": false,
+   "location": "Loket",
+   "postcode": "35733",
+   "aukroFreePriorityList": false,
+   "charity": false,
+   "paymentViaAukro": true,
+   "buyersProtectionAvailable": true,
+   "retailPrice": {
+    "amount": 0,
+    "currency": "CZK"
+   },
+   "adultContent": false,
+   "auction": true,
+   "aukroPlus": true,
+   "freeShipping": false,
+   "paymentOnline": false
+  },
+  {
+   "itemId": 7135092438,
+   "itemName": "Eska skládačka",
+   "categoryPath": [
+    {
+     "id": 17533,
+     "name": "Sport a turistika",
+     "seoUrl": "sport-a-turistika"
+    },
+    {
+     "id": 17570,
+     "name": "Cyklistika",
+     "seoUrl": "cyklistika"
+    },
+    {
+     "id": 17590,
+     "name": "Cyklobazar",
+     "seoUrl": "jizdni-kola"
+    },
+    {
+     "id": 17597,
+     "name": "Ostatní kola",
+     "seoUrl": "ostatni-kola"
+    }
+   ],
+   "startingTime": "2026-09-27T19:25:04.131+02:00",
+   "endingTime": "2026-10-04T19:25:00+02:00",
+   "buyNowActive": false,
+   "buyNowPrice": {
+    "amount": 0,
+    "currency": "CZK"
+   },
+   "quantity": 1,
+   "quantityType": "pieces",
+   "attributes": [
+    {
+     "attributeId": 48,
+     "attributeName": "Stav zboží",
+     "attributeValue": "Nefunkční / na díly",
+     "attributeValueId": 4,
+     "position": 0
+    }
+   ],
+   "price": {
+    "amount": 100,
+    "currency": "CZK"
+   },
+   "priceWithShipping": {
+    "amount": 100,
+    "currency": "CZK"
+   },
+   "titleImage": {
+    "position": 0,
+    "titleImage": false,
+    "url": "https://cdn.aukro.cz/images/sk1790493362303/thumbnail/eska-skladacka-297973480.jpeg"
+   },
+   "titleImageUrl": "https://cdn.aukro.cz/images/sk1790493362303/thumbnail/eska-skladacka-297973480.jpeg",
+   "seoUrl": "eska-skladacka",
+   "ppPriorityList": true,
+   "ppPriorityListSort": true,
+   "ppHighlight": false,
+   "ppBoldTitle": false,
+   "buyersCountRelative": 0,
+   "itemState": "ACTIVE",
+   "sellerLogin": "REDACTED_LOGIN",
+   "seller": {
+    "accountActivated": true,
+    "aukroPlus": false,
+    "companyAccount": false,
+    "favouritedByCount": 2,
+    "feedbackUniqueUserCount": 75,
+    "positiveFeedbackPercentage": 1,
+    "rating": 75,
+    "registrationDomain": "CZ",
+    "showName": "REDACTED_NAME",
+    "starType": "BRONZE",
+    "userId": 1
+   },
+   "userWatching": false,
+   "watchersCount": 1,
+   "pepperLevel": 0,
+   "personalPickup": true,
+   "location": "Jičín",
+   "postcode": "50601",
+   "aukroFreePriorityList": false,
+   "charity": false,
+   "paymentViaAukro": true,
+   "buyersProtectionAvailable": true,
+   "retailPrice": {
+    "amount": 0,
+    "currency": "CZK"
+   },
+   "adultContent": false,
+   "auction": true,
+   "aukroPlus": false,
+   "freeShipping": false,
+   "paymentOnline": false
+  },
+  {
+   "itemId": 7131903174,
+   "itemName": "Handbike",
+   "categoryPath": [
+    {
+     "id": 17533,
+     "name": "Sport a turistika",
+     "seoUrl": "sport-a-turistika"
+    },
+    {
+     "id": 17570,
+     "name": "Cyklistika",
+     "seoUrl": "cyklistika"
+    },
+    {
+     "id": 17590,
+     "name": "Cyklobazar",
+     "seoUrl": "jizdni-kola"
+    },
+    {
+     "id": 17597,
+     "name": "Ostatní kola",
+     "seoUrl": "ostatni-kola"
+    }
+   ],
+   "startingTime": "2026-09-27T19:25:02+02:00",
+   "endingTime": "2026-10-04T19:23:35+02:00",
+   "buyNowActive": false,
+   "buyNowPrice": {
+    "amount": 0,
+    "currency": "CZK"
+   },
+   "quantity": 1,
+   "quantityType": "pieces",
+   "attributes": [
+    {
+     "attributeId": 48,
+     "attributeName": "Stav zboží",
+     "attributeValue": "Použité",
+     "attributeValueId": 2,
+     "position": 0
+    },
+    {
+     "attributeId": 110,
+     "attributeName": "Barva kola",
+     "attributeValue": "Fialová",
+     "attributeValueId": 7,
+     "position": 0
+    }
+   ],
+   "price": {
+    "amount": 5000,
+    "currency": "CZK"
+   },
+   "priceWithShipping": {
+    "amount": 5000,
+    "currency": "CZK"
+   },
+   "titleImage": {
+    "position": 0,
+    "titleImage": false,
+    "url": "https://cdn.aukro.cz/images/sk1790062059602/thumbnail/handbike-297049755.jpeg"
+   },
+   "titleImageUrl": "https://cdn.aukro.cz/images/sk1790062059602/thumbnail/handbike-297049755.jpeg",
+   "seoUrl": "handbike",
+   "ppPriorityList": true,
+   "ppPriorityListSort": true,
+   "ppHighlight": false,
+   "ppBoldTitle": true,
+   "buyersCountRelative": 0,
+   "itemState": "ACTIVE",
+   "sellerLogin": "REDACTED_LOGIN",
+   "seller": {
+    "accountActivated": true,
+    "aukroPlus": false,
+    "companyAccount": false,
+    "favouritedByCount": 31,
+    "feedbackUniqueUserCount": 165,
+    "positiveFeedbackPercentage": 1,
+    "rating": 165,
+    "registrationDomain": "CZ",
+    "showName": "REDACTED_NAME",
+    "starType": "BRONZE",
+    "userId": 1
+   },
+   "userWatching": false,
+   "watchersCount": 4,
+   "pepperLevel": 0,
+   "personalPickup": true,
+   "location": "Hradec Králové",
+   "postcode": "50009",
+   "aukroFreePriorityList": false,
+   "charity": false,
+   "paymentViaAukro": false,
+   "buyersProtectionAvailable": false,
+   "retailPrice": {
+    "amount": 0,
+    "currency": "CZK"
+   },
+   "adultContent": false,
+   "auction": true,
+   "aukroPlus": false,
+   "freeShipping": false,
+   "paymentOnline": false
+  },
+  {
+   "itemId": 7135092054,
+   "itemName": "Historická kola. Štítek Zbrojovka",
+   "categoryPath": [
+    {
+     "id": 17533,
+     "name": "Sport a turistika",
+     "seoUrl": "sport-a-turistika"
+    },
+    {
+     "id": 17570,
+     "name": "Cyklistika",
+     "seoUrl": "cyklistika"
+    },
+    {
+     "id": 17590,
+     "name": "Cyklobazar",
+     "seoUrl": "jizdni-kola"
+    },
+    {
+     "id": 17598,
+     "name": "Historická kola",
+     "seoUrl": "historicka-kola"
+    }
+   ],
+   "startingTime": "2026-09-27T19:15:04.062+02:00",
+   "endingTime": "2026-10-04T19:15:00+02:00",
+   "buyNowActive": false,
+   "buyNowPrice": {
+    "amount": 0,
+    "currency": "CZK"
+   },
+   "quantity": 1,
+   "quantityType": "pieces",
+   "attributes": [
+    {
+     "attributeId": 48,
+     "attributeName": "Stav zboží",
+     "attributeValue": "Nefunkční / na díly",
+     "attributeValueId": 4,
+     "position": 0
+    }
+   ],
+   "price": {
+    "amount": 100,
+    "currency": "CZK"
+   },
+   "priceWithShipping": {
+    "amount": 100,
+    "currency": "CZK"
+   },
+   "titleImage": {
+    "position": 0,
+    "titleImage": false,
+    "url": "https://cdn.aukro.cz/images/sk1790492778945/thumbnail/historicka-kola-stitek-zbrojovka-297972183.jpeg"
+   },
+   "titleImageUrl": "https://cdn.aukro.cz/images/sk1790492778945/thumbnail/historicka-kola-stitek-zbrojovka-297972183.jpeg",
+   "seoUrl": "historicka-kola-stitek-zbrojovka",
+   "ppPriorityList": true,
+   "ppPriorityListSort": true,
+   "ppHighlight": false,
+   "ppBoldTitle": false,
+   "buyersCountRelative": 1,
+   "itemState": "ACTIVE",
+   "sellerLogin": "REDACTED_LOGIN",
+   "seller": {
+    "accountActivated": true,
+    "aukroPlus": false,
+    "companyAccount": false,
+    "favouritedByCount": 2,
+    "feedbackUniqueUserCount": 75,
+    "positiveFeedbackPercentage": 1,
+    "rating": 75,
+    "registrationDomain": "CZ",
+    "showName": "REDACTED_NAME",
+    "starType": "BRONZE",
+    "userId": 1
+   },
+   "userWatching": false,
+   "watchersCount": 11,
+   "pepperLevel": 0,
+   "personalPickup": true,
+   "location": "Jičín",
+   "postcode": "50601",
+   "aukroFreePriorityList": false,
+   "charity": false,
+   "paymentViaAukro": true,
+   "buyersProtectionAvailable": true,
+   "retailPrice": {
+    "amount": 0,
+    "currency": "CZK"
+   },
+   "adultContent": false,
+   "auction": true,
+   "aukroPlus": false,
+   "freeShipping": false,
+   "paymentOnline": false
+  },
+  {
+   "itemId": 7131634758,
+   "itemName": "Elektrokolo SCOTT E-Sub Cross 20 Men + druhá orig. baterie",
+   "categoryPath": [
+    {
+     "id": 17533,
+     "name": "Sport a turistika",
+     "seoUrl": "sport-a-turistika"
+    },
+    {
+     "id": 17570,
+     "name": "Cyklistika",
+     "seoUrl": "cyklistika"
+    },
+    {
+     "id": 17590,
+     "name": "Cyklobazar",
+     "seoUrl": "jizdni-kola"
+    },
+    {
+     "id": 147974,
+     "name": "Elektrokola",
+     "seoUrl": "elektrokola"
+    }
+   ],
+   "startingTime": "2026-09-27T10:15:01+02:00",
+   "endingTime": "2026-10-07T10:13:50+02:00",
+   "buyNowActive": true,
+   "buyNowPrice": {
+    "amount": 20000,
+    "currency": "CZK"
+   },
+   "quantity": 1,
+   "quantityType": "pieces",
+   "attributes": [
+    {
+     "attributeId": 48,
+     "attributeName": "Stav zboží",
+     "attributeValue": "Použité",
+     "attributeValueId": 2,
+     "position": 0
+    },
+    {
+     "attributeId": 16,
+     "attributeName": "Určení",
+     "attributeValue": "Pánská",
+     "attributeValueId": 1,
+     "position": 0
+    },
+    {
+     "attributeId": 8820,
+     "attributeName": "Doba dodání (od obdržení platby)",
+     "attributeValue": "2-3 dny",
+     "attributeValueId": 2,
+     "position": 0
+    },
+    {
+     "attributeId": 129769,
+     "attributeName": "Značka",
+     "attributeValue": "Scott",
+     "attributeValueId": 15,
+     "position": 0
+    },
+    {
+     "attributeId": 9,
+     "attributeName": "Délka dojezdu",
+     "attributeValue": "Méně než 130 km",
+     "attributeValueId": 1,
+     "position": 0
+    },
+    {
+     "attributeId": 106,
+     "attributeName": "Odpružení",
+     "attributeValue": "Odpružená přední vidlice",
+     "attributeValueId": 1,
+     "position": 0
+    },
+    {
+     "attributeId": 107,
+     "attributeName": "Hmotnost kola",
+     "attributeValue": "Nad 16 kg",
+     "attributeValueId": 1,
+     "position": 0
+    },
+    {
+     "attributeId": 108,
+     "attributeName": "Materíál rámu",
+     "attributeValue": "Hliník",
+     "attributeValueId": 1,
+     "position": 0
+    },
+    {
+     "attributeId": 109,
+     "attributeName": "Průměr kol",
+     "attributeValue": "28″",
+     "attributeValueId": 23,
+     "position": 0
+    }
+   ],
+   "price": {
+    "amount": 19000,
+    "currency": "CZK"
+   },
+   "priceWithShipping": {
+    "amount": 19000,
+    "currency": "CZK"
+   },
+   "titleImage": {
+    "position": 0,
+    "titleImage": false,
+    "url": "https://cdn.aukro.cz/images/sk1787903399477/thumbnail/elektrokolo-scott-e-sub-cross-20-men-druha-orig-baterie-292751800.jpeg"
+   },
+   "titleImageUrl": "https://cdn.aukro.cz/images/sk1787903399477/thumbnail/elektrokolo-scott-e-sub-cross-20-men-druha-orig-baterie-292751800.jpeg",
+   "seoUrl": "elektrokolo-scott-e-sub-cross-20-men-druha-orig-baterie",
+   "ppPriorityList": true,
+   "ppPriorityListSort": true,
+   "ppHighlight": false,
+   "ppBoldTitle": false,
+   "buyersCountRelative": 0,
+   "itemState": "ACTIVE",
+   "sellerLogin": "REDACTED_LOGIN",
+   "seller": {
+    "accountActivated": true,
+    "aukroPlus": false,
+    "companyAccount": false,
+    "favouritedByCount": 0,
+    "feedbackUniqueUserCount": 5,
+    "positiveFeedbackPercentage": 0.7143,
+    "rating": 3,
+    "registrationDomain": "CZ",
+    "showName": "REDACTED_NAME",
+    "starType": "GREEN",
+    "userId": 1
+   },
+   "userWatching": false,
+   "watchersCount": 7,
+   "pepperLevel": 0,
+   "personalPickup": true,
+   "location": "Moravské Bránice",
+   "postcode": "66464",
+   "aukroFreePriorityList": false,
+   "charity": false,
+   "paymentViaAukro": true,
+   "buyersProtectionAvailable": true,
+   "retailPrice": {
+    "amount": 0,
+    "currency": "CZK"
+   },
+   "adultContent": false,
+   "auction": true,
+   "aukroPlus": false,
+   "freeShipping": false,
+   "paymentOnline": false
+  },
+  {
+   "itemId": 7134953681,
+   "itemName": "Horské kolo AMULET Maniac",
+   "categoryPath": [
+    {
+     "id": 17533,
+     "name": "Sport a turistika",
+     "seoUrl": "sport-a-turistika"
+    },
+    {
+     "id": 17570,
+     "name": "Cyklistika",
+     "seoUrl": "cyklistika"
+    },
+    {
+     "id": 17590,
+     "name": "Cyklobazar",
+     "seoUrl": "jizdni-kola"
+    },
+    {
+     "id": 17594,
+     "name": "Horská (MTB) kola",
+     "seoUrl": "horska-mtb-kola"
+    }
+   ],
+   "startingTime": "2026-09-26T02:46:01.586+02:00",
+   "endingTime": "2026-10-03T02:45:36+02:00",
+   "buyNowActive": true,
+   "buyNowPrice": {
+    "amount": 6500,
+    "currency": "CZK"
+   },
+   "quantity": 1,
+   "quantityType": "pieces",
+   "attributes": [
+    {
+     "attributeId": 48,
+     "attributeName": "Stav zboží",
+     "attributeValue": "Zánovní",
+     "attributeValueId": 6,
+     "position": 0
+    },
+    {
+     "attributeId": 16,
+     "attributeName": "Určení",
+     "attributeValue": "Dětská",
+     "attributeValueId": 3,
+     "position": 0
+    },
+    {
+     "attributeId": 7113,
+     "attributeName": "Typ",
+     "attributeValue": "Pánské",
+     "attributeValueId": 2,
+     "position": 0
+    },
+    {
+     "attributeId": 25948,
+     "attributeName": "Značka",
+     "attributeValue": "Amulet",
+     "attributeValueId": 3,
+     "position": 1
+    },
+    {
+     "attributeId": 108,
+     "attributeName": "Materíál rámu",
+     "attributeValue": "Hliník",
+     "attributeValueId": 1,
+     "position": 0
+    },
+    {
+     "attributeId": 109,
+     "attributeName": "Průměr kol",
+     "attributeValue": "26″",
+     "attributeValueId": 20,
+     "position": 0
+    }
+   ],
+   "price": {
+    "amount": 6500,
+    "currency": "CZK"
+   },
+   "priceWithShipping": {
+    "amount": 7000,
+    "currency": "CZK"
+   },
+   "titleImage": {
+    "position": 0,
+    "titleImage": false,
+    "url": "https://cdn.aukro.cz/images/sk1790383135344/thumbnail/horske-kolo-amulet-maniac-297772552.jpeg"
+   },
+   "titleImageUrl": "https://cdn.aukro.cz/images/sk1790383135344/thumbnail/horske-kolo-amulet-maniac-297772552.jpeg",
+   "seoUrl": "horske-kolo-amulet-maniac",
+   "ppPriorityList": true,
+   "ppPriorityListSort": true,
+   "ppHighlight": true,
+   "ppBoldTitle": true,
+   "buyersCountRelative": 0,
+   "itemState": "ACTIVE",
+   "sellerLogin": "REDACTED_LOGIN",
+   "seller": {
+    "accountActivated": true,
+    "aukroPlus": false,
+    "companyAccount": false,
+    "favouritedByCount": 0,
+    "feedbackUniqueUserCount": 22,
+    "positiveFeedbackPercentage": 1,
+    "rating": 22,
+    "registrationDomain": "CZ",
+    "showName": "REDACTED_NAME",
+    "starType": "WHITE",
+    "userId": 1
+   },
+   "userWatching": false,
+   "watchersCount": 0,
+   "pepperLevel": 0,
+   "personalPickup": true,
+   "location": "Varnsdorf",
+   "postcode": "40747",
+   "aukroFreePriorityList": false,
+   "charity": false,
+   "paymentViaAukro": true,
+   "buyersProtectionAvailable": true,
+   "retailPrice": {
+    "amount": 0,
+    "currency": "CZK"
+   },
+   "adultContent": false,
+   "auction": false,
+   "aukroPlus": false,
+   "freeShipping": false,
+   "paymentOnline": false
+  },
+  {
+   "itemId": 7131448425,
+   "itemName": "Prodam jizdní kolo LEADER FOX",
+   "categoryPath": [
+    {
+     "id": 17533,
+     "name": "Sport a turistika",
+     "seoUrl": "sport-a-turistika"
+    },
+    {
+     "id": 17570,
+     "name": "Cyklistika",
+     "seoUrl": "cyklistika"
+    },
+    {
+     "id": 17590,
+     "name": "Cyklobazar",
+     "seoUrl": "jizdni-kola"
+    },
+    {
+     "id": 17595,
+     "name": "Silniční kola",
+     "seoUrl": "silnicni-kola"
+    }
+   ],
+   "startingTime": "2026-09-25T17:32:01+02:00",
+   "endingTime": "2026-10-25T17:30:41+01:00",
+   "buyNowActive": true,
+   "buyNowPrice": {
+    "amount": 6000,
+    "currency": "CZK"
+   },
+   "quantity": 1,
+   "quantityType": "pieces",
+   "attributes": [
+    {
+     "attributeId": 48,
+     "attributeName": "Stav zboží",
+     "attributeValue": "Zánovní",
+     "attributeValueId": 6,
+     "position": 0
+    },
+    {
+     "attributeId": 16,
+     "attributeName": "Určení",
+     "attributeValue": "Pánská",
+     "attributeValueId": 1,
+     "position": 0
+    },
+    {
+     "attributeId": 25988,
+     "attributeName": "Značka",
+     "attributeValue": "Ostatní",
+     "attributeValueId": 22,
+     "position": 0
+    },
+    {
+     "attributeId": 8820,
+     "attributeName": "Doba dodání (od obdržení platby)",
+     "attributeValue": "7-10 dní",
+     "attributeValueId": 4,
+     "position": 0
+    },
+    {
+     "attributeId": 7113,
+     "attributeName": "Typ",
+     "attributeValue": "Pánské",
+     "attributeValueId": 2,
+     "position": 0
+    },
+    {
+     "attributeId": 106,
+     "attributeName": "Odpružení",
+     "attributeValue": "Bezodpružení",
+     "attributeValueId": 3,
+     "position": 0
+    },
+    {
+     "attributeId": 107,
+     "attributeName": "Hmotnost kola",
+     "attributeValue": "11 kg až 12 kg",
+     "attributeValueId": 6,
+     "position": 0
+    },
+    {
+     "attributeId": 108,
+     "attributeName": "Materíál rámu",
+     "attributeValue": "Ocel",
+     "attributeValueId": 4,
+     "position": 0
+    },
+    {
+     "attributeId": 109,
+     "attributeName": "Průměr kol",
+     "attributeValue": "11″",
+     "attributeValueId": 5,
+     "position": 0
+    },
+    {
+     "attributeId": 110,
+     "attributeName": "Barva kola",
+     "attributeValue": "Černá",
+     "attributeValueId": 1,
+     "position": 0
+    }
+   ],
+   "price": {
+    "amount": 6000,
+    "currency": "CZK"
+   },
+   "priceWithShipping": {
+    "amount": 6300,
+    "currency": "CZK"
+   },
+   "titleImage": {
+    "position": 0,
+    "titleImage": false,
+    "url": "https://cdn.aukro.cz/images/sk1787756611530/thumbnail/prodam-jizdni-kolo-leader-fox-292449106.jpeg"
+   },
+   "titleImageUrl": "https://cdn.aukro.cz/images/sk1787756611530/thumbnail/prodam-jizdni-kolo-leader-fox-292449106.jpeg",
+   "seoUrl": "prodam-jizdni-kolo-leader-fox",
+   "ppPriorityList": true,
+   "ppPriorityListSort": true,
+   "ppHighlight": false,
+   "ppBoldTitle": false,
+   "buyersCountRelative": 0,
+   "itemState": "ACTIVE",
+   "sellerLogin": "REDACTED_LOGIN",
+   "seller": {
+    "accountActivated": true,
+    "aukroPlus": false,
+    "companyAccount": false,
+    "favouritedByCount": 7,
+    "feedbackUniqueUserCount": 51,
+    "positiveFeedbackPercentage": 1,
+    "rating": 51,
+    "registrationDomain": "CZ",
+    "showName": "REDACTED_NAME",
+    "starType": "BRONZE",
+    "userId": 1
+   },
+   "userWatching": false,
+   "watchersCount": 1,
+   "pepperLevel": 0,
+   "personalPickup": true,
+   "location": "Neratovice",
+   "postcode": "27711",
+   "aukroFreePriorityList": false,
+   "charity": false,
+   "paymentViaAukro": true,
+   "buyersProtectionAvailable": true,
+   "retailPrice": {
+    "amount": 0,
+    "currency": "CZK"
+   },
+   "adultContent": false,
+   "auction": false,
+   "aukroPlus": false,
+   "freeShipping": false,
+   "paymentOnline": false
+  },
+  {
+   "itemId": 7126998213,
+   "itemName": "elektrokolo Voltera Explore (2025) – Rám XL / 29\"",
+   "categoryPath": [
+    {
+     "id": 17533,
+     "name": "Sport a turistika",
+     "seoUrl": "sport-a-turistika"
+    },
+    {
+     "id": 17570,
+     "name": "Cyklistika",
+     "seoUrl": "cyklistika"
+    },
+    {
+     "id": 17590,
+     "name": "Cyklobazar",
+     "seoUrl": "jizdni-kola"
+    },
+    {
+     "id": 147974,
+     "name": "Elektrokola",
+     "seoUrl": "elektrokola"
+    }
+   ],
+   "startingTime": "2026-09-25T16:05:02+02:00",
+   "endingTime": "2026-10-02T16:03:01+02:00",
+   "buyNowActive": true,
+   "buyNowPrice": {
+    "amount": 18000,
+    "currency": "CZK"
+   },
+   "quantity": 1,
+   "quantityType": "pieces",
+   "attributes": [
+    {
+     "attributeId": 48,
+     "attributeName": "Stav zboží",
+     "attributeValue": "Použité",
+     "attributeValueId": 2,
+     "position": 0
+    },
+    {
+     "attributeId": 16,
+     "attributeName": "Určení",
+     "attributeValue": "Pánská",
+     "attributeValueId": 1,
+     "position": 0
+    },
+    {
+     "attributeId": 9,
+     "attributeName": "Délka dojezdu",
+     "attributeValue": "Méně než 130 km",
+     "attributeValueId": 1,
+     "position": 0
+    },
+    {
+     "attributeId": 106,
+     "attributeName": "Odpružení",
+     "attributeValue": "Odpružená přední vidlice",
+     "attributeValueId": 1,
+     "position": 0
+    },
+    {
+     "attributeId": 107,
+     "attributeName": "Hmotnost kola",
+     "attributeValue": "Nad 16 kg",
+     "attributeValueId": 1,
+     "position": 0
+    },
+    {
+     "attributeId": 11,
+     "attributeName": "Kapacita Baterie",
+     "attributeValue": "600 až 700 Wh",
+     "attributeValueId": 4,
+     "position": 0
+    },
+    {
+     "attributeId": 108,
+     "attributeName": "Materíál rámu",
+     "attributeValue": "Hliník",
+     "attributeValueId": 1,
+     "position": 0
+    },
+    {
+     "attributeId": 109,
+     "attributeName": "Průměr kol",
+     "attributeValue": "29″",
+     "attributeValueId": 24,
+     "position": 0
+    },
+    {
+     "attributeId": 110,
+     "attributeName": "Barva kola",
+     "attributeValue": "Černá, Červená",
+     "attributeValueId": 1,
+     "position": 0
+    }
+   ],
+   "price": {
+    "amount": 17999,
+    "currency": "CZK"
+   },
+   "priceWithShipping": {
+    "amount": 18064,
+    "currency": "CZK"
+   },
+   "titleImage": {
+    "position": 0,
+    "titleImage": false,
+    "url": "https://cdn.aukro.cz/images/sk1790457449479/thumbnail/elektrokolo-voltera-explore-2025-ram-xl-29-297913223.jpeg"
+   },
+   "titleImageUrl": "https://cdn.aukro.cz/images/sk1790457449479/thumbnail/elektrokolo-voltera-explore-2025-ram-xl-29-297913223.jpeg",
+   "seoUrl": "elektrokolo-voltera-explore-2025-ram-xl-29",
+   "ppPriorityList": true,
+   "ppPriorityListSort": true,
+   "ppHighlight": true,
+   "ppBoldTitle": true,
+   "buyersCountRelative": 0,
+   "itemState": "ACTIVE",
+   "sellerLogin": "REDACTED_LOGIN",
+   "seller": {
+    "accountActivated": true,
+    "aukroPlus": false,
+    "companyAccount": false,
+    "favouritedByCount": 0,
+    "feedbackUniqueUserCount": 1,
+    "positiveFeedbackPercentage": 1,
+    "rating": 1,
+    "registrationDomain": "CZ",
+    "showName": "REDACTED_NAME",
+    "starType": "GREEN",
+    "userId": 1
+   },
+   "userWatching": false,
+   "watchersCount": 13,
+   "pepperLevel": 0,
+   "personalPickup": true,
+   "location": "Brno",
+   "postcode": "61700",
+   "aukroFreePriorityList": false,
+   "charity": false,
+   "paymentViaAukro": true,
+   "buyersProtectionAvailable": true,
+   "retailPrice": {
+    "amount": 0,
+    "currency": "CZK"
+   },
+   "adultContent": false,
+   "auction": true,
+   "aukroPlus": false,
+   "freeShipping": false,
+   "paymentOnline": false
+  },
+  {
+   "itemId": 7133429684,
+   "itemName": "Lehké dětské kolo Pidapi alu 16\", hliníkové, 4-6let - JEN OSOBNÍ ODBĚR",
+   "categoryPath": [
+    {
+     "id": 17533,
+     "name": "Sport a turistika",
+     "seoUrl": "sport-a-turistika"
+    },
+    {
+     "id": 17570,
+     "name": "Cyklistika",
+     "seoUrl": "cyklistika"
+    },
+    {
+     "id": 17590,
+     "name": "Cyklobazar",
+     "seoUrl": "jizdni-kola"
+    },
+    {
+     "id": 17592,
+     "name": "Dětská kola",
+     "seoUrl": "detska-kola"
+    }
+   ],
+   "startingTime": "2026-09-13T10:41:00.814+02:00",
+   "endingTime": "2026-10-13T10:40:59+02:00",
+   "buyNowActive": true,
+   "buyNowPrice": {
+    "amount": 490,
+    "currency": "CZK"
+   },
+   "quantity": 1,
+   "quantityType": "pieces",
+   "attributes": [
+    {
+     "attributeId": 48,
+     "attributeName": "Stav zboží",
+     "attributeValue": "Použité",
+     "attributeValueId": 2,
+     "position": 0
+    },
+    {
+     "attributeId": 16,
+     "attributeName": "Určení",
+     "attributeValue": "Dětská",
+     "attributeValueId": 3,
+     "position": 0
+    }
+   ],
+   "price": {
+    "amount": 490,
+    "currency": "CZK"
+   },
+   "priceWithShipping": {
+    "amount": 490,
+    "currency": "CZK"
+   },
+   "titleImage": {
+    "position": 0,
+    "titleImage": false,
+    "url": "https://cdn.aukro.cz/images/sk1758360562326/thumbnail/lehke-detske-kolo-pidapi-alu-16-hlinikove-4-6let-jen-osobni-odber-241004362.jpeg"
+   },
+   "titleImageUrl": "https://cdn.aukro.cz/images/sk1758360562326/thumbnail/lehke-detske-kolo-pidapi-alu-16-hlinikove-4-6let-jen-osobni-odber-241004362.jpeg",
+   "seoUrl": "lehke-detske-kolo-pidapi-alu-16-hlinikove-4-6let-jen-osobni-odber",
+   "ppPriorityList": true,
+   "ppPriorityListSort": true,
+   "ppHighlight": false,
+   "ppBoldTitle": true,
+   "buyersCountRelative": 0,
+   "itemState": "ACTIVE",
+   "sellerLogin": "REDACTED_LOGIN",
+   "seller": {
+    "accountActivated": true,
+    "aukroPlus": false,
+    "companyAccount": false,
+    "favouritedByCount": 5,
+    "feedbackUniqueUserCount": 78,
+    "positiveFeedbackPercentage": 1,
+    "rating": 78,
+    "registrationDomain": "CZ",
+    "showName": "REDACTED_NAME",
+    "starType": "BRONZE",
+    "userId": 1
+   },
+   "userWatching": false,
+   "watchersCount": 1,
+   "pepperLevel": 0,
+   "personalPickup": true,
+   "location": "Mladá Boleslav",
+   "postcode": "29301",
+   "aukroFreePriorityList": false,
+   "charity": false,
+   "paymentViaAukro": false,
+   "buyersProtectionAvailable": false,
+   "retailPrice": {
+    "amount": 0,
+    "currency": "CZK"
+   },
+   "adultContent": false,
+   "auction": false,
+   "aukroPlus": false,
+   "freeShipping": false,
+   "paymentOnline": false
+  },
+  {
+   "itemId": 7066879703,
+   "itemName": "Nové horské kolo Olpran Apollo Full Disc 29\", 19\" ALU rám, záruka 2 r.",
+   "categoryPath": [
+    {
+     "id": 17533,
+     "name": "Sport a turistika",
+     "seoUrl": "sport-a-turistika"
+    },
+    {
+     "id": 17570,
+     "name": "Cyklistika",
+     "seoUrl": "cyklistika"
+    },
+    {
+     "id": 17590,
+     "name": "Cyklobazar",
+     "seoUrl": "jizdni-kola"
+    },
+    {
+     "id": 17594,
+     "name": "Horská (MTB) kola",
+     "seoUrl": "horska-mtb-kola"
+    }
+   ],
+   "startingTime": "2026-10-02T15:01:02+02:00",
+   "endingTime": "2026-10-12T15:00:00+02:00",
+   "buyNowActive": true,
+   "buyNowPrice": {
+    "amount": 7799,
+    "currency": "CZK"
+   },
+   "quantity": 1,
+   "quantityType": "pieces",
+   "attributes": [
+    {
+     "attributeId": 48,
+     "attributeName": "Stav zboží",
+     "attributeValue": "Nové",
+     "attributeValueId": 1,
+     "position": 0
+    },
+    {
+     "attributeId": 16,
+     "attributeName": "Určení",
+     "attributeValue": "Pánská",
+     "attributeValueId": 1,
+     "position": 0
+    },
+    {
+     "attributeId": 130547,
+     "attributeName": "Doba záruky (měsíců)",
+     "attributeValue": "24",
+     "position": 5
+    },
+    {
+     "attributeId": 7113,
+     "attributeName": "Typ",
+     "attributeValue": "Pánské",
+     "attributeValueId": 2,
+     "position": 0
+    },
+    {
+     "attributeId": 106,
+     "attributeName": "Odpružení",
+     "attributeValue": "Odpružená přední vidlice",
+     "attributeValueId": 1,
+     "position": 0
+    },
+    {
+     "attributeId": 107,
+     "attributeName": "Hmotnost kola",
+     "attributeValue": "14 kg až 15 kg",
+     "attributeValueId": 3,
+     "position": 0
+    },
+    {
+     "attributeId": 25948,
+     "attributeName": "Značka",
+     "attributeValue": "Olpran",
+     "attributeValueId": 24,
+     "position": 1
+    },
+    {
+     "attributeId": 108,
+     "attributeName": "Materíál rámu",
+     "attributeValue": "Hliník",
+     "attributeValueId": 1,
+     "position": 0
+    },
+    {
+     "attributeId": 109,
+     "attributeName": "Průměr kol",
+     "attributeValue": "29″",
+     "attributeValueId": 24,
+     "position": 0
+    },
+    {
+     "attributeId": 110,
+     "attributeName": "Barva kola",
+     "attributeValue": "Černá",
+     "attributeValueId": 1,
+     "position": 0
+    }
+   ],
+   "price": {
+    "amount": 7799,
+    "currency": "CZK"
+   },
+   "priceWithShipping": {
+    "amount": 8129,
+    "currency": "CZK"
+   },
+   "titleImage": {
+    "position": 0,
+    "titleImage": false,
+    "url": "https://cdn.aukro.cz/images/sk1647950824719/thumbnail/nove-horske-kolo-olpran-apollo-full-disc-29-19-alu-ram-zaruka-2-r-120639346.jpeg"
+   },
+   "titleImageUrl": "https://cdn.aukro.cz/images/sk1647950824719/thumbnail/nove-horske-kolo-olpran-apollo-full-disc-29-19-alu-ram-zaruka-2-r-120639346.jpeg",
+   "seoUrl": "nove-horske-kolo-olpran-apollo-full-disc-29-19-alu-ram-zaruka-2-r",
+   "ppPriorityList": false,
+   "ppPriorityListSort": false,
+   "ppHighlight": false,
+   "ppBoldTitle": false,
+   "buyersCountRelative": 0,
+   "itemState": "ACTIVE",
+   "sellerLogin": "REDACTED_LOGIN",
+   "seller": {
+    "accountActivated": true,
+    "aukroPlus": false,
+    "companyAccount": true,
+    "favouritedByCount": 112,
+    "feedbackUniqueUserCount": 356,
+    "positiveFeedbackPercentage": 1,
+    "rating": 356,
+    "registrationDomain": "CZ",
+    "showName": "REDACTED_NAME",
+    "starType": "SILVER",
+    "userId": 1
+   },
+   "userWatching": false,
+   "watchersCount": 4,
+   "pepperLevel": 0,
+   "personalPickup": true,
+   "location": "Brno",
+   "postcode": "602 00",
+   "aukroFreePriorityList": false,
+   "charity": false,
+   "paymentViaAukro": true,
+   "buyersProtectionAvailable": true,
+   "retailPrice": {
+    "amount": 0,
+    "currency": "CZK"
+   },
+   "adultContent": false,
+   "auction": false,
+   "aukroPlus": false,
+   "freeShipping": false,
+   "paymentOnline": false
+  },
+  {
+   "itemId": 7041607156,
+   "itemName": "Horské kolo zn.: Author Versus Disc, Alu rám 19\"/kola 26\"",
+   "categoryPath": [
+    {
+     "id": 17533,
+     "name": "Sport a turistika",
+     "seoUrl": "sport-a-turistika"
+    },
+    {
+     "id": 17570,
+     "name": "Cyklistika",
+     "seoUrl": "cyklistika"
+    },
+    {
+     "id": 17590,
+     "name": "Cyklobazar",
+     "seoUrl": "jizdni-kola"
+    },
+    {
+     "id": 17594,
+     "name": "Horská (MTB) kola",
+     "seoUrl": "horska-mtb-kola"
+    }
+   ],
+   "startingTime": "2026-10-02T12:37:01+02:00",
+   "endingTime": "2026-10-07T12:35:59+02:00",
+   "buyNowActive": true,
+   "buyNowPrice": {
+    "amount": 8200,
+    "currency": "CZK"
+   },
+   "quantity": 1,
+   "quantityType": "pieces",
+   "attributes": [
+    {
+     "attributeId": 48,
+     "attributeName": "Stav zboží",
+     "attributeValue": "Použité",
+     "attributeValueId": 2,
+     "position": 0
+    },
+    {
+     "attributeId": 16,
+     "attributeName": "Určení",
+     "attributeValue": "Pánská",
+     "attributeValueId": 1,
+     "position": 0
+    },
+    {
+     "attributeId": 8820,
+     "attributeName": "Doba dodání (od obdržení platby)",
+     "attributeValue": "1-2 dny",
+     "attributeValueId": 1,
+     "position": 0
+    },
+    {
+     "attributeId": 7113,
+     "attributeName": "Typ",
+     "attributeValue": "Pánské",
+     "attributeValueId": 2,
+     "position": 0
+    },
+    {
+     "attributeId": 106,
+     "attributeName": "Odpružení",
+     "attributeValue": "Odpružená přední vidlice",
+     "attributeValueId": 1,
+     "position": 0
+    },
+    {
+     "attributeId": 107,
+     "attributeName": "Hmotnost kola",
+     "attributeValue": "12 kg až 13 kg",
+     "attributeValueId": 5,
+     "position": 0
+    },
+    {
+     "attributeId": 25948,
+     "attributeName": "Značka",
+     "attributeValue": "Author",
+     "attributeValueId": 5,
+     "position": 1
+    },
+    {
+     "attributeId": 108,
+     "attributeName": "Materíál rámu",
+     "attributeValue": "Dural",
+     "attributeValueId": 2,
+     "position": 0
+    },
+    {
+     "attributeId": 109,
+     "attributeName": "Průměr kol",
+     "attributeValue": "26″",
+     "attributeValueId": 20,
+     "position": 0
+    },
+    {
+     "attributeId": 110,
+     "attributeName": "Barva kola",
+     "attributeValue": "Zelená",
+     "attributeValueId": 3,
+     "position": 0
+    }
+   ],
+   "price": {
+    "amount": 7459,
+    "currency": "CZK"
+   },
+   "priceWithShipping": {
+    "amount": 7819,
+    "currency": "CZK"
+   },
+   "titleImage": {
+    "position": 0,
+    "titleImage": false,
+    "url": "https://cdn.aukro.cz/images/sk1688984959916/thumbnail/horske-kolo-zn-author-versus-disc-alu-ram-19-kola-26-164476290.jpeg"
+   },
+   "titleImageUrl": "https://cdn.aukro.cz/images/sk1688984959916/thumbnail/horske-kolo-zn-author-versus-disc-alu-ram-19-kola-26-164476290.jpeg",
+   "seoUrl": "horske-kolo-zn-author-versus-disc-alu-ram-19-kola-26",
+   "ppPriorityList": false,
+   "ppPriorityListSort": false,
+   "ppHighlight": false,
+   "ppBoldTitle": false,
+   "buyersCountRelative": 0,
+   "itemState": "ACTIVE",
+   "sellerLogin": "REDACTED_LOGIN",
+   "seller": {
+    "accountActivated": true,
+    "aukroPlus": true,
+    "companyAccount": true,
+    "favouritedByCount": 393,
+    "feedbackUniqueUserCount": 3337,
+    "positiveFeedbackPercentage": 0.9982,
+    "rating": 3332,
+    "registrationDomain": "CZ",
+    "showName": "REDACTED_NAME",
+    "starType": "GOLD",
+    "userId": 1
+   },
+   "userWatching": false,
+   "watchersCount": 15,
+   "pepperLevel": 0,
+   "personalPickup": true,
+   "location": "Praha",
+   "postcode": "169 00",
+   "aukroFreePriorityList": false,
+   "charity": false,
+   "paymentViaAukro": true,
+   "buyersProtectionAvailable": true,
+   "retailPrice": {
+    "amount": 17000,
+    "currency": "CZK"
+   },
+   "adultContent": false,
+   "auction": true,
+   "aukroPlus": true,
+   "freeShipping": false,
+   "paymentOnline": false
+  },
+  {
+   "itemId": 7103101367,
+   "itemName": "Dámsky mestský cestný bicykel STOVAGE s košíkem + světla",
+   "categoryPath": [
+    {
+     "id": 17533,
+     "name": "Sport a turistika",
+     "seoUrl": "sport-a-turistika"
+    },
+    {
+     "id": 17570,
+     "name": "Cyklistika",
+     "seoUrl": "cyklistika"
+    },
+    {
+     "id": 17590,
+     "name": "Cyklobazar",
+     "seoUrl": "jizdni-kola"
+    },
+    {
+     "id": 17595,
+     "name": "Silniční kola",
+     "seoUrl": "silnicni-kola"
+    }
+   ],
+   "startingTime": "2026-10-02T11:21:02+02:00",
+   "endingTime": "2026-10-12T11:19:57+02:00",
+   "buyNowActive": true,
+   "buyNowPrice": {
+    "amount": 8000,
+    "currency": "CZK"
+   },
+   "quantity": 2,
+   "quantityType": "pieces",
+   "attributes": [
+    {
+     "attributeId": 48,
+     "attributeName": "Stav zboží",
+     "attributeValue": "Nové",
+     "attributeValueId": 1,
+     "position": 0
+    },
+    {
+     "attributeId": 16,
+     "attributeName": "Určení",
+     "attributeValue": "Dámská",
+     "attributeValueId": 2,
+     "position": 0
+    },
+    {
+     "attributeId": 130547,
+     "attributeName": "Doba záruky (měsíců)",
+     "attributeValue": "24",
+     "position": 5
+    },
+    {
+     "attributeId": 8820,
+     "attributeName": "Doba dodání (od obdržení platby)",
+     "attributeValue": "2-3 dny",
+     "attributeValueId": 2,
+     "position": 0
+    },
+    {
+     "attributeId": 7113,
+     "attributeName": "Typ",
+     "attributeValue": "Dámské",
+     "attributeValueId": 1,
+     "position": 0
+    },
+    {
+     "attributeId": 106,
+     "attributeName": "Odpružení",
+     "attributeValue": "Bezodpružení",
+     "attributeValueId": 3,
+     "position": 0
+    },
+    {
+     "attributeId": 108,
+     "attributeName": "Materíál rámu",
+     "attributeValue": "Ocel",
+     "attributeValueId": 4,
+     "position": 0
+    },
+    {
+     "attributeId": 109,
+     "attributeName": "Průměr kol",
+     "attributeValue": "28″",
+     "attributeValueId": 23,
+     "position": 0
+    },
+    {
+     "attributeId": 110,
+     "attributeName": "Barva kola",
+     "attributeValue": "Bílá",
+     "attributeValueId": 6,
+     "position": 0
+    }
+   ],
+   "price": {
+    "amount": 8000,
+    "currency": "CZK"
+   },
+   "priceWithShipping": {
+    "amount": 8400,
+    "currency": "CZK"
+   },
+   "titleImage": {
+    "position": 0,
+    "titleImage": false,
+    "url": "https://cdn.aukro.cz/images/sk1763287997507/thumbnail/damsky-mestsky-cestny-bicykel-stovage-s-kosikem-svetla-247484773.jpeg"
+   },
+   "titleImageUrl": "https://cdn.aukro.cz/images/sk1763287997507/thumbnail/damsky-mestsky-cestny-bicykel-stovage-s-kosikem-svetla-247484773.jpeg",
+   "seoUrl": "damsky-mestsky-cestny-bicykel-stovage-s-kosikem-svetla",
+   "ppPriorityList": false,
+   "ppPriorityListSort": false,
+   "ppHighlight": false,
+   "ppBoldTitle": false,
+   "buyersCountRelative": 0,
+   "itemState": "ACTIVE",
+   "sellerLogin": "REDACTED_LOGIN",
+   "seller": {
+    "accountActivated": true,
+    "aukroPlus": false,
+    "companyAccount": true,
+    "favouritedByCount": 13,
+    "feedbackUniqueUserCount": 45,
+    "positiveFeedbackPercentage": 1,
+    "rating": 45,
+    "registrationDomain": "CZ",
+    "showName": "REDACTED_NAME",
+    "starType": "WHITE",
+    "userId": 1
+   },
+   "userWatching": false,
+   "watchersCount": 1,
+   "pepperLevel": 0,
+   "personalPickup": true,
+   "location": "Velké Kapušany",
+   "postcode": "07901",
+   "aukroFreePriorityList": false,
+   "charity": false,
+   "paymentViaAukro": true,
+   "buyersProtectionAvailable": true,
+   "retailPrice": {
+    "amount": 0,
+    "currency": "CZK"
+   },
+   "adultContent": false,
+   "auction": false,
+   "aukroPlus": false,
+   "freeShipping": false,
+   "paymentOnline": false
+  },
+  {
+   "itemId": 7102249104,
+   "itemName": "Městský elektrobicykel 250W 36V10Ah 23\" rám 28\" kola VÝŠKA od 175cm",
+   "categoryPath": [
+    {
+     "id": 17533,
+     "name": "Sport a turistika",
+     "seoUrl": "sport-a-turistika"
+    },
+    {
+     "id": 17570,
+     "name": "Cyklistika",
+     "seoUrl": "cyklistika"
+    },
+    {
+     "id": 17590,
+     "name": "Cyklobazar",
+     "seoUrl": "jizdni-kola"
+    },
+    {
+     "id": 147974,
+     "name": "Elektrokola",
+     "seoUrl": "elektrokola"
+    }
+   ],
+   "startingTime": "2026-10-02T10:19:01+02:00",
+   "endingTime": "2026-10-09T10:18:03+02:00",
+   "buyNowActive": true,
+   "buyNowPrice": {
+    "amount": 23717,
+    "currency": "CZK"
+   },
+   "quantity": 1,
+   "quantityType": "pieces",
+   "attributes": [
+    {
+     "attributeId": 48,
+     "attributeName": "Stav zboží",
+     "attributeValue": "Zánovní",
+     "attributeValueId": 6,
+     "position": 0
+    },
+    {
+     "attributeId": 16,
+     "attributeName": "Určení",
+     "attributeValue": "Pánská",
+     "attributeValueId": 1,
+     "position": 0
+    },
+    {
+     "attributeId": 130547,
+     "attributeName": "Doba záruky (měsíců)",
+     "attributeValue": "12",
+     "position": 5
+    },
+    {
+     "attributeId": 8820,
+     "attributeName": "Doba dodání (od obdržení platby)",
+     "attributeValue": "1-2 dny",
+     "attributeValueId": 1,
+     "position": 0
+    },
+    {
+     "attributeId": 9,
+     "attributeName": "Délka dojezdu",
+     "attributeValue": "Méně než 130 km",
+     "attributeValueId": 1,
+     "position": 0
+    },
+    {
+     "attributeId": 106,
+     "attributeName": "Odpružení",
+     "attributeValue": "Bezodpružení",
+     "attributeValueId": 3,
+     "position": 0
+    },
+    {
+     "attributeId": 107,
+     "attributeName": "Hmotnost kola",
+     "attributeValue": "Nad 16 kg",
+     "attributeValueId": 1,
+     "position": 0
+    },
+    {
+     "attributeId": 11,
+     "attributeName": "Kapacita Baterie",
+     "attributeValue": "Do 400 Wh",
+     "attributeValueId": 1,
+     "position": 0
+    },
+    {
+     "attributeId": 108,
+     "attributeName": "Materíál rámu",
+     "attributeValue": "Hliník",
+     "attributeValueId": 1,
+     "position": 0
+    },
+    {
+     "attributeId": 109,
+     "attributeName": "Průměr kol",
+     "attributeValue": "28″",
+     "attributeValueId": 23,
+     "position": 0
+    },
+    {
+     "attributeId": 110,
+     "attributeName": "Barva kola",
+     "attributeValue": "Černá",
+     "attributeValueId": 1,
+     "position": 0
+    }
+   ],
+   "price": {
+    "amount": 23717,
+    "currency": "CZK"
+   },
+   "priceWithShipping": {
+    "amount": 24091,
+    "currency": "CZK"
+   },
+   "titleImage": {
+    "position": 0,
+    "titleImage": false,
+    "url": "https://cdn.aukro.cz/images/sk1762506654230/thumbnail/mestsky-elektrobicykel-250w-36v10ah-23-ram-28-kola-vyska-od-175cm-246329115.jpeg"
+   },
+   "titleImageUrl": "https://cdn.aukro.cz/images/sk1762506654230/thumbnail/mestsky-elektrobicykel-250w-36v10ah-23-ram-28-kola-vyska-od-175cm-246329115.jpeg",
+   "seoUrl": "mestsky-elektrobicykel-250w-36v10ah-23-ram-28-kola-vyska-od-175cm",
+   "ppPriorityList": false,
+   "ppPriorityListSort": false,
+   "ppHighlight": false,
+   "ppBoldTitle": false,
+   "buyersCountRelative": 0,
+   "itemState": "ACTIVE",
+   "sellerLogin": "REDACTED_LOGIN",
+   "seller": {
+    "accountActivated": true,
+    "aukroPlus": false,
+    "companyAccount": true,
+    "favouritedByCount": 5,
+    "feedbackUniqueUserCount": 17,
+    "positiveFeedbackPercentage": 1,
+    "rating": 17,
+    "registrationDomain": "SK",
+    "showName": "REDACTED_NAME",
+    "starType": "WHITE",
+    "userId": 1
+   },
+   "userWatching": false,
+   "watchersCount": 6,
+   "pepperLevel": 0,
+   "personalPickup": true,
+   "location": "Veľké Kapušany",
+   "postcode": "07901",
+   "aukroFreePriorityList": false,
+   "charity": false,
+   "paymentViaAukro": true,
+   "buyersProtectionAvailable": true,
+   "retailPrice": {
+    "amount": 0,
+    "currency": "CZK"
+   },
+   "adultContent": false,
+   "auction": false,
+   "aukroPlus": false,
+   "freeShipping": false,
+   "paymentOnline": false
+  },
+  {
+   "itemId": 7135809051,
+   "itemName": "Elektrokolo CTM Metric",
+   "categoryPath": [
+    {
+     "id": 17533,
+     "name": "Sport a turistika",
+     "seoUrl": "sport-a-turistika"
+    },
+    {
+     "id": 17570,
+     "name": "Cyklistika",
+     "seoUrl": "cyklistika"
+    },
+    {
+     "id": 17590,
+     "name": "Cyklobazar",
+     "seoUrl": "jizdni-kola"
+    },
+    {
+     "id": 147974,
+     "name": "Elektrokola",
+     "seoUrl": "elektrokola"
+    }
+   ],
+   "startingTime": "2026-10-02T09:03:03.567+02:00",
+   "endingTime": "2026-10-09T09:02:23+02:00",
+   "buyNowActive": true,
+   "buyNowPrice": {
+    "amount": 30242,
+    "currency": "CZK"
+   },
+   "quantity": 1,
+   "quantityType": "pieces",
+   "attributes": [
+    {
+     "attributeId": 48,
+     "attributeName": "Stav zboží",
+     "attributeValue": "Použité",
+     "attributeValueId": 2,
+     "position": 0
+    },
+    {
+     "attributeId": 16,
+     "attributeName": "Určení",
+     "attributeValue": "Pánská",
+     "attributeValueId": 1,
+     "position": 0
+    },
+    {
+     "attributeId": 129769,
+     "attributeName": "Značka",
+     "attributeValue": "Ostatní",
+     "attributeValueId": 17,
+     "position": 0
+    },
+    {
+     "attributeId": 9,
+     "attributeName": "Délka dojezdu",
+     "attributeValue": "Méně než 130 km",
+     "attributeValueId": 1,
+     "position": 0
+    },
+    {
+     "attributeId": 106,
+     "attributeName": "Odpružení",
+     "attributeValue": "Odpružená přední vidlice",
+     "attributeValueId": 1,
+     "position": 0
+    },
+    {
+     "attributeId": 11,
+     "attributeName": "Kapacita Baterie",
+     "attributeValue": "600 až 700 Wh",
+     "attributeValueId": 4,
+     "position": 0
+    },
+    {
+     "attributeId": 108,
+     "attributeName": "Materíál rámu",
+     "attributeValue": "Ocel",
+     "attributeValueId": 4,
+     "position": 0
+    },
+    {
+     "attributeId": 109,
+     "attributeName": "Průměr kol",
+     "attributeValue": "29″",
+     "attributeValueId": 24,
+     "position": 0
+    },
+    {
+     "attributeId": 110,
+     "attributeName": "Barva kola",
+     "attributeValue": "Černá",
+     "attributeValueId": 1,
+     "position": 0
+    }
+   ],
+   "price": {
+    "amount": 30242,
+    "currency": "CZK"
+   },
+   "priceWithShipping": {
+    "amount": 30242,
+    "currency": "CZK"
+   },
+   "titleImage": {
+    "position": 0,
+    "titleImage": false,
+    "url": "https://cdn.aukro.cz/images/sk1785986104802/thumbnail/elektrokolo-ctm-metric-289154163.jpeg"
+   },
+   "titleImageUrl": "https://cdn.aukro.cz/images/sk1785986104802/thumbnail/elektrokolo-ctm-metric-289154163.jpeg",
+   "seoUrl": "elektrokolo-ctm-metric",
+   "ppPriorityList": false,
+   "ppPriorityListSort": false,
+   "ppHighlight": false,
+   "ppBoldTitle": false,
+   "buyersCountRelative": 0,
+   "itemState": "ACTIVE",
+   "sellerLogin": "REDACTED_LOGIN",
+   "seller": {
+    "accountActivated": false,
+    "aukroPlus": false,
+    "companyAccount": false,
+    "favouritedByCount": 0,
+    "feedbackUniqueUserCount": 8,
+    "positiveFeedbackPercentage": 1,
+    "rating": 8,
+    "registrationDomain": "HU",
+    "showName": "REDACTED_NAME",
+    "starType": "WHITE",
+    "userId": 1
+   },
+   "userWatching": false,
+   "watchersCount": 0,
+   "pepperLevel": 0,
+   "personalPickup": true,
+   "location": "Baja",
+   "postcode": "6500",
+   "aukroFreePriorityList": false,
+   "charity": false,
+   "paymentViaAukro": true,
+   "buyersProtectionAvailable": true,
+   "retailPrice": {
+    "amount": 0,
+    "currency": "CZK"
+   },
+   "adultContent": false,
+   "auction": false,
+   "aukroPlus": false,
+   "freeShipping": false,
+   "paymentOnline": false
+  },
+  {
+   "itemId": 7127870584,
+   "itemName": "Nové horské kolo Olpran Professional Full Disc 29“ hydraulické brzdy",
+   "categoryPath": [
+    {
+     "id": 17533,
+     "name": "Sport a turistika",
+     "seoUrl": "sport-a-turistika"
+    },
+    {
+     "id": 17570,
+     "name": "Cyklistika",
+     "seoUrl": "cyklistika"
+    },
+    {
+     "id": 17590,
+     "name": "Cyklobazar",
+     "seoUrl": "jizdni-kola"
+    },
+    {
+     "id": 17594,
+     "name": "Horská (MTB) kola",
+     "seoUrl": "horska-mtb-kola"
+    }
+   ],
+   "startingTime": "2026-10-02T08:01:01+02:00",
+   "endingTime": "2026-10-12T08:00:00+02:00",
+   "buyNowActive": true,
+   "buyNowPrice": {
+    "amount": 8990,
+    "currency": "CZK"
+   },
+   "quantity": 1,
+   "quantityType": "pieces",
+   "attributes": [
+    {
+     "attributeId": 48,
+     "attributeName": "Stav zboží",
+     "attributeValue": "Nové",
+     "attributeValueId": 1,
+     "position": 0
+    },
+    {
+     "attributeId": 16,
+     "attributeName": "Určení",
+     "attributeValue": "Pánská",
+     "attributeValueId": 1,
+     "position": 0
+    },
+    {
+     "attributeId": 130547,
+     "attributeName": "Doba záruky (měsíců)",
+     "attributeValue": "24",
+     "position": 5
+    },
+    {
+     "attributeId": 8820,
+     "attributeName": "Doba dodání (od obdržení platby)",
+     "attributeValue": "4-6 dní",
+     "attributeValueId": 3,
+     "position": 0
+    },
+    {
+     "attributeId": 7113,
+     "attributeName": "Typ",
+     "attributeValue": "Pánské",
+     "attributeValueId": 2,
+     "position": 0
+    },
+    {
+     "attributeId": 106,
+     "attributeName": "Odpružení",
+     "attributeValue": "Odpružená přední vidlice",
+     "attributeValueId": 1,
+     "position": 0
+    },
+    {
+     "attributeId": 107,
+     "attributeName": "Hmotnost kola",
+     "attributeValue": "15 kg až 16 kg",
+     "attributeValueId": 2,
+     "position": 0
+    },
+    {
+     "attributeId": 25948,
+     "attributeName": "Značka",
+     "attributeValue": "Olpran",
+     "attributeValueId": 24,
+     "position": 1
+    },
+    {
+     "attributeId": 108,
+     "attributeName": "Materíál rámu",
+     "attributeValue": "Hliník",
+     "attributeValueId": 1,
+     "position": 0
+    },
+    {
+     "attributeId": 109,
+     "attributeName": "Průměr kol",
+     "attributeValue": "29″",
+     "attributeValueId": 24,
+     "position": 0
+    },
+    {
+     "attributeId": 110,
+     "attributeName": "Barva kola",
+     "attributeValue": "Bílá, Černá",
+     "attributeValueId": 1,
+     "position": 0
+    }
+   ],
+   "price": {
+    "amount": 8990,
+    "currency": "CZK"
+   },
+   "priceWithShipping": {
+    "amount": 9290,
+    "currency": "CZK"
+   },
+   "titleImage": {
+    "position": 0,
+    "titleImage": false,
+    "url": "https://cdn.aukro.cz/images/sk1755208360016/thumbnail/nove-horske-kolo-olpran-professional-full-disc-29-hydraulicke-brzdy-237399793.jpeg"
+   },
+   "titleImageUrl": "https://cdn.aukro.cz/images/sk1755208360016/thumbnail/nove-horske-kolo-olpran-professional-full-disc-29-hydraulicke-brzdy-237399793.jpeg",
+   "seoUrl": "nove-horske-kolo-olpran-professional-full-disc-29-hydraulicke-brzdy",
+   "ppPriorityList": false,
+   "ppPriorityListSort": false,
+   "ppHighlight": false,
+   "ppBoldTitle": false,
+   "buyersCountRelative": 0,
+   "itemState": "ACTIVE",
+   "sellerLogin": "REDACTED_LOGIN",
+   "seller": {
+    "accountActivated": true,
+    "aukroPlus": false,
+    "companyAccount": true,
+    "favouritedByCount": 112,
+    "feedbackUniqueUserCount": 356,
+    "positiveFeedbackPercentage": 1,
+    "rating": 356,
+    "registrationDomain": "CZ",
+    "showName": "REDACTED_NAME",
+    "starType": "SILVER",
+    "userId": 1
+   },
+   "userWatching": false,
+   "watchersCount": 1,
+   "pepperLevel": 0,
+   "personalPickup": true,
+   "location": "Brno",
+   "postcode": "60200",
+   "aukroFreePriorityList": false,
+   "charity": false,
+   "paymentViaAukro": true,
+   "buyersProtectionAvailable": true,
+   "retailPrice": {
+    "amount": 0,
+    "currency": "CZK"
+   },
+   "adultContent": false,
+   "auction": false,
+   "aukroPlus": false,
+   "freeShipping": false,
+   "paymentOnline": false
+  }
+ ],
+ "page": {
+  "number": 0,
+  "size": 180,
+  "totalElements": 54,
+  "totalPages": 3
+ },
+ "resultReport": {
+  "algorithmByKey": {},
+  "defaultLayout": "LIST",
+  "defaultSort": "relevance",
+  "defaultSortDirection": "DESC",
+  "excludedCategory": false,
+  "hideAds": false,
+  "sort": "startingTime",
+  "sortDirection": "DESC",
+  "state": "DEFAULT"
+ }
+}

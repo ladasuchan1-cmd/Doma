@@ -1,0 +1,1592 @@
+{
+ "categoryPath": [
+  {
+   "id": 17533,
+   "level": 0,
+   "name": "Sport a turistika",
+   "shortName": "Sport a turistika",
+   "fullName": "Sport a turistika",
+   "seoUrl": "sport-a-turistika",
+   "active": true,
+   "itemCategoryId": 17533
+  },
+  {
+   "id": 17570,
+   "level": 1,
+   "name": "Cyklistika",
+   "shortName": "Cyklistika",
+   "fullName": "Sport a turistika | Cyklistika",
+   "seoUrl": "cyklistika",
+   "active": true,
+   "parentId": 17533,
+   "itemCategoryId": 17570
+  },
+  {
+   "id": 17590,
+   "level": 2,
+   "name": "Cyklobazar",
+   "shortName": "Kola",
+   "fullName": "Sport a turistika | Cyklistika | Kola",
+   "seoUrl": "jizdni-kola",
+   "active": true,
+   "parentId": 17570,
+   "itemCategoryId": 17590
+  },
+  {
+   "id": 17592,
+   "level": 3,
+   "name": "Dětská kola",
+   "shortName": "Dětská",
+   "fullName": "Sport a turistika | Cyklistika | Kola | Dětská",
+   "seoUrl": "detska-kola",
+   "active": true,
+   "parentId": 17590,
+   "itemCategoryId": 17592
+  }
+ ],
+ "content": [
+  {
+   "itemId": 7129826188,
+   "itemName": "Kolo Specialized hard rock 26\"",
+   "categoryPath": [
+    {
+     "id": 17533,
+     "name": "Sport a turistika",
+     "seoUrl": "sport-a-turistika"
+    },
+    {
+     "id": 17570,
+     "name": "Cyklistika",
+     "seoUrl": "cyklistika"
+    },
+    {
+     "id": 17590,
+     "name": "Cyklobazar",
+     "seoUrl": "jizdni-kola"
+    },
+    {
+     "id": 17592,
+     "name": "Dětská kola",
+     "seoUrl": "detska-kola"
+    }
+   ],
+   "startingTime": "2026-10-01T07:24:01+02:00",
+   "endingTime": "2026-10-08T07:22:58+02:00",
+   "buyNowActive": true,
+   "buyNowPrice": {
+    "amount": 3500,
+    "currency": "CZK"
+   },
+   "quantity": 1,
+   "quantityType": "pieces",
+   "attributes": [
+    {
+     "attributeId": 48,
+     "attributeName": "Stav zboží",
+     "attributeValue": "Použité",
+     "attributeValueId": 2,
+     "position": 0
+    },
+    {
+     "attributeId": 16,
+     "attributeName": "Určení",
+     "attributeValue": "Dětská",
+     "attributeValueId": 3,
+     "position": 0
+    },
+    {
+     "attributeId": 106,
+     "attributeName": "Odpružení",
+     "attributeValue": "Odpružená přední vidlice",
+     "attributeValueId": 1,
+     "position": 0
+    },
+    {
+     "attributeId": 109,
+     "attributeName": "Průměr kol",
+     "attributeValue": "26″",
+     "attributeValueId": 20,
+     "position": 0
+    },
+    {
+     "attributeId": 110,
+     "attributeName": "Barva kola",
+     "attributeValue": "Černá",
+     "attributeValueId": 1,
+     "position": 0
+    }
+   ],
+   "price": {
+    "amount": 3500,
+    "currency": "CZK"
+   },
+   "priceWithShipping": {
+    "amount": 3500,
+    "currency": "CZK"
+   },
+   "titleImage": {
+    "position": 0,
+    "titleImage": false,
+    "url": "https://cdn.aukro.cz/images/sk1782493322314/thumbnail/kolo-specialized-hard-rock-26-283056611.jpeg"
+   },
+   "titleImageUrl": "https://cdn.aukro.cz/images/sk1782493322314/thumbnail/kolo-specialized-hard-rock-26-283056611.jpeg",
+   "seoUrl": "kolo-specialized-hard-rock-26",
+   "ppPriorityList": false,
+   "ppPriorityListSort": false,
+   "ppHighlight": false,
+   "ppBoldTitle": false,
+   "buyersCountRelative": 0,
+   "itemState": "ACTIVE",
+   "sellerLogin": "REDACTED_LOGIN",
+   "seller": {
+    "accountActivated": true,
+    "aukroPlus": false,
+    "companyAccount": false,
+    "favouritedByCount": 2,
+    "feedbackUniqueUserCount": 172,
+    "positiveFeedbackPercentage": 1,
+    "rating": 172,
+    "registrationDomain": "CZ",
+    "showName": "REDACTED_NAME",
+    "starType": "BRONZE",
+    "userId": 1
+   },
+   "userWatching": false,
+   "watchersCount": 2,
+   "pepperLevel": 0,
+   "personalPickup": true,
+   "location": "Nový Bor",
+   "postcode": "47301",
+   "aukroFreePriorityList": false,
+   "charity": false,
+   "paymentViaAukro": true,
+   "buyersProtectionAvailable": true,
+   "retailPrice": {
+    "amount": 0,
+    "currency": "CZK"
+   },
+   "adultContent": false,
+   "auction": false,
+   "aukroPlus": false,
+   "freeShipping": false,
+   "paymentOnline": false
+  },
+  {
+   "itemId": 7122236998,
+   "itemName": "PLÁŠŤ A DUŠE 16\" - ZADNÍ+PŘEDNÍ - viz foto",
+   "categoryPath": [
+    {
+     "id": 17533,
+     "name": "Sport a turistika",
+     "seoUrl": "sport-a-turistika"
+    },
+    {
+     "id": 17570,
+     "name": "Cyklistika",
+     "seoUrl": "cyklistika"
+    },
+    {
+     "id": 17590,
+     "name": "Cyklobazar",
+     "seoUrl": "jizdni-kola"
+    },
+    {
+     "id": 17592,
+     "name": "Dětská kola",
+     "seoUrl": "detska-kola"
+    }
+   ],
+   "startingTime": "2026-10-01T02:25:02+02:00",
+   "endingTime": "2026-10-11T02:23:16+02:00",
+   "buyNowActive": true,
+   "buyNowPrice": {
+    "amount": 220,
+    "currency": "CZK"
+   },
+   "quantity": 1,
+   "quantityType": "pieces",
+   "attributes": [
+    {
+     "attributeId": 48,
+     "attributeName": "Stav zboží",
+     "attributeValue": "Použité",
+     "attributeValueId": 2,
+     "position": 0
+    },
+    {
+     "attributeId": 16,
+     "attributeName": "Určení",
+     "attributeValue": "Dětská",
+     "attributeValueId": 3,
+     "position": 0
+    },
+    {
+     "attributeId": 8820,
+     "attributeName": "Doba dodání (od obdržení platby)",
+     "attributeValue": "1-2 dny",
+     "attributeValueId": 1,
+     "position": 0
+    }
+   ],
+   "price": {
+    "amount": 110,
+    "currency": "CZK"
+   },
+   "priceWithShipping": {
+    "amount": 285,
+    "currency": "CZK"
+   },
+   "titleImage": {
+    "position": 0,
+    "titleImage": false,
+    "url": "https://cdn.aukro.cz/images/sk1780446129763/thumbnail/plast-a-duse-16-zadni-predni-viz-foto-276897912.jpeg"
+   },
+   "titleImageUrl": "https://cdn.aukro.cz/images/sk1780446129763/thumbnail/plast-a-duse-16-zadni-predni-viz-foto-276897912.jpeg",
+   "seoUrl": "plast-a-duse-16-zadni-predni-viz-foto",
+   "ppPriorityList": false,
+   "ppPriorityListSort": false,
+   "ppHighlight": false,
+   "ppBoldTitle": false,
+   "buyersCountRelative": 0,
+   "itemState": "ACTIVE",
+   "sellerLogin": "REDACTED_LOGIN",
+   "seller": {
+    "accountActivated": true,
+    "aukroPlus": false,
+    "companyAccount": false,
+    "favouritedByCount": 284,
+    "feedbackUniqueUserCount": 2681,
+    "positiveFeedbackPercentage": 0.9427,
+    "rating": 2530,
+    "registrationDomain": "CZ",
+    "showName": "REDACTED_NAME",
+    "starType": "GOLD",
+    "userId": 1
+   },
+   "userWatching": false,
+   "watchersCount": 1,
+   "pepperLevel": 0,
+   "personalPickup": false,
+   "location": "Tatrovice",
+   "postcode": "35735",
+   "aukroFreePriorityList": false,
+   "charity": false,
+   "paymentViaAukro": true,
+   "buyersProtectionAvailable": true,
+   "retailPrice": {
+    "amount": 0,
+    "currency": "CZK"
+   },
+   "adultContent": false,
+   "auction": true,
+   "aukroPlus": false,
+   "freeShipping": false,
+   "paymentOnline": false
+  },
+  {
+   "itemId": 7127774999,
+   "itemName": "Horské kolo",
+   "categoryPath": [
+    {
+     "id": 17533,
+     "name": "Sport a turistika",
+     "seoUrl": "sport-a-turistika"
+    },
+    {
+     "id": 17570,
+     "name": "Cyklistika",
+     "seoUrl": "cyklistika"
+    },
+    {
+     "id": 17590,
+     "name": "Cyklobazar",
+     "seoUrl": "jizdni-kola"
+    },
+    {
+     "id": 17592,
+     "name": "Dětská kola",
+     "seoUrl": "detska-kola"
+    }
+   ],
+   "startingTime": "2026-09-30T23:40:04+02:00",
+   "endingTime": "2026-10-30T23:39:27+01:00",
+   "buyNowActive": true,
+   "buyNowPrice": {
+    "amount": 5500,
+    "currency": "CZK"
+   },
+   "quantity": 1,
+   "quantityType": "pieces",
+   "attributes": [
+    {
+     "attributeId": 48,
+     "attributeName": "Stav zboží",
+     "attributeValue": "Zánovní",
+     "attributeValueId": 6,
+     "position": 0
+    }
+   ],
+   "price": {
+    "amount": 5500,
+    "currency": "CZK"
+   },
+   "priceWithShipping": {
+    "amount": 5500,
+    "currency": "CZK"
+   },
+   "titleImage": {
+    "position": 0,
+    "titleImage": false,
+    "url": "https://cdn.aukro.cz/images/sk1693313369345/thumbnail/horske-kolo-168134277.jpeg"
+   },
+   "titleImageUrl": "https://cdn.aukro.cz/images/sk1693313369345/thumbnail/horske-kolo-168134277.jpeg",
+   "seoUrl": "horske-kolo",
+   "ppPriorityList": false,
+   "ppPriorityListSort": false,
+   "ppHighlight": false,
+   "ppBoldTitle": false,
+   "buyersCountRelative": 0,
+   "itemState": "ACTIVE",
+   "sellerLogin": "REDACTED_LOGIN",
+   "seller": {
+    "accountActivated": true,
+    "aukroPlus": false,
+    "companyAccount": false,
+    "favouritedByCount": 26,
+    "feedbackUniqueUserCount": 250,
+    "positiveFeedbackPercentage": 0.996,
+    "rating": 249,
+    "registrationDomain": "CZ",
+    "showName": "REDACTED_NAME",
+    "starType": "BRONZE",
+    "userId": 1
+   },
+   "userWatching": false,
+   "watchersCount": 0,
+   "pepperLevel": 0,
+   "personalPickup": true,
+   "location": "Ježov",
+   "postcode": "69648",
+   "aukroFreePriorityList": false,
+   "charity": false,
+   "paymentViaAukro": true,
+   "buyersProtectionAvailable": true,
+   "retailPrice": {
+    "amount": 0,
+    "currency": "CZK"
+   },
+   "adultContent": false,
+   "auction": false,
+   "aukroPlus": false,
+   "freeShipping": false,
+   "paymentOnline": false
+  },
+  {
+   "itemId": 7133865789,
+   "itemName": "20 palcové dětské kolo",
+   "categoryPath": [
+    {
+     "id": 17533,
+     "name": "Sport a turistika",
+     "seoUrl": "sport-a-turistika"
+    },
+    {
+     "id": 17570,
+     "name": "Cyklistika",
+     "seoUrl": "cyklistika"
+    },
+    {
+     "id": 17590,
+     "name": "Cyklobazar",
+     "seoUrl": "jizdni-kola"
+    },
+    {
+     "id": 17592,
+     "name": "Dětská kola",
+     "seoUrl": "detska-kola"
+    }
+   ],
+   "startingTime": "2026-09-30T22:36:01+02:00",
+   "endingTime": "2026-10-07T22:35:28+02:00",
+   "buyNowActive": true,
+   "buyNowPrice": {
+    "amount": 2100,
+    "currency": "CZK"
+   },
+   "quantity": 6,
+   "quantityType": "pieces",
+   "attributes": [
+    {
+     "attributeId": 48,
+     "attributeName": "Stav zboží",
+     "attributeValue": "Nové",
+     "attributeValueId": 1,
+     "position": 0
+    }
+   ],
+   "price": {
+    "amount": 2100,
+    "currency": "CZK"
+   },
+   "priceWithShipping": {
+    "amount": 2275,
+    "currency": "CZK"
+   },
+   "titleImage": {
+    "position": 0,
+    "titleImage": false,
+    "url": "https://cdn.aukro.cz/images/sk1789590895847/thumbnail/20-palcove-detske-kolo-296056441.jpeg"
+   },
+   "titleImageUrl": "https://cdn.aukro.cz/images/sk1789590895847/thumbnail/20-palcove-detske-kolo-296056441.jpeg",
+   "seoUrl": "20-palcove-detske-kolo",
+   "ppPriorityList": false,
+   "ppPriorityListSort": false,
+   "ppHighlight": false,
+   "ppBoldTitle": false,
+   "buyersCountRelative": 0,
+   "itemState": "ACTIVE",
+   "sellerLogin": "REDACTED_LOGIN",
+   "seller": {
+    "accountActivated": false,
+    "aukroPlus": false,
+    "companyAccount": false,
+    "favouritedByCount": 15,
+    "feedbackUniqueUserCount": 28,
+    "positiveFeedbackPercentage": 0.8888888888888888,
+    "rating": 22,
+    "registrationDomain": "CZ",
+    "showName": "REDACTED_NAME",
+    "starType": "WHITE",
+    "userId": 1
+   },
+   "userWatching": false,
+   "watchersCount": 0,
+   "pepperLevel": 0,
+   "personalPickup": true,
+   "location": "Praha",
+   "postcode": "15000",
+   "aukroFreePriorityList": false,
+   "charity": false,
+   "paymentViaAukro": true,
+   "buyersProtectionAvailable": true,
+   "retailPrice": {
+    "amount": 0,
+    "currency": "CZK"
+   },
+   "adultContent": false,
+   "auction": false,
+   "aukroPlus": false,
+   "freeShipping": false,
+   "paymentOnline": false
+  },
+  {
+   "itemId": 7091564839,
+   "itemName": "Dětské horské kolo zn.: Canyon 24\", Alu rám, odpružená vidlice",
+   "categoryPath": [
+    {
+     "id": 17533,
+     "name": "Sport a turistika",
+     "seoUrl": "sport-a-turistika"
+    },
+    {
+     "id": 17570,
+     "name": "Cyklistika",
+     "seoUrl": "cyklistika"
+    },
+    {
+     "id": 17590,
+     "name": "Cyklobazar",
+     "seoUrl": "jizdni-kola"
+    },
+    {
+     "id": 17592,
+     "name": "Dětská kola",
+     "seoUrl": "detska-kola"
+    }
+   ],
+   "startingTime": "2026-09-30T22:26:01+02:00",
+   "endingTime": "2026-10-05T22:24:20+02:00",
+   "buyNowActive": true,
+   "buyNowPrice": {
+    "amount": 3600,
+    "currency": "CZK"
+   },
+   "quantity": 1,
+   "quantityType": "pieces",
+   "attributes": [
+    {
+     "attributeId": 48,
+     "attributeName": "Stav zboží",
+     "attributeValue": "Použité",
+     "attributeValueId": 2,
+     "position": 0
+    },
+    {
+     "attributeId": 16,
+     "attributeName": "Určení",
+     "attributeValue": "Dětská",
+     "attributeValueId": 3,
+     "position": 0
+    },
+    {
+     "attributeId": 8820,
+     "attributeName": "Doba dodání (od obdržení platby)",
+     "attributeValue": "2-3 dny",
+     "attributeValueId": 2,
+     "position": 0
+    },
+    {
+     "attributeId": 129782,
+     "attributeName": "Značka",
+     "attributeValue": "Ostatní",
+     "attributeValueId": 33,
+     "position": 0
+    },
+    {
+     "attributeId": 106,
+     "attributeName": "Odpružení",
+     "attributeValue": "Odpružená přední vidlice",
+     "attributeValueId": 1,
+     "position": 0
+    },
+    {
+     "attributeId": 107,
+     "attributeName": "Hmotnost kola",
+     "attributeValue": "12 kg až 13 kg",
+     "attributeValueId": 5,
+     "position": 0
+    },
+    {
+     "attributeId": 108,
+     "attributeName": "Materíál rámu",
+     "attributeValue": "Dural",
+     "attributeValueId": 2,
+     "position": 0
+    },
+    {
+     "attributeId": 109,
+     "attributeName": "Průměr kol",
+     "attributeValue": "24″",
+     "attributeValueId": 18,
+     "position": 0
+    },
+    {
+     "attributeId": 110,
+     "attributeName": "Barva kola",
+     "attributeValue": "Černá, Červená",
+     "attributeValueId": 1,
+     "position": 0
+    }
+   ],
+   "price": {
+    "amount": 3379,
+    "currency": "CZK"
+   },
+   "priceWithShipping": {
+    "amount": 3739,
+    "currency": "CZK"
+   },
+   "titleImage": {
+    "position": 0,
+    "titleImage": false,
+    "url": "https://cdn.aukro.cz/images/sk1750191366031/thumbnail/detske-horske-kolo-zn-canyon-24-alu-ram-odpruzena-vidlice-232330127.jpeg"
+   },
+   "titleImageUrl": "https://cdn.aukro.cz/images/sk1750191366031/thumbnail/detske-horske-kolo-zn-canyon-24-alu-ram-odpruzena-vidlice-232330127.jpeg",
+   "seoUrl": "detske-horske-kolo-zn-canyon-24-alu-ram-odpruzena-vidlice",
+   "ppPriorityList": false,
+   "ppPriorityListSort": false,
+   "ppHighlight": false,
+   "ppBoldTitle": false,
+   "buyersCountRelative": 0,
+   "itemState": "ACTIVE",
+   "sellerLogin": "REDACTED_LOGIN",
+   "seller": {
+    "accountActivated": true,
+    "aukroPlus": true,
+    "companyAccount": true,
+    "favouritedByCount": 393,
+    "feedbackUniqueUserCount": 3337,
+    "positiveFeedbackPercentage": 0.9982,
+    "rating": 3332,
+    "registrationDomain": "CZ",
+    "showName": "REDACTED_NAME",
+    "starType": "GOLD",
+    "userId": 1
+   },
+   "userWatching": false,
+   "watchersCount": 2,
+   "pepperLevel": 0,
+   "personalPickup": true,
+   "location": "Praha",
+   "postcode": "16900",
+   "aukroFreePriorityList": false,
+   "charity": false,
+   "paymentViaAukro": true,
+   "buyersProtectionAvailable": true,
+   "retailPrice": {
+    "amount": 0,
+    "currency": "CZK"
+   },
+   "adultContent": false,
+   "auction": true,
+   "aukroPlus": true,
+   "freeShipping": false,
+   "paymentOnline": false
+  },
+  {
+   "itemId": 7091929344,
+   "itemName": "Dětské kolo Rock Machine \"15\"",
+   "categoryPath": [
+    {
+     "id": 17533,
+     "name": "Sport a turistika",
+     "seoUrl": "sport-a-turistika"
+    },
+    {
+     "id": 17570,
+     "name": "Cyklistika",
+     "seoUrl": "cyklistika"
+    },
+    {
+     "id": 17590,
+     "name": "Cyklobazar",
+     "seoUrl": "jizdni-kola"
+    },
+    {
+     "id": 17592,
+     "name": "Dětská kola",
+     "seoUrl": "detska-kola"
+    }
+   ],
+   "startingTime": "2026-09-30T21:53:01+02:00",
+   "endingTime": "2026-10-05T21:51:41+02:00",
+   "buyNowActive": false,
+   "buyNowPrice": {
+    "amount": 0,
+    "currency": "CZK"
+   },
+   "quantity": 1,
+   "quantityType": "pieces",
+   "attributes": [
+    {
+     "attributeId": 48,
+     "attributeName": "Stav zboží",
+     "attributeValue": "Použité",
+     "attributeValueId": 2,
+     "position": 0
+    },
+    {
+     "attributeId": 16,
+     "attributeName": "Určení",
+     "attributeValue": "Dětská",
+     "attributeValueId": 3,
+     "position": 0
+    }
+   ],
+   "price": {
+    "amount": 1300,
+    "currency": "CZK"
+   },
+   "priceWithShipping": {
+    "amount": 1300,
+    "currency": "CZK"
+   },
+   "titleImage": {
+    "position": 0,
+    "titleImage": false,
+    "url": "https://cdn.aukro.cz/images/sk1747118379488/thumbnail/detske-kolo-rock-machine-15-228808707.jpeg"
+   },
+   "titleImageUrl": "https://cdn.aukro.cz/images/sk1747118379488/thumbnail/detske-kolo-rock-machine-15-228808707.jpeg",
+   "seoUrl": "detske-kolo-rock-machine-15",
+   "ppPriorityList": false,
+   "ppPriorityListSort": false,
+   "ppHighlight": false,
+   "ppBoldTitle": false,
+   "buyersCountRelative": 0,
+   "itemState": "ACTIVE",
+   "sellerLogin": "REDACTED_LOGIN",
+   "seller": {
+    "accountActivated": true,
+    "aukroPlus": false,
+    "companyAccount": false,
+    "favouritedByCount": 8,
+    "feedbackUniqueUserCount": 922,
+    "positiveFeedbackPercentage": 0.9968,
+    "rating": 920,
+    "registrationDomain": "CZ",
+    "showName": "REDACTED_NAME",
+    "starType": "SILVER",
+    "userId": 1
+   },
+   "userWatching": false,
+   "watchersCount": 0,
+   "pepperLevel": 0,
+   "personalPickup": true,
+   "location": "Brníčko",
+   "postcode": "78975",
+   "aukroFreePriorityList": false,
+   "charity": false,
+   "paymentViaAukro": false,
+   "buyersProtectionAvailable": false,
+   "retailPrice": {
+    "amount": 0,
+    "currency": "CZK"
+   },
+   "adultContent": false,
+   "auction": true,
+   "aukroPlus": false,
+   "freeShipping": false,
+   "paymentOnline": false
+  },
+  {
+   "itemId": 7116492810,
+   "itemName": "Dětské horské kolo zn.: Merida 20\", Alu rám",
+   "categoryPath": [
+    {
+     "id": 17533,
+     "name": "Sport a turistika",
+     "seoUrl": "sport-a-turistika"
+    },
+    {
+     "id": 17570,
+     "name": "Cyklistika",
+     "seoUrl": "cyklistika"
+    },
+    {
+     "id": 17590,
+     "name": "Cyklobazar",
+     "seoUrl": "jizdni-kola"
+    },
+    {
+     "id": 17592,
+     "name": "Dětská kola",
+     "seoUrl": "detska-kola"
+    }
+   ],
+   "startingTime": "2026-09-30T21:44:02+02:00",
+   "endingTime": "2026-10-05T21:42:37+02:00",
+   "buyNowActive": true,
+   "buyNowPrice": {
+    "amount": 3100,
+    "currency": "CZK"
+   },
+   "quantity": 1,
+   "quantityType": "pieces",
+   "attributes": [
+    {
+     "attributeId": 48,
+     "attributeName": "Stav zboží",
+     "attributeValue": "Použité",
+     "attributeValueId": 2,
+     "position": 0
+    },
+    {
+     "attributeId": 16,
+     "attributeName": "Určení",
+     "attributeValue": "Dětská",
+     "attributeValueId": 3,
+     "position": 0
+    },
+    {
+     "attributeId": 8820,
+     "attributeName": "Doba dodání (od obdržení platby)",
+     "attributeValue": "2-3 dny",
+     "attributeValueId": 2,
+     "position": 0
+    },
+    {
+     "attributeId": 129782,
+     "attributeName": "Značka",
+     "attributeValue": "Merida",
+     "attributeValueId": 23,
+     "position": 0
+    },
+    {
+     "attributeId": 106,
+     "attributeName": "Odpružení",
+     "attributeValue": "Odpružená přední vidlice",
+     "attributeValueId": 1,
+     "position": 0
+    },
+    {
+     "attributeId": 107,
+     "attributeName": "Hmotnost kola",
+     "attributeValue": "11 kg až 12 kg",
+     "attributeValueId": 6,
+     "position": 0
+    },
+    {
+     "attributeId": 108,
+     "attributeName": "Materíál rámu",
+     "attributeValue": "Dural",
+     "attributeValueId": 2,
+     "position": 0
+    },
+    {
+     "attributeId": 109,
+     "attributeName": "Průměr kol",
+     "attributeValue": "20″",
+     "attributeValueId": 14,
+     "position": 0
+    },
+    {
+     "attributeId": 110,
+     "attributeName": "Barva kola",
+     "attributeValue": "Černá, Žlutá",
+     "attributeValueId": 1,
+     "position": 0
+    }
+   ],
+   "price": {
+    "amount": 2999,
+    "currency": "CZK"
+   },
+   "priceWithShipping": {
+    "amount": 3359,
+    "currency": "CZK"
+   },
+   "titleImage": {
+    "position": 0,
+    "titleImage": false,
+    "url": "https://cdn.aukro.cz/images/sk1775676858939/thumbnail/detske-horske-kolo-zn-merida-20-alu-ram-267666293.jpeg"
+   },
+   "titleImageUrl": "https://cdn.aukro.cz/images/sk1775676858939/thumbnail/detske-horske-kolo-zn-merida-20-alu-ram-267666293.jpeg",
+   "seoUrl": "detske-horske-kolo-zn-merida-20-alu-ram",
+   "ppPriorityList": false,
+   "ppPriorityListSort": false,
+   "ppHighlight": false,
+   "ppBoldTitle": false,
+   "buyersCountRelative": 0,
+   "itemState": "ACTIVE",
+   "sellerLogin": "REDACTED_LOGIN",
+   "seller": {
+    "accountActivated": true,
+    "aukroPlus": true,
+    "companyAccount": true,
+    "favouritedByCount": 393,
+    "feedbackUniqueUserCount": 3337,
+    "positiveFeedbackPercentage": 0.9982,
+    "rating": 3332,
+    "registrationDomain": "CZ",
+    "showName": "REDACTED_NAME",
+    "starType": "GOLD",
+    "userId": 1
+   },
+   "userWatching": false,
+   "watchersCount": 0,
+   "pepperLevel": 0,
+   "personalPickup": true,
+   "location": "Praha",
+   "postcode": "16900",
+   "aukroFreePriorityList": false,
+   "charity": false,
+   "paymentViaAukro": true,
+   "buyersProtectionAvailable": true,
+   "retailPrice": {
+    "amount": 0,
+    "currency": "CZK"
+   },
+   "adultContent": false,
+   "auction": true,
+   "aukroPlus": true,
+   "freeShipping": false,
+   "paymentOnline": false
+  },
+  {
+   "itemId": 7121352160,
+   "itemName": "Denver Dětské chlapecké jízdní kolo Speed 14' !chybí přední blatník!",
+   "categoryPath": [
+    {
+     "id": 17533,
+     "name": "Sport a turistika",
+     "seoUrl": "sport-a-turistika"
+    },
+    {
+     "id": 17570,
+     "name": "Cyklistika",
+     "seoUrl": "cyklistika"
+    },
+    {
+     "id": 17590,
+     "name": "Cyklobazar",
+     "seoUrl": "jizdni-kola"
+    },
+    {
+     "id": 17592,
+     "name": "Dětská kola",
+     "seoUrl": "detska-kola"
+    }
+   ],
+   "startingTime": "2026-09-30T21:25:02+02:00",
+   "endingTime": "2026-10-03T21:23:51+02:00",
+   "buyNowActive": false,
+   "buyNowPrice": {
+    "amount": 0,
+    "currency": "CZK"
+   },
+   "quantity": 1,
+   "quantityType": "pieces",
+   "attributes": [
+    {
+     "attributeId": 48,
+     "attributeName": "Stav zboží",
+     "attributeValue": "Nové",
+     "attributeValueId": 1,
+     "position": 0
+    },
+    {
+     "attributeId": 16,
+     "attributeName": "Určení",
+     "attributeValue": "Dětská",
+     "attributeValueId": 3,
+     "position": 0
+    },
+    {
+     "attributeId": 8820,
+     "attributeName": "Doba dodání (od obdržení platby)",
+     "attributeValue": "2-3 dny",
+     "attributeValueId": 2,
+     "position": 0
+    },
+    {
+     "attributeId": 109,
+     "attributeName": "Průměr kol",
+     "attributeValue": "14″",
+     "attributeValueId": 8,
+     "position": 0
+    }
+   ],
+   "price": {
+    "amount": 1389,
+    "currency": "CZK"
+   },
+   "priceWithShipping": {
+    "amount": 1509,
+    "currency": "CZK"
+   },
+   "titleImage": {
+    "position": 0,
+    "titleImage": false,
+    "url": "https://cdn.aukro.cz/images/sk1725621276754/thumbnail/denver-detske-chlapecke-jizdni-kolo-speed-14-chybi-predni-blatnik-204206429.jpeg"
+   },
+   "titleImageUrl": "https://cdn.aukro.cz/images/sk1725621276754/thumbnail/denver-detske-chlapecke-jizdni-kolo-speed-14-chybi-predni-blatnik-204206429.jpeg",
+   "seoUrl": "denver-detske-chlapecke-jizdni-kolo-speed-14-chybi-predni-blatnik",
+   "ppPriorityList": false,
+   "ppPriorityListSort": false,
+   "ppHighlight": false,
+   "ppBoldTitle": false,
+   "buyersCountRelative": 0,
+   "itemState": "ACTIVE",
+   "sellerLogin": "REDACTED_LOGIN",
+   "seller": {
+    "accountActivated": true,
+    "aukroPlus": true,
+    "companyAccount": true,
+    "favouritedByCount": 1205,
+    "feedbackUniqueUserCount": 5955,
+    "positiveFeedbackPercentage": 0.9937999999999999,
+    "rating": 5925,
+    "registrationDomain": "CZ",
+    "showName": "REDACTED_NAME",
+    "starType": "GOLD",
+    "userId": 1
+   },
+   "userWatching": false,
+   "watchersCount": 2,
+   "pepperLevel": 0,
+   "personalPickup": false,
+   "location": "Brno",
+   "postcode": "62500",
+   "aukroFreePriorityList": false,
+   "charity": false,
+   "paymentViaAukro": true,
+   "buyersProtectionAvailable": true,
+   "retailPrice": {
+    "amount": 0,
+    "currency": "CZK"
+   },
+   "adultContent": false,
+   "auction": true,
+   "aukroPlus": true,
+   "freeShipping": false,
+   "paymentOnline": false
+  },
+  {
+   "itemId": 7121267091,
+   "itemName": "Dětské horské kolo zn.: Miles Xentos 24\", Alu rám",
+   "categoryPath": [
+    {
+     "id": 17533,
+     "name": "Sport a turistika",
+     "seoUrl": "sport-a-turistika"
+    },
+    {
+     "id": 17570,
+     "name": "Cyklistika",
+     "seoUrl": "cyklistika"
+    },
+    {
+     "id": 17590,
+     "name": "Cyklobazar",
+     "seoUrl": "jizdni-kola"
+    },
+    {
+     "id": 17592,
+     "name": "Dětská kola",
+     "seoUrl": "detska-kola"
+    }
+   ],
+   "startingTime": "2026-09-30T21:18:01+02:00",
+   "endingTime": "2026-10-05T21:16:57+02:00",
+   "buyNowActive": true,
+   "buyNowPrice": {
+    "amount": 3500,
+    "currency": "CZK"
+   },
+   "quantity": 1,
+   "quantityType": "pieces",
+   "attributes": [
+    {
+     "attributeId": 48,
+     "attributeName": "Stav zboží",
+     "attributeValue": "Použité",
+     "attributeValueId": 2,
+     "position": 0
+    },
+    {
+     "attributeId": 16,
+     "attributeName": "Určení",
+     "attributeValue": "Dětská",
+     "attributeValueId": 3,
+     "position": 0
+    },
+    {
+     "attributeId": 8820,
+     "attributeName": "Doba dodání (od obdržení platby)",
+     "attributeValue": "2-3 dny",
+     "attributeValueId": 2,
+     "position": 0
+    },
+    {
+     "attributeId": 129782,
+     "attributeName": "Značka",
+     "attributeValue": "Ostatní",
+     "attributeValueId": 33,
+     "position": 0
+    },
+    {
+     "attributeId": 106,
+     "attributeName": "Odpružení",
+     "attributeValue": "Odpružená přední vidlice",
+     "attributeValueId": 1,
+     "position": 0
+    },
+    {
+     "attributeId": 107,
+     "attributeName": "Hmotnost kola",
+     "attributeValue": "12 kg až 13 kg",
+     "attributeValueId": 5,
+     "position": 0
+    },
+    {
+     "attributeId": 108,
+     "attributeName": "Materíál rámu",
+     "attributeValue": "Dural",
+     "attributeValueId": 2,
+     "position": 0
+    },
+    {
+     "attributeId": 109,
+     "attributeName": "Průměr kol",
+     "attributeValue": "24″",
+     "attributeValueId": 18,
+     "position": 0
+    },
+    {
+     "attributeId": 110,
+     "attributeName": "Barva kola",
+     "attributeValue": "Bílá, Zelená, Černá",
+     "attributeValueId": 1,
+     "position": 0
+    }
+   ],
+   "price": {
+    "amount": 3369,
+    "currency": "CZK"
+   },
+   "priceWithShipping": {
+    "amount": 3789,
+    "currency": "CZK"
+   },
+   "titleImage": {
+    "position": 0,
+    "titleImage": false,
+    "url": "https://cdn.aukro.cz/images/sk1779563129531/thumbnail/detske-horske-kolo-zn-miles-xentos-24-alu-ram-275312305.jpeg"
+   },
+   "titleImageUrl": "https://cdn.aukro.cz/images/sk1779563129531/thumbnail/detske-horske-kolo-zn-miles-xentos-24-alu-ram-275312305.jpeg",
+   "seoUrl": "detske-horske-kolo-zn-miles-xentos-24-alu-ram",
+   "ppPriorityList": false,
+   "ppPriorityListSort": false,
+   "ppHighlight": false,
+   "ppBoldTitle": false,
+   "buyersCountRelative": 0,
+   "itemState": "ACTIVE",
+   "sellerLogin": "REDACTED_LOGIN",
+   "seller": {
+    "accountActivated": true,
+    "aukroPlus": true,
+    "companyAccount": true,
+    "favouritedByCount": 393,
+    "feedbackUniqueUserCount": 3337,
+    "positiveFeedbackPercentage": 0.9982,
+    "rating": 3332,
+    "registrationDomain": "CZ",
+    "showName": "REDACTED_NAME",
+    "starType": "GOLD",
+    "userId": 1
+   },
+   "userWatching": false,
+   "watchersCount": 1,
+   "pepperLevel": 0,
+   "personalPickup": true,
+   "location": "Praha",
+   "postcode": "16900",
+   "aukroFreePriorityList": false,
+   "charity": false,
+   "paymentViaAukro": true,
+   "buyersProtectionAvailable": true,
+   "retailPrice": {
+    "amount": 0,
+    "currency": "CZK"
+   },
+   "adultContent": false,
+   "auction": true,
+   "aukroPlus": true,
+   "freeShipping": false,
+   "paymentOnline": false
+  },
+  {
+   "itemId": 7121264979,
+   "itemName": "Dětské horské kolo zn.: HEAD Lauren 20\", Alu rám",
+   "categoryPath": [
+    {
+     "id": 17533,
+     "name": "Sport a turistika",
+     "seoUrl": "sport-a-turistika"
+    },
+    {
+     "id": 17570,
+     "name": "Cyklistika",
+     "seoUrl": "cyklistika"
+    },
+    {
+     "id": 17590,
+     "name": "Cyklobazar",
+     "seoUrl": "jizdni-kola"
+    },
+    {
+     "id": 17592,
+     "name": "Dětská kola",
+     "seoUrl": "detska-kola"
+    }
+   ],
+   "startingTime": "2026-09-30T21:04:02+02:00",
+   "endingTime": "2026-10-05T21:02:36+02:00",
+   "buyNowActive": true,
+   "buyNowPrice": {
+    "amount": 3200,
+    "currency": "CZK"
+   },
+   "quantity": 1,
+   "quantityType": "pieces",
+   "attributes": [
+    {
+     "attributeId": 48,
+     "attributeName": "Stav zboží",
+     "attributeValue": "Použité",
+     "attributeValueId": 2,
+     "position": 0
+    },
+    {
+     "attributeId": 16,
+     "attributeName": "Určení",
+     "attributeValue": "Dětská",
+     "attributeValueId": 3,
+     "position": 0
+    },
+    {
+     "attributeId": 8820,
+     "attributeName": "Doba dodání (od obdržení platby)",
+     "attributeValue": "2-3 dny",
+     "attributeValueId": 2,
+     "position": 0
+    },
+    {
+     "attributeId": 129782,
+     "attributeName": "Značka",
+     "attributeValue": "Head",
+     "attributeValueId": 18,
+     "position": 0
+    },
+    {
+     "attributeId": 106,
+     "attributeName": "Odpružení",
+     "attributeValue": "Bezodpružení",
+     "attributeValueId": 3,
+     "position": 0
+    },
+    {
+     "attributeId": 107,
+     "attributeName": "Hmotnost kola",
+     "attributeValue": "11 kg až 12 kg",
+     "attributeValueId": 6,
+     "position": 0
+    },
+    {
+     "attributeId": 108,
+     "attributeName": "Materíál rámu",
+     "attributeValue": "Dural",
+     "attributeValueId": 2,
+     "position": 0
+    },
+    {
+     "attributeId": 109,
+     "attributeName": "Průměr kol",
+     "attributeValue": "20″",
+     "attributeValueId": 14,
+     "position": 0
+    },
+    {
+     "attributeId": 110,
+     "attributeName": "Barva kola",
+     "attributeValue": "Bílá, Zelená, Černá, Červená",
+     "attributeValueId": 1,
+     "position": 0
+    }
+   ],
+   "price": {
+    "amount": 2999,
+    "currency": "CZK"
+   },
+   "priceWithShipping": {
+    "amount": 3419,
+    "currency": "CZK"
+   },
+   "titleImage": {
+    "position": 0,
+    "titleImage": false,
+    "url": "https://cdn.aukro.cz/images/sk1779562367217/thumbnail/detske-horske-kolo-zn-head-lauren-20-alu-ram-275308037.jpeg"
+   },
+   "titleImageUrl": "https://cdn.aukro.cz/images/sk1779562367217/thumbnail/detske-horske-kolo-zn-head-lauren-20-alu-ram-275308037.jpeg",
+   "seoUrl": "detske-horske-kolo-zn-head-lauren-20-alu-ram",
+   "ppPriorityList": false,
+   "ppPriorityListSort": false,
+   "ppHighlight": false,
+   "ppBoldTitle": false,
+   "buyersCountRelative": 0,
+   "itemState": "ACTIVE",
+   "sellerLogin": "REDACTED_LOGIN",
+   "seller": {
+    "accountActivated": true,
+    "aukroPlus": true,
+    "companyAccount": true,
+    "favouritedByCount": 393,
+    "feedbackUniqueUserCount": 3337,
+    "positiveFeedbackPercentage": 0.9982,
+    "rating": 3332,
+    "registrationDomain": "CZ",
+    "showName": "REDACTED_NAME",
+    "starType": "GOLD",
+    "userId": 1
+   },
+   "userWatching": false,
+   "watchersCount": 0,
+   "pepperLevel": 0,
+   "personalPickup": true,
+   "location": "Praha",
+   "postcode": "16900",
+   "aukroFreePriorityList": false,
+   "charity": false,
+   "paymentViaAukro": true,
+   "buyersProtectionAvailable": true,
+   "retailPrice": {
+    "amount": 7500,
+    "currency": "CZK"
+   },
+   "adultContent": false,
+   "auction": true,
+   "aukroPlus": true,
+   "freeShipping": false,
+   "paymentOnline": false
+  },
+  {
+   "itemId": 7097638013,
+   "itemName": "Dětské horské kolo zn.: Leader Fox 20\", Alu rám",
+   "categoryPath": [
+    {
+     "id": 17533,
+     "name": "Sport a turistika",
+     "seoUrl": "sport-a-turistika"
+    },
+    {
+     "id": 17570,
+     "name": "Cyklistika",
+     "seoUrl": "cyklistika"
+    },
+    {
+     "id": 17590,
+     "name": "Cyklobazar",
+     "seoUrl": "jizdni-kola"
+    },
+    {
+     "id": 17592,
+     "name": "Dětská kola",
+     "seoUrl": "detska-kola"
+    }
+   ],
+   "startingTime": "2026-09-30T21:01:02+02:00",
+   "endingTime": "2026-10-05T20:59:49+02:00",
+   "buyNowActive": true,
+   "buyNowPrice": {
+    "amount": 2900,
+    "currency": "CZK"
+   },
+   "quantity": 1,
+   "quantityType": "pieces",
+   "attributes": [
+    {
+     "attributeId": 48,
+     "attributeName": "Stav zboží",
+     "attributeValue": "Použité",
+     "attributeValueId": 2,
+     "position": 0
+    },
+    {
+     "attributeId": 16,
+     "attributeName": "Určení",
+     "attributeValue": "Dětská",
+     "attributeValueId": 3,
+     "position": 0
+    },
+    {
+     "attributeId": 8820,
+     "attributeName": "Doba dodání (od obdržení platby)",
+     "attributeValue": "2-3 dny",
+     "attributeValueId": 2,
+     "position": 0
+    },
+    {
+     "attributeId": 129782,
+     "attributeName": "Značka",
+     "attributeValue": "Leader Fox",
+     "attributeValueId": 21,
+     "position": 0
+    },
+    {
+     "attributeId": 106,
+     "attributeName": "Odpružení",
+     "attributeValue": "Bezodpružení",
+     "attributeValueId": 3,
+     "position": 0
+    },
+    {
+     "attributeId": 107,
+     "attributeName": "Hmotnost kola",
+     "attributeValue": "11 kg až 12 kg",
+     "attributeValueId": 6,
+     "position": 0
+    },
+    {
+     "attributeId": 108,
+     "attributeName": "Materíál rámu",
+     "attributeValue": "Dural",
+     "attributeValueId": 2,
+     "position": 0
+    },
+    {
+     "attributeId": 109,
+     "attributeName": "Průměr kol",
+     "attributeValue": "20″",
+     "attributeValueId": 14,
+     "position": 0
+    },
+    {
+     "attributeId": 110,
+     "attributeName": "Barva kola",
+     "attributeValue": "Bílá, Černá",
+     "attributeValueId": 1,
+     "position": 0
+    }
+   ],
+   "price": {
+    "amount": 2799,
+    "currency": "CZK"
+   },
+   "priceWithShipping": {
+    "amount": 3159,
+    "currency": "CZK"
+   },
+   "titleImage": {
+    "position": 0,
+    "titleImage": false,
+    "url": "https://cdn.aukro.cz/images/sk1757530109374/thumbnail/detske-horske-kolo-zn-leader-fox-20-alu-ram-240072450.jpeg"
+   },
+   "titleImageUrl": "https://cdn.aukro.cz/images/sk1757530109374/thumbnail/detske-horske-kolo-zn-leader-fox-20-alu-ram-240072450.jpeg",
+   "seoUrl": "detske-horske-kolo-zn-leader-fox-20-alu-ram",
+   "ppPriorityList": false,
+   "ppPriorityListSort": false,
+   "ppHighlight": false,
+   "ppBoldTitle": false,
+   "buyersCountRelative": 0,
+   "itemState": "ACTIVE",
+   "sellerLogin": "REDACTED_LOGIN",
+   "seller": {
+    "accountActivated": true,
+    "aukroPlus": true,
+    "companyAccount": true,
+    "favouritedByCount": 393,
+    "feedbackUniqueUserCount": 3337,
+    "positiveFeedbackPercentage": 0.9982,
+    "rating": 3332,
+    "registrationDomain": "CZ",
+    "showName": "REDACTED_NAME",
+    "starType": "GOLD",
+    "userId": 1
+   },
+   "userWatching": false,
+   "watchersCount": 0,
+   "pepperLevel": 0,
+   "personalPickup": true,
+   "location": "Praha",
+   "postcode": "16900",
+   "aukroFreePriorityList": false,
+   "charity": false,
+   "paymentViaAukro": true,
+   "buyersProtectionAvailable": true,
+   "retailPrice": {
+    "amount": 0,
+    "currency": "CZK"
+   },
+   "adultContent": false,
+   "auction": true,
+   "aukroPlus": true,
+   "freeShipping": false,
+   "paymentOnline": false
+  },
+  {
+   "itemId": 7135534363,
+   "itemName": "Dětské retro kolo",
+   "categoryPath": [
+    {
+     "id": 17533,
+     "name": "Sport a turistika",
+     "seoUrl": "sport-a-turistika"
+    },
+    {
+     "id": 17570,
+     "name": "Cyklistika",
+     "seoUrl": "cyklistika"
+    },
+    {
+     "id": 17590,
+     "name": "Cyklobazar",
+     "seoUrl": "jizdni-kola"
+    },
+    {
+     "id": 17592,
+     "name": "Dětská kola",
+     "seoUrl": "detska-kola"
+    }
+   ],
+   "startingTime": "2026-09-30T17:35:01.571+02:00",
+   "endingTime": "2026-10-07T17:34:45+02:00",
+   "buyNowActive": false,
+   "buyNowPrice": {
+    "amount": 0,
+    "currency": "CZK"
+   },
+   "quantity": 1,
+   "quantityType": "pieces",
+   "attributes": [
+    {
+     "attributeId": 48,
+     "attributeName": "Stav zboží",
+     "attributeValue": "Zánovní",
+     "attributeValueId": 6,
+     "position": 0
+    }
+   ],
+   "price": {
+    "amount": 500,
+    "currency": "CZK"
+   },
+   "priceWithShipping": {
+    "amount": 600,
+    "currency": "CZK"
+   },
+   "titleImage": {
+    "position": 0,
+    "titleImage": false,
+    "url": "https://cdn.aukro.cz/images/sk1785996701968/thumbnail/detske-retro-kolo-289161697.jpeg"
+   },
+   "titleImageUrl": "https://cdn.aukro.cz/images/sk1785996701968/thumbnail/detske-retro-kolo-289161697.jpeg",
+   "seoUrl": "detske-retro-kolo",
+   "ppPriorityList": false,
+   "ppPriorityListSort": false,
+   "ppHighlight": false,
+   "ppBoldTitle": false,
+   "buyersCountRelative": 0,
+   "itemState": "ACTIVE",
+   "sellerLogin": "REDACTED_LOGIN",
+   "seller": {
+    "accountActivated": true,
+    "aukroPlus": false,
+    "companyAccount": false,
+    "favouritedByCount": 2,
+    "feedbackUniqueUserCount": 13,
+    "positiveFeedbackPercentage": 1,
+    "rating": 13,
+    "registrationDomain": "SK",
+    "showName": "REDACTED_NAME",
+    "starType": "WHITE",
+    "userId": 1
+   },
+   "userWatching": false,
+   "watchersCount": 3,
+   "pepperLevel": 0,
+   "personalPickup": true,
+   "location": "Prievidza",
+   "postcode": "97101",
+   "aukroFreePriorityList": false,
+   "charity": false,
+   "paymentViaAukro": true,
+   "buyersProtectionAvailable": true,
+   "retailPrice": {
+    "amount": 0,
+    "currency": "CZK"
+   },
+   "adultContent": false,
+   "auction": true,
+   "aukroPlus": false,
+   "freeShipping": false,
+   "paymentOnline": false
+  }
+ ],
+ "page": {
+  "number": 2,
+  "size": 180,
+  "totalElements": 54,
+  "totalPages": 3
+ },
+ "resultReport": {
+  "algorithmByKey": {},
+  "defaultLayout": "LIST",
+  "defaultSort": "relevance",
+  "defaultSortDirection": "DESC",
+  "excludedCategory": false,
+  "hideAds": false,
+  "sort": "startingTime",
+  "sortDirection": "DESC",
+  "state": "DEFAULT"
+ }
+}

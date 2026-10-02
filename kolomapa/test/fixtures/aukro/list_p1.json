@@ -1,0 +1,1487 @@
+{
+ "categoryPath": [
+  {
+   "id": 17533,
+   "level": 0,
+   "name": "Sport a turistika",
+   "shortName": "Sport a turistika",
+   "fullName": "Sport a turistika",
+   "seoUrl": "sport-a-turistika",
+   "active": true,
+   "itemCategoryId": 17533
+  },
+  {
+   "id": 17570,
+   "level": 1,
+   "name": "Cyklistika",
+   "shortName": "Cyklistika",
+   "fullName": "Sport a turistika | Cyklistika",
+   "seoUrl": "cyklistika",
+   "active": true,
+   "parentId": 17533,
+   "itemCategoryId": 17570
+  },
+  {
+   "id": 17590,
+   "level": 2,
+   "name": "Cyklobazar",
+   "shortName": "Kola",
+   "fullName": "Sport a turistika | Cyklistika | Kola",
+   "seoUrl": "jizdni-kola",
+   "active": true,
+   "parentId": 17570,
+   "itemCategoryId": 17590
+  },
+  {
+   "id": 147974,
+   "level": 3,
+   "name": "Elektrokola",
+   "shortName": "Elektrokola",
+   "fullName": "Sport a turistika | Cyklistika | Kola | Elektrokola",
+   "seoUrl": "elektrokola",
+   "active": true,
+   "parentId": 17590,
+   "itemCategoryId": 147974
+  }
+ ],
+ "content": [
+  {
+   "itemId": 7131634758,
+   "itemName": "Elektrokolo SCOTT E-Sub Cross 20 Men + druhá orig. baterie",
+   "categoryPath": [
+    {
+     "id": 17533,
+     "name": "Sport a turistika",
+     "seoUrl": "sport-a-turistika"
+    },
+    {
+     "id": 17570,
+     "name": "Cyklistika",
+     "seoUrl": "cyklistika"
+    },
+    {
+     "id": 17590,
+     "name": "Cyklobazar",
+     "seoUrl": "jizdni-kola"
+    },
+    {
+     "id": 147974,
+     "name": "Elektrokola",
+     "seoUrl": "elektrokola"
+    }
+   ],
+   "startingTime": "2026-09-27T10:15:01+02:00",
+   "endingTime": "2026-10-07T10:13:50+02:00",
+   "buyNowActive": true,
+   "buyNowPrice": {
+    "amount": 20000,
+    "currency": "CZK"
+   },
+   "quantity": 1,
+   "quantityType": "pieces",
+   "attributes": [
+    {
+     "attributeId": 48,
+     "attributeName": "Stav zboží",
+     "attributeValue": "Použité",
+     "attributeValueId": 2,
+     "position": 0
+    },
+    {
+     "attributeId": 16,
+     "attributeName": "Určení",
+     "attributeValue": "Pánská",
+     "attributeValueId": 1,
+     "position": 0
+    },
+    {
+     "attributeId": 8820,
+     "attributeName": "Doba dodání (od obdržení platby)",
+     "attributeValue": "2-3 dny",
+     "attributeValueId": 2,
+     "position": 0
+    },
+    {
+     "attributeId": 129769,
+     "attributeName": "Značka",
+     "attributeValue": "Scott",
+     "attributeValueId": 15,
+     "position": 0
+    },
+    {
+     "attributeId": 9,
+     "attributeName": "Délka dojezdu",
+     "attributeValue": "Méně než 130 km",
+     "attributeValueId": 1,
+     "position": 0
+    },
+    {
+     "attributeId": 106,
+     "attributeName": "Odpružení",
+     "attributeValue": "Odpružená přední vidlice",
+     "attributeValueId": 1,
+     "position": 0
+    },
+    {
+     "attributeId": 107,
+     "attributeName": "Hmotnost kola",
+     "attributeValue": "Nad 16 kg",
+     "attributeValueId": 1,
+     "position": 0
+    },
+    {
+     "attributeId": 108,
+     "attributeName": "Materíál rámu",
+     "attributeValue": "Hliník",
+     "attributeValueId": 1,
+     "position": 0
+    },
+    {
+     "attributeId": 109,
+     "attributeName": "Průměr kol",
+     "attributeValue": "28″",
+     "attributeValueId": 23,
+     "position": 0
+    }
+   ],
+   "price": {
+    "amount": 19000,
+    "currency": "CZK"
+   },
+   "priceWithShipping": {
+    "amount": 19000,
+    "currency": "CZK"
+   },
+   "titleImage": {
+    "position": 0,
+    "titleImage": false,
+    "url": "https://cdn.aukro.cz/images/sk1787903399477/thumbnail/elektrokolo-scott-e-sub-cross-20-men-druha-orig-baterie-292751800.jpeg"
+   },
+   "titleImageUrl": "https://cdn.aukro.cz/images/sk1787903399477/thumbnail/elektrokolo-scott-e-sub-cross-20-men-druha-orig-baterie-292751800.jpeg",
+   "seoUrl": "elektrokolo-scott-e-sub-cross-20-men-druha-orig-baterie",
+   "ppPriorityList": true,
+   "ppPriorityListSort": true,
+   "ppHighlight": false,
+   "ppBoldTitle": false,
+   "buyersCountRelative": 0,
+   "itemState": "ACTIVE",
+   "sellerLogin": "REDACTED_LOGIN",
+   "seller": {
+    "accountActivated": true,
+    "aukroPlus": false,
+    "companyAccount": false,
+    "favouritedByCount": 0,
+    "feedbackUniqueUserCount": 5,
+    "positiveFeedbackPercentage": 0.7143,
+    "rating": 3,
+    "registrationDomain": "CZ",
+    "showName": "REDACTED_NAME",
+    "starType": "GREEN",
+    "userId": 1
+   },
+   "userWatching": false,
+   "watchersCount": 7,
+   "pepperLevel": 0,
+   "personalPickup": true,
+   "location": "Moravské Bránice",
+   "postcode": "66464",
+   "aukroFreePriorityList": false,
+   "charity": false,
+   "paymentViaAukro": true,
+   "buyersProtectionAvailable": true,
+   "retailPrice": {
+    "amount": 0,
+    "currency": "CZK"
+   },
+   "adultContent": false,
+   "auction": true,
+   "aukroPlus": false,
+   "freeShipping": false,
+   "paymentOnline": false
+  },
+  {
+   "itemId": 7130801270,
+   "itemName": "pánské elektrokolo",
+   "categoryPath": [
+    {
+     "id": 17533,
+     "name": "Sport a turistika",
+     "seoUrl": "sport-a-turistika"
+    },
+    {
+     "id": 17570,
+     "name": "Cyklistika",
+     "seoUrl": "cyklistika"
+    },
+    {
+     "id": 17590,
+     "name": "Cyklobazar",
+     "seoUrl": "jizdni-kola"
+    },
+    {
+     "id": 147974,
+     "name": "Elektrokola",
+     "seoUrl": "elektrokola"
+    }
+   ],
+   "startingTime": "2026-10-02T14:01:01+02:00",
+   "endingTime": "2026-10-09T13:59:46+02:00",
+   "buyNowActive": false,
+   "buyNowPrice": {
+    "amount": 0,
+    "currency": "CZK"
+   },
+   "quantity": 1,
+   "quantityType": "pieces",
+   "attributes": [
+    {
+     "attributeId": 48,
+     "attributeName": "Stav zboží",
+     "attributeValue": "Použité",
+     "attributeValueId": 2,
+     "position": 0
+    },
+    {
+     "attributeId": 16,
+     "attributeName": "Určení",
+     "attributeValue": "Pánská",
+     "attributeValueId": 1,
+     "position": 0
+    },
+    {
+     "attributeId": 8820,
+     "attributeName": "Doba dodání (od obdržení platby)",
+     "attributeValue": "4-6 dní",
+     "attributeValueId": 3,
+     "position": 0
+    },
+    {
+     "attributeId": 129769,
+     "attributeName": "Značka",
+     "attributeValue": "Apache",
+     "attributeValueId": 3,
+     "position": 0
+    },
+    {
+     "attributeId": 9,
+     "attributeName": "Délka dojezdu",
+     "attributeValue": "Méně než 130 km",
+     "attributeValueId": 1,
+     "position": 0
+    },
+    {
+     "attributeId": 106,
+     "attributeName": "Odpružení",
+     "attributeValue": "Odpružená přední vidlice",
+     "attributeValueId": 1,
+     "position": 0
+    },
+    {
+     "attributeId": 11,
+     "attributeName": "Kapacita Baterie",
+     "attributeValue": "400 až 500 Wh",
+     "attributeValueId": 2,
+     "position": 0
+    },
+    {
+     "attributeId": 108,
+     "attributeName": "Materíál rámu",
+     "attributeValue": "Jiný",
+     "attributeValueId": 6,
+     "position": 0
+    },
+    {
+     "attributeId": 109,
+     "attributeName": "Průměr kol",
+     "attributeValue": "28″",
+     "attributeValueId": 23,
+     "position": 0
+    },
+    {
+     "attributeId": 110,
+     "attributeName": "Barva kola",
+     "attributeValue": "Červená",
+     "attributeValueId": 5,
+     "position": 0
+    }
+   ],
+   "price": {
+    "amount": 6999,
+    "currency": "CZK"
+   },
+   "priceWithShipping": {
+    "amount": 6999,
+    "currency": "CZK"
+   },
+   "titleImage": {
+    "position": 0,
+    "titleImage": false,
+    "url": "https://cdn.aukro.cz/images/sk1731507295707/thumbnail/panske-elektrokolo-210394767.jpeg"
+   },
+   "titleImageUrl": "https://cdn.aukro.cz/images/sk1731507295707/thumbnail/panske-elektrokolo-210394767.jpeg",
+   "seoUrl": "panske-elektrokolo",
+   "ppPriorityList": false,
+   "ppPriorityListSort": false,
+   "ppHighlight": false,
+   "ppBoldTitle": false,
+   "buyersCountRelative": 0,
+   "itemState": "ACTIVE",
+   "sellerLogin": "REDACTED_LOGIN",
+   "seller": {
+    "accountActivated": true,
+    "aukroPlus": false,
+    "companyAccount": false,
+    "favouritedByCount": 2,
+    "feedbackUniqueUserCount": 125,
+    "positiveFeedbackPercentage": 0.9843000000000001,
+    "rating": 125,
+    "registrationDomain": "CZ",
+    "showName": "REDACTED_NAME",
+    "starType": "BRONZE",
+    "userId": 1
+   },
+   "userWatching": false,
+   "watchersCount": 6,
+   "pepperLevel": 0,
+   "personalPickup": true,
+   "location": "Plzeň",
+   "postcode": "32300",
+   "aukroFreePriorityList": false,
+   "charity": false,
+   "paymentViaAukro": true,
+   "buyersProtectionAvailable": true,
+   "retailPrice": {
+    "amount": 0,
+    "currency": "CZK"
+   },
+   "adultContent": false,
+   "auction": true,
+   "aukroPlus": false,
+   "freeShipping": false,
+   "paymentOnline": false
+  },
+  {
+   "itemId": 7123182024,
+   "itemName": "Elektrokolo MTF",
+   "categoryPath": [
+    {
+     "id": 17533,
+     "name": "Sport a turistika",
+     "seoUrl": "sport-a-turistika"
+    },
+    {
+     "id": 17570,
+     "name": "Cyklistika",
+     "seoUrl": "cyklistika"
+    },
+    {
+     "id": 17590,
+     "name": "Cyklobazar",
+     "seoUrl": "jizdni-kola"
+    },
+    {
+     "id": 147974,
+     "name": "Elektrokola",
+     "seoUrl": "elektrokola"
+    }
+   ],
+   "startingTime": "2026-10-02T13:19:03+02:00",
+   "endingTime": "2026-10-09T13:18:30+02:00",
+   "buyNowActive": true,
+   "buyNowPrice": {
+    "amount": 38000,
+    "currency": "CZK"
+   },
+   "quantity": 1,
+   "quantityType": "pieces",
+   "attributes": [
+    {
+     "attributeId": 48,
+     "attributeName": "Stav zboží",
+     "attributeValue": "Rozbaleno",
+     "attributeValueId": 3,
+     "position": 0
+    }
+   ],
+   "price": {
+    "amount": 38000,
+    "currency": "CZK"
+   },
+   "priceWithShipping": {
+    "amount": 38000,
+    "currency": "CZK"
+   },
+   "titleImage": {
+    "position": 0,
+    "titleImage": false,
+    "url": "https://cdn.aukro.cz/images/sk1781262985486/thumbnail/elektrokolo-mtf-278366797.jpeg"
+   },
+   "titleImageUrl": "https://cdn.aukro.cz/images/sk1781262985486/thumbnail/elektrokolo-mtf-278366797.jpeg",
+   "seoUrl": "elektrokolo-mtf",
+   "ppPriorityList": false,
+   "ppPriorityListSort": false,
+   "ppHighlight": false,
+   "ppBoldTitle": false,
+   "buyersCountRelative": 0,
+   "itemState": "ACTIVE",
+   "sellerLogin": "REDACTED_LOGIN",
+   "seller": {
+    "accountActivated": true,
+    "aukroPlus": false,
+    "companyAccount": false,
+    "favouritedByCount": 2,
+    "feedbackUniqueUserCount": 69,
+    "positiveFeedbackPercentage": 1,
+    "rating": 69,
+    "registrationDomain": "CZ",
+    "showName": "REDACTED_NAME",
+    "starType": "BRONZE",
+    "userId": 1
+   },
+   "userWatching": false,
+   "watchersCount": 3,
+   "pepperLevel": 0,
+   "personalPickup": true,
+   "location": "Miroslav",
+   "postcode": "67172",
+   "aukroFreePriorityList": false,
+   "charity": false,
+   "paymentViaAukro": true,
+   "buyersProtectionAvailable": true,
+   "retailPrice": {
+    "amount": 0,
+    "currency": "CZK"
+   },
+   "adultContent": false,
+   "auction": false,
+   "aukroPlus": false,
+   "freeShipping": false,
+   "paymentOnline": false
+  },
+  {
+   "itemId": 7118170061,
+   "itemName": "elektrokolo ",
+   "categoryPath": [
+    {
+     "id": 17533,
+     "name": "Sport a turistika",
+     "seoUrl": "sport-a-turistika"
+    },
+    {
+     "id": 17570,
+     "name": "Cyklistika",
+     "seoUrl": "cyklistika"
+    },
+    {
+     "id": 17590,
+     "name": "Cyklobazar",
+     "seoUrl": "jizdni-kola"
+    },
+    {
+     "id": 147974,
+     "name": "Elektrokola",
+     "seoUrl": "elektrokola"
+    }
+   ],
+   "startingTime": "2026-10-02T10:23:01+02:00",
+   "endingTime": "2026-10-12T10:21:20+02:00",
+   "buyNowActive": false,
+   "buyNowPrice": {
+    "amount": 0,
+    "currency": "CZK"
+   },
+   "quantity": 1,
+   "quantityType": "pieces",
+   "attributes": [
+    {
+     "attributeId": 48,
+     "attributeName": "Stav zboží",
+     "attributeValue": "Zánovní",
+     "attributeValueId": 6,
+     "position": 0
+    },
+    {
+     "attributeId": 9,
+     "attributeName": "Délka dojezdu",
+     "attributeValue": "130 až 145 km",
+     "attributeValueId": 2,
+     "position": 0
+    }
+   ],
+   "price": {
+    "amount": 29500,
+    "currency": "CZK"
+   },
+   "priceWithShipping": {
+    "amount": 29500,
+    "currency": "CZK"
+   },
+   "titleImage": {
+    "position": 0,
+    "titleImage": false,
+    "url": "https://cdn.aukro.cz/images/sk1777104514741/thumbnail/elektrokolo-270471627.jpeg"
+   },
+   "titleImageUrl": "https://cdn.aukro.cz/images/sk1777104514741/thumbnail/elektrokolo-270471627.jpeg",
+   "seoUrl": "elektrokolo",
+   "ppPriorityList": false,
+   "ppPriorityListSort": false,
+   "ppHighlight": false,
+   "ppBoldTitle": false,
+   "buyersCountRelative": 0,
+   "itemState": "ACTIVE",
+   "sellerLogin": "REDACTED_LOGIN",
+   "seller": {
+    "accountActivated": true,
+    "aukroPlus": false,
+    "companyAccount": false,
+    "favouritedByCount": 9,
+    "feedbackUniqueUserCount": 538,
+    "positiveFeedbackPercentage": 1,
+    "rating": 538,
+    "registrationDomain": "CZ",
+    "showName": "REDACTED_NAME",
+    "starType": "SILVER",
+    "userId": 1
+   },
+   "userWatching": false,
+   "watchersCount": 4,
+   "pepperLevel": 0,
+   "personalPickup": true,
+   "location": "Kojetín",
+   "postcode": "75201",
+   "aukroFreePriorityList": false,
+   "charity": false,
+   "paymentViaAukro": true,
+   "buyersProtectionAvailable": true,
+   "retailPrice": {
+    "amount": 0,
+    "currency": "CZK"
+   },
+   "adultContent": false,
+   "auction": true,
+   "aukroPlus": false,
+   "freeShipping": false,
+   "paymentOnline": false
+  },
+  {
+   "itemId": 7132405196,
+   "itemName": "NOVÉ Elektrokolo KROSS Sentio Hybrid 3.0 (Vel. XXL/24\")",
+   "categoryPath": [
+    {
+     "id": 17533,
+     "name": "Sport a turistika",
+     "seoUrl": "sport-a-turistika"
+    },
+    {
+     "id": 17570,
+     "name": "Cyklistika",
+     "seoUrl": "cyklistika"
+    },
+    {
+     "id": 17590,
+     "name": "Cyklobazar",
+     "seoUrl": "jizdni-kola"
+    },
+    {
+     "id": 147974,
+     "name": "Elektrokola",
+     "seoUrl": "elektrokola"
+    }
+   ],
+   "startingTime": "2026-10-01T21:47:01+02:00",
+   "endingTime": "2026-10-08T21:45:48+02:00",
+   "buyNowActive": true,
+   "buyNowPrice": {
+    "amount": 23000,
+    "currency": "CZK"
+   },
+   "quantity": 1,
+   "quantityType": "pieces",
+   "attributes": [
+    {
+     "attributeId": 48,
+     "attributeName": "Stav zboží",
+     "attributeValue": "Rozbaleno",
+     "attributeValueId": 3,
+     "position": 0
+    },
+    {
+     "attributeId": 9,
+     "attributeName": "Délka dojezdu",
+     "attributeValue": "Méně než 130 km",
+     "attributeValueId": 1,
+     "position": 0
+    },
+    {
+     "attributeId": 107,
+     "attributeName": "Hmotnost kola",
+     "attributeValue": "Nad 16 kg",
+     "attributeValueId": 1,
+     "position": 0
+    },
+    {
+     "attributeId": 11,
+     "attributeName": "Kapacita Baterie",
+     "attributeValue": "400 až 500 Wh",
+     "attributeValueId": 2,
+     "position": 0
+    },
+    {
+     "attributeId": 109,
+     "attributeName": "Průměr kol",
+     "attributeValue": "28″",
+     "attributeValueId": 23,
+     "position": 0
+    }
+   ],
+   "price": {
+    "amount": 23000,
+    "currency": "CZK"
+   },
+   "priceWithShipping": {
+    "amount": 23000,
+    "currency": "CZK"
+   },
+   "titleImage": {
+    "position": 0,
+    "titleImage": false,
+    "url": "https://cdn.aukro.cz/images/sk1788464462560/thumbnail/nove-elektrokolo-kross-sentio-hybrid-3-0-vel-xxl-24-293909632.jpeg"
+   },
+   "titleImageUrl": "https://cdn.aukro.cz/images/sk1788464462560/thumbnail/nove-elektrokolo-kross-sentio-hybrid-3-0-vel-xxl-24-293909632.jpeg",
+   "seoUrl": "nove-elektrokolo-kross-sentio-hybrid-3-0-vel-xxl-24",
+   "ppPriorityList": false,
+   "ppPriorityListSort": false,
+   "ppHighlight": false,
+   "ppBoldTitle": false,
+   "buyersCountRelative": 0,
+   "itemState": "ACTIVE",
+   "sellerLogin": "REDACTED_LOGIN",
+   "seller": {
+    "accountActivated": true,
+    "aukroPlus": false,
+    "companyAccount": false,
+    "favouritedByCount": 8,
+    "feedbackUniqueUserCount": 129,
+    "positiveFeedbackPercentage": 0.9923000000000001,
+    "rating": 128,
+    "registrationDomain": "CZ",
+    "showName": "REDACTED_NAME",
+    "starType": "BRONZE",
+    "userId": 1
+   },
+   "userWatching": false,
+   "watchersCount": 3,
+   "pepperLevel": 0,
+   "personalPickup": true,
+   "location": "Blatno",
+   "postcode": "44101",
+   "aukroFreePriorityList": false,
+   "charity": false,
+   "paymentViaAukro": true,
+   "buyersProtectionAvailable": true,
+   "retailPrice": {
+    "amount": 0,
+    "currency": "CZK"
+   },
+   "adultContent": false,
+   "auction": false,
+   "aukroPlus": false,
+   "freeShipping": false,
+   "paymentOnline": false
+  },
+  {
+   "itemId": 7135772967,
+   "itemName": "Horské elektrokolo Lovelec",
+   "categoryPath": [
+    {
+     "id": 17533,
+     "name": "Sport a turistika",
+     "seoUrl": "sport-a-turistika"
+    },
+    {
+     "id": 17570,
+     "name": "Cyklistika",
+     "seoUrl": "cyklistika"
+    },
+    {
+     "id": 17590,
+     "name": "Cyklobazar",
+     "seoUrl": "jizdni-kola"
+    },
+    {
+     "id": 147974,
+     "name": "Elektrokola",
+     "seoUrl": "elektrokola"
+    }
+   ],
+   "startingTime": "2026-10-01T20:32:03.595+02:00",
+   "endingTime": "2026-10-08T20:31:24+02:00",
+   "buyNowActive": true,
+   "buyNowPrice": {
+    "amount": 34000,
+    "currency": "CZK"
+   },
+   "quantity": 1,
+   "quantityType": "pieces",
+   "attributes": [
+    {
+     "attributeId": 48,
+     "attributeName": "Stav zboží",
+     "attributeValue": "Zánovní",
+     "attributeValueId": 6,
+     "position": 0
+    },
+    {
+     "attributeId": 129769,
+     "attributeName": "Značka",
+     "attributeValue": "Ostatní",
+     "attributeValueId": 17,
+     "position": 0
+    },
+    {
+     "attributeId": 9,
+     "attributeName": "Délka dojezdu",
+     "attributeValue": "160 až 185 km",
+     "attributeValueId": 4,
+     "position": 0
+    },
+    {
+     "attributeId": 106,
+     "attributeName": "Odpružení",
+     "attributeValue": "Odpružená přední vidlice",
+     "attributeValueId": 1,
+     "position": 0
+    },
+    {
+     "attributeId": 11,
+     "attributeName": "Kapacita Baterie",
+     "attributeValue": "700 Wh a více",
+     "attributeValueId": 5,
+     "position": 0
+    },
+    {
+     "attributeId": 109,
+     "attributeName": "Průměr kol",
+     "attributeValue": "29″",
+     "attributeValueId": 24,
+     "position": 0
+    }
+   ],
+   "price": {
+    "amount": 34000,
+    "currency": "CZK"
+   },
+   "priceWithShipping": {
+    "amount": 34000,
+    "currency": "CZK"
+   },
+   "titleImage": {
+    "position": 0,
+    "titleImage": false,
+    "url": "https://cdn.aukro.cz/images/sk1789309914249/thumbnail/horske-elektrokolo-lovelec-295483303.jpeg"
+   },
+   "titleImageUrl": "https://cdn.aukro.cz/images/sk1789309914249/thumbnail/horske-elektrokolo-lovelec-295483303.jpeg",
+   "seoUrl": "horske-elektrokolo-lovelec",
+   "ppPriorityList": false,
+   "ppPriorityListSort": false,
+   "ppHighlight": false,
+   "ppBoldTitle": false,
+   "buyersCountRelative": 0,
+   "itemState": "ACTIVE",
+   "sellerLogin": "REDACTED_LOGIN",
+   "seller": {
+    "accountActivated": true,
+    "aukroPlus": false,
+    "companyAccount": false,
+    "favouritedByCount": 1,
+    "feedbackUniqueUserCount": 29,
+    "positiveFeedbackPercentage": 1,
+    "rating": 29,
+    "registrationDomain": "CZ",
+    "showName": "REDACTED_NAME",
+    "starType": "WHITE",
+    "userId": 1
+   },
+   "userWatching": false,
+   "watchersCount": 2,
+   "pepperLevel": 0,
+   "personalPickup": true,
+   "location": "Jičín",
+   "postcode": "50601",
+   "aukroFreePriorityList": false,
+   "charity": false,
+   "paymentViaAukro": true,
+   "buyersProtectionAvailable": true,
+   "retailPrice": {
+    "amount": 0,
+    "currency": "CZK"
+   },
+   "adultContent": false,
+   "auction": false,
+   "aukroPlus": false,
+   "freeShipping": false,
+   "paymentOnline": false
+  },
+  {
+   "itemId": 7135759522,
+   "itemName": "Damske elektro kolo Velamos s displejem (baterie 36v 15ah)",
+   "categoryPath": [
+    {
+     "id": 17533,
+     "name": "Sport a turistika",
+     "seoUrl": "sport-a-turistika"
+    },
+    {
+     "id": 17570,
+     "name": "Cyklistika",
+     "seoUrl": "cyklistika"
+    },
+    {
+     "id": 17590,
+     "name": "Cyklobazar",
+     "seoUrl": "jizdni-kola"
+    },
+    {
+     "id": 147974,
+     "name": "Elektrokola",
+     "seoUrl": "elektrokola"
+    }
+   ],
+   "startingTime": "2026-10-01T18:38:01.855+02:00",
+   "endingTime": "2026-10-31T18:37:34+01:00",
+   "buyNowActive": true,
+   "buyNowPrice": {
+    "amount": 8900,
+    "currency": "CZK"
+   },
+   "quantity": 1,
+   "quantityType": "pieces",
+   "attributes": [
+    {
+     "attributeId": 48,
+     "attributeName": "Stav zboží",
+     "attributeValue": "Použité",
+     "attributeValueId": 2,
+     "position": 0
+    },
+    {
+     "attributeId": 9,
+     "attributeName": "Délka dojezdu",
+     "attributeValue": "Méně než 130 km",
+     "attributeValueId": 1,
+     "position": 0
+    }
+   ],
+   "price": {
+    "amount": 8900,
+    "currency": "CZK"
+   },
+   "priceWithShipping": {
+    "amount": 8900,
+    "currency": "CZK"
+   },
+   "titleImage": {
+    "position": 0,
+    "titleImage": false,
+    "url": "https://cdn.aukro.cz/images/sk1783413304266/thumbnail/damske-elektro-kolo-velamos-s-displejem-baterie-36v-15ah-284527722.jpeg"
+   },
+   "titleImageUrl": "https://cdn.aukro.cz/images/sk1783413304266/thumbnail/damske-elektro-kolo-velamos-s-displejem-baterie-36v-15ah-284527722.jpeg",
+   "seoUrl": "damske-elektro-kolo-velamos-s-displejem-baterie-36v-15ah",
+   "ppPriorityList": false,
+   "ppPriorityListSort": false,
+   "ppHighlight": false,
+   "ppBoldTitle": false,
+   "buyersCountRelative": 0,
+   "itemState": "ACTIVE",
+   "sellerLogin": "REDACTED_LOGIN",
+   "seller": {
+    "accountActivated": true,
+    "aukroPlus": false,
+    "companyAccount": false,
+    "favouritedByCount": 38,
+    "feedbackUniqueUserCount": 1567,
+    "positiveFeedbackPercentage": 0.9911,
+    "rating": 1558,
+    "registrationDomain": "CZ",
+    "showName": "REDACTED_NAME",
+    "starType": "SILVER",
+    "userId": 1
+   },
+   "userWatching": false,
+   "watchersCount": 0,
+   "pepperLevel": 0,
+   "personalPickup": true,
+   "location": "Pardubice 21",
+   "postcode": "53301",
+   "aukroFreePriorityList": false,
+   "charity": false,
+   "paymentViaAukro": true,
+   "buyersProtectionAvailable": true,
+   "retailPrice": {
+    "amount": 0,
+    "currency": "CZK"
+   },
+   "adultContent": false,
+   "auction": false,
+   "aukroPlus": false,
+   "freeShipping": false,
+   "paymentOnline": false
+  },
+  {
+   "itemId": 7135748056,
+   "itemName": "Elektrokolo Happyrun HR-X40",
+   "categoryPath": [
+    {
+     "id": 17533,
+     "name": "Sport a turistika",
+     "seoUrl": "sport-a-turistika"
+    },
+    {
+     "id": 17570,
+     "name": "Cyklistika",
+     "seoUrl": "cyklistika"
+    },
+    {
+     "id": 17590,
+     "name": "Cyklobazar",
+     "seoUrl": "jizdni-kola"
+    },
+    {
+     "id": 147974,
+     "name": "Elektrokola",
+     "seoUrl": "elektrokola"
+    }
+   ],
+   "startingTime": "2026-10-01T16:38:03.292+02:00",
+   "endingTime": "2026-10-08T16:37:25+02:00",
+   "buyNowActive": true,
+   "buyNowPrice": {
+    "amount": 5000,
+    "currency": "CZK"
+   },
+   "quantity": 1,
+   "quantityType": "pieces",
+   "attributes": [
+    {
+     "attributeId": 48,
+     "attributeName": "Stav zboží",
+     "attributeValue": "Zánovní",
+     "attributeValueId": 6,
+     "position": 0
+    }
+   ],
+   "price": {
+    "amount": 5000,
+    "currency": "CZK"
+   },
+   "priceWithShipping": {
+    "amount": 5000,
+    "currency": "CZK"
+   },
+   "titleImage": {
+    "position": 0,
+    "titleImage": false,
+    "url": "https://cdn.aukro.cz/images/sk1790864285075/thumbnail/elektrokolo-happyrun-hr-x40-298983485.jpeg"
+   },
+   "titleImageUrl": "https://cdn.aukro.cz/images/sk1790864285075/thumbnail/elektrokolo-happyrun-hr-x40-298983485.jpeg",
+   "seoUrl": "elektrokolo-happyrun-hr-x40",
+   "ppPriorityList": false,
+   "ppPriorityListSort": false,
+   "ppHighlight": false,
+   "ppBoldTitle": false,
+   "buyersCountRelative": 0,
+   "itemState": "ACTIVE",
+   "sellerLogin": "REDACTED_LOGIN",
+   "seller": {
+    "accountActivated": true,
+    "aukroPlus": false,
+    "companyAccount": false,
+    "favouritedByCount": 0,
+    "feedbackUniqueUserCount": 1,
+    "positiveFeedbackPercentage": 1,
+    "rating": 1,
+    "registrationDomain": "CZ",
+    "showName": "REDACTED_NAME",
+    "starType": "GREEN",
+    "userId": 1
+   },
+   "userWatching": false,
+   "watchersCount": 1,
+   "pepperLevel": 0,
+   "personalPickup": true,
+   "location": "Valašské Meziříčí",
+   "postcode": "75701",
+   "aukroFreePriorityList": false,
+   "charity": false,
+   "paymentViaAukro": false,
+   "buyersProtectionAvailable": false,
+   "retailPrice": {
+    "amount": 0,
+    "currency": "CZK"
+   },
+   "adultContent": false,
+   "auction": false,
+   "aukroPlus": false,
+   "freeShipping": false,
+   "paymentOnline": false
+  },
+  {
+   "itemId": 7132365536,
+   "itemName": "Elektrokolo Romet Wagant",
+   "categoryPath": [
+    {
+     "id": 17533,
+     "name": "Sport a turistika",
+     "seoUrl": "sport-a-turistika"
+    },
+    {
+     "id": 17570,
+     "name": "Cyklistika",
+     "seoUrl": "cyklistika"
+    },
+    {
+     "id": 17590,
+     "name": "Cyklobazar",
+     "seoUrl": "jizdni-kola"
+    },
+    {
+     "id": 147974,
+     "name": "Elektrokola",
+     "seoUrl": "elektrokola"
+    }
+   ],
+   "startingTime": "2026-10-01T14:22:01+02:00",
+   "endingTime": "2026-10-08T14:20:55+02:00",
+   "buyNowActive": false,
+   "buyNowPrice": {
+    "amount": 0,
+    "currency": "CZK"
+   },
+   "quantity": 1,
+   "quantityType": "pieces",
+   "attributes": [
+    {
+     "attributeId": 48,
+     "attributeName": "Stav zboží",
+     "attributeValue": "Zánovní",
+     "attributeValueId": 6,
+     "position": 0
+    }
+   ],
+   "price": {
+    "amount": 12000,
+    "currency": "CZK"
+   },
+   "priceWithShipping": {
+    "amount": 12000,
+    "currency": "CZK"
+   },
+   "titleImage": {
+    "position": 0,
+    "titleImage": false,
+    "url": "https://cdn.aukro.cz/images/sk1788437788591/thumbnail/elektrokolo-romet-wagant-293840642.jpeg"
+   },
+   "titleImageUrl": "https://cdn.aukro.cz/images/sk1788437788591/thumbnail/elektrokolo-romet-wagant-293840642.jpeg",
+   "seoUrl": "elektrokolo-romet-wagant",
+   "ppPriorityList": false,
+   "ppPriorityListSort": false,
+   "ppHighlight": false,
+   "ppBoldTitle": false,
+   "buyersCountRelative": 0,
+   "itemState": "ACTIVE",
+   "sellerLogin": "REDACTED_LOGIN",
+   "seller": {
+    "accountActivated": false,
+    "aukroPlus": false,
+    "companyAccount": false,
+    "favouritedByCount": 0,
+    "feedbackUniqueUserCount": 1,
+    "positiveFeedbackPercentage": 1,
+    "rating": 1,
+    "registrationDomain": "CZ",
+    "showName": "REDACTED_NAME",
+    "starType": "GREEN",
+    "userId": 1
+   },
+   "userWatching": false,
+   "watchersCount": 1,
+   "pepperLevel": 0,
+   "personalPickup": true,
+   "location": "České Budějovice",
+   "postcode": "37011",
+   "aukroFreePriorityList": false,
+   "charity": false,
+   "paymentViaAukro": true,
+   "buyersProtectionAvailable": true,
+   "retailPrice": {
+    "amount": 0,
+    "currency": "CZK"
+   },
+   "adultContent": false,
+   "auction": true,
+   "aukroPlus": false,
+   "freeShipping": false,
+   "paymentOnline": false
+  },
+  {
+   "itemId": 7123076728,
+   "itemName": "Horské elektrokolo Trek Powerfly 5 model 2016",
+   "categoryPath": [
+    {
+     "id": 17533,
+     "name": "Sport a turistika",
+     "seoUrl": "sport-a-turistika"
+    },
+    {
+     "id": 17570,
+     "name": "Cyklistika",
+     "seoUrl": "cyklistika"
+    },
+    {
+     "id": 17590,
+     "name": "Cyklobazar",
+     "seoUrl": "jizdni-kola"
+    },
+    {
+     "id": 147974,
+     "name": "Elektrokola",
+     "seoUrl": "elektrokola"
+    }
+   ],
+   "startingTime": "2026-10-01T13:01:01+02:00",
+   "endingTime": "2026-10-08T13:00:23+02:00",
+   "buyNowActive": true,
+   "buyNowPrice": {
+    "amount": 17990,
+    "currency": "CZK"
+   },
+   "quantity": 1,
+   "quantityType": "pieces",
+   "attributes": [
+    {
+     "attributeId": 48,
+     "attributeName": "Stav zboží",
+     "attributeValue": "Použité",
+     "attributeValueId": 2,
+     "position": 0
+    },
+    {
+     "attributeId": 16,
+     "attributeName": "Určení",
+     "attributeValue": "Pánská",
+     "attributeValueId": 1,
+     "position": 0
+    },
+    {
+     "attributeId": 8820,
+     "attributeName": "Doba dodání (od obdržení platby)",
+     "attributeValue": "2-3 dny",
+     "attributeValueId": 2,
+     "position": 0
+    },
+    {
+     "attributeId": 9,
+     "attributeName": "Délka dojezdu",
+     "attributeValue": "Méně než 130 km",
+     "attributeValueId": 1,
+     "position": 0
+    },
+    {
+     "attributeId": 106,
+     "attributeName": "Odpružení",
+     "attributeValue": "Odpružená přední vidlice",
+     "attributeValueId": 1,
+     "position": 0
+    },
+    {
+     "attributeId": 11,
+     "attributeName": "Kapacita Baterie",
+     "attributeValue": "400 až 500 Wh",
+     "attributeValueId": 2,
+     "position": 0
+    },
+    {
+     "attributeId": 109,
+     "attributeName": "Průměr kol",
+     "attributeValue": "29″",
+     "attributeValueId": 24,
+     "position": 0
+    },
+    {
+     "attributeId": 110,
+     "attributeName": "Barva kola",
+     "attributeValue": "Modrá",
+     "attributeValueId": 2,
+     "position": 0
+    }
+   ],
+   "price": {
+    "amount": 17990,
+    "currency": "CZK"
+   },
+   "priceWithShipping": {
+    "amount": 17990,
+    "currency": "CZK"
+   },
+   "titleImage": {
+    "position": 0,
+    "titleImage": false,
+    "url": "https://cdn.aukro.cz/images/sk1781175556735/thumbnail/horske-elektrokolo-trek-powerfly-5-model-2016-278194105.jpeg"
+   },
+   "titleImageUrl": "https://cdn.aukro.cz/images/sk1781175556735/thumbnail/horske-elektrokolo-trek-powerfly-5-model-2016-278194105.jpeg",
+   "seoUrl": "horske-elektrokolo-trek-powerfly-5-model-2016",
+   "ppPriorityList": false,
+   "ppPriorityListSort": false,
+   "ppHighlight": false,
+   "ppBoldTitle": false,
+   "buyersCountRelative": 0,
+   "itemState": "ACTIVE",
+   "sellerLogin": "REDACTED_LOGIN",
+   "seller": {
+    "accountActivated": true,
+    "aukroPlus": false,
+    "companyAccount": false,
+    "favouritedByCount": 209,
+    "feedbackUniqueUserCount": 1949,
+    "positiveFeedbackPercentage": 0.998,
+    "rating": 1945,
+    "registrationDomain": "CZ",
+    "showName": "REDACTED_NAME",
+    "starType": "SILVER",
+    "userId": 1
+   },
+   "userWatching": false,
+   "watchersCount": 5,
+   "pepperLevel": 0,
+   "personalPickup": true,
+   "location": "Praha",
+   "postcode": "16000",
+   "aukroFreePriorityList": false,
+   "charity": false,
+   "paymentViaAukro": false,
+   "buyersProtectionAvailable": false,
+   "retailPrice": {
+    "amount": 0,
+    "currency": "CZK"
+   },
+   "adultContent": false,
+   "auction": false,
+   "aukroPlus": false,
+   "freeShipping": false,
+   "paymentOnline": false
+  },
+  {
+   "itemId": 7131551546,
+   "itemName": "Sada pro přestavbu elektrokola",
+   "categoryPath": [
+    {
+     "id": 17533,
+     "name": "Sport a turistika",
+     "seoUrl": "sport-a-turistika"
+    },
+    {
+     "id": 17570,
+     "name": "Cyklistika",
+     "seoUrl": "cyklistika"
+    },
+    {
+     "id": 17590,
+     "name": "Cyklobazar",
+     "seoUrl": "jizdni-kola"
+    },
+    {
+     "id": 147974,
+     "name": "Elektrokola",
+     "seoUrl": "elektrokola"
+    }
+   ],
+   "startingTime": "2026-10-01T12:54:01+02:00",
+   "endingTime": "2026-10-08T12:52:41+02:00",
+   "buyNowActive": true,
+   "buyNowPrice": {
+    "amount": 2500,
+    "currency": "CZK"
+   },
+   "quantity": 1,
+   "quantityType": "pieces",
+   "attributes": [
+    {
+     "attributeId": 48,
+     "attributeName": "Stav zboží",
+     "attributeValue": "Nové",
+     "attributeValueId": 1,
+     "position": 0
+    }
+   ],
+   "price": {
+    "amount": 2500,
+    "currency": "CZK"
+   },
+   "priceWithShipping": {
+    "amount": 2565,
+    "currency": "CZK"
+   },
+   "titleImage": {
+    "position": 0,
+    "titleImage": false,
+    "url": "https://cdn.aukro.cz/images/sk1787827923754/thumbnail/sada-pro-prestavbu-elektrokola-292601464.jpeg"
+   },
+   "titleImageUrl": "https://cdn.aukro.cz/images/sk1787827923754/thumbnail/sada-pro-prestavbu-elektrokola-292601464.jpeg",
+   "seoUrl": "sada-pro-prestavbu-elektrokola",
+   "ppPriorityList": false,
+   "ppPriorityListSort": false,
+   "ppHighlight": false,
+   "ppBoldTitle": false,
+   "buyersCountRelative": 0,
+   "itemState": "ACTIVE",
+   "sellerLogin": "REDACTED_LOGIN",
+   "seller": {
+    "accountActivated": false,
+    "aukroPlus": false,
+    "companyAccount": false,
+    "favouritedByCount": 15,
+    "feedbackUniqueUserCount": 28,
+    "positiveFeedbackPercentage": 0.8888888888888888,
+    "rating": 22,
+    "registrationDomain": "CZ",
+    "showName": "REDACTED_NAME",
+    "starType": "WHITE",
+    "userId": 1
+   },
+   "userWatching": false,
+   "watchersCount": 7,
+   "pepperLevel": 0,
+   "personalPickup": true,
+   "location": "Praha",
+   "postcode": "15000",
+   "aukroFreePriorityList": false,
+   "charity": false,
+   "paymentViaAukro": true,
+   "buyersProtectionAvailable": true,
+   "retailPrice": {
+    "amount": 0,
+    "currency": "CZK"
+   },
+   "adultContent": false,
+   "auction": false,
+   "aukroPlus": false,
+   "freeShipping": false,
+   "paymentOnline": false
+  },
+  {
+   "itemId": 7132357754,
+   "itemName": "elektrokolo",
+   "categoryPath": [
+    {
+     "id": 17533,
+     "name": "Sport a turistika",
+     "seoUrl": "sport-a-turistika"
+    },
+    {
+     "id": 17570,
+     "name": "Cyklistika",
+     "seoUrl": "cyklistika"
+    },
+    {
+     "id": 17590,
+     "name": "Cyklobazar",
+     "seoUrl": "jizdni-kola"
+    },
+    {
+     "id": 147974,
+     "name": "Elektrokola",
+     "seoUrl": "elektrokola"
+    }
+   ],
+   "startingTime": "2026-10-01T12:34:03+02:00",
+   "endingTime": "2026-10-08T12:32:20+02:00",
+   "buyNowActive": false,
+   "buyNowPrice": {
+    "amount": 0,
+    "currency": "CZK"
+   },
+   "quantity": 1,
+   "quantityType": "pieces",
+   "attributes": [
+    {
+     "attributeId": 48,
+     "attributeName": "Stav zboží",
+     "attributeValue": "Rozbaleno",
+     "attributeValueId": 3,
+     "position": 0
+    }
+   ],
+   "price": {
+    "amount": 15000,
+    "currency": "CZK"
+   },
+   "priceWithShipping": {
+    "amount": 15000,
+    "currency": "CZK"
+   },
+   "titleImage": {
+    "position": 0,
+    "titleImage": false,
+    "url": "https://cdn.aukro.cz/images/sk1788431217960/thumbnail/elektrokolo-293825045.jpeg"
+   },
+   "titleImageUrl": "https://cdn.aukro.cz/images/sk1788431217960/thumbnail/elektrokolo-293825045.jpeg",
+   "seoUrl": "elektrokolo",
+   "ppPriorityList": false,
+   "ppPriorityListSort": false,
+   "ppHighlight": false,
+   "ppBoldTitle": true,
+   "buyersCountRelative": 0,
+   "itemState": "ACTIVE",
+   "sellerLogin": "REDACTED_LOGIN",
+   "seller": {
+    "accountActivated": false,
+    "aukroPlus": false,
+    "companyAccount": false,
+    "favouritedByCount": 0,
+    "feedbackUniqueUserCount": 0,
+    "positiveFeedbackPercentage": 0,
+    "rating": 0,
+    "registrationDomain": "CZ",
+    "showName": "REDACTED_NAME",
+    "starType": "NOTHING",
+    "userId": 1
+   },
+   "userWatching": false,
+   "watchersCount": 5,
+   "pepperLevel": 0,
+   "personalPickup": true,
+   "location": "Praha 4",
+   "postcode": "14000",
+   "aukroFreePriorityList": false,
+   "charity": false,
+   "paymentViaAukro": true,
+   "buyersProtectionAvailable": true,
+   "retailPrice": {
+    "amount": 0,
+    "currency": "CZK"
+   },
+   "adultContent": false,
+   "auction": true,
+   "aukroPlus": false,
+   "freeShipping": false,
+   "paymentOnline": false
+  }
+ ],
+ "page": {
+  "number": 1,
+  "size": 180,
+  "totalElements": 54,
+  "totalPages": 3
+ },
+ "resultReport": {
+  "algorithmByKey": {},
+  "defaultLayout": "LIST",
+  "defaultSort": "relevance",
+  "defaultSortDirection": "DESC",
+  "excludedCategory": false,
+  "hideAds": false,
+  "sort": "startingTime",
+  "sortDirection": "DESC",
+  "state": "DEFAULT"
+ }
+}

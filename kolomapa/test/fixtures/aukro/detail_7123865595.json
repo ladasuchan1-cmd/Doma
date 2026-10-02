@@ -1,0 +1,350 @@
+{
+ "attributes": [
+  {
+   "attributeId": 16,
+   "attributeKey": "1",
+   "attributeLandingPage": true,
+   "attributeName": "Určení",
+   "attributeSeoUrl": "panska",
+   "attributeValue": "Pánská",
+   "position": 0
+  },
+  {
+   "attributeId": 48,
+   "attributeKey": "2",
+   "attributeLandingPage": true,
+   "attributeName": "Stav zboží",
+   "attributeSeoUrl": "pouzite",
+   "attributeValue": "Použité",
+   "attributeValueAdditionalDescription": "delší doba používání, funkční produkt",
+   "position": 0
+  },
+  {
+   "attributeId": 106,
+   "attributeKey": "1",
+   "attributeLandingPage": true,
+   "attributeName": "Odpružení",
+   "attributeSeoUrl": "odpruzena-predni-vidlice",
+   "attributeValue": "Odpružená přední vidlice",
+   "position": 0
+  },
+  {
+   "attributeId": 107,
+   "attributeKey": "5",
+   "attributeLandingPage": true,
+   "attributeName": "Hmotnost kola",
+   "attributeSeoUrl": "12-kg-az-13-kg",
+   "attributeValue": "12 kg až 13 kg",
+   "position": 0
+  },
+  {
+   "attributeId": 108,
+   "attributeKey": "2",
+   "attributeLandingPage": true,
+   "attributeName": "Materíál rámu",
+   "attributeSeoUrl": "dural",
+   "attributeValue": "Dural",
+   "position": 0
+  },
+  {
+   "attributeId": 109,
+   "attributeKey": "20",
+   "attributeLandingPage": true,
+   "attributeName": "Průměr kol",
+   "attributeSeoUrl": "26-palcu",
+   "attributeValue": "26″",
+   "position": 0
+  },
+  {
+   "attributeId": 110,
+   "attributeKey": "2",
+   "attributeLandingPage": true,
+   "attributeName": "Barva kola",
+   "attributeSeoUrl": "modra",
+   "attributeValue": "Modrá",
+   "position": 0
+  },
+  {
+   "attributeId": 7113,
+   "attributeKey": "2",
+   "attributeLandingPage": true,
+   "attributeName": "Typ",
+   "attributeSeoUrl": "panske",
+   "attributeValue": "Pánské",
+   "position": 0
+  },
+  {
+   "attributeId": 8820,
+   "attributeKey": "1",
+   "attributeLandingPage": false,
+   "attributeName": "Doba dodání (od obdržení platby)",
+   "attributeSeoUrl": "1-2-dny",
+   "attributeValue": "1-2 dny",
+   "position": 0
+  },
+  {
+   "attributeId": 25948,
+   "attributeKey": "5",
+   "attributeLandingPage": true,
+   "attributeName": "Značka",
+   "attributeSeoUrl": "author",
+   "attributeValue": "Author",
+   "position": 1
+  }
+ ],
+ "aukroFreePriorityList": false,
+ "bargainingAvailable": true,
+ "bestOfferEnabled": true,
+ "bidNoMinimumLimit": false,
+ "biddersCount": 0,
+ "biddersCountRelative": 0,
+ "buyNowActive": false,
+ "buyNowPrice": {
+  "amount": 0,
+  "currency": "CZK"
+ },
+ "category": [
+  {
+   "id": 17533,
+   "shortName": "Sport a turistika",
+   "name": "Sport a turistika",
+   "seoUrl": "sport-a-turistika",
+   "level": 0,
+   "active": true
+  },
+  {
+   "id": 17570,
+   "shortName": "Cyklistika",
+   "name": "Cyklistika",
+   "seoUrl": "cyklistika",
+   "level": 1,
+   "active": true
+  },
+  {
+   "id": 17590,
+   "shortName": "Kola",
+   "name": "Cyklobazar",
+   "seoUrl": "jizdni-kola",
+   "level": 2,
+   "active": true
+  },
+  {
+   "id": 17594,
+   "shortName": "Horská (MTB)",
+   "name": "Horská (MTB) kola",
+   "seoUrl": "horska-mtb-kola",
+   "level": 3,
+   "itemCount": 401,
+   "active": true
+  }
+ ],
+ "charity": false,
+ "descriptionInHtml": "<html><head></head><body><div class=\"aukro-offer-default\"><div data-layout=\"text\"><div><p>Horské kolo <strong>Author Traction</strong> v modré barvě, velikost rámu 19\" (ideální pro postavu cca 170–185 cm). Kolo má klasická 26\" kola, je <strong>plně funkční</strong> a připravené k jízdě. Součástí je kvalitní <strong>zadní nosič Sport Arsenal</strong>, vhodný pro brašny.</p><p><strong>Výbava</strong></p><ul><li>rám 19\", materiál dural</li><li>kola 26\"</li><li>přední a zadní brzdy V-brake</li><li>přehazovačka Shimano (3x9 rychlostí)</li><li>pohodlné sedlo</li><li>přidaný zadní nosič Sport Arsenal</li><li>technicky v pořádku</li><li>běžné známky používání</li></ul><br></div></div></div></body></html>",
+ "descriptionStripped": "Horské kolo Author Traction v modré barvě, velikost rámu 19\" (ideální pro postavu cca 170–185 cm). Kolo má klasická 26\" kola, je plně funkční a připravené k jízdě. Součástí je kvalitní zadní nosič Sport Arsenal, vhodný pro brašny. Výbava rám 19\", materiál dural kola 26\" přední a zadní brzdy V-brake přehazovačka Shimano (3x9 rychlostí) pohodlné sedlo přidaný zadní nosič Sport Arsenal technicky v pořádku běžné známky používání",
+ "descriptionTranslated": false,
+ "displayedCount": 5,
+ "endingTime": "2026-10-09T07:10:51+02:00",
+ "endingTimeText": "6 dní",
+ "exposeDomain": "CZ",
+ "hidden": false,
+ "highestBidderAnonymizedLogin": "REDACTED_LOGIN",
+ "id": 7123865595,
+ "infiniteOrder": true,
+ "itemArchived": false,
+ "itemDetailType": "BASIC",
+ "itemId": 7123865595,
+ "itemImages": [
+  {
+   "position": 0,
+   "sizes": {
+    "SMALL": {
+     "url": "https://cdn.aukro.cz/images/sk1775402902070/73x73/author-traction-horske-kolo-26-ram-19-modre-zadni-nosic-267166002.jpeg"
+    },
+    "MEDIUM": {
+     "url": "https://cdn.aukro.cz/images/sk1775402902070/400x300/author-traction-horske-kolo-26-ram-19-modre-zadni-nosic-267166002.jpeg"
+    },
+    "MEDIUM_PREVIEW": {
+     "url": "https://cdn.aukro.cz/images/sk1775402902070/thumbnail/author-traction-horske-kolo-26-ram-19-modre-zadni-nosic-267166002.jpeg"
+    },
+    "LARGE": {
+     "url": "https://cdn.aukro.cz/images/sk1775402902070/730x548/author-traction-horske-kolo-26-ram-19-modre-zadni-nosic-267166002.jpeg"
+    },
+    "ORIGINAL": {
+     "url": "https://cdn.aukro.cz/images/sk1775402902070/author-traction-horske-kolo-26-ram-19-modre-zadni-nosic-267166002.jpeg"
+    }
+   }
+  },
+  {
+   "position": 1,
+   "sizes": {
+    "SMALL": {
+     "url": "https://cdn.aukro.cz/images/sk1775402908178/73x73/author-traction-horske-kolo-26-ram-19-modre-zadni-nosic-267166014.jpeg"
+    },
+    "MEDIUM": {
+     "url": "https://cdn.aukro.cz/images/sk1775402908178/400x300/author-traction-horske-kolo-26-ram-19-modre-zadni-nosic-267166014.jpeg"
+    },
+    "MEDIUM_PREVIEW": {
+     "url": "https://cdn.aukro.cz/images/sk1775402908178/400x300/author-traction-horske-kolo-26-ram-19-modre-zadni-nosic-267166014.jpeg"
+    },
+    "LARGE": {
+     "url": "https://cdn.aukro.cz/images/sk1775402908178/730x548/author-traction-horske-kolo-26-ram-19-modre-zadni-nosic-267166014.jpeg"
+    },
+    "ORIGINAL": {
+     "url": "https://cdn.aukro.cz/images/sk1775402908178/author-traction-horske-kolo-26-ram-19-modre-zadni-nosic-267166014.jpeg"
+    }
+   }
+  },
+  {
+   "position": 2,
+   "sizes": {
+    "SMALL": {
+     "url": "https://cdn.aukro.cz/images/sk1775402912789/73x73/author-traction-horske-kolo-26-ram-19-modre-zadni-nosic-267166023.jpeg"
+    },
+    "MEDIUM": {
+     "url": "https://cdn.aukro.cz/images/sk1775402912789/400x300/author-traction-horske-kolo-26-ram-19-modre-zadni-nosic-267166023.jpeg"
+    },
+    "MEDIUM_PREVIEW": {
+     "url": "https://cdn.aukro.cz/images/sk1775402912789/400x300/author-traction-horske-kolo-26-ram-19-modre-zadni-nosic-267166023.jpeg"
+    },
+    "LARGE": {
+     "url": "https://cdn.aukro.cz/images/sk1775402912789/730x548/author-traction-horske-kolo-26-ram-19-modre-zadni-nosic-267166023.jpeg"
+    },
+    "ORIGINAL": {
+     "url": "https://cdn.aukro.cz/images/sk1775402912789/author-traction-horske-kolo-26-ram-19-modre-zadni-nosic-267166023.jpeg"
+    }
+   }
+  },
+  {
+   "position": 3,
+   "sizes": {
+    "SMALL": {
+     "url": "https://cdn.aukro.cz/images/sk1775402919202/73x73/author-traction-horske-kolo-26-ram-19-modre-zadni-nosic-267166025.jpeg"
+    },
+    "MEDIUM": {
+     "url": "https://cdn.aukro.cz/images/sk1775402919202/400x300/author-traction-horske-kolo-26-ram-19-modre-zadni-nosic-267166025.jpeg"
+    },
+    "MEDIUM_PREVIEW": {
+     "url": "https://cdn.aukro.cz/images/sk1775402919202/400x300/author-traction-horske-kolo-26-ram-19-modre-zadni-nosic-267166025.jpeg"
+    },
+    "LARGE": {
+     "url": "https://cdn.aukro.cz/images/sk1775402919202/730x548/author-traction-horske-kolo-26-ram-19-modre-zadni-nosic-267166025.jpeg"
+    },
+    "ORIGINAL": {
+     "url": "https://cdn.aukro.cz/images/sk1775402919202/author-traction-horske-kolo-26-ram-19-modre-zadni-nosic-267166025.jpeg"
+    }
+   }
+  },
+  {
+   "position": 4,
+   "sizes": {
+    "SMALL": {
+     "url": "https://cdn.aukro.cz/images/sk1775402923986/73x73/author-traction-horske-kolo-26-ram-19-modre-zadni-nosic-267166026.jpeg"
+    },
+    "MEDIUM": {
+     "url": "https://cdn.aukro.cz/images/sk1775402923986/400x300/author-traction-horske-kolo-26-ram-19-modre-zadni-nosic-267166026.jpeg"
+    },
+    "MEDIUM_PREVIEW": {
+     "url": "https://cdn.aukro.cz/images/sk1775402923986/400x300/author-traction-horske-kolo-26-ram-19-modre-zadni-nosic-267166026.jpeg"
+    },
+    "LARGE": {
+     "url": "https://cdn.aukro.cz/images/sk1775402923986/730x548/author-traction-horske-kolo-26-ram-19-modre-zadni-nosic-267166026.jpeg"
+    },
+    "ORIGINAL": {
+     "url": "https://cdn.aukro.cz/images/sk1775402923986/author-traction-horske-kolo-26-ram-19-modre-zadni-nosic-267166026.jpeg"
+    }
+   }
+  },
+  {
+   "position": 5,
+   "sizes": {
+    "SMALL": {
+     "url": "https://cdn.aukro.cz/images/sk1775402931175/73x73/author-traction-horske-kolo-26-ram-19-modre-zadni-nosic-267166035.jpeg"
+    },
+    "MEDIUM": {
+     "url": "https://cdn.aukro.cz/images/sk1775402931175/400x300/author-traction-horske-kolo-26-ram-19-modre-zadni-nosic-267166035.jpeg"
+    },
+    "MEDIUM_PREVIEW": {
+     "url": "https://cdn.aukro.cz/images/sk1775402931175/400x300/author-traction-horske-kolo-26-ram-19-modre-zadni-nosic-267166035.jpeg"
+    },
+    "LARGE": {
+     "url": "https://cdn.aukro.cz/images/sk1775402931175/730x548/author-traction-horske-kolo-26-ram-19-modre-zadni-nosic-267166035.jpeg"
+    },
+    "ORIGINAL": {
+     "url": "https://cdn.aukro.cz/images/sk1775402931175/author-traction-horske-kolo-26-ram-19-modre-zadni-nosic-267166035.jpeg"
+    }
+   }
+  },
+  {
+   "position": 6,
+   "sizes": {
+    "SMALL": {
+     "url": "https://cdn.aukro.cz/images/sk1775402936137/73x73/author-traction-horske-kolo-26-ram-19-modre-zadni-nosic-267166038.jpeg"
+    },
+    "MEDIUM": {
+     "url": "https://cdn.aukro.cz/images/sk1775402936137/400x300/author-traction-horske-kolo-26-ram-19-modre-zadni-nosic-267166038.jpeg"
+    },
+    "MEDIUM_PREVIEW": {
+     "url": "https://cdn.aukro.cz/images/sk1775402936137/400x300/author-traction-horske-kolo-26-ram-19-modre-zadni-nosic-267166038.jpeg"
+    },
+    "LARGE": {
+     "url": "https://cdn.aukro.cz/images/sk1775402936137/730x548/author-traction-horske-kolo-26-ram-19-modre-zadni-nosic-267166038.jpeg"
+    },
+    "ORIGINAL": {
+     "url": "https://cdn.aukro.cz/images/sk1775402936137/author-traction-horske-kolo-26-ram-19-modre-zadni-nosic-267166038.jpeg"
+    }
+   }
+  }
+ ],
+ "itemLocation": "Zašová, Česká republika",
+ "itemQuantityTypeEnum": "PIECES",
+ "itemType": "BIDDING",
+ "metaDescription": "Author Traction – horské kolo 26\", rám 19\", modré + zadní nosič. Aukce od 3 200 Kč. Bezpečná Aukro platba. Vyhrajte aukci a ušetřete na Aukru.",
+ "name": "Author Traction – horské kolo 26\", rám 19\", modré + zadní nosič",
+ "newEditor": true,
+ "nextBidMinAmount": {
+  "amount": 3200,
+  "currency": "CZK"
+ },
+ "pepperLevel": 0,
+ "postCode": "75651",
+ "postponingEnd": true,
+ "ppPriorityList": true,
+ "price": {
+  "amount": 3200,
+  "currency": "CZK"
+ },
+ "quantity": 1,
+ "retailPrice": {
+  "amount": 0,
+  "currency": "CZK"
+ },
+ "seller": {
+  "accountActivated": true,
+  "aukroPlus": false,
+  "companyAccount": false,
+  "favouritedByCount": 4,
+  "feedbackUniqueUserCount": 74,
+  "location": "Zašová",
+  "positiveFeedbackPercentage": 1,
+  "rating": 74,
+  "registrationDomain": "CZ",
+  "showName": "REDACTED_NAME",
+  "starType": "BRONZE",
+  "userId": 1
+ },
+ "sellerExpertReviewEnabled": true,
+ "sellerHasAdditionalInformation": false,
+ "seoUrl": "author-traction-horske-kolo-26-ram-19-modre-zadni-nosic",
+ "shortDescription": "Horské kolo Author Traction v modré barvě, velikost rámu 19\" (ideální pro postavu cca 170–185 cm). Kolo má klasická 26\" kola, je plně funkční a připravené k jízdě. Součástí je kvalitní zadní nosič Sport Arsenal, vhodný pro brašny. Výbava rám 19\", materiál dural kola 26\" přední a zadní brzdy V-brake přehazovačka Shiman…",
+ "showAds": true,
+ "soldQuantity": 0,
+ "startingQuantity": 1,
+ "startingTime": "2026-10-02T07:12:03+02:00",
+ "state": "ACTIVE",
+ "statusAdultContent": false,
+ "translatedName": false,
+ "unverifiedBuyerAllowed": true,
+ "version": 4,
+ "visibilityType": "OK",
+ "watchingUserCount": 6
+}

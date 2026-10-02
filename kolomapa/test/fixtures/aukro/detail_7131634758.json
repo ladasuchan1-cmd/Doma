@@ -1,0 +1,281 @@
+{
+ "attributes": [
+  {
+   "attributeId": 9,
+   "attributeKey": "1",
+   "attributeLandingPage": true,
+   "attributeName": "Délka dojezdu",
+   "attributeSeoUrl": "mene-nez-130-km",
+   "attributeValue": "Méně než 130 km",
+   "position": 0
+  },
+  {
+   "attributeId": 16,
+   "attributeKey": "1",
+   "attributeLandingPage": true,
+   "attributeName": "Určení",
+   "attributeSeoUrl": "panska",
+   "attributeValue": "Pánská",
+   "position": 0
+  },
+  {
+   "attributeId": 48,
+   "attributeKey": "2",
+   "attributeLandingPage": true,
+   "attributeName": "Stav zboží",
+   "attributeSeoUrl": "pouzite",
+   "attributeValue": "Použité",
+   "attributeValueAdditionalDescription": "delší doba používání, funkční produkt",
+   "position": 0
+  },
+  {
+   "attributeId": 106,
+   "attributeKey": "1",
+   "attributeLandingPage": true,
+   "attributeName": "Odpružení",
+   "attributeSeoUrl": "odpruzena-predni-vidlice",
+   "attributeValue": "Odpružená přední vidlice",
+   "position": 0
+  },
+  {
+   "attributeId": 107,
+   "attributeKey": "1",
+   "attributeLandingPage": true,
+   "attributeName": "Hmotnost kola",
+   "attributeSeoUrl": "nad-16-kg",
+   "attributeValue": "Nad 16 kg",
+   "position": 0
+  },
+  {
+   "attributeId": 108,
+   "attributeKey": "1",
+   "attributeLandingPage": true,
+   "attributeName": "Materíál rámu",
+   "attributeSeoUrl": "hlinik",
+   "attributeValue": "Hliník",
+   "position": 0
+  },
+  {
+   "attributeId": 109,
+   "attributeKey": "23",
+   "attributeLandingPage": true,
+   "attributeName": "Průměr kol",
+   "attributeSeoUrl": "28-palcu",
+   "attributeValue": "28″",
+   "position": 0
+  },
+  {
+   "attributeId": 8820,
+   "attributeKey": "2",
+   "attributeLandingPage": false,
+   "attributeName": "Doba dodání (od obdržení platby)",
+   "attributeSeoUrl": "2-3-dny",
+   "attributeValue": "2-3 dny",
+   "position": 0
+  },
+  {
+   "attributeId": 129769,
+   "attributeKey": "15",
+   "attributeLandingPage": true,
+   "attributeName": "Značka",
+   "attributeSeoUrl": "scott",
+   "attributeValue": "Scott",
+   "position": 0
+  }
+ ],
+ "aukroFreePriorityList": false,
+ "bargainingAvailable": false,
+ "bestOfferEnabled": false,
+ "bidNoMinimumLimit": false,
+ "biddersCount": 0,
+ "biddersCountRelative": 0,
+ "buyNowActive": true,
+ "buyNowPrice": {
+  "amount": 20000,
+  "currency": "CZK"
+ },
+ "category": [
+  {
+   "id": 17533,
+   "shortName": "Sport a turistika",
+   "name": "Sport a turistika",
+   "seoUrl": "sport-a-turistika",
+   "level": 0,
+   "active": true
+  },
+  {
+   "id": 17570,
+   "shortName": "Cyklistika",
+   "name": "Cyklistika",
+   "seoUrl": "cyklistika",
+   "level": 1,
+   "active": true
+  },
+  {
+   "id": 17590,
+   "shortName": "Kola",
+   "name": "Cyklobazar",
+   "seoUrl": "jizdni-kola",
+   "level": 2,
+   "active": true
+  },
+  {
+   "id": 147974,
+   "shortName": "Elektrokola",
+   "name": "Elektrokola",
+   "seoUrl": "elektrokola",
+   "level": 3,
+   "itemCount": 206,
+   "active": true
+  }
+ ],
+ "charity": false,
+ "descriptionInHtml": "<html><head></head><body><div class=\"aukro-offer-default\"><div data-layout=\"text\"><div><p>Elektrokolo Scott s motorem Bosch Active Line, koupeno v roce 2020, najeto 3570 km. V roce 2025 dokoupena druhá originální baterie Bosch kvůli prodloužení dojezdu, první baterie stále plně funkční. Každá má dojezd na ECO 100 km. </p></div></div><div data-layout=\"text\"><div><p>Značka SCOTT</p><p>Brzdy Shimano BR-M315 Disc</p><p>Nosnost (hmotnost kola + jezdce + zavazadel) 130</p><p>Pláště Schwalbe Smart Sam Reflex 700x47c</p><p>Ráfky Rodi</p><p>Brzdové páky Shimano BR-M315 Disc</p><p>Elektromotor Bosch Active 250w System w/ 400wh battery pack / Purion display / 4A Charger</p><p>Hlavové složení GW semi integrated</p><p>Kazeta Shimano CS-HG200 11-34 T</p><p>Rám E-SUB 6061 Alloy</p><p>Vidlice Suntour NEX-E25 LO DS QR</p><p>Přehazovačka Shimano Acera T3000 9 Speed</p><p>Zadní náboj Shimano FH-TX50 CL</p><p>Řazení Shimano Acera T3000</p></div></div></div></body></html>",
+ "descriptionStripped": "Elektrokolo Scott s motorem Bosch Active Line, koupeno v roce 2020, najeto 3570 km. V roce 2025 dokoupena druhá originální baterie Bosch kvůli prodloužení dojezdu, první baterie stále plně funkční. Každá má dojezd na ECO 100 km. Značka SCOTT Brzdy Shimano BR-M315 Disc Nosnost (hmotnost kola + jezdce + zavazadel) 130 Pláště Schwalbe Smart Sam Reflex 700x47c Ráfky Rodi Brzdové páky Shimano BR-M315 Disc Elektromotor Bosch Active 250w System w/ 400wh battery pack / Purion display / 4A Charger Hlavové složení GW semi integrated Kazeta Shimano CS-HG200 11-34 T Rám E-SUB 6061 Alloy Vidlice Suntour NEX-E25 LO DS QR Přehazovačka Shimano Acera T3000 9 Speed Zadní náboj Shimano FH-TX50 CL Řazení Shimano Acera T3000",
+ "descriptionTranslated": false,
+ "displayedCount": 65,
+ "endingTime": "2026-10-07T10:13:50+02:00",
+ "endingTimeText": "4 dny",
+ "exposeDomain": "CZ",
+ "hidden": false,
+ "highestBidderAnonymizedLogin": "REDACTED_LOGIN",
+ "id": 7131634758,
+ "infiniteOrder": true,
+ "itemArchived": false,
+ "itemDetailType": "BASIC",
+ "itemId": 7131634758,
+ "itemImages": [
+  {
+   "position": 0,
+   "sizes": {
+    "SMALL": {
+     "url": "https://cdn.aukro.cz/images/sk1787903399477/73x73/elektrokolo-scott-e-sub-cross-20-men-druha-orig-baterie-292751800.jpeg"
+    },
+    "MEDIUM": {
+     "url": "https://cdn.aukro.cz/images/sk1787903399477/400x300/elektrokolo-scott-e-sub-cross-20-men-druha-orig-baterie-292751800.jpeg"
+    },
+    "MEDIUM_PREVIEW": {
+     "url": "https://cdn.aukro.cz/images/sk1787903399477/thumbnail/elektrokolo-scott-e-sub-cross-20-men-druha-orig-baterie-292751800.jpeg"
+    },
+    "LARGE": {
+     "url": "https://cdn.aukro.cz/images/sk1787903399477/730x548/elektrokolo-scott-e-sub-cross-20-men-druha-orig-baterie-292751800.jpeg"
+    },
+    "ORIGINAL": {
+     "url": "https://cdn.aukro.cz/images/sk1787903399477/elektrokolo-scott-e-sub-cross-20-men-druha-orig-baterie-292751800.jpeg"
+    }
+   }
+  },
+  {
+   "position": 1,
+   "sizes": {
+    "SMALL": {
+     "url": "https://cdn.aukro.cz/images/sk1789558214762/73x73/elektrokolo-scott-e-sub-cross-20-men-druha-orig-baterie-295971985.jpeg"
+    },
+    "MEDIUM": {
+     "url": "https://cdn.aukro.cz/images/sk1789558214762/400x300/elektrokolo-scott-e-sub-cross-20-men-druha-orig-baterie-295971985.jpeg"
+    },
+    "MEDIUM_PREVIEW": {
+     "url": "https://cdn.aukro.cz/images/sk1789558214762/400x300/elektrokolo-scott-e-sub-cross-20-men-druha-orig-baterie-295971985.jpeg"
+    },
+    "LARGE": {
+     "url": "https://cdn.aukro.cz/images/sk1789558214762/730x548/elektrokolo-scott-e-sub-cross-20-men-druha-orig-baterie-295971985.jpeg"
+    },
+    "ORIGINAL": {
+     "url": "https://cdn.aukro.cz/images/sk1789558214762/elektrokolo-scott-e-sub-cross-20-men-druha-orig-baterie-295971985.jpeg"
+    }
+   }
+  },
+  {
+   "position": 2,
+   "sizes": {
+    "SMALL": {
+     "url": "https://cdn.aukro.cz/images/sk1789558214938/73x73/elektrokolo-scott-e-sub-cross-20-men-druha-orig-baterie-295971986.jpeg"
+    },
+    "MEDIUM": {
+     "url": "https://cdn.aukro.cz/images/sk1789558214938/400x300/elektrokolo-scott-e-sub-cross-20-men-druha-orig-baterie-295971986.jpeg"
+    },
+    "MEDIUM_PREVIEW": {
+     "url": "https://cdn.aukro.cz/images/sk1789558214938/400x300/elektrokolo-scott-e-sub-cross-20-men-druha-orig-baterie-295971986.jpeg"
+    },
+    "LARGE": {
+     "url": "https://cdn.aukro.cz/images/sk1789558214938/730x548/elektrokolo-scott-e-sub-cross-20-men-druha-orig-baterie-295971986.jpeg"
+    },
+    "ORIGINAL": {
+     "url": "https://cdn.aukro.cz/images/sk1789558214938/elektrokolo-scott-e-sub-cross-20-men-druha-orig-baterie-295971986.jpeg"
+    }
+   }
+  },
+  {
+   "position": 3,
+   "sizes": {
+    "SMALL": {
+     "url": "https://cdn.aukro.cz/images/sk1789558215102/73x73/elektrokolo-scott-e-sub-cross-20-men-druha-orig-baterie-295971987.jpeg"
+    },
+    "MEDIUM": {
+     "url": "https://cdn.aukro.cz/images/sk1789558215102/400x300/elektrokolo-scott-e-sub-cross-20-men-druha-orig-baterie-295971987.jpeg"
+    },
+    "MEDIUM_PREVIEW": {
+     "url": "https://cdn.aukro.cz/images/sk1789558215102/400x300/elektrokolo-scott-e-sub-cross-20-men-druha-orig-baterie-295971987.jpeg"
+    },
+    "LARGE": {
+     "url": "https://cdn.aukro.cz/images/sk1789558215102/730x548/elektrokolo-scott-e-sub-cross-20-men-druha-orig-baterie-295971987.jpeg"
+    },
+    "ORIGINAL": {
+     "url": "https://cdn.aukro.cz/images/sk1789558215102/elektrokolo-scott-e-sub-cross-20-men-druha-orig-baterie-295971987.jpeg"
+    }
+   }
+  }
+ ],
+ "itemLocation": "Moravské Bránice, Česká republika",
+ "itemQuantityTypeEnum": "PIECES",
+ "itemType": "BIDDING",
+ "metaDescription": "Elektrokolo SCOTT E-Sub Cross 20 Men + druhá orig. baterie. Aukce od 19 000 Kč. Bezpečná Aukro platba. Vyhrajte aukci a ušetřete na Aukru.",
+ "name": "Elektrokolo SCOTT E-Sub Cross 20 Men + druhá orig. baterie",
+ "newEditor": true,
+ "nextBidMinAmount": {
+  "amount": 19000,
+  "currency": "CZK"
+ },
+ "pepperLevel": 0,
+ "postCode": "66464",
+ "postponingEnd": true,
+ "ppPriorityList": true,
+ "price": {
+  "amount": 19000,
+  "currency": "CZK"
+ },
+ "quantity": 1,
+ "retailPrice": {
+  "amount": 0,
+  "currency": "CZK"
+ },
+ "seller": {
+  "accountActivated": true,
+  "aukroPlus": false,
+  "companyAccount": false,
+  "favouritedByCount": 0,
+  "feedbackUniqueUserCount": 5,
+  "location": "Moravské Bránice",
+  "positiveFeedbackPercentage": 0.7143,
+  "rating": 3,
+  "registrationDomain": "CZ",
+  "showName": "REDACTED_NAME",
+  "starType": "GREEN",
+  "userId": 1
+ },
+ "sellerExpertReviewEnabled": true,
+ "sellerHasAdditionalInformation": false,
+ "seoUrl": "elektrokolo-scott-e-sub-cross-20-men-druha-orig-baterie",
+ "shortDescription": "Elektrokolo Scott s motorem Bosch Active Line, koupeno v roce 2020, najeto 3570 km. V roce 2025 dokoupena druhá originální baterie Bosch kvůli prodloužení dojezdu, první baterie stále plně funkční. Každá má dojezd na ECO 100 km. Značka SCOTT Brzdy Shimano BR-M315 Disc Nosnost (hmotnost kola + jezdce + zavazadel) 130 P…",
+ "showAds": true,
+ "soldQuantity": 0,
+ "startingQuantity": 1,
+ "startingTime": "2026-09-27T10:15:01+02:00",
+ "state": "ACTIVE",
+ "statusAdultContent": false,
+ "translatedName": false,
+ "unverifiedBuyerAllowed": false,
+ "version": 3,
+ "visibilityType": "OK",
+ "watchingUserCount": 7
+}
