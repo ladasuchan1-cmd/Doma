@@ -338,7 +338,7 @@ async function runPipeline(o) {
       // aby se detaily nestahovaly u zjevných nekol (díly, oblečení, poptávky).
       const maxDetails = config.maxDetails ?? src.defaultMaxDetails ?? 1500;
       if (src.detail && maxDetails > 0 && !o.signal?.aborted) {
-        classifyPending(db);
+        stats.classified += classifyPending(db);
         const todo = db
           .prepare(
             'SELECT * FROM listings WHERE source = ? AND gone_at IS NULL AND detail_at IS NULL AND (is_bike IS NULL OR is_bike = 1) ORDER BY COALESCE(posted_at, first_seen_at) DESC LIMIT ?'
@@ -376,7 +376,7 @@ async function runPipeline(o) {
     }
 
     progress('Klasifikuji inzeráty…');
-    stats.classified = classifyPending(db);
+    stats.classified += classifyPending(db);
     progress('Určuji polohu…');
     stats.geocoded = geocodePending(db);
     progress('Naceňuji…');

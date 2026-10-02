@@ -16,9 +16,9 @@
 //    „Potvrďte, že jste člověk“), vrátí fetchHtml challenged: true, origin se pro zbytek běhu uzavře (další požadavky
 //    na něj už nejdou) a zdroj musí skončit. Ověření se nikdy neřeší ani neobchází.
 //  - Šetrnost: mezi požadavky na jeden origin drží pauzu minIntervalMs (zadává zdroj – Cyklobazar 20 s; úvodní
-//    stránka se počítá taky). Obrázky, média, písma, reklamy a signály ?do= se nestahují (route.abort – jen menší
-//    zátěž webu a ohled na robots.txt, nic neskrývá); kontroly Cloudflare (/cdn-cgi/, challenges.cloudflare.com) se
-//    nikdy neblokují.
+//    stránka se počítá taky). Obrázky, média, písma, reklamy a adresy zakázané v robots.txt (?do=, sort= …) se
+//    nestahují (route.abort – jen menší zátěž webu a ohled na robots.txt, nic neskrývá); kontroly Cloudflare
+//    (/cdn-cgi/challenge-platform/, challenges.cloudflare.com) se nikdy neblokují.
 //
 // Postup: pro každý origin jednou otevře úvodní stránku (jako člověk v prohlížeči) a počká, až se ustálí (titulek
 // přestane být „Just a moment…“ / „Okamžik…“, nejvýš ~20 s – nic se neklikne ani nevyplní). Další HTML stahuje
@@ -42,9 +42,11 @@ const FORBIDDEN_ARG_RX = /AutomationControlled|^--user-agent(=|$)|^--disable-web
 const SKIP_RESOURCE_TYPES = new Set(['image', 'media', 'font']);
 const AD_RX = /googlesyndication|doubleclick|googletagmanager|google-analytics|googleadservices|adservice\.google|fundingchoicesmessages|facebook\.(net|com)|connect\.facebook|hotjar|\.seznam\.cz\/(ssp|rs)|ssp\.seznam|imedia\.cz/i;
 const CLOUDFLARE_RX = /^https:\/\/challenges\.cloudflare\.com\/|\/cdn-cgi\//i;
-// Signály Nette (?do=… – telefon, sdílení, AI souhrn) zakazuje robots.txt Cyklobazaru; stránka je při zahřátí
-// nepotřebuje, takže je neodešle ani její vlastní JavaScript.
-const DISALLOWED_REQUEST_RX = /[?&]do=/i;
+// Co zakazuje robots.txt Cyklobazaru (signály Nette ?do=… – telefon, sdílení, AI souhrn; changes?event=, sort=, /tisk …):
+// stránka to při zahřátí nepotřebuje, takže to neodešle ani její vlastní JavaScript. Kontroly Cloudflare
+// (/cdn-cgi/challenge-platform/) se tím nikdy neblokují.
+const DISALLOWED_REQUEST_RX = /[?&]do=|changes\?event=|sort=|condition=new|type=buy|type=sell|\/tisk|email-protection/i;
+const CF_CHALLENGE_PATH_RX = /^https:\/\/challenges\.cloudflare\.com\/|\/cdn-cgi\/challenge-platform\//i;
 
 // Rozpoznání ověřovací stránky Cloudflare. Pozor: běžné stránky Cyklobazaru obsahují skript
 // /cdn-cgi/challenge-platform/scripts/jsd/main.js i formulář s Turnstile („Potvrďte prosím, že nejste robot“) –
@@ -251,7 +253,8 @@ function createBrowser(opts = {}) {
     } catch {
       /* požadavek už neexistuje */
     }
-    const skip = !CLOUDFLARE_RX.test(url) && (SKIP_RESOURCE_TYPES.has(type) || AD_RX.test(url) || DISALLOWED_REQUEST_RX.test(url));
+    const disallowed = !CF_CHALLENGE_PATH_RX.test(url) && DISALLOWED_REQUEST_RX.test(url);
+    const skip = disallowed || (!CLOUDFLARE_RX.test(url) && (SKIP_RESOURCE_TYPES.has(type) || AD_RX.test(url)));
     const p = skip ? route.abort() : route.continue();
     return Promise.resolve(p).catch(() => {});
   }
@@ -292,11 +295,12 @@ function createBrowser(opts = {}) {
     o.lastAt = now();
   }
 
+  /** Titulek stránky; null, když ho teď nejde přečíst (stránka se právě znovu načítá – např. po kontrole Cloudflare). */
   async function pageTitle(page) {
     try {
       return String((await page.title()) ?? '');
     } catch {
-      return '';
+      return null;
     }
   }
 
@@ -328,9 +332,18 @@ function createBrowser(opts = {}) {
     const deadline = now() + settleMs;
     // Neviditelná JS kontrola Cloudflare proběhne sama (jako u každého návštěvníka); interaktivní ověření
     // („Potvrďte, že jste člověk“) se neřeší – končíme hned.
-    while (isChallengeTitle(title) && now() < deadline && !(await pageLooksInteractive(o.page))) {
+    while ((title === null || isChallengeTitle(title)) && now() < deadline && !(await pageLooksInteractive(o.page))) {
       await sleep(pollMs, signal);
       title = await pageTitle(o.page);
+    }
+    // Po neviditelné kontrole se stránka sama znovu načte – fetch() až v načtené stránce (jinak „Execution context
+    // was destroyed“).
+    if (title !== null && !isChallengeTitle(title) && typeof o.page.waitForLoadState === 'function') {
+      try {
+        await raceAbort(Promise.resolve(o.page.waitForLoadState('domcontentloaded', { timeout: navTimeoutMs })), signal);
+      } catch (e) {
+        if (signal?.aborted) throw e;
+      }
     }
     o.lastAt = now(); // pauza do dalšího požadavku až od ustálení úvodní stránky
     if (isChallengeTitle(title)) {

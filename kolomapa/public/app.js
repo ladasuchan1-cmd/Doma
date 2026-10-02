@@ -98,7 +98,7 @@
   ];
   const PAGE = 60;
   const POLL_MS = 3000;
-  const DEFAULT_THRESHOLDS = { deal: 0.85, high: 1.15, minConfidence: 0.45, newHours: 36 };
+  const DEFAULT_THRESHOLDS = { deal: 0.85, suspicious: 0.3, evidenceConfidence: 0.6, high: 1.15, minConfidence: 0.45, newHours: 36 };
   const CR_BOUNDS = [
     [48.55, 12.09],
     [51.06, 18.86],
@@ -284,12 +284,18 @@
 
   // =========================================================================================== klasifikace nabídky
 
-  /** good | fair | high | unsure | none */
+  /** good | fair | high | suspicious | unsure | none */
   function dealClass(l) {
     const t = state.thresholds;
     if (l.d == null || !(l.p > 0)) return 'none';
     if ((l.ec ?? 0) < t.minConfidence) return 'unsure';
-    if (l.d <= t.deal) return 'good';
+    // hluboko pod odhadem = spíš díly, zástupná cena, překlep nebo podvod než výhodná koupě
+    if (l.d < (t.suspicious ?? 0.3)) return 'suspicious';
+    if (l.d <= t.deal) {
+      // „výhodné“ jen s podloženým odhadem (srovnatelné inzeráty / AI / vysoká jistota), jinak nejisté
+      const backed = l.em === 'comps' || !!l.ai?.e || (l.ec ?? 0) >= (t.evidenceConfidence ?? 0.6);
+      return backed ? 'good' : 'unsure';
+    }
     if (l.d > t.high) return 'high';
     return 'fair';
   }
@@ -309,6 +315,12 @@
     if (c === 'none') return null;
     const pct = Math.round(Math.abs(1 - l.d) * 100);
     if (c === 'unsure') return el('span', { class: 'badge', title: 'Odhad tržní ceny má nízkou jistotu' }, 'nejistý odhad');
+    if (c === 'suspicious')
+      return el(
+        'span',
+        { class: 'badge badge--suspicious', title: 'Cena je hluboko pod odhadem – často jde o díly, zástupnou cenu, překlep nebo podvod. Ověřte inzerát.' },
+        '? podezřele levné'
+      );
     if (c === 'good') return el('span', { class: 'badge badge--good' }, icon('down'), `${pct} % pod odhadem`);
     if (c === 'high') return el('span', { class: 'badge badge--high' }, icon('up'), `${pct} % nad odhadem`);
     return el('span', { class: 'badge badge--fair', title: `${l.d < 1 ? '−' : '+'}${pct} % proti odhadu` }, icon('dash'), 'běžná cena');
@@ -575,15 +587,17 @@
   // ------------------------------------------------------------------------------- piny
 
   function pinSize(c) {
-    return c === 'good' ? 22 : c === 'fair' ? 16 : c === 'high' ? 15 : 12;
+    return c === 'good' ? 22 : c === 'fair' ? 16 : c === 'high' ? 15 : c === 'suspicious' ? 15 : 12;
   }
 
   function pinIcon(l) {
     const c = dealClass(l);
     const visual = c === 'unsure' ? 'none' : c;
+    // podezřele levné: šedý pin s otazníkem (není to výhodná nabídka, dokud se neověří)
     const s = pinSize(visual);
     const dot = el('span', { class: 'pin__dot' });
     if (visual === 'good') dot.append(icon('down'));
+    else if (visual === 'suspicious') dot.append(el('span', { class: 'pin__q', text: '?' }));
     else if (visual === 'high') dot.append(icon('up'));
     const wrap = el('span', null, dot, isEbike(l) ? el('span', { class: 'pin__bolt' }, icon('bolt')) : null);
     return L.divIcon({ className: `pin pin--${visual}`, html: wrap, iconSize: [s, s], iconAnchor: [s / 2, s / 2], tooltipAnchor: [0, -s / 2] });
@@ -692,6 +706,7 @@
     const s = cls === 'none' ? 12 : 14;
     const dot = el('span', { class: 'pin__dot' });
     if (arrow) dot.append(icon(arrow));
+    else if (cls === 'suspicious') dot.append(el('span', { class: 'pin__q', text: '?' }));
     const p = el('span', { class: `legend__pin pin pin--${cls}`, 'aria-hidden': 'true' }, bolt ? el('span', { class: 'pin__bolt' }, icon('bolt')) : dot);
     p.style.width = p.style.height = `${s}px`;
     if (bolt) {
@@ -717,6 +732,7 @@
           legendPin('good', 'down', short ? `výhodná ≤ −${dealPct} %` : `výhodná (≤ −${dealPct} %)`),
           legendPin('fair', null, short ? 'běžná' : 'běžná cena'),
           legendPin('high', 'up', short ? `dražší > +${highPct} %` : `předražená (> +${highPct} %)`),
+          legendPin('suspicious', null, short ? 'podezřelá' : 'podezřele levná (ověřit)'),
           legendPin('none', null, short ? 'bez odhadu' : 'bez odhadu / nejistý'),
           legendPin('none', null, short ? 'e-kolo' : 'elektrokolo', true)
         )
@@ -1166,7 +1182,12 @@
     const by = {
       deal: (l) => {
         const c = dealClass(l);
-        return c === 'none' ? Infinity : c === 'unsure' ? 10 + l.d : l.d;
+        if (c === 'good') {
+          // výhodné: podle očekávané úspory v Kč vážené jistotou (nejnižší poměr vynáší spíš chyby odhadu)
+          const e = l.ai?.e ?? l.e;
+          return -((e - l.p) * (l.ec ?? 0.5)) / 1e9;
+        }
+        return c === 'none' ? Infinity : c === 'unsure' ? 10 + l.d : c === 'suspicious' ? 5 + l.d : l.d;
       },
       new: (l) => {
         const t = Date.parse(l.ps || l.f || '');

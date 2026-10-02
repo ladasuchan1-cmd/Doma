@@ -66,7 +66,13 @@ function fakePlaywright(o = {}) {
                   },
                   async title() {
                     const titles = o.homeTitles || ['Cyklobazar.cz – bazar kol'];
-                    return titles[Math.min(titleCalls++, titles.length - 1)];
+                    const t = titles[Math.min(titleCalls++, titles.length - 1)];
+                    if (t instanceof Error) throw t;
+                    return t;
+                  },
+                  async waitForLoadState(state) {
+                    rec.loadStates = (rec.loadStates || 0) + 1;
+                    assert.equal(state, 'domcontentloaded');
                   },
                   async content() {
                     return o.homeContent || '<html><body>Cyklobazar</body></html>';
@@ -195,6 +201,16 @@ test('úvodní stránka s neviditelnou kontrolou Cloudflare: počká, až se ust
   assert.ok(clock.sleeps.filter((ms) => ms === 1000).length >= 2);
 });
 
+test('úvodní stránka se po kontrole sama znovu načítá (titulek nejde přečíst) → počká, nepovažuje to za ustálené', async () => {
+  const gone = new Error('Execution context was destroyed, most likely because of a navigation');
+  const { b, rec, clock } = makeBrowser({ homeTitles: ['Okamžik…', gone, gone, 'Cyklobazar.cz – bazar kol'] });
+  const r = await b.fetchHtml(`${ORIGIN}/kola`, { minIntervalMs: 20000 });
+  assert.equal(r.challenged, false);
+  assert.equal(clock.sleeps.filter((ms) => ms === 1000).length, 3);
+  assert.equal(rec.loadStates, 1);
+  assert.equal(rec.evaluates.length, 1);
+});
+
 test('úvodní stránka zůstane „Just a moment…“ → challenged, žádný fetch a origin je pro běh uzavřený', async () => {
   const { b, rec, logs } = makeBrowser({ homeTitles: ['Just a moment...'], homeStatus: 403 });
   const r = await b.fetchHtml(`${ORIGIN}/kola`);
@@ -301,10 +317,15 @@ test('route: obrázky, písma a reklamy se nestahují, dokumenty, skripty a Clou
   assert.equal(await run(`${ORIGIN}/dist/fonts/a.woff2`, 'font'), 'abort');
   assert.equal(await run('https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js', 'script'), 'abort');
   assert.equal(await run(`${ORIGIN}/?do=cookieBar-hide`, 'fetch'), 'abort'); // signály Nette zakazuje robots.txt
+  // i ostatní, co zakazuje robots.txt (požadavky vlastního JavaScriptu stránky při zahřátí)
+  for (const u of [`${ORIGIN}/changes?event=view`, `${ORIGIN}/kola?sort=price`, `${ORIGIN}/kola?condition=new`, `${ORIGIN}/kola?type=buy`, `${ORIGIN}/inzerat/X/y/tisk`, `${ORIGIN}/cdn-cgi/l/email-protection`]) {
+    assert.equal(await run(u, 'xhr'), 'abort', u);
+  }
   assert.equal(await run(`${ORIGIN}/`, 'document'), 'continue');
   assert.equal(await run(`${ORIGIN}/dist/main.js`, 'script'), 'continue');
   assert.equal(await run(`${ORIGIN}/cdn-cgi/challenge-platform/scripts/jsd/main.js`, 'script'), 'continue');
   assert.equal(await run('https://challenges.cloudflare.com/turnstile/v0/x.png', 'image'), 'continue');
+  assert.equal(await run(`${ORIGIN}/cdn-cgi/challenge-platform/h/b/orchestrate/chl_page/v1?ray=1&do=x`, 'script'), 'continue');
 });
 
 test('inPageFetch: obyčejný fetch s cookies prohlížeče, vrací stav, text a cf-mitigated', async () => {

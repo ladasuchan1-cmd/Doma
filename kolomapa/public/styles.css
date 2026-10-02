@@ -592,6 +592,23 @@ a {
   background: var(--high);
 }
 
+.pin--suspicious .pin__dot {
+  background: var(--none, #8a8f98);
+  outline: 2px dashed var(--high);
+  outline-offset: 1px;
+}
+
+.pin__q {
+  color: #fff;
+  font: 700 10px/1 system-ui, sans-serif;
+}
+
+.badge--suspicious {
+  background: color-mix(in srgb, var(--high) 14%, transparent);
+  color: var(--text, inherit);
+  border: 1px dashed var(--high);
+}
+
 .pin--high .pin__dot .ic {
   width: 10px;
   height: 10px;

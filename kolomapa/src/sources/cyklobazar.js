@@ -20,7 +20,8 @@
 //  - Osobní údaje: jméno prodejce, odkaz na profil, ID prodejce ani telefon se nečtou ani neukládají – jen příznak
 //    firma (štítek „Profi“) × soukromník.
 //  - Pauza mezi stránkami config.cyklobazarDelayMs (výchozí 20 s, nikdy pod 10 s), stránek výpisu nejvýš
-//    config.cyklobazarMaxListPages za běh (výchozí 60 ≈ 20 min), detailů defaultMaxDetails = 120 (≈ 40 min).
+//    config.cyklobazarMaxListPages za běh (výchozí 60 ≈ 20 min), detailů defaultMaxDetails = 120 (≈ 40 min) a nikdy
+//    víc než HARD_MAX_DETAILS = 300, i když KOLOMAPA_MAX_DETAILS (společné pro všechny zdroje) povolí víc.
 //
 // Web (ověřeno 2. 10. 2026; Nette, server-side HTML, žádné API ani RSS):
 //   sitemap  /sitemap/sitemap-ads.xml – VŠECHNY aktivní inzeráty webu (~15 800 ze všech kategorií, bez kategorie)
@@ -36,7 +37,8 @@
 //   fotky    /uploads/items/R/M/D/<číslo>/<velikost>_<soubor>, velikosti 250/500/800/1680 – načtou se bez cookies.
 //
 // Průchod (scan):
-//   1. Sitemapa (1 požadavek). „Zdravá“ = > 5 000 inzerátů a ne výrazně méně než minule → každý známý inzerát v ní
+//   1. Sitemapa (1 požadavek). „Zdravá“ = celý dokument (i </urlset>), > 5 000 inzerátů, ID jde přečíst u ≥ 95 %
+//      adres a ne výrazně méně než minule (leda by nový počet vydržel ≥ 48 h) → každý známý inzerát v ní
 //      dostane ctx.markSeen (je stále aktivní; refreshDetail, když lastmod > čas našeho detailu). Zmizelé pak
 //      označí pipeline + confirmGone() čistě podle sitemapy tohoto běhu (bez dalších požadavků).
 //   2. Novinky: /kola a /elektrokola od 1. stránky, dokud není celá stránka (bez topovaných) za „obzorem“ = začátek
@@ -49,7 +51,7 @@
 //      (~445 stránek ≈ 2,5 h) se tak projde postupně během ~1–2 týdnů a pak znovu od začátku. Najde staré inzeráty,
 //      které ještě neznáme (první plnění), a obnoví ceny. Rychlejší první plnění: vyšší
 //      KOLOMAPA_CYKLOBAZAR_MAX_LIST_PAGES.
-//   complete = režim full + zdravá sitemapa + žádná chyba ani ověření.
+//   complete = režim full + zdravá sitemapa + žádná chyba ani ověření (+ pipeline nabízí ctx.markSeen).
 
 const { decodeEntities, htmlToText, parseCzk } = require('../util/text');
 
@@ -70,8 +72,11 @@ const COOLDOWN_HOURS = 12;
 const COOLDOWN_KEY = 'cooldownUntil';
 /** Sitemapa s méně inzeráty není zdravá (celý web jich má ~15 800). */
 const MIN_SITEMAP_URLS = 5000;
-/** … ani když má výrazně méně inzerátů než minulá zdravá sitemapa. */
+/** … ani když má výrazně méně inzerátů než minulá zdravá sitemapa (leda by nový stav trval ≥ 48 h) … */
 const MIN_SITEMAP_RATIO = 0.7;
+const SITEMAP_LOW_ACCEPT_MS = 48 * 3600e3;
+/** … ani když z jejích adres nejde přečíst ID inzerátu (změna podoby adres). */
+const MIN_SITEMAP_PARSED = 0.95;
 /** Inzerát chybějící ve zdravé sitemapě je smazaný, jen když ho známe déle (sitemapa se generuje po hodině). */
 const GONE_GRACE_MS = 2 * 3600e3;
 /** Rezerva obzoru novinek (posun hodin u nás a na webu, zpoždění webu). */
@@ -79,6 +84,12 @@ const HORIZON_BUFFER_MS = 3600e3;
 const DAY_MS = 86400e3;
 /** Po tolika chybách webu po sobě (síť, HTTP 5xx) zdroj pro běh skončí – nezatěžovat web, který má potíže. */
 const MAX_CONSECUTIVE_FAILURES = 3;
+const DEFAULT_MAX_DETAILS = 120;
+/**
+ * Strop detailů za běh i při vyšším KOLOMAPA_MAX_DETAILS (to platí pro všechny zdroje – Bazoš 4000 by tu znamenalo
+ * ~22 h nepřetržitého stahování): 300 × 20 s ≈ 1 h 40 min.
+ */
+const HARD_MAX_DETAILS = 300;
 
 // ---------------------------------------------------------------- robots.txt a osobní údaje
 
@@ -126,7 +137,7 @@ const states = new WeakMap(); // ctx → stav běhu
 function stateOf(ctx) {
   let st = states.get(ctx);
   if (!st) {
-    st = { sitemap: null, sitemapOk: false, sitemapAtMs: 0, stopped: null, browser: null, browserError: null, requests: 0, failures: 0, seen: new Set() };
+    st = { sitemap: null, sitemapOk: false, sitemapAtMs: 0, stopped: null, browser: null, browserError: null, requests: 0, failures: 0, details: 0, seen: new Set() };
     states.set(ctx, st);
   }
   return st;
@@ -161,7 +172,8 @@ function cacheSet(ctx, key, value) {
   try {
     ctx.cache?.set?.(key, value);
   } catch (e) {
-    ctx.log?.debug?.('Cyklobazar: zápis do cache selhal', { key, error: e.message });
+    // pauza po ověření se neuloží → další běh by šel na web hned; to musí být vidět
+    ctx.log?.[key === COOLDOWN_KEY ? 'warn' : 'debug']?.(`Cyklobazar: zápis „${key}“ do cache selhal`, { error: e.message });
   }
 }
 
@@ -376,6 +388,8 @@ function parsePrice(text, currency = null, amount = null) {
     return { priceCzk: null, priceNote: `Cena v ${cur}: ${shown}` };
   }
   if (num != null && num > 0) return { priceCzk: num, priceNote: null };
+  // JSON-LD má u „Dohodou“ / „V textu“ cenu 0 – text webu je pak výstižnější
+  if (num === 0 && t && !/\d/.test(t)) return { priceCzk: null, priceNote: t };
   if (num === 0 || /^0\s*(kč)?$/i.test(t)) return { priceCzk: null, priceNote: 'Cena neuvedena' };
   return { priceCzk: null, priceNote: t || null };
 }
@@ -484,15 +498,21 @@ function jsonLdBlocks(html) {
         j = null;
       }
     }
-    if (Array.isArray(j)) out.push(...j);
-    else if (j && typeof j === 'object') out.push(j);
+    for (const b of Array.isArray(j) ? j : [j]) {
+      if (!b || typeof b !== 'object') continue;
+      out.push(b);
+      if (Array.isArray(b['@graph'])) out.push(...b['@graph'].filter((g) => g && typeof g === 'object'));
+    }
   }
   return out;
 }
 
+/** Je blok JSON-LD daného typu? (@type může být i pole) */
+const ldIs = (b, type) => !!b && (Array.isArray(b['@type']) ? b['@type'].includes(type) : b['@type'] === type);
+
 /** Drobečková navigace → [{name, slug}] bez kořene webu a bez samotného inzerátu. */
 function breadcrumbsOf(blocks) {
-  const bl = blocks.find((b) => b && b['@type'] === 'BreadcrumbList');
+  const bl = blocks.find((b) => ldIs(b, 'BreadcrumbList'));
   if (!bl || !Array.isArray(bl.itemListElement)) return [];
   return bl.itemListElement
     .slice()
@@ -511,6 +531,9 @@ function breadcrumbsOf(blocks) {
     .filter((c) => c.slug && !c.slug.startsWith('inzerat/') && c.name);
 }
 
+/** Řádky, které by nesly údaje o prodejci (dnes v tabulce parametrů nejsou – pojistka pro změnu webu). */
+const PERSONAL_LABEL_RX = /prodejce|prodávající|kontakt|telefon|tel\.|mobil|e-?mail|jméno|příjmení|adresa|^web|www|^ičo?$|^dič$/i;
+
 /** Tabulka parametrů (<tr><th>Popisek:</th><td>…</td></tr>) → {Popisek: hodnota} s přesnými českými popisky. */
 function paramsTable(html) {
   const out = {};
@@ -521,7 +544,7 @@ function paramsTable(html) {
   for (const m of box.matchAll(/<tr>\s*<th[^>]*>([\s\S]*?)<\/th>\s*<td[^>]*>([\s\S]*?)<\/td>\s*<\/tr>/g)) {
     const label = clean(m[1]).replace(/\s*:\s*$/, '');
     const value = clean(m[2]);
-    if (label && value) out[label] = value;
+    if (label && value && !PERSONAL_LABEL_RX.test(label)) out[label] = value;
   }
   return out;
 }
@@ -550,9 +573,9 @@ const GONE_TEXT_RX = /inzer[áa]t\s+(?:byl|je)\s+(?:již\s+|už\s+)?(?:smaz|odst
 function parseDetail(html) {
   const s = String(html ?? '');
   const blocks = jsonLdBlocks(s);
-  const ld = blocks.find((b) => b && b['@type'] === 'Product') || null;
-  const canonical = (/<link rel="canonical" href="([^"]+)"/.exec(s) || [])[1];
-  const url = adUrl(canonical);
+  const ld = blocks.find((b) => ldIs(b, 'Product')) || null;
+  const canonicalTag = (/<link\s[^>]*rel=["']?canonical["']?[^>]*>/i.exec(s) || [''])[0];
+  const url = adUrl(attr(canonicalTag, 'href'));
   const sourceId = idFromUrl(url);
   const h1 = clean((/<div class="offer-detail__header">\s*<h1[^>]*>([\s\S]*?)<\/h1>/.exec(s) || [])[1]);
   const title = clean(ld?.name) || h1;
@@ -628,7 +651,10 @@ function parseDetail(html) {
 // ---------------------------------------------------------------- sitemap
 
 /**
- * sitemap-ads.xml → {ok, urls, entries: Map(id → {url, lastmodMs})}.
+ * sitemap-ads.xml → {ok, urls, entries: Map(id → {url, lastmodMs})}. ok = celý dokument (<urlset> i jeho konec
+ * </urlset> za poslední položkou) – useknutý přenos by jinak vypadal jako hromadné mazání inzerátů. ID se bere
+ * z každé adresy /inzerat/<id>… (i bez slugu nebo na cyklobazar.cz bez www), aby aktivní inzerát nevypadl jen kvůli
+ * podobě adresy; url jen u úplné adresy se slugem (jinak null).
  * @param {string} xml
  */
 function parseSitemap(xml) {
@@ -638,14 +664,15 @@ function parseSitemap(xml) {
   for (const m of s.matchAll(/<url>([\s\S]*?)<\/url>/g)) {
     urls++;
     const loc = /<loc>\s*([^<\s]+)\s*<\/loc>/.exec(m[1]);
-    const url = loc ? adUrl(decodeEntities(loc[1])) : null;
-    const id = idFromUrl(url);
+    const raw = loc ? decodeEntities(loc[1]) : '';
+    const id = /^https?:\/\/(?:www\.)?cyklobazar\.cz\//i.test(raw) ? idFromUrl(raw) : null;
     if (!id) continue;
     const lm = /<lastmod>\s*([^<\s]+)\s*<\/lastmod>/.exec(m[1]);
     const t = lm ? Date.parse(lm[1]) : NaN;
-    entries.set(id, { url, lastmodMs: Number.isFinite(t) ? t : null });
+    entries.set(id, { url: adUrl(raw), lastmodMs: Number.isFinite(t) ? t : null });
   }
-  return { ok: /<urlset[\s>]/.test(s), urls, entries };
+  const closed = s.lastIndexOf('</urlset>') > s.lastIndexOf('</url>');
+  return { ok: /<urlset[\s>]/.test(s) && closed, urls, entries };
 }
 
 /** Stáhne sitemapu; zdravou uloží do stavu běhu a označí známé inzeráty jako aktivní (ctx.markSeen). */
@@ -654,16 +681,33 @@ async function loadSitemap(ctx, st) {
   if (r.status !== 200) throw new Error(`Cyklobazar: sitemapa vrátila HTTP ${r.status}`);
   const sm = parseSitemap(r.html);
   st.sitemapAtMs = nowMs(ctx);
+  const size = sm.entries.size;
   const prev = Number(cacheGet(ctx, 'sitemapCount')) || 0;
-  if (!sm.ok || sm.entries.size <= MIN_SITEMAP_URLS || (prev && sm.entries.size < prev * MIN_SITEMAP_RATIO)) {
-    ctx.log?.warn?.(
-      `Cyklobazar: sitemapa vypadá neúplně (${sm.entries.size} inzerátů${prev ? `, minule ${prev}` : ''}) – mizení inzerátů v tomto běhu nevyhodnocuji`
-    );
-    return { ok: false, size: sm.entries.size, seen: 0, refresh: 0 };
+  let why = null;
+  if (!sm.ok) why = 'neúplný dokument (chybí konec </urlset>)';
+  else if (size < sm.urls * MIN_SITEMAP_PARSED) why = `jen ${size} z ${sm.urls} adres jde přečíst (změna webu?)`;
+  else if (size <= MIN_SITEMAP_URLS) why = `jen ${size} inzerátů`;
+  else if (prev && size < prev * MIN_SITEMAP_RATIO) {
+    // Výrazně méně než minule: napřed nevěřit (porucha generování). Drží-li se nový počet ≥ 48 h, je to skutečný
+    // úbytek (hromadné smazání starých inzerátů) – jinak by se mizení nevyhodnotilo už nikdy.
+    const low = cacheGet(ctx, 'sitemapLow');
+    const lowSince = low && Date.parse(low.since);
+    if (low && Number.isFinite(lowSince) && Math.abs(size - Number(low.count)) <= Number(low.count) * 0.1) {
+      if (st.sitemapAtMs - lowSince < SITEMAP_LOW_ACCEPT_MS) why = `${size} inzerátů, minule ${prev} (méně už od ${fmtPrague(lowSince)})`;
+      else ctx.log?.warn?.(`Cyklobazar: sitemapa má trvale méně inzerátů (${size}, dřív ${prev}) od ${fmtPrague(lowSince)} – beru to jako nový stav`);
+    } else {
+      cacheSet(ctx, 'sitemapLow', { count: size, since: new Date(st.sitemapAtMs).toISOString() });
+      why = `${size} inzerátů, minule ${prev}`;
+    }
+  }
+  if (why) {
+    ctx.log?.warn?.(`Cyklobazar: sitemapa vypadá neúplně (${why}) – mizení inzerátů v tomto běhu nevyhodnocuji`);
+    return { ok: false, size, seen: 0, refresh: 0 };
   }
   st.sitemap = sm.entries;
   st.sitemapOk = true;
-  cacheSet(ctx, 'sitemapCount', sm.entries.size);
+  cacheSet(ctx, 'sitemapCount', size);
+  if (cacheGet(ctx, 'sitemapLow') != null) cacheSet(ctx, 'sitemapLow', null);
   let seen = 0;
   let refresh = 0;
   if (typeof ctx.markSeen === 'function' && typeof ctx.isKnown === 'function') {
@@ -711,6 +755,10 @@ async function fetchListPage(ctx, st, cat, page) {
   // Za koncem výpisu web ukáže jinou stránku (aktuální číslo ≠ požadované) nebo prázdný výpis.
   if (page > 1 && ((parsed.page != null && parsed.page !== page) || !parsed.items.length)) return { end: true };
   if (page === 1 && !parsed.items.length) throw new Error(`Cyklobazar: výpis ${cat.label} je prázdný (změna webu?)`);
+  // Plná 1. stránka bez stránkování = web změnil podobu stránkování → průchod by tiše skončil po 1. stránce.
+  if (page === 1 && parsed.items.length >= 20 && parsed.lastPage <= 1 && !parsed.hasNext) {
+    ctx.log?.warn?.(`Cyklobazar: výpis ${cat.label} – stránkování nenalezeno (změna webu?), procházím jen 1. stránku`);
+  }
   return parsed;
 }
 
@@ -735,8 +783,11 @@ async function emitPage(ctx, st, run, parsed) {
       entry.known = true;
       continue;
     }
-    // Inzerát s detailem: zkrácený popis a kratší název kategorie z výpisu nepřepisují údaje z detailu.
-    if (known && known.detail_at) {
+    // Známý inzerát: zkrácený popis a kratší název kategorie z výpisu nepřepisují uložené údaje. Nejen u inzerátů
+    // s detailem – sitemapa (refreshDetail) mohla detail_at právě vynulovat a nový detail přijde až později (limit
+    // detailů), mezitím by plný popis nahradil úryvek „…“ (a změna otisku by spustila klasifikaci i AI nacenění).
+    // Popis i kategorii pak obnoví detail.
+    if (known) {
       delete it.description;
       delete it.categorySrc;
     }
@@ -917,7 +968,8 @@ async function scan(ctx) {
   if (run.belowMin) ctx.log?.debug?.(`Cyklobazar: ${run.belowMin} nových inzerátů pod minimální cenou ${ctx.minPrice} Kč přeskočeno`);
   ctx.log?.info?.(`Cyklobazar: ${run.emitted} inzerátů z výpisu (${run.listPages} stránek, z toho ${run.sweepPages} postupného průchodu), ${st.requests} požadavků`);
   if (errors.length) throw new Error(`Cyklobazar: část průchodu selhala (${run.emitted} inzerátů uloženo) – ${errors.join('; ')}`);
-  return { complete: full && st.sitemapOk };
+  // Bez ctx.markSeen by známé aktivní inzeráty mimo prošlé stránky vypadaly jako zmizelé – complete jen s ním.
+  return { complete: full && st.sitemapOk && typeof ctx.markSeen === 'function' && typeof ctx.isKnown === 'function' };
 }
 
 /**
@@ -934,6 +986,11 @@ async function detail(ctx, listing) {
   if (!id) throw new Error(`Cyklobazar: nelze zjistit ID inzerátu (${listing?.url || '?'})`);
   const url = adUrl(listing?.url) || st.sitemap?.get(id)?.url || null;
   if (!url || idFromUrl(url) !== id) throw new Error(`Cyklobazar: chybí úplná adresa inzerátu ${id}`);
+  if (st.details >= HARD_MAX_DETAILS) {
+    if (st.details++ === HARD_MAX_DETAILS) ctx.log?.warn?.(`Cyklobazar: ${HARD_MAX_DETAILS} detailů za běh stačí (šetrnost k webu) – zbytek příště`);
+    throw new Error(`Cyklobazar: limit ${HARD_MAX_DETAILS} detailů za běh – zbytek příště`);
+  }
+  st.details++;
   const r = await fetchPage(ctx, st, url, { referer: `${BASE}/` });
   if (r.status === 404 || r.status === 410) return null;
   if (r.status !== 200) throw new Error(`Cyklobazar: detail ${url} vrátil HTTP ${r.status}`);
@@ -968,8 +1025,8 @@ module.exports = {
   label: 'Cyklobazar',
   homepage: BASE,
   requiresBrowser: true,
-  /** Detailů za běh: 120 × 20 s ≈ 40 min; zbytek se dočte další dny. */
-  defaultMaxDetails: 120,
+  /** Detailů za běh: 120 × 20 s ≈ 40 min; zbytek se dočte další dny (a nikdy víc než HARD_MAX_DETAILS). */
+  defaultMaxDetails: DEFAULT_MAX_DETAILS,
   scan,
   detail,
   confirmGone,
@@ -979,6 +1036,7 @@ module.exports = {
   CATEGORIES,
   COOLDOWN_HOURS,
   MIN_SITEMAP_URLS,
+  HARD_MAX_DETAILS,
   DISALLOWED_PATHS,
   CyklobazarChallengeError,
   assertAllowed,

@@ -15,7 +15,7 @@ const K = require('./keywords');
 const X = require('./extract');
 
 /** Zvýšit při změně logiky → pipeline překlasifikuje všechny inzeráty. */
-const CLASSIFIER_VERSION = '2026-10-02.1';
+const CLASSIFIER_VERSION = '2026-10-02.2';
 
 const BIKE_TYPES = [
   'mtb_hardtail', 'mtb_full', 'road', 'gravel', 'cyclocross', 'trekking', 'cross', 'city', 'kids', 'balance', 'bmx', 'dirt', 'fatbike',

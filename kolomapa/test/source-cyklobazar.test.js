@@ -819,3 +819,146 @@ test('opakované chyby webu (5xx / síť) → zdroj pro běh skončí, bez pauzy
   await assert.rejects(() => cb.detail(c2, { source_id: 'Kai00xyz', url: `${BASE}/inzerat/Kai00xyz/kolo-kai00xyz` }), /po sobě neodpověděl/);
   assert.equal(n, 3);
 });
+
+// ---------------------------------------------------------------- kontrola: sitemapa, která by mohla hromadně „smazat“ aktivní inzeráty
+
+test('useknutá sitemapa (bez </urlset>) není zdravá → complete false a confirmGone nic nepotvrdí', async () => {
+  const full = renderSitemap([...fillers(12000), { id: 'KnownA0001' }]);
+  const cut = full.slice(0, full.lastIndexOf('</url>') - 40); // přenos skončil uprostřed položky
+  const db = new Map([['KnownA0001', { id: 1, detail_at: null, gone_at: null }]]);
+  for (const xml of [cut, full.replace('</urlset>', '')]) {
+    const site = fakeSite({ [cb.SITEMAP_URL]: xml });
+    const ctx = makeCtx({ site, db, cache: new Map([['sitemapCount', '15800']]), config: { cyklobazarMaxListPages: 0 } });
+    assert.deepEqual(await cb.scan(ctx), { complete: false });
+    assert.ok(ctx._logs.some(([l, m]) => l === 'warn' && /neúplný dokument/.test(m)));
+    assert.deepEqual(ctx._seen, []);
+    assert.equal(await cb.confirmGone(ctx, { source_id: 'Chybi00001', first_seen_at: new Date(NOW - 50 * H).toISOString() }), null);
+  }
+  assert.equal(cb.parseSitemap(cut).ok, false);
+  assert.equal(cb.parseSitemap(full).ok, true);
+});
+
+test('sitemapa: ID i z adresy bez slugu / bez www (aktivní inzerát nesmí „zmizet“ kvůli podobě adresy), jinak nečitelná = nezdravá', async () => {
+  const xml = renderSitemap(fillers(6000))
+    .replace('</urlset>', '')
+    .concat(`<url><loc>${BASE}/inzerat/BezSlugu01</loc></url>\n<url><loc>https://cyklobazar.cz/inzerat/BezWww0001/kolo</loc><lastmod>2026-10-01T10:00:00+02:00</lastmod></url>\n</urlset>\n`);
+  const sm = cb.parseSitemap(xml);
+  assert.equal(sm.ok, true);
+  assert.deepEqual(sm.entries.get('BezSlugu01'), { url: null, lastmodMs: null });
+  assert.equal(sm.entries.get('BezWww0001').url, null);
+  assert.equal(cb.parseSitemap(`<urlset><url><loc>https://example.org/inzerat/Cizi000001/x</loc></url></urlset>`).entries.size, 0);
+  const site = fakeSite({ [cb.SITEMAP_URL]: xml });
+  const ctx = makeCtx({ site, config: { cyklobazarMaxListPages: 0 } });
+  assert.deepEqual(await cb.scan(ctx), { complete: true });
+  const old = new Date(NOW - 50 * H).toISOString();
+  assert.equal(await cb.confirmGone(ctx, { source_id: 'BezSlugu01', first_seen_at: old }), false);
+  assert.equal(await cb.confirmGone(ctx, { source_id: 'BezWww0001', first_seen_at: old }), false);
+  // detail bez úplné adresy v DB vezme adresu ze sitemapy jen úplnou – jinak chyba, ne požadavek naslepo
+  await assert.rejects(() => cb.detail(ctx, { source_id: 'BezSlugu01', url: `${BASE}/inzerat/BezSlugu01` }), /úplná adresa/);
+  // web změnil podobu adres: ID nejde přečíst u víc než 5 % položek → nezdravá
+  const odd = renderSitemap(fillers(6000)).replace('</urlset>', '') + Array.from({ length: 400 }, (_, i) => `<url><loc>${BASE}/ad/${i}</loc></url>`).join('\n') + '\n</urlset>\n';
+  const ctx2 = makeCtx({ site: fakeSite({ [cb.SITEMAP_URL]: odd }), config: { cyklobazarMaxListPages: 0 } });
+  assert.deepEqual(await cb.scan(ctx2), { complete: false });
+  assert.ok(ctx2._logs.some(([l, m]) => l === 'warn' && /jde přečíst/.test(m)));
+});
+
+test('sitemapa trvale menší než minule: napřed nezdravá, po 48 h stejného stavu nový základ (jinak by mizení stálo navždy)', async () => {
+  const xml = renderSitemap(fillers(8000));
+  const cache = new Map([['sitemapCount', '15800']]);
+  const at = (h) => makeCtx({ site: fakeSite({ [cb.SITEMAP_URL]: xml }), cache, now: () => NOW + h * H, config: { cyklobazarMaxListPages: 0 } });
+  assert.deepEqual(await cb.scan(at(0)), { complete: false });
+  assert.deepEqual(await cb.scan(at(24)), { complete: false });
+  assert.deepEqual(await cb.scan(at(47)), { complete: false });
+  // jiný (opět rozkolísaný) počet začíná odpočet znovu
+  const other = makeCtx({ site: fakeSite({ [cb.SITEMAP_URL]: renderSitemap(fillers(6000)) }), cache, now: () => NOW + 30 * H, config: { cyklobazarMaxListPages: 0 } });
+  assert.deepEqual(await cb.scan(other), { complete: false });
+  assert.deepEqual(await cb.scan(at(60)), { complete: false }); // 8000 znovu od 60 h
+  assert.deepEqual(await cb.scan(at(100)), { complete: false });
+  const ok = at(108);
+  assert.deepEqual(await cb.scan(ok), { complete: true });
+  assert.ok(ok._logs.some(([l, m]) => l === 'warn' && /beru to jako nový stav/.test(m)));
+  assert.equal(JSON.parse(cache.get('sitemapCount')), 8000);
+  assert.equal(JSON.parse(cache.get('sitemapLow')), null);
+});
+
+test('detail: kanonická adresa s atributy v jiném pořadí; cena 0 v JSON-LD s textem „Dohodou“', () => {
+  const base = read('detail_mtb_hardtail_private.html');
+  const swapped = base.replace(/<link rel="canonical" href="([^"]+)"\s*\/?>/, '<link href="$1" rel="canonical">');
+  assert.notEqual(swapped, base);
+  assert.equal(cb.parseDetail(swapped).sourceId, '84OemEXXQ4paM');
+  assert.deepEqual(cb.parsePrice('Dohodou', 'CZK', 0), { priceCzk: null, priceNote: 'Dohodou' });
+  assert.deepEqual(cb.parsePrice('0 Kč', 'CZK', 0), { priceCzk: null, priceNote: 'Cena neuvedena' });
+});
+
+test('detailů za běh nejvýš HARD_MAX_DETAILS i při vysokém KOLOMAPA_MAX_DETAILS (společném pro všechny zdroje) – dál bez požadavku', async () => {
+  const url = `${BASE}/inzerat/84OemEXXQ4paM/merida-matts-j-champion-26`;
+  const site = fakeSite({ [url]: read('detail_mtb_hardtail_private.html') });
+  const ctx = makeCtx({ site });
+  for (let i = 0; i < cb.HARD_MAX_DETAILS; i++) await cb.detail(ctx, { source_id: '84OemEXXQ4paM', url });
+  await assert.rejects(() => cb.detail(ctx, { source_id: '84OemEXXQ4paM', url }), /limit 300 detailů/);
+  await assert.rejects(() => cb.detail(ctx, { source_id: '84OemEXXQ4paM', url }), /limit 300 detailů/);
+  assert.equal(site.requests.length, cb.HARD_MAX_DETAILS);
+  assert.equal(ctx._logs.filter(([l, m]) => l === 'warn' && /detailů za běh stačí/.test(m)).length, 1);
+  assert.ok(cb.defaultMaxDetails <= cb.HARD_MAX_DETAILS);
+});
+
+test('známý inzerát s detailem čekajícím na obnovu (sitemapa vynulovala detail_at): výpis nepošle úryvek popisu ani kratší kategorii', async () => {
+  const kola = [pageItems('Ka', 3, { ageFrom: 0.1 })];
+  // Kai00: lastmod novější než detail → markSeen(refreshDetail) vynuluje detail_at (jako pipeline)
+  const db = new Map([
+    ['Kai00xyz', { id: 1, price_czk: 15000, title: 'Kolo Ka 0', detail_at: new Date(NOW - 48 * H).toISOString(), gone_at: null }],
+    ['Kai01xyz', { id: 2, price_czk: 15001, title: 'Kolo Ka 1', detail_at: null, gone_at: null }], // detail ještě nebyl
+  ]);
+  const site = siteWith({ kola, elektro: [pageItems('Ea', 1, { ageFrom: 1 })], sitemapExtra: [{ id: 'Kai00xyz', lastmod: NOW - 1 * H }] });
+  const ctx = makeCtx({ site, db });
+  const markSeen = ctx.markSeen;
+  ctx.markSeen = (id, o = {}) => {
+    const ok = markSeen(id, o);
+    if (ok && o.refreshDetail) db.get(id).detail_at = null;
+    return ok;
+  };
+  await cb.scan(ctx);
+  assert.deepEqual(ctx._seen.filter(([id]) => id === 'Kai00xyz'), [['Kai00xyz', true]]);
+  const byId = Object.fromEntries(ctx._emitted.map((x) => [x.sourceId, x]));
+  for (const id of ['Kai00xyz', 'Kai01xyz']) {
+    assert.equal(byId[id].description, undefined, id);
+    assert.equal(byId[id].categorySrc, undefined, id);
+    assert.equal(typeof byId[id].priceCzk, 'number'); // cena z výpisu se obnovuje dál
+  }
+  assert.match(byId.Kai02xyz.description, /^Popis inzerátu Kai02xyz/); // nový inzerát: úryvek i kategorie z výpisu
+  assert.equal(byId.Kai02xyz.categorySrc, 'Jízdní kola › Pevná horská kola');
+});
+
+test('detail: JSON-LD v @graph nebo s @type jako polem se čte stejně', () => {
+  const base = read('detail_mtb_hardtail_private.html');
+  const blocks = [...base.matchAll(/<script type="application\/ld\+json">([\s\S]*?)<\/script>/g)].map((m) => JSON.parse(m[1]));
+  assert.equal(blocks.length, 2);
+  const noLd = base.replace(/<script type="application\/ld\+json">[\s\S]*?<\/script>/g, '');
+  const graph = noLd.replace('</head>', `<script type="application/ld+json">${JSON.stringify({ '@context': 'https://schema.org', '@graph': blocks })}</script></head>`);
+  const arr = noLd.replace('</head>', `<script type="application/ld+json">${JSON.stringify([{ ...blocks[0], '@type': ['Product', 'Vehicle'] }, blocks[1]])}</script></head>`);
+  const ref = cb.parseDetail(base).item;
+  for (const html of [graph, arr]) {
+    assert.notEqual(html, noLd);
+    const it = cb.parseDetail(html).item;
+    assert.equal(it.categorySrc, ref.categorySrc);
+    assert.equal(it.description, ref.description);
+    assert.equal(it.priceCzk, 12500);
+  }
+});
+
+test('detail: řádky parametrů s údaji o prodejci se neukládají (pojistka pro změnu webu)', () => {
+  const base = read('detail_mtb_hardtail_private.html');
+  const extra = '<tr> <th>Prodejce:</th> <td> JMENO-PRODEJCE </td> </tr> <tr> <th>Telefon:</th> <td> 777 123 456 </td> </tr> <tr> <th>E-mail:</th> <td> x@example.org </td> </tr> <tr> <th>Web:</th> <td> <a href="https://example.org/">example.org</a> </td> </tr>';
+  const html = base.replace(/(<table class="cb-property-box__table">)/, `$1 ${extra}`);
+  assert.notEqual(html, base);
+  const it = cb.parseDetail(html).item;
+  assert.deepEqual(Object.keys(it.params), Object.keys(cb.parseDetail(base).item.params));
+  assert.ok(!JSON.stringify(it).includes(SENTINEL) && !JSON.stringify(it).includes('777 123 456'));
+});
+
+test('bez ctx.markSeen (živost podle sitemapy nejde předat) scan nikdy nevrací complete', async () => {
+  const site = siteWith({ kola: [pageItems('Ka', 5, { ageFrom: 0.1 })], elektro: [pageItems('Ea', 5, { ageFrom: 1 })] });
+  const ctx = makeCtx({ site });
+  delete ctx.markSeen;
+  assert.deepEqual(await cb.scan(ctx), { complete: false });
+});

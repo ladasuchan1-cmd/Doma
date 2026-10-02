@@ -13,7 +13,8 @@
 //   KOLOMAPA_DELAY_MS           pauza mezi požadavky na jeden web v ms (výchozí 1200 – šetrné k webům)
 //   KOLOMAPA_MAX_PAGES          max. stránek výpisu na kategorii za běh (výchozí 400; ochrana před nekonečným během)
 //   KOLOMAPA_MAX_DETAILS        max. detailů inzerátů na zdroj za běh (výchozí podle zdroje: Bazoš 4000, Sbazar 2000,
-//                               Aukro 300, Cyklobazar 120 – zbytek se dočte další dny; nastavení platí pro všechny)
+//                               Aukro 300, Cyklobazar 120 – zbytek se dočte další dny; nastavení platí pro všechny,
+//                               Cyklobazar ale nikdy víc než 300 za běh)
 //   KOLOMAPA_FULL_SCAN_DAYS     jak často projít výpis celý (kvůli odhalení prodaných/smazaných) – dny (výchozí 1)
 //   KOLOMAPA_SBAZAR_MAX_RESOLVE max. nových lokalit Sbazaru přeložených na souřadnice za běh (výchozí 400)
 //   KOLOMAPA_MIN_PRICE          nové inzeráty s cenou pod touto hranicí se ignorují (výchozí 200 Kč – levná dětská kola)

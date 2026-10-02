@@ -1,7 +1,9 @@
 #!/usr/bin/env node
 'use strict';
 // Ruční zkouška jednoho zdroje proti živému webu (NENÍ součástí npm test): projde pár stránek výpisu, stáhne pár
-// detailů a vypíše normalizované položky. Nic neukládá do databáze. Požadavky jdou přes sdílený šetrný HTTP klient.
+// detailů a vypíše normalizované položky. Nic neukládá do databáze – jen pauzu Cyklobazaru po ověření Cloudflare
+// (cache:cyklobazar:cooldownUntil), aby platila i pro další zkoušky a denní běh. Požadavky jdou přes sdílený šetrný
+// HTTP klient (Cyklobazar přes sdílený prohlížeč, src/sources/browser.js).
 //
 //   node tools/try-source.js <zdroj> [--pages=1] [--details=3] [--mode=incremental|full] [--show=5] [--json]
 //
@@ -130,6 +132,21 @@ async function main(argv) {
     browserMod ||= require('../src/sources/browser');
     return browserMod.getBrowser({ config, log });
   };
+  // Zdroj za Cloudflare: pauza po ověření (cooldownUntil) se čte a ukládá v databázi jako v denním běhu – jinak by
+  // další zkouška šla na web hned znovu. Ostatní stav (obzor, pozice průchodu) zůstává jen v paměti, aby zkouška
+  // neovlivnila denní běh.
+  const PERSIST_KEYS = new Set(['cooldownUntil']);
+  let db = null;
+  let persistent = null;
+  if (src.requiresBrowser) {
+    try {
+      db = require('../src/db').openDb(config.dbFile);
+      persistent = require('../src/pipeline').makeCache(db, key);
+    } catch (e) {
+      log.warn(`Pauzu po ověření Cloudflare nejde uložit do databáze (${String(e.message).split('\n')[0]}) – po ověření zkoušku 12 h nespouštějte`);
+    }
+  }
+  const useDb = (k) => persistent && PERSIST_KEYS.has(k);
   const items = new Map();
   const ctx = {
     http,
@@ -143,7 +160,11 @@ async function main(argv) {
     minPrice: config.minPrice,
     cache: (() => {
       const m = new Map();
-      return { get: (k) => m.get(k), set: (k, v) => m.set(k, v), delete: (k) => m.delete(k) };
+      return {
+        get: (k) => (useDb(k) ? persistent.get(k) : m.get(k)),
+        set: (k, v) => (useDb(k) ? persistent.set(k, v) : m.set(k, v)),
+        delete: (k) => (useDb(k) ? persistent.delete(k) : m.delete(k)),
+      };
     })(),
     isKnown: (id) => (items.has(String(id)) ? { id: 0, price_czk: items.get(String(id)).priceCzk ?? null, title: items.get(String(id)).title, detail_at: null, gone_at: null } : null),
     emit: async (item) => {
@@ -157,31 +178,41 @@ async function main(argv) {
   const t0 = Date.now();
   let failed = false;
   let scanRes = null;
+  const list = [];
+  const detailed = [];
   console.log(`${src.label}: výpis (${mode === 'full' ? 'celý' : 'jen novinky'}, max. ${pages} stránek na kategorii)…`);
   try {
-    scanRes = (await src.scan(ctx)) || {};
-  } catch (e) {
-    failed = true;
-    console.error(`Výpis selhal: ${e.message}`);
-  }
-  const list = [...items.values()];
-  const detailed = [];
-  for (const it of list.slice(0, details)) {
-    if (controller.signal.aborted) break;
     try {
-      const d = await src.detail(ctx, asRow(key, it));
-      detailed.push(d === null ? { sourceId: it.sourceId, url: it.url, title: it.title, gone: true } : { ...it, ...d });
+      scanRes = (await src.scan(ctx)) || {};
     } catch (e) {
       failed = true;
-      detailed.push({ sourceId: it.sourceId, url: it.url, title: it.title, error: e.message });
+      console.error(`Výpis selhal: ${e.message}`);
     }
-  }
-  if (src.requiresBrowser && browserMod) {
-    for (const fn of ['closeBrowser', 'close']) {
-      if (typeof browserMod[fn] === 'function') {
-        await browserMod[fn]().catch(() => {});
-        break;
+    list.push(...items.values());
+    for (const it of list.slice(0, details)) {
+      if (controller.signal.aborted) break;
+      try {
+        const d = await src.detail(ctx, asRow(key, it));
+        detailed.push(d === null ? { sourceId: it.sourceId, url: it.url, title: it.title, gone: true } : { ...it, ...d });
+      } catch (e) {
+        failed = true;
+        detailed.push({ sourceId: it.sourceId, url: it.url, title: it.title, error: e.message });
       }
+    }
+  } finally {
+    // prohlížeč zavřít vždy (jinak běžící Chromium nedovolí procesu skončit)
+    if (browserMod) {
+      for (const fn of ['closeBrowser', 'close']) {
+        if (typeof browserMod[fn] === 'function') {
+          await browserMod[fn]().catch(() => {});
+          break;
+        }
+      }
+    }
+    try {
+      db?.close?.();
+    } catch {
+      /* už zavřená */
     }
   }
 

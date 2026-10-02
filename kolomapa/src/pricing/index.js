@@ -479,6 +479,11 @@ function evidenceKey(it, nComps) {
 }
 
 /** Log-odhad na úrovni inzerovaných cen (bez kalibrace) + diagnostika. */
+// Váha přímého přitažení k cenám ≥ 3 srovnatelných (× n/(n+2)). 5× CV na 10 676 kolech z Bazoše:
+// 0 → MdAPE (≥3 srovnatelné) 28,8 %, 0,3 → 27,1 %, 0,5 → 26,3 %, 0,7 → 26,4 % (a horší vlastní prodeje BAZAR).
+// blendMinComps 3 → 1: MdAPE u inzerátů s 1–2 srovnatelnými 33,9 % → 32,1 %, celkem 42,5 % → 42,3 %, BAZAR beze změny.
+const TUNE = { compBlend: 0.5, blendMinComps: 1 };
+
 function rawLogEstimate(core, it, { useComps = true, rulesWeight = 0.1, kb = KB } = {}) {
   const x = featurize(it, core.vocab);
   let lp = 0;
@@ -500,6 +505,16 @@ function rawLogEstimate(core, it, { useComps = true, rulesWeight = 0.1, kb = KB 
       const shrink = comps.length / (comps.length + 2);
       compShift = clamp(med * shrink, -1, 1);
       lp += compShift;
+      // Při srovnatelných inzerátech přitáhnout odhad i přímo k jejich cenám: posun reziduí nevyrovná slova v titulku,
+      // která mají jen tento inzerát („gen 2“, „2.0“) – model pak ujede nahoru, přestože podobná kola stojí méně.
+      if (comps.length >= TUNE.blendMinComps && TUNE.compBlend > 0) {
+        const compLp = weightedMedian(
+          comps.map((c) => Math.log(c.entry.price)),
+          comps.map((c) => c.score)
+        );
+        const wc = TUNE.compBlend * (comps.length / (comps.length + 2));
+        lp = (1 - wc) * lp + wc * compLp;
+      }
     }
   }
   const rules = rulesEstimate(it, kb);
@@ -920,5 +935,5 @@ module.exports = {
   TYPE_LABEL,
   COND_LABEL,
   // pro evaluaci
-  _internal: { fitCore, rawLogEstimate, askingLog, trainable, evidenceKey, spreadStats, findCompEntries, calibrate, LAMBDA, MIN_COUNT },
+  _internal: { fitCore, rawLogEstimate, askingLog, trainable, evidenceKey, spreadStats, findCompEntries, calibrate, LAMBDA, MIN_COUNT, TUNE },
 };

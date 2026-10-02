@@ -180,7 +180,16 @@ test('buildListing: plný řádek + historie ceny, bez interních otisků', () =
 });
 
 test('isDeal a truncate', () => {
-  assert.equal(data.isDeal({ price_czk: 8000, est_czk: 10000, deal_ratio: 0.8, est_confidence: 0.5 }), true);
+  assert.equal(data.isDeal({ price_czk: 8000, est_czk: 10000, deal_ratio: 0.8, est_confidence: 0.5, est_method: 'comps' }), true);
+  // bez srovnatelných / AI jen s vysokou jistotou
+  assert.equal(data.isDeal({ price_czk: 8000, est_czk: 10000, deal_ratio: 0.8, est_confidence: 0.5, est_method: 'model' }), false);
+  assert.equal(data.isDeal({ price_czk: 8000, est_czk: 10000, deal_ratio: 0.8, est_confidence: 0.65, est_method: 'model' }), true);
+  assert.equal(
+    data.isDeal({ price_czk: 8000, est_czk: 10000, deal_ratio: 0.8, est_confidence: 0.5, est_method: 'model', ai_czk: 11000, ai_input_hash: 'h', content_hash: 'h' }),
+    true
+  );
+  // podezřele levné (pod 30 % odhadu) není výhodná nabídka
+  assert.equal(data.isDeal({ price_czk: 2000, est_czk: 10000, deal_ratio: 0.2, est_confidence: 0.7, est_method: 'comps' }), false);
   assert.equal(data.isDeal({ price_czk: 8000, est_czk: 10000, deal_ratio: 0.8, est_confidence: 0.2 }), false);
   assert.equal(data.isDeal({ price_czk: null, est_czk: 10000, deal_ratio: 0.8, est_confidence: 0.9 }), false);
   assert.equal(data.truncate('krátký'), 'krátký');
@@ -188,4 +197,23 @@ test('isDeal a truncate', () => {
   assert.equal(data.safeUrl('https://a.cz/x'), 'https://a.cz/x');
   assert.equal(data.safeUrl('ftp://a.cz/x'), null);
   assert.equal(data.safeUrl(' javascript:alert(1)'), null);
+});
+
+test('buildSummary: výhodné jen s podloženým odhadem; nejvýhodnější podle úspory × jistota; podezřele levné mimo', () => {
+  const db = openDb(':memory:');
+  // model bez srovnatelných s jistotou 0,5 → není výhodná
+  insertListing(db, { price_czk: 8000, est_czk: 16000, deal_ratio: 0.5, est_confidence: 0.5, est_method: 'model' });
+  // srovnatelné inzeráty → výhodná; úspora 40 000 × 0,7
+  const big = insertListing(db, { price_czk: 60000, est_czk: 100000, deal_ratio: 0.6, est_confidence: 0.7, est_method: 'comps' });
+  // menší úspora, nižší poměr → až druhá
+  const small = insertListing(db, { price_czk: 3000, est_czk: 9000, deal_ratio: 0.33, est_confidence: 0.7, est_method: 'comps' });
+  // aktuální AI odhad podloží i model
+  const ai = insertListing(db, { price_czk: 5000, est_czk: 8000, deal_ratio: 0.625, est_confidence: 0.5, est_method: 'model', ai_czk: 9000, ai_input_hash: 'x', content_hash: 'x' });
+  // podezřele levné (pod 30 %) se nepočítá
+  insertListing(db, { price_czk: 500, est_czk: 20000, deal_ratio: 0.025, est_confidence: 0.8, est_method: 'comps' });
+  const s = data.buildSummary(db);
+  assert.equal(s.totals.deals, 3);
+  assert.deepEqual(s.topDeals.map((l) => l.id), [big, small, ai]);
+  assert.equal(s.thresholds.suspicious, data.SUSPICIOUS_RATIO);
+  assert.equal(s.thresholds.evidenceConfidence, data.EVIDENCE_CONFIDENCE);
 });

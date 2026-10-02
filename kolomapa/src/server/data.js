@@ -20,6 +20,10 @@ const { LABELS } = require('../sources');
 
 /** Výhodná nabídka: cena / odhad ≤ DEAL_RATIO při jistotě odhadu ≥ MIN_CONFIDENCE. */
 const DEAL_RATIO = 0.85;
+/** Pod tímto poměrem jde spíš o chybu / díly / zástupnou cenu / podvod než o výhodnou koupi → „podezřele levné“. */
+const SUSPICIOUS_RATIO = 0.3;
+/** Výhodná nabídka musí mít odhad podložený: ≥ 3 srovnatelné inzeráty, aktuální AI odhad, nebo jistotu ≥ této hodnoty. */
+const EVIDENCE_CONFIDENCE = 0.6;
 /** Předražená nabídka: cena / odhad > HIGH_RATIO. */
 const HIGH_RATIO = 1.15;
 /** Minimální jistota odhadu, aby se inzerát počítal mezi výhodné / předražené. */
@@ -97,12 +101,25 @@ function strArray(v) {
   return out;
 }
 
+/** AI odhad je aktuální (spočítaný pro současný obsah inzerátu). */
+function hasCurrentAi(r) {
+  return r.ai_czk > 0 && r.ai_input_hash != null && r.ai_input_hash === r.content_hash;
+}
+
 /**
  * Je řádek výhodnou nabídkou? (stejné pravidlo používá UI přes summary.thresholds)
  * @param {{price_czk?: number, est_czk?: number, deal_ratio?: number, est_confidence?: number}} r
  */
 function isDeal(r) {
-  return r.price_czk > 0 && r.est_czk > 0 && r.deal_ratio != null && r.deal_ratio <= DEAL_RATIO && (r.est_confidence ?? 0) >= MIN_CONFIDENCE;
+  return (
+    r.price_czk > 0 &&
+    r.est_czk > 0 &&
+    r.deal_ratio != null &&
+    r.deal_ratio <= DEAL_RATIO &&
+    r.deal_ratio >= SUSPICIOUS_RATIO &&
+    (r.est_confidence ?? 0) >= MIN_CONFIDENCE &&
+    (r.est_method === 'comps' || hasCurrentAi(r) || (r.est_confidence ?? 0) >= EVIDENCE_CONFIDENCE)
+  );
 }
 
 /**
@@ -223,7 +240,8 @@ function buildSummary(db, { mode = 'server', now = new Date(), topDeals = TOP_DE
   totals.active = Number(db.prepare('SELECT COUNT(*) AS n FROM listings WHERE gone_at IS NULL').get().n);
   const rows = db
     .prepare(
-      `SELECT source, kraj, lat, lon, price_czk, est_czk, deal_ratio, est_confidence, first_seen_at, photo_url
+      `SELECT source, kraj, lat, lon, price_czk, est_czk, deal_ratio, est_confidence, est_method, ai_czk, ai_input_hash,
+              content_hash, first_seen_at, photo_url
          FROM listings WHERE gone_at IS NULL AND is_bike = 1`
     )
     .all();
@@ -253,11 +271,14 @@ function buildSummary(db, { mode = 'server', now = new Date(), topDeals = TOP_DE
     .prepare(
       `SELECT * FROM listings
         WHERE gone_at IS NULL AND is_bike = 1 AND price_czk > 0 AND est_czk > 0 AND deal_ratio IS NOT NULL
-          AND est_confidence >= ? AND deal_ratio <= ?
-        ORDER BY deal_ratio ASC, est_confidence DESC, id ASC
+          AND est_confidence >= ? AND deal_ratio <= ? AND deal_ratio >= ?
+          AND (est_method = 'comps' OR (ai_czk > 0 AND ai_input_hash = content_hash) OR est_confidence >= ?)
+        -- řadit podle očekávané úspory (odhad − cena) vážené jistotou: nejnižší poměr cena/odhad
+        -- vynáší hlavně chyby odhadu, úspora v Kč odpovídá tomu, co obchod na kole může vydělat
+        ORDER BY (est_czk - price_czk) * est_confidence DESC, deal_ratio ASC, id ASC
         LIMIT ?`
     )
-    .all(MIN_CONFIDENCE, DEAL_RATIO, topDeals)
+    .all(MIN_CONFIDENCE, DEAL_RATIO, SUSPICIOUS_RATIO, EVIDENCE_CONFIDENCE, topDeals)
     .map(compactListing);
 
   const demo = Number(
@@ -275,7 +296,7 @@ function buildSummary(db, { mode = 'server', now = new Date(), topDeals = TOP_DE
     unlocated,
     newSince,
     demo: demo > 0 ? demo : 0,
-    thresholds: { deal: DEAL_RATIO, high: HIGH_RATIO, minConfidence: MIN_CONFIDENCE, newHours: NEW_HOURS },
+    thresholds: { deal: DEAL_RATIO, suspicious: SUSPICIOUS_RATIO, evidenceConfidence: EVIDENCE_CONFIDENCE, high: HIGH_RATIO, minConfidence: MIN_CONFIDENCE, newHours: NEW_HOURS },
   };
 }
 
@@ -328,6 +349,8 @@ module.exports = {
   truncate,
   KRAJ_CODES,
   DEAL_RATIO,
+  SUSPICIOUS_RATIO,
+  EVIDENCE_CONFIDENCE,
   HIGH_RATIO,
   MIN_CONFIDENCE,
   NEW_HOURS,
