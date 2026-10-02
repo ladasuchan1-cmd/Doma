@@ -40,9 +40,11 @@
 //      dostane ctx.markSeen (je stále aktivní; refreshDetail, když lastmod > čas našeho detailu). Zmizelé pak
 //      označí pipeline + confirmGone() čistě podle sitemapy tohoto běhu (bez dalších požadavků).
 //   2. Novinky: /kola a /elektrokola od 1. stránky, dokud není celá stránka (bez topovaných) za „obzorem“ = začátek
-//      minulého dokončeného průchodu novinek − 2 h (podle relativního času posunu, se zaokrouhlením dolů). Když čas
-//      posunu nejde přečíst nebo obzor chybí, platí záloha: všechny ne-topované položky stránky jsou známé a vložené
-//      dřív než nejnovější známé vložení − 1 den. Jinak do ctx.maxPages / limitu stránek.
+//      minulého průchodu novinek − 1 h. Rozhoduje relativní čas posunu („před 5 hodinami“, „včera“ …) jako rozpětí:
+//      položka posunutá určitě před obzorem, nebo možná před ním a už známá (hrubé „včera“ = 24–48 h viděl minulý
+//      denní běh). Když čas posunu nejde přečíst nebo obzor chybí, platí záloha podle zadání: všechny ne-topované
+//      položky stránky jsou známé a vložené dřív než nejnovější známé vložení − 1 den. Jinak do ctx.maxPages /
+//      limitu stránek (a obzor se i tak posune – zbytek dožene bod 3).
 //   3. Jen v režimu full: zbytek limitu stránek projde výpis dál od uložené pozice (ctx.cache „sweep“) – celý výpis
 //      (~445 stránek ≈ 2,5 h) se tak projde postupně během ~1–2 týdnů a pak znovu od začátku. Najde staré inzeráty,
 //      které ještě neznáme (první plnění), a obnoví ceny. Rychlejší první plnění: vyšší
@@ -72,8 +74,8 @@ const MIN_SITEMAP_URLS = 5000;
 const MIN_SITEMAP_RATIO = 0.7;
 /** Inzerát chybějící ve zdravé sitemapě je smazaný, jen když ho známe déle (sitemapa se generuje po hodině). */
 const GONE_GRACE_MS = 2 * 3600e3;
-/** Rezerva obzoru novinek (zaokrouhlení „před N hodinami“, posun hodin, zpoždění webu). */
-const HORIZON_BUFFER_MS = 2 * 3600e3;
+/** Rezerva obzoru novinek (posun hodin u nás a na webu, zpoždění webu). */
+const HORIZON_BUFFER_MS = 3600e3;
 const DAY_MS = 86400e3;
 
 // ---------------------------------------------------------------- robots.txt a osobní údaje
@@ -233,7 +235,7 @@ async function fetchPage(ctx, st, url, { referer } = {}) {
 /** Text bez značek a s jednou mezerou. */
 function clean(s) {
   return htmlToText(String(s ?? ''))
-    .replace(/[\s ]+/g, ' ')
+    .replace(/[\s\u00a0]+/g, ' ')
     .trim();
 }
 
@@ -241,7 +243,7 @@ function clean(s) {
 function cleanDescription(s) {
   return decodeEntities(String(s ?? ''))
     .replace(/\r\n?/g, '\n')
-    .replace(/[ \t ]+/g, ' ')
+    .replace(/[ \t\u00a0]+/g, ' ')
     .replace(/ *\n */g, '\n')
     .replace(/\n{3,}/g, '\n\n')
     .trim();
@@ -304,34 +306,39 @@ function pragueToIso(s) {
 }
 
 /**
- * Relativní čas posunu ve výpisu („před 5 hodinami“, „včera“, „před 3 dny“) → DOLNÍ odhad stáří v hodinách
- * (web zaokrouhluje; raději projít o stránku víc). Neznámý text → null.
- * @param {string} s
- * @returns {number|null}
+ * Relativní čas posunu ve výpisu → rozpětí stáří v hodinách {low, high} (neznámý text → null).
+ * Web používá klasický pomocník Nette „timeAgoInWords“ (ověřeno na vzorcích: minuty do 44, „před hodinou“,
+ * hodiny do 23–24, pak „včera“ = 24–48 h, „před N dny“ = zaokrouhlené dny od 48 h …); meze jsou o kus širší
+ * (zaokrouhlení, posun hodin), aby průchod skončil spíš o stránku později než dřív.
+ * @param {string} s „před 5 hodinami“, „včera“, „před 3 dny“ …
+ * @returns {{low: number, high: number}|null}
  */
-function ageLowHours(s) {
+function ageRange(s) {
   const t = String(s ?? '')
     .toLowerCase()
     .replace(/\s+/g, ' ')
     .trim();
   if (!t) return null;
+  const r = (low, high) => ({ low: Math.max(0, low), high });
   let m;
-  if (/právě|teď|chvíl|okamžik/.test(t)) return 0;
-  if (/před minutou/.test(t)) return 0;
-  if ((m = /před (\d+) minut/.exec(t))) return Math.max(0, (Number(m[1]) - 1) / 60);
-  if (/před hodinou/.test(t)) return 0.5;
-  if ((m = /před (\d+) hodin/.exec(t))) return Math.max(0, Number(m[1]) - 1);
-  if (/včera/.test(t)) return 20;
-  if (/před dnem/.test(t)) return 20;
-  if ((m = /před (\d+) dn/.exec(t))) return Math.max(0, Number(m[1]) - 1) * 24;
-  if (/před týdnem/.test(t)) return 6 * 24;
-  if ((m = /před (\d+) týdn/.exec(t))) return Math.max(0, Number(m[1]) - 1) * 7 * 24;
-  if (/před měsícem/.test(t)) return 25 * 24;
-  if ((m = /před (\d+) měsíc/.exec(t))) return Math.max(0, Number(m[1]) - 1) * 30 * 24;
-  if (/před rokem/.test(t)) return 300 * 24;
-  if ((m = /před (\d+) (let|rok)/.exec(t))) return Math.max(0, Number(m[1]) - 1) * 365 * 24;
+  if (/právě|teď|chvíl|okamžik/.test(t)) return r(0, 0.1);
+  if (/před minutou/.test(t)) return r(0, 0.1);
+  if ((m = /před (\d+) minut/.exec(t))) return r((Number(m[1]) - 1) / 60, (Number(m[1]) + 1) / 60);
+  if (/před hodinou/.test(t)) return r(0.5, 1.6);
+  if ((m = /před (\d+) hodin/.exec(t))) return r(Number(m[1]) - 1, Number(m[1]) + 1);
+  if (/včera/.test(t)) return r(23, 49);
+  if ((m = /před (\d+) dn/.exec(t))) return r(Math.max(47, (Number(m[1]) - 0.5) * 24 - 1), (Number(m[1]) + 0.5) * 24 + 1);
+  if (/před týdnem/.test(t)) return r(6 * 24, 14 * 24);
+  if ((m = /před (\d+) týdn/.exec(t))) return r((Number(m[1]) - 1) * 7 * 24, (Number(m[1]) + 1) * 7 * 24);
+  if (/před měsícem/.test(t)) return r(29 * 24, 61 * 24);
+  if ((m = /před (\d+) měsíc/.exec(t))) return r(Math.max(59, (Number(m[1]) - 0.5) * 30 - 1) * 24, ((Number(m[1]) + 0.5) * 30 + 1) * 24);
+  if (/před rokem/.test(t)) return r(364 * 24, 732 * 24);
+  if ((m = /před (\d+) (let|rok)/.exec(t))) return r(((Number(m[1]) - 0.5) * 365.25 - 1) * 24, ((Number(m[1]) + 0.5) * 365.25 + 1) * 24);
   return null;
 }
+
+/** Dolní odhad stáří (h) z relativního času posunu, nebo null. */
+const ageLowHours = (s) => ageRange(s)?.low ?? null;
 
 /**
  * Cena z textu webu: „54 999 Kč“ → 54999; jiná měna („1 200 €“) → null + „Cena v EUR: 1 200 €“; bez čísla
@@ -369,7 +376,7 @@ const tagText = (inner, cls) => {
 };
 
 /**
- * Položka výpisu (vnitřek <a class="cb-offer">) → {item, pinned, ageLow, ageText}. Štítek prodejce
+ * Položka výpisu (vnitřek <a class="cb-offer">) → {item, pinned, age: {low, high}|null, ageText}. Štítek prodejce
  * (cb-offer__tag-user) se čte jen jako příznak „--profi“, jméno nikdy.
  */
 function parseListItem(href, inner, pinned, rootLabel) {
@@ -380,7 +387,9 @@ function parseListItem(href, inner, pinned, rootLabel) {
   const timeTag = /<small\s[^>]*class="cb-time-ago"[^>]*>([\s\S]*?)<\/small>/.exec(inner);
   const created = timeTag ? attr(timeTag[0].slice(0, timeTag[0].indexOf('>') + 1), 'title') : null;
   const ageText = timeTag ? clean(timeTag[1]) : '';
-  const sub = clean((/<span class="cb-tag cb-tag--small hidden">([\s\S]*?)<\/span>/.exec(inner) || [])[1]);
+  let sub = clean((/<span class="cb-tag cb-tag--small hidden">([\s\S]*?)<\/span>/.exec(inner) || [])[1]);
+  // Dětská kola mají ve výpisu jen „125-155 cm / 12 let“ (detail: „Dětská kola 24\" / 125-155 cm / …“).
+  if (/^\d{2,3}\s*-\s*\d{2,3}\s*cm\b/.test(sub)) sub = `Dětská kola ${sub}`;
   const location = tagText(inner, 'cb-offer__tag-location') || tagText(inner, 'cb-offer__vertical-location');
   const brand = tagText(inner, 'cb-offer__tag-brand');
   const desc = clean((/<div class="cb-offer__desc[^"]*">([\s\S]*?)<\/div>/.exec(inner) || [])[1]);
@@ -401,11 +410,12 @@ function parseListItem(href, inner, pinned, rootLabel) {
   if (brand) item.params = { Výrobce: brand };
   const photo = photo800(img);
   if (photo) item.photoUrl = photo;
-  return { item, pinned, ageText, ageLow: ageLowHours(ageText) };
+  else if (/class="cb-offer__photo">\s*<picture>\s*<\/picture>/.test(inner)) item.photoCount = 0; // inzerát bez fotek
+  return { item, pinned, ageText, age: ageRange(ageText) };
 }
 
 /**
- * Stránka výpisu (/kola?vp-page=N) → {ok, items: [{item, pinned, ageLow, ageText}], total, page, lastPage, hasNext}.
+ * Stránka výpisu (/kola?vp-page=N) → {ok, items: [{item, pinned, age, ageText}], total, page, lastPage, hasNext}.
  * Přeskakuje TOP karusely (cb-offer--compact / --vertical) a reklamy (cb-offer--ad).
  * @param {string} html
  * @param {{label: string}} [cat] kořenová kategorie (štítek do categorySrc)
@@ -424,7 +434,7 @@ function parseListPage(html, cat = CATEGORIES[0]) {
     ids.add(it.item.sourceId);
     items.push(it);
   }
-  const totalM = /Nalezeno inzerátů:\s*([\d\s ]+)/.exec(s);
+  const totalM = /Nalezeno inzerátů:\s*([\d\s\u00a0]+)/.exec(s);
   const pag = (/<div id="snippet-vp-paginator">([\s\S]*?)<\/div>/.exec(s) || [])[1] || '';
   const pages = [...pag.matchAll(/[?&](?:amp;)?vp-page=(\d+)/g)].map((x) => Number(x[1]));
   const cur = (/cb-btn--current">\s*(\d+)\s*</.exec(pag) || [])[1];
@@ -532,7 +542,8 @@ function parseDetail(html) {
   }
   const crumbs = breadcrumbsOf(blocks);
   const params = paramsTable(s);
-  const cond = clean((/<div class="offer-detail__header">[\s\S]*?class="cb-tag cb-tag--attention">([\s\S]*?)<\/a>/.exec(s) || [])[1]);
+  const header = (/<div class="offer-detail__header">([\s\S]*?)<\/div>/.exec(s) || [])[1] || '';
+  const cond = clean((/class="cb-tag cb-tag--attention"[^>]*>([\s\S]*?)<\/a>/.exec(header) || [])[1]);
   if (cond) params.Stav = cond;
   const times = footerTimes(s);
   if (times['Editováno']) params.Upraveno = times['Editováno'];
@@ -561,7 +572,7 @@ function parseDetail(html) {
   const okres = (/okres\s+(.+)$/i.exec(clean(locHtml)) || [])[1] || null;
 
   // Fotky: JSON v atributu photos=… u <swipe-gallery>
-  let photos = [];
+  let photos = null;
   const galleryTag = (/<swipe-gallery\s[^>]*>/.exec(s) || [])[0] || '';
   const photosAttr = attr(galleryTag, 'photos');
   if (photosAttr) {
@@ -569,11 +580,11 @@ function parseDetail(html) {
       const arr = JSON.parse(photosAttr);
       if (Array.isArray(arr)) photos = arr.filter((p) => p && typeof p === 'object' && p.path && p.filename);
     } catch {
-      photos = [];
+      photos = null; // neznámý formát galerie – počet fotek neuvádět
     }
   }
   const ldImage = Array.isArray(ld?.image) ? ld.image[0] : typeof ld?.image === 'object' ? ld?.image?.url : ld?.image;
-  const photoUrl = (photos[0] && photo800(`${photos[0].path}/${photos[0].filename}`)) || photo800(ldImage) || undefined;
+  const photoUrl = (photos?.[0] && photo800(`${photos[0].path}/${photos[0].filename}`)) || photo800(ldImage) || undefined;
 
   const item = {
     sourceId,
@@ -585,7 +596,7 @@ function parseDetail(html) {
     locationText: city || undefined,
     okres: okres ? okres.trim() : undefined,
     photoUrl,
-    photoCount: photosAttr ? photos.length : photoUrl ? undefined : 0,
+    photoCount: photos ? photos.length : photoUrl || photosAttr ? undefined : 0,
     params,
     sellerType: /cb-seller-box__tag-profi/.test(s) ? 'company' : 'private',
     detailComplete: true,
@@ -685,7 +696,7 @@ async function fetchListPage(ctx, st, cat, page) {
 }
 
 /**
- * Předá položky stránky pipeline. Vrací [{item, pinned, ageLow, known}] pro rozhodnutí o konci průchodu.
+ * Předá položky stránky pipeline. Vrací [{item, pinned, age, known}] pro rozhodnutí o konci průchodu.
  * known = inzerát byl v DB už před touto stránkou (nebo je pod minimální cenou a záměrně se přeskočil).
  */
 async function emitPage(ctx, st, run, parsed) {
@@ -694,7 +705,7 @@ async function emitPage(ctx, st, run, parsed) {
   for (const e of parsed.items) {
     const it = { ...e.item };
     const known = ctx.isKnown?.(it.sourceId) || null;
-    const entry = { item: it, pinned: e.pinned, ageLow: e.ageLow, known: !!known };
+    const entry = { item: it, pinned: e.pinned, age: e.age, known: !!known };
     out.push(entry);
     if (!e.pinned && it.postedAt) run.newestPosted = Math.max(run.newestPosted || 0, Date.parse(it.postedAt));
     if (st.seen.has(it.sourceId)) continue; // už předaný v tomto běhu (posun výpisu mezi stránkami)
@@ -717,18 +728,21 @@ async function emitPage(ctx, st, run, parsed) {
 }
 
 /**
- * Je celá stránka „za obzorem“ (vše už viděno minulým průchodem novinek)? Topované položky nerozhodují.
- * @param {Array<{item: object, pinned: boolean, ageLow: number|null, known: boolean}>} entries
+ * Je celá stránka „za obzorem“ (vše už viděl minulý průchod novinek)? Topované položky nerozhodují.
+ * 1) Podle času posunu (řazení výpisu): každá položka byla posunutá určitě před obzorem, nebo možná před ním a už
+ *    ji známe („včera“ = 24–48 h je hrubé, minulý denní běh ji ale viděl). Neznámá položka s nejistým časem →
+ *    pokračovat (mohla přibýt těsně po startu minulého běhu).
+ * 2) Záloha, když čas posunu nejde přečíst nebo chybí obzor (podle zadání): všechny položky známé a vložené dřív
+ *    než nejnovější známé vložení − 1 den.
+ * @param {Array<{item: object, pinned: boolean, age: {low: number, high: number}|null, known: boolean}>} entries
  * @param {{horizonMs: number|null, newestPostedMs: number|null, fetchedAtMs: number}} h
  */
 function pageIsStale(entries, h) {
   const rows = entries.filter((e) => !e.pinned);
   if (!rows.length) return false;
-  // 1) podle času posunu (řazení výpisu): všechny položky posunuté naposledy před obzorem
-  if (h.horizonMs != null && rows.every((e) => e.ageLow != null)) {
-    return rows.every((e) => h.fetchedAtMs - e.ageLow * 3600e3 < h.horizonMs);
+  if (h.horizonMs != null && rows.every((e) => e.age)) {
+    return rows.every((e) => h.fetchedAtMs - e.age.low * 3600e3 < h.horizonMs || (e.known && h.fetchedAtMs - e.age.high * 3600e3 < h.horizonMs));
   }
-  // 2) záloha: všechny známé a vložené víc než den před nejnovějším známým vložením
   if (h.newestPostedMs != null) {
     return rows.every((e) => e.known && e.item.postedAt && Date.parse(e.item.postedAt) < h.newestPostedMs - DAY_MS);
   }
@@ -736,7 +750,10 @@ function pageIsStale(entries, h) {
 }
 
 /**
- * Novinky: každá kategorie od 1. stránky po obzor. Vrací {done: všechny kategorie došly k obzoru/konci, pagesByCat}.
+ * Novinky: každá kategorie od 1. stránky po obzor. Vrací {done: všechny kategorie došly k obzoru / konci výpisu,
+ * pagesByCat: poslední prošlá stránka v kategorii}. done = false jen kvůli limitu stránek – zbytek mezi
+ * dosaženou stránkou a starým obzorem pak dožene postupný průchod (jinak by se po delší pauze novinky nikdy
+ * nedokončily a průchod by nedostal žádné stránky).
  */
 async function walkNew(ctx, st, run, budget) {
   const maxPages = Math.min(Number(ctx.maxPages) > 0 ? Number(ctx.maxPages) : HARD_MAX_PAGES, HARD_MAX_PAGES);
@@ -848,22 +865,34 @@ async function scan(ctx) {
 
   const budget = { left: maxListPagesOf(ctx) };
   let pagesByCat = {};
+  let listOk = true;
+  // Úplně první běh (bez obzoru i pozice průchodu): novinky nemají s čím srovnat – výpis od 1. stránky projde
+  // rovnou postupný průchod a obzor se nastaví na začátek tohoto běhu.
+  const firstRun = full && !cacheGet(ctx, 'newHorizonAt') && !cacheGet(ctx, 'sweep');
   try {
-    const r = await walkNew(ctx, st, run, budget);
-    pagesByCat = r.pagesByCat;
-    if (r.done) cacheSet(ctx, 'newHorizonAt', startedIso);
-  } catch (e) {
-    fail('výpis novinek', e);
-  }
-  if (run.newestPosted) {
-    const prev = Date.parse(cacheGet(ctx, 'newestPostedAt') || '');
-    if (!Number.isFinite(prev) || run.newestPosted > prev) cacheSet(ctx, 'newestPostedAt', new Date(run.newestPosted).toISOString());
-  }
-  if (full && budget.left > 0) {
-    try {
-      await walkSweep(ctx, st, run, budget, pagesByCat);
-    } catch (e) {
-      fail('průchod výpisu', e);
+    if (!firstRun) {
+      try {
+        const r = await walkNew(ctx, st, run, budget);
+        pagesByCat = r.pagesByCat;
+        if (!r.done) ctx.log?.info?.('Cyklobazar: novinky nedošly k minulému obzoru (limit stránek) – zbytek dožene postupný průchod');
+        cacheSet(ctx, 'newHorizonAt', startedIso);
+      } catch (e) {
+        listOk = false;
+        fail('výpis novinek', e);
+      }
+    }
+    if (full && listOk && budget.left > 0) {
+      try {
+        await walkSweep(ctx, st, run, budget, pagesByCat);
+        if (firstRun) cacheSet(ctx, 'newHorizonAt', startedIso);
+      } catch (e) {
+        fail('průchod výpisu', e);
+      }
+    }
+  } finally {
+    if (run.newestPosted) {
+      const prev = Date.parse(cacheGet(ctx, 'newestPostedAt') || '');
+      if (!Number.isFinite(prev) || run.newestPosted > prev) cacheSet(ctx, 'newestPostedAt', new Date(run.newestPosted).toISOString());
     }
   }
   if (run.belowMin) ctx.log?.debug?.(`Cyklobazar: ${run.belowMin} nových inzerátů pod minimální cenou ${ctx.minPrice} Kč přeskočeno`);
@@ -941,6 +970,7 @@ module.exports = {
   parsePrice,
   pragueToIso,
   ageLowHours,
+  ageRange,
   photo800,
   pageIsStale,
   cooldownUntil,
