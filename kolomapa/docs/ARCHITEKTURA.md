@@ -64,7 +64,7 @@ module.exports = {
 ```
 
 `ctx`: `http` (src/util/http.js – šetrné pauzy, opakování), `getBrowser()` (jen requiresBrowser), `log`, `config`,
-`signal`, `mode` (`'full'` = projít celý výpis, `'incremental'` = skončit, když 3 stránky po sobě přinesou jen známé
+`signal`, `cache` (trvalé `get/set/delete` klíč → JSON pro daný zdroj, např. přeložené lokality), `mode` (`'full'` = projít celý výpis, `'incremental'` = skončit, když 3 stránky po sobě přinesou jen známé
 inzeráty bez změny ceny – pozor na topované inzeráty nahoře), `maxPages`, `minPrice`, `isKnown(sourceId)`,
 `emit(item) → {isNew, changed}`.
 

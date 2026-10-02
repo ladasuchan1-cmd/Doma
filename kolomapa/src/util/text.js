@@ -116,4 +116,15 @@ function truncate(s, n) {
   return (sp > n * 0.6 ? cut.slice(0, sp) : cut).trimEnd() + '…';
 }
 
-module.exports = { decodeEntities, htmlToText, fold, keyOf, parseCzk, parseCzDate, parsePsc, hash, truncate };
+/**
+ * Skryje kontakty, které prodávající napsali do textu inzerátu (telefony, e-maily) – neukládáme osobní údaje.
+ * Telefon: 9 číslic (volitelně +420/00420, mezery/tečky/pomlčky po trojicích); ceny ani roky to nezasáhne.
+ */
+function scrubContacts(s) {
+  if (s == null) return s;
+  return String(s)
+    .replace(/[\w.+-]+@[\w-]+(\.[\w-]+)+/g, '[e-mail skryt]')
+    .replace(/(?<![\d\w])(?:(?:\+|00)\s?42[01][\s.-]?)?[1-9]\d{2}[\s.-]?\d{3}[\s.-]?\d{3}(?![\d])/g, '[telefon skryt]');
+}
+
+module.exports = { decodeEntities, htmlToText, fold, keyOf, parseCzk, parseCzDate, parsePsc, hash, truncate, scrubContacts };

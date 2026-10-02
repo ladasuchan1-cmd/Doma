@@ -16,7 +16,7 @@
 //       sellerType, views, detailComplete (true = položka už obsahuje vše z detailu).
 
 const { tx, nowIso, bind, parseJson } = require('./db');
-const { hash } = require('./util/text');
+const { hash, scrubContacts } = require('./util/text');
 const { classifyListing, CLASSIFIER_VERSION } = require('./classify');
 const { resolveLocation } = require('./geo');
 const pricing = require('./pricing');
@@ -58,6 +58,7 @@ function upsertItem(db, source, item, at, { fromDetail = false } = {}) {
     if (item[k] === undefined) continue;
     let v = item[k];
     if (k === 'params') v = JSON.stringify(v && typeof v === 'object' ? v : {});
+    if (k === 'description' || k === 'title') v = scrubContacts(v);
     row[col] = v;
   }
   if (!existing) {
@@ -98,6 +99,30 @@ function upsertItem(db, source, item, at, { fromDetail = false } = {}) {
     db.prepare('INSERT OR IGNORE INTO price_history (listing_id, at, price_czk) VALUES (?, ?, ?)').run(existing.id, at, row.price_czk);
   }
   return { id: existing.id, isNew: false, changed };
+}
+
+/**
+ * Trvalá cache pro zdroj (tabulka settings, klíče „cache:<zdroj>:<klíč>“) – např. přeložené lokality nebo stav
+ * inkrementálního průchodu. Hodnoty jsou JSON.
+ * @returns {{get(key: string): any, set(key: string, value: any): void, delete(key: string): void}}
+ */
+function makeCache(db, sourceKey) {
+  const prefix = `cache:${sourceKey}:`;
+  const getStmt = db.prepare('SELECT value FROM settings WHERE key = ?');
+  const setStmt = db.prepare('INSERT INTO settings (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value');
+  const delStmt = db.prepare('DELETE FROM settings WHERE key = ?');
+  return {
+    get(key) {
+      const row = getStmt.get(prefix + key);
+      return row ? parseJson(row.value, null) : undefined;
+    },
+    set(key, value) {
+      setStmt.run(prefix + key, JSON.stringify(value ?? null));
+    },
+    delete(key) {
+      delStmt.run(prefix + key);
+    },
+  };
 }
 
 /** Klasifikace + vytěžení údajů pro inzeráty bez klasifikace nebo se změněným obsahem / starší verzí klasifikátoru. */
@@ -235,6 +260,7 @@ async function runPipeline(o) {
         mode: s.mode,
         maxPages: config.maxPages,
         minPrice: config.minPrice,
+        cache: makeCache(db, src.key),
         isKnown: (sourceId) => db.prepare('SELECT id, price_czk, title, detail_at, gone_at FROM listings WHERE source = ? AND source_id = ?').get(src.key, String(sourceId)) || null,
         emit: async (item) => {
           s.scanned++;
@@ -324,4 +350,4 @@ async function runPipeline(o) {
   return { runId, status, stats, error };
 }
 
-module.exports = { runPipeline, upsertItem, classifyPending, geocodePending, contentHash, markMissing };
+module.exports = { runPipeline, upsertItem, classifyPending, geocodePending, contentHash, markMissing, makeCache };

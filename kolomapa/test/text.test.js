@@ -28,3 +28,12 @@ test('fold, keyOf, parseCzDate, parsePsc, hash, truncate', () => {
   assert.notEqual(t.hash('a'), t.hash('b'));
   assert.equal(t.truncate('jedna dva tři čtyři', 10), 'jedna dva…');
 });
+
+test('scrubContacts: skryje telefony a e-maily, ceny a roky nechá', () => {
+  const s = t.scrubContacts('Volejte 777 123 456 nebo +420 602-111-222, mail jan.novak@seznam.cz. Cena 12 500 Kč, rok 2021, 150 000 Kč, rám 19".');
+  assert.ok(!s.includes('777 123 456'));
+  assert.ok(!s.includes('602-111-222'));
+  assert.ok(!s.includes('seznam.cz'));
+  assert.ok(s.includes('12 500 Kč') && s.includes('2021') && s.includes('150 000 Kč'));
+  assert.equal(t.scrubContacts(null), null);
+});

@@ -133,3 +133,20 @@ test('runPipeline: chyba zdroje → partial, ostatní kroky proběhnou', async (
   assert.equal(r.stats.sources.bad.error, 'captcha');
   assert.equal(r.stats.sources.fake.new, 1);
 });
+
+test('ctx.cache: trvalá cache zdroje přes běhy', async () => {
+  const db = openDb(':memory:');
+  const seen = [];
+  const src = {
+    key: 'c',
+    label: 'C',
+    async scan(ctx) {
+      seen.push(ctx.cache.get('loc:1'));
+      ctx.cache.set('loc:1', { lat: 49.1, lon: 16.6 });
+      return { complete: false };
+    },
+  };
+  await runPipeline({ db, config, sources: [src] });
+  await runPipeline({ db, config, sources: [src] });
+  assert.deepEqual(seen, [undefined, { lat: 49.1, lon: 16.6 }]);
+});
