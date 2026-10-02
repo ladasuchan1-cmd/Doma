@@ -97,14 +97,22 @@ async function fetchText(ctx, url, { okStatuses = [], accept } = {}) {
   return { status: res.status, url: res.url || url, text: String(res.text() ?? '') };
 }
 
+// Chybový JSON objekt API, který zní jako omezení („too many requests“, „blocked“ …) = blokace, ne změna schématu.
+const API_BLOCK_RX = /too\s*many|rate.?limit|throttl|blocked|banned|zablokov|captcha|p[řr][íi]li[šs]\s+mnoho/i;
+
 /** JSON odpověď API; HTML/captcha místo JSONu → blokace, jiný nesmysl → chyba schématu. */
 function parseApiJson(ctx, text, url) {
+  let data;
   try {
-    return JSON.parse(text);
+    data = JSON.parse(text);
   } catch {
     if (BLOCK_RX.test(text)) throw markBlocked(ctx, 'captcha / ověření místo dat', url);
     throw new Error(`Bazoš API vrátilo neplatný JSON (${url}): ${text.slice(0, 120).replace(/\s+/g, ' ')}`);
   }
+  if (data && typeof data === 'object' && !Array.isArray(data) && data.id == null && data.status !== 'deleted' && API_BLOCK_RX.test(text.slice(0, 2000))) {
+    throw markBlocked(ctx, `API: ${text.slice(0, 80).replace(/\s+/g, ' ')}`, url);
+  }
+  return data;
 }
 
 // ---------------------------------------------------------------- pomocníci
@@ -353,7 +361,8 @@ function parseApiDetail(data, expectId) {
   const c = validCoord(x.latitude, x.longitude);
   if (c) Object.assign(item, c);
   if (!toBool(x.topped)) {
-    const posted = rfcToIso(x.from) || pragueLocalToIso(x.from);
+    // Nejdřív přesný formát „YYYY-MM-DD HH:MM:SS“ (pražský čas) – Date.parse by ho bral v časovém pásmu serveru.
+    const posted = pragueLocalToIso(x.from) || rfcToIso(x.from);
     if (posted) item.postedAt = posted;
   }
   return { gone: false, item, categoryId };
@@ -439,8 +448,10 @@ async function emitItem(ctx, run, item) {
 }
 
 /**
- * Projde stránky jedné kategorie přes API. Vrací {complete, pages, positions, apiFailed}.
- * apiFailed = API neodpovědělo hned na 1. stránce (→ zkusit HTML).
+ * Projde stránky jedné kategorie přes API. Vrací {complete, pages, positions, endedShort, apiFailed}.
+ * apiFailed = API neodpovědělo hned na 1. stránce nebo ji vrátilo prázdnou (→ zkusit HTML).
+ * endedShort = poslední neprázdná stránka byla kratší než limit (přirozený konec výpisu; prázdná stránka hned po
+ * plné stránce může být i omezení ze strany webu).
  */
 async function scanApi(ctx, cat, run) {
   const full = ctx.mode === 'full';
@@ -448,6 +459,8 @@ async function scanApi(ctx, cat, run) {
   let offset = 0;
   let pages = 0;
   let stale = 0;
+  let lastLen = 0;
+  let noFresh = 0;
   for (;;) {
     throwIfAborted(ctx);
     if (pages >= maxPages) {
@@ -462,6 +475,8 @@ async function scanApi(ctx, cat, run) {
       raw = parseApiJson(ctx, res.text, url);
       list = parseApiList(raw, cat); // jiný JSON než pole → chyba
       if (raw.length && !list.length) throw new Error(`Bazoš API: výpis ${cat.label} má neznámý formát položek`);
+      // Neznámá (přečíslovaná) kategorie vrací [] se stavem 200 (ověřeno živě) – kategorie s koly prázdná nebývá.
+      if (pages === 0 && !raw.length) throw new Error(`Bazoš API: prázdný výpis kategorie ${cat.label}`);
     } catch (e) {
       if (isBlocked(e) || ctx.signal?.aborted) throw e;
       if (pages === 0) return { complete: false, pages, positions: 0, apiFailed: e };
@@ -470,7 +485,8 @@ async function scanApi(ctx, cat, run) {
     pages++;
     // Posun o skutečný počet vrácených pozic (stránka může mít i méně než limit) – konec až u prázdné stránky.
     offset += raw.length;
-    if (!raw.length) return { complete: true, pages, positions: offset };
+    if (!raw.length) return { complete: true, pages, positions: offset, endedShort: lastLen < API_LIMIT };
+    lastLen = raw.length;
     let fresh = 0;
     let nonTop = 0;
     let nonTopKnown = 0;
@@ -485,10 +501,13 @@ async function scanApi(ctx, cat, run) {
     }
     ctx.log?.debug?.(`Bazoš ${cat.label}: API stránka ${pages}`, { offset, items: list.length, fresh, nonTop, nonTopKnown });
     if (!fresh) {
-      // Stránka bez jediného nového ID = API ignoruje offset nebo se zacyklilo → raději neúplný průchod.
-      ctx.log?.warn?.(`Bazoš ${cat.label}: API vrací stále stejné inzeráty (offset ${offset}) – končím kategorii`);
-      return { complete: false, pages, positions: offset };
-    }
+      // Krátká stránka samých viděných ID = posun výpisu (během průchodu přibyly nové inzeráty nahoře) → pokračovat.
+      // Velká nebo opakovaná = API ignoruje offset / zacyklilo se → raději neúplný průchod.
+      if (raw.length >= 50 || ++noFresh >= 2) {
+        ctx.log?.warn?.(`Bazoš ${cat.label}: API vrací stále stejné inzeráty (offset ${offset}) – končím kategorii`);
+        return { complete: false, pages, positions: offset };
+      }
+    } else noFresh = 0;
     if (!full && nonTop > 0) {
       stale = nonTopKnown === nonTop ? stale + 1 : 0;
       if (stale >= STALE_PAGES_TO_STOP) return { complete: false, pages, positions: offset, stoppedEarly: true };
@@ -496,22 +515,34 @@ async function scanApi(ctx, cat, run) {
   }
 }
 
+/** Leží URL ve výpisu dané kategorie (stejný host, cesta pod cat.path)? */
+function inCategoryList(u, cat) {
+  try {
+    const x = new URL(u);
+    return x.host === cat.host && x.pathname.startsWith(cat.path);
+  } catch {
+    return false;
+  }
+}
+
 /**
- * Projde HTML stránky výpisu od startOffset (záloha za API / ověření konce výpisu). Vrací {complete, pages, ok}.
- * @param {{verify?: boolean}} o verify = ověřovací stránka po API: chyba 1. stránky nevadí (API skončilo řádně)
+ * Projde HTML stránky výpisu od startOffset (záloha za API / ověření konce výpisu). Vrací {complete, pages, ok, total}.
+ * @param {{verify?: boolean, apiEndedShort?: boolean, pagesUsed?: number}} o verify = ověřovací stránka po API:
+ *   když selže, platí výsledek API – ale jen pokud API skončilo přirozeně kratší stránkou (apiEndedShort)
  */
-async function scanHtml(ctx, cat, run, startOffset, { verify = false, pagesUsed = 0 } = {}) {
+async function scanHtml(ctx, cat, run, startOffset, { verify = false, apiEndedShort = false, pagesUsed = 0 } = {}) {
   const full = ctx.mode === 'full';
   const maxPages = Math.min(Number(ctx.maxPages) > 0 ? Number(ctx.maxPages) : HARD_MAX_PAGES, HARD_MAX_PAGES);
   let url = htmlListUrl(cat, startOffset);
   let pages = 0;
   let stale = 0;
+  let total = null;
   while (url) {
     throwIfAborted(ctx);
     // Jedna ověřovací stránka po API se do limitu nepočítá.
     if (!(verify && pages === 0) && pagesUsed + pages >= maxPages) {
       ctx.log?.[full ? 'warn' : 'debug']?.(`Bazoš ${cat.label}: dosažen limit ${maxPages} stránek výpisu (KOLOMAPA_MAX_PAGES)`);
-      return { complete: false, pages, ok: true };
+      return { complete: false, pages, ok: true, total };
     }
     const offset = offsetOfHtmlUrl(url);
     let page;
@@ -519,24 +550,36 @@ async function scanHtml(ctx, cat, run, startOffset, { verify = false, pagesUsed 
     try {
       const res = await fetchText(ctx, url, { okStatuses: [404] });
       status = res.status;
+      // Přesměrování mimo výpis kategorie (zrušená / přejmenovaná kategorie) → cizí inzeráty nebrat.
+      if (!inCategoryList(res.url, cat)) throw new Error(`Bazoš: výpis ${cat.label} přesměrován jinam (${res.url})`);
       page = parseListHtml(res.text, url, cat);
-      if (!page.ok && status !== 404) {
+      if (status === 404) {
+        // 404 za koncem výpisu: hlavička „Zobrazeno … z N“ s N ≤ offset a žádné inzeráty (ověřeno živě).
+        // Neexistující kategorie vrací 404 s inzeráty CELÉ sekce (a „Další“ na /20/) → nikdy je nepřebírat.
+        if (offset === 0 || page.items.length || (page.total != null && page.total > offset)) {
+          throw new Error(`Bazoš: výpis ${cat.label} neexistuje (HTTP 404 ${url})`);
+        }
+      } else if (!page.ok) {
         if (BLOCK_RX.test(res.text)) throw markBlocked(ctx, 'captcha / ověření místo výpisu', url);
         throw new Error(`Bazoš: stránka výpisu ${url} nemá očekávanou podobu (změna webu?)`);
       }
     } catch (e) {
       if (isBlocked(e) || ctx.signal?.aborted) throw e;
       if (verify && pages === 0) {
-        ctx.log?.warn?.(`Bazoš ${cat.label}: kontrola konce výpisu přes HTML selhala – beru výsledek API`, { url, error: e.message });
-        return { complete: true, pages, ok: false };
+        ctx.log?.warn?.(
+          `Bazoš ${cat.label}: kontrola konce výpisu přes HTML selhala – ${apiEndedShort ? 'beru výsledek API' : 'API skončilo podezřele (prázdná stránka po plné), průchod beru jako neúplný'}`,
+          { url, error: e.message }
+        );
+        return { complete: apiEndedShort, pages, ok: false, total };
       }
       throw e;
     }
     pages++;
-    if (status === 404 && !page.items.length) return { complete: true, pages, ok: true }; // za koncem výpisu
+    if (page.total != null) total = page.total;
+    if (status === 404) return { complete: true, pages, ok: true, total }; // za koncem výpisu
     if (page.first != null && page.items.length && page.first !== offset + 1) {
       ctx.log?.warn?.(`Bazoš ${cat.label}: HTML stránkování nesouhlasí (čekal jsem ${offset + 1}, web ukazuje ${page.first})`, { url });
-      return { complete: verify && pages === 1 && !page.next, pages, ok: false };
+      return { complete: verify && pages === 1 && !page.next, pages, ok: false, total };
     }
     let fresh = 0;
     let nonTop = 0;
@@ -560,21 +603,25 @@ async function scanHtml(ctx, cat, run, startOffset, { verify = false, pagesUsed 
     }
     if (!full && nonTop > 0) {
       stale = nonTopKnown === nonTop ? stale + 1 : 0;
-      if (stale >= STALE_PAGES_TO_STOP) return { complete: false, pages, ok: true };
+      if (stale >= STALE_PAGES_TO_STOP) return { complete: false, pages, ok: true, total };
     }
     const next = page.next;
-    if (!next) return { complete: true, pages, ok: true };
-    if (offsetOfHtmlUrl(next) <= offset) {
-      ctx.log?.warn?.(`Bazoš ${cat.label}: odkaz „Další“ nevede dál (${next}) – končím kategorii`);
-      return { complete: false, pages, ok: false };
+    if (!next) return { complete: true, pages, ok: true, total };
+    if (!inCategoryList(next, cat) || offsetOfHtmlUrl(next) <= offset) {
+      ctx.log?.warn?.(`Bazoš ${cat.label}: odkaz „Další“ nevede dál ve výpisu kategorie (${next}) – končím kategorii`);
+      return { complete: false, pages, ok: false, total };
     }
     url = next;
   }
-  return { complete: true, pages, ok: true };
+  return { complete: true, pages, ok: true, total };
 }
+
+/** Kolik různých inzerátů kategorie musí průchod vidět vůči počtu, který uvádí web („Zobrazeno … z N“). */
+const MIN_SEEN_RATIO = 0.9;
 
 async function scanCategory(ctx, cat, run) {
   const before = run.emitted;
+  const seenBefore = run.seen.size;
   const api = await scanApi(ctx, cat, run);
   let complete = api.complete;
   let html = null;
@@ -585,8 +632,20 @@ async function scanCategory(ctx, cat, run) {
   } else if (ctx.mode === 'full' && api.complete) {
     // Ověření konce: HTML stránka, kde API skončilo. Má-li „Další“, API vrátilo jen část výpisu → pokračovat HTML.
     const start = Math.max(0, Math.floor((api.positions - 1) / HTML_PAGE_SIZE) * HTML_PAGE_SIZE);
-    html = await scanHtml(ctx, cat, run, start, { verify: true, pagesUsed: api.pages });
+    html = await scanHtml(ctx, cat, run, start, { verify: true, apiEndedShort: !!api.endedShort, pagesUsed: api.pages });
     complete = html.complete;
+  }
+  // Pojistky proti „úplnému“ průchodu, který ve skutečnosti úplný není (pipeline by pak označila živé inzeráty jako
+  // zmizelé): kategorie s koly není nikdy prázdná a počet viděných inzerátů musí odpovídat počtu na webu.
+  const seenCat = run.seen.size - seenBefore;
+  if (ctx.mode === 'full' && complete) {
+    if (!seenCat) {
+      ctx.log?.warn?.(`Bazoš ${cat.label}: průchod nenašel žádný inzerát – beru jako neúplný`);
+      complete = false;
+    } else if (html?.total && seenCat < html.total * MIN_SEEN_RATIO) {
+      ctx.log?.warn?.(`Bazoš ${cat.label}: viděno jen ${seenCat} z ${html.total} inzerátů, které uvádí web – beru jako neúplný průchod`);
+      complete = false;
+    }
   }
   ctx.log?.info?.(`Bazoš ${cat.label}: ${run.emitted - before} inzerátů`, {
     apiPages: api.pages,

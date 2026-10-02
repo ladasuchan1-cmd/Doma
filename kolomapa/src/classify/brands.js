@@ -30,7 +30,7 @@ const BRANDS = [
       ['\\bhotwalk\\b', 'balance'],
       ['\\b(hotrock|riprock|jett)\\b', 'kids'],
       ['\\bstumpjumper (ht|hardtail)\\b|\\bepic (ht|hardtail)\\b', 'mtb_hardtail'],
-      ['\\b(stumpjumper|stumpy|enduro|epic|camber|demo|status|fsr|safire|era|rumor|big hit|pitch fsr)\\b', 'mtb_full'],
+      ['\\b(stumpjumper|stumpy|enduro|epic|camber|demo|status|fsr|safire|era|rumor|big hit|pitch fsr|sx trail|sx|kenevo sl)\\b', 'mtb_full'],
       ['\\b(rockhopper|rock hopper|chisel|fuse|pitch|hardrock|hard rock|myka|stumpjumper m2|jynx)\\b', 'mtb_hardtail'],
       ['\\b(diverge|crux|sequoia|awol)\\b', 'gravel'],
       ['\\b(tarmac|allez|roubaix|aethos|venge|shiv|ruby|dolce|amira|transition)\\b', 'road'],
@@ -398,6 +398,11 @@ const BRANDS = [
   { name: 'Argon 18', tier: 4, aliases: ['argon 18', 'argon18'], kind: 'road' },
   { name: '3T', tier: 4, aliases: ['3t'], models: [['\\b(exploro|racemax|extrema)\\b', 'gravel']], kind: 'road' },
   { name: 'Open', tier: 5, aliases: ['open cycle', 'opencycle', 'open u p', 'open wi de', 'open up'], models: [['.', 'gravel']] },
+  { name: 'Eddy Merckx', tier: 4, aliases: ['eddy merckx', 'merckx'], kind: 'road' },
+  { name: 'Gianni Motta', tier: 3, aliases: ['gianni motta'], kind: 'road' },
+  { name: 'McKenzie', tier: 1, aliases: ['mckenzie', 'mc kenzie'] },
+  { name: 'Madison', tier: 1, aliases: ['madison'], strict: true },
+  { name: 'Duratec', tier: 2, aliases: ['duratec'] },
   { name: 'Storck', tier: 4, aliases: ['storck'], kind: 'road' },
   { name: 'Cipollini', tier: 4, aliases: ['cipollini'], kind: 'road' },
   { name: 'Kuota', tier: 3, aliases: ['kuota'], kind: 'road' },
@@ -471,7 +476,7 @@ const BRANDS = [
 
   // --- české a slovenské značky ---
   {
-    name: 'Author', tier: 2, aliases: ['author', 'authror', 'auhtor', 'authora'], strict: true,
+    name: 'Author', tier: 2, aliases: ['author', 'authror', 'auhtor', 'authora', 'aithor', 'athor', 'autor', 'authour'], strict: true,
     models: [
       ['\\b(engine|integra|a matrix|e matrix)\\b', 'ebike_mtb'],
       ['\\b(jet|cosmic|smart|stylo|orbit|bello|magic|energy|limit|agang|cyclone|gift|cocoo|floppy|neon|basic)\\b', 'kids'],
@@ -503,6 +508,7 @@ const BRANDS = [
       ['\\b(tygon|tayen|hacker r|e gate|tyger)\\b', 'ebike_mtb'],
       ['\\b(estima|e carson|e cristy|e phanatic|e cristy|e clea|e carter)\\b', 'ebike_trekking'],
       ['\\b(kiter|lumi|wasper|marc|naga|cookie|caprice|pirate|lumi|kitty|blaze|rider|wasper|madman 24|spider 10|spider 20)\\b', 'kids'],
+      ['\\b(whip|gear|sniper)\\b', 'dirt'],
       ['\\b(tyon|thorx|swag|slanger|tnt|eraser)\\b', 'mtb_full'],
       ['\\b(spider|gate|desert|hacker|madman|viper|vanity|mojo|zebra|spy|tnt|alpha|lock|frontrunner)\\b', 'mtb_hardtail'],
       ['\\b(soot|nebula)\\b', 'gravel'],

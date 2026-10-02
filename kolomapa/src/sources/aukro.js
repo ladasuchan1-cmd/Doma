@@ -16,17 +16,26 @@
 //    CELÝ výpis (i v inkrementálním režimu; je to jen ~10 stránek).
 //  - Detail: GET /backend-web/api/offers/{id}/offerDetail → plný popis, fotka, počet fotek a zobrazení.
 //    Když API odpoví 4xx (kromě 404/410 = nabídka neexistuje a 429), zkusí se HTML stránka a JSON, který do ní
-//    Angular vkládá v <script id="ng-state"> (SSR). Totéž pro výpis (jen při chybě hned první stránky).
+//    Angular vkládá v <script id="ng-state"> (SSR); po 3 odmítnutích po sobě už do konce běhu rovnou HTML.
+//    Totéž pro výpis (jen při chybě hned první stránky).
+//  - Pojistky proti změně API: výpis jiné kategorie → chyba; detail hlásící konec u mnoha nabídek z dnešního výpisu
+//    → chyba (ne hromadné „zmizení“); odpověď detailu pro jinou nabídku → chyba.
 //  - Zahraniční prodejci (PSČ mimo ^[1-7]\d{4}$ nebo registrace mimo CZ) se přeskakují – mapa je jen ČR.
 //  - Aukce: běžící příhoz NENÍ cena kola (aukce často začínají na 1 Kč) → priceCzk = null a cena jen v priceNote,
 //    pokud nabídka nemá zároveň „Kup teď“ (pak priceCzk = cena Kup teď).
 //  - Jméno, login ani id prodávajícího se neukládá; z popisu se odstraní telefonní čísla a e-maily.
 
-const { htmlToText, fold, scrubContacts } = require('../util/text');
+const { htmlToText, fold, scrubContacts, decodeEntities } = require('../util/text');
 
 const BASE = 'https://aukro.cz';
 const CATEGORY_SEO = 'jizdni-kola';
 const CATEGORY_ID = 17590;
+// Podkategorie kol (pro případ, že by API vrátilo jen list stromu bez předků).
+const BIKE_CATEGORY_IDS = new Set([CATEGORY_ID, 17594, 256788, 63317, 17596, 17595, 147974, 17592, 17591, 17598, 17597]);
+const BIKE_CATEGORY_SEO = new Set([
+  CATEGORY_SEO, 'horska-mtb-kola', 'gravel-bike-kola', 'krosova-kola', 'trekkingova-kola', 'silnicni-kola', 'elektrokola',
+  'detska-kola', 'kola-bmx-a-freestyle', 'historicka-kola', 'ostatni-kola',
+]);
 const PAGE_SIZE = 180;
 const SORT = 'startingTime:DESC';
 const SEARCH_BODY = { categorySeoUrl: CATEGORY_SEO, splitGroups: {}, fallbackItemsCount: 0, subbrandExclusive: false };
@@ -35,6 +44,8 @@ const API_HEADERS = { Accept: API_ACCEPT, 'X-Accept-Subbrand': 'BAZAAR' };
 const HTML_ACCEPT = 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8';
 /** Rezerva po plánovaném konci nabídky (aukce se při příhozu na poslední chvíli může prodloužit). */
 const END_GRACE_MS = 30 * 60 * 1000;
+/** Po kolika odmítnutích API detailu (4xx) po sobě jít do konce běhu rovnou na HTML stránky (~1 MB místo ~20 kB). */
+const SSR_SWITCH_AFTER = 3;
 
 // Atributy Aukra (název bez diakritiky → štítek v params). Web má v názvu překlep „Materíál rámu“.
 const ATTR_LABELS = {
@@ -61,7 +72,10 @@ const searchUrl = (page) => `${BASE}/backend-web/api/offers/searchItemsCommon?pa
 const detailUrl = (id) => `${BASE}/backend-web/api/offers/${id}/offerDetail?pageType=DETAIL&requestedFor=DETAIL`;
 /** HTML stránka výpisu pro SSR záložku (v UI je stránkování od 1). */
 const listingPageUrl = (page) => `${BASE}/${CATEGORY_SEO}?sort=${SORT}${page > 0 ? `&page=${page + 1}` : ''}`;
-const offerUrl = (seoUrl, id) => `${BASE}/${seoUrl ? `${seoUrl}-` : ''}${id}`;
+function offerUrl(seoUrl, id) {
+  const slug = String(seoUrl ?? '').replace(/[^a-z0-9-]/gi, '').replace(/^-+|-+$/g, '');
+  return `${BASE}/${slug ? `${slug}-` : ''}${id}`;
+}
 
 function throwIfAborted(signal) {
   if (signal?.aborted) throw signal.reason || new Error('Přerušeno');
@@ -125,9 +139,14 @@ function parseCzDateTime(s) {
   const [d, mo, y, h, mi] = m.slice(1).map(Number);
   if (mo < 1 || mo > 12 || d < 1 || d > 31 || h > 23 || mi > 59) return null;
   const naive = Date.UTC(y, mo - 1, d, h, mi);
-  const p = pragueParts(naive);
-  const offset = Date.UTC(p.year, p.month - 1, p.day, p.hour, p.minute) - naive; // posun Prahy vůči UTC
-  return naive - offset;
+  // Posun Prahy vůči UTC (+1 h / +2 h); druhý krok opraví noci přechodu na letní/zimní čas.
+  const offsetAt = (ms) => {
+    const p = pragueParts(ms);
+    return Date.UTC(p.year, p.month - 1, p.day, p.hour, p.minute) - Math.floor(ms / 60000) * 60000;
+  };
+  let t = naive - offsetAt(naive);
+  t = naive - offsetAt(t);
+  return t;
 }
 
 function toIso(s) {
@@ -135,11 +154,15 @@ function toIso(s) {
   return s && Number.isFinite(ms) ? new Date(ms).toISOString() : undefined;
 }
 
-const clean = (s) => String(s ?? '').replace(/\s+/g, ' ').trim();
+/** Text z API → jeden řádek bez nadbytečných mezer (případné HTML entity dekódované). */
+const clean = (s) => decodeEntities(String(s ?? '')).replace(/\s+/g, ' ').trim();
+
+/** PSČ z API bez mezer (i nezlomitelných) a bez předpony „CZ“/„CZ-“. */
+const pscDigits = (pc) => String(pc ?? '').replace(/\s+/g, '').replace(/^CZ-?/i, '');
 
 /** PSČ → 5 číslic bez mezery, jen české (^[1-7]\d{4}$); jinak undefined. */
 function czPsc(pc) {
-  const d = String(pc ?? '').replace(/\s+/g, '');
+  const d = pscDigits(pc);
   return /^[1-7]\d{4}$/.test(d) ? d : undefined;
 }
 
@@ -151,7 +174,20 @@ function cleanLocation(s) {
 /** Hlavní fotka ve velikosti 730×548 (výpis dává náhled /thumbnail/; stejný soubor je i v detailu jako LARGE). */
 function largePhoto(u) {
   if (!u || typeof u !== 'string') return undefined;
-  return u.replace(/\/(thumbnail|400x300|73x73)\//, '/730x548/');
+  const abs = u.startsWith('//') ? `https:${u}` : u;
+  if (!/^https?:\/\//i.test(abs)) return undefined;
+  return abs.replace(/\/(thumbnail|400x300|73x73)\//, '/730x548/');
+}
+
+/** Cesta kategorií (výpis: categoryPath, detail: category) obsahuje kola? null = cesta chybí. */
+function inBikeCategory(path) {
+  if (!Array.isArray(path) || !path.length) return null;
+  return path.some((c) => BIKE_CATEGORY_IDS.has(Number(c?.id ?? c?.itemCategoryId)) || BIKE_CATEGORY_SEO.has(c?.seoUrl));
+}
+
+/** Celá cesta kategorií (s předky) a kola v ní nejsou → nabídka je mimo kola. Jen list stromu / chybí → nevím (false). */
+function outsideBikes(path) {
+  return Array.isArray(path) && path.length >= 2 && inBikeCategory(path) === false;
 }
 
 /** Kategorie na webu = poslední prvek cesty („Horská (MTB) kola“); kořen „Cyklobazar“ → „Kola“. */
@@ -225,7 +261,7 @@ function buildParams(attributes, { retailPrice, offerType, endingTime } = {}) {
 function isForeignSeller(raw) {
   const domain = raw?.seller?.registrationDomain;
   if (domain && String(domain).toUpperCase() !== 'CZ') return true;
-  const pc = String(raw?.postcode ?? '').replace(/\s+/g, '');
+  const pc = pscDigits(raw?.postcode);
   return pc !== '' && !/^[1-7]\d{4}$/.test(pc);
 }
 
@@ -270,7 +306,7 @@ function normalizeDetail(d) {
   const rawId = d?.itemId ?? d?.id;
   if (!d || rawId == null) return null;
   const id = String(rawId);
-  const auction = typeof d.auction === 'boolean' ? d.auction : /BID/i.test(String(d.itemType || ''));
+  const auction = typeof d.auction === 'boolean' ? d.auction : /BID|AUCTION/i.test(String(d.itemType || ''));
   const offer = offerInfo({
     auction,
     buyNowActive: d.buyNowActive,
@@ -310,8 +346,7 @@ function isGoneOffer(d) {
   if (!d || typeof d !== 'object') return false;
   if (d.state && String(d.state).toUpperCase() !== 'ACTIVE') return true;
   if (d.itemArchived === true) return true;
-  if (Array.isArray(d.category) && d.category.length && !d.category.some((c) => c?.id === CATEGORY_ID || c?.seoUrl === CATEGORY_SEO)) return true;
-  return false;
+  return outsideBikes(d.category);
 }
 
 // ---------------------------------------------------------------------------------------------------------------
@@ -382,10 +417,13 @@ function parseSsrSearch(html) {
 // ---------------------------------------------------------------------------------------------------------------
 // Síť (výhradně přes ctx.http – šetrné pauzy a opakování řeší src/util/http.js)
 
-const runState = new WeakMap(); // ctx → {detailViaSsr}
+// Stav jednoho běhu (pipeline vytváří pro každý běh nový ctx):
+//  apiRejects – odmítnutí API detailu (4xx) po sobě; od SSR_SWITCH_AFTER rovnou HTML stránky,
+//  listed – id nabídek z dnešního výpisu, details / goneListed – pojistka proti hromadnému „zmizení“ (viz detail()).
+const runState = new WeakMap();
 function stateOf(ctx) {
   let s = runState.get(ctx);
-  if (!s) runState.set(ctx, (s = { detailViaSsr: false }));
+  if (!s) runState.set(ctx, (s = { apiRejects: 0, listed: new Set(), details: 0, goneListed: 0 }));
   return s;
 }
 
@@ -424,15 +462,18 @@ async function fetchSearchSsr(ctx, page) {
  */
 async function fetchDetailJson(ctx, id, pageUrl) {
   const st = stateOf(ctx);
-  if (!st.detailViaSsr) {
+  if (st.apiRejects < SSR_SWITCH_AFTER) {
     try {
       const res = await ctx.http.request(detailUrl(id), { accept: API_ACCEPT, headers: API_HEADERS, okStatuses: [404, 410], signal: ctx.signal });
+      st.apiRejects = 0;
       if (res.status === 404 || res.status === 410) return null;
       return res.json();
     } catch (e) {
       if (!ssrWorthy(e, { detail: true })) throw e;
-      st.detailViaSsr = true; // API detailu odmítá → do konce běhu rovnou HTML stránky
-      ctx.log?.warn?.('Aukro: API detailu odpovědělo chybou, zkouším HTML stránky nabídek (SSR)', { status: e.status });
+      // Jednorázové odmítnutí → HTML jen pro tuto nabídku; opakované → do konce běhu rovnou HTML stránky.
+      st.apiRejects++;
+      const msg = st.apiRejects >= SSR_SWITCH_AFTER ? 'do konce běhu beru HTML stránky nabídek (SSR)' : 'zkouším HTML stránku nabídky (SSR)';
+      ctx.log?.warn?.(`Aukro: API detailu odpovědělo chybou, ${msg}`, { status: e.status, id });
     }
   }
   const res = await ctx.http.request(pageUrl || offerUrl(null, id), { accept: HTML_ACCEPT, okStatuses: [404, 410], signal: ctx.signal });
@@ -440,6 +481,12 @@ async function fetchDetailJson(ctx, id, pageUrl) {
   const d = parseSsrDetail(res.text(), id);
   if (!d) throw new Error(`Aukro: HTML stránka nabídky ${id} neobsahuje data detailu (ng-state)`);
   return d;
+}
+
+/** Odpověď detailu patří jiné nabídce (přesměrování / změna API) → chyba, ne data cizí nabídky. */
+function checkDetailId(d, id) {
+  const got = d?.itemId ?? d?.id;
+  if (got != null && String(got) !== id) throw new Error(`Aukro: detail nabídky ${id} vrátil nabídku ${got}`);
 }
 
 function listingId(listing) {
@@ -455,7 +502,7 @@ function listingId(listing) {
  * Projde celý výpis kategorie kol (všechny stránky, i v inkrementálním režimu – topované nabídky jsou nahoře).
  * complete = došel na poslední stránku bez chyby, počet unikátních nabídek ≈ totalElements a režim je 'full'.
  * @param {object} ctx viz docs/ARCHITEKTURA.md
- * @returns {Promise<{complete: boolean, total: number|null, unique: number, emitted: number, foreign: number, cheap: number, viaSsr: boolean}>}
+ * @returns {Promise<{complete: boolean, total: number|null, unique: number, emitted: number, foreign: number, cheap: number, offCategory: number, viaSsr: boolean}>}
  */
 async function scan(ctx) {
   const log = ctx.log;
@@ -469,7 +516,9 @@ async function scan(ctx) {
   let foreign = 0;
   let cheap = 0;
   let invalid = 0;
+  let offCategory = 0;
   let viaSsr = false;
+  const st = stateOf(ctx);
   let reachedEnd = false;
 
   while (page < totalPages) {
@@ -495,6 +544,8 @@ async function scan(ctx) {
     if (Number.isFinite(info.number) && info.number !== page) {
       throw new Error(`Aukro: výpis vrátil stranu ${info.number + 1} místo ${page + 1}`);
     }
+    // API by při změně mohlo tělo hledání ignorovat a vrátit jiný výpis (celý web) → nic neukládat ani nemazat.
+    if (inBikeCategory(json.categoryPath) === false) throw new Error(`Aukro: výpis (strana ${page + 1}) není kategorie kol – změnilo se API?`);
     totalPages = Number(info.totalPages) || 0;
     totalElements = Number(info.totalElements) || 0;
     if (!content.length) {
@@ -509,6 +560,10 @@ async function scan(ctx) {
       }
       if (seen.has(id)) continue; // posun stránkování během průchodu
       seen.add(id);
+      if (outsideBikes(raw.categoryPath)) {
+        offCategory++;
+        continue;
+      }
       if (isForeignSeller(raw)) {
         foreign++;
         continue;
@@ -522,6 +577,7 @@ async function scan(ctx) {
         cheap++;
         continue;
       }
+      st.listed.add(item.sourceId);
       await ctx.emit(item);
       emitted++;
     }
@@ -533,13 +589,13 @@ async function scan(ctx) {
   const tolerance = Math.max(3, Math.ceil(total * 0.02));
   const countOk = total > 0 && seen.size + tolerance >= total;
   // Pojistka proti změně formátu API: kdyby většina nabídek vypadala jako zahraniční / neúplná, nic neoznačovat jako zmizelé.
-  const sane = foreign <= seen.size * 0.5 && invalid <= Math.max(2, seen.size * 0.05);
-  const full = ctx.mode == null || ctx.mode === 'full';
+  const sane = foreign <= seen.size * 0.5 && invalid + offCategory <= Math.max(2, seen.size * 0.05);
+  const full = ctx.mode === 'full'; // kontrakt: complete jen v úplném režimu
   const complete = reachedEnd && countOk && sane && full;
   if (reachedEnd && !countOk) log?.warn?.('Aukro: počet nabídek nesedí s celkovým počtem, výpis beru jako neúplný', { unique: seen.size, total });
-  if (!sane) log?.warn?.('Aukro: podezřele mnoho zahraničních / neúplných nabídek – změnilo se API?', { foreign, invalid, unique: seen.size });
+  if (!sane) log?.warn?.('Aukro: podezřele mnoho zahraničních / neúplných nabídek – změnilo se API?', { foreign, invalid, offCategory, unique: seen.size });
   log?.info?.(`Aukro: ${emitted} nabídek z ${seen.size} (zahraniční ${foreign}, pod minimální cenou ${cheap})`, { pages: page, total, viaSsr });
-  return { complete, total: totalElements, unique: seen.size, emitted, foreign, cheap, viaSsr };
+  return { complete, total: totalElements, unique: seen.size, emitted, foreign, cheap, offCategory, viaSsr };
 }
 
 /**
@@ -549,8 +605,19 @@ async function scan(ctx) {
  */
 async function detail(ctx, listing) {
   const id = listingId(listing);
+  const st = stateOf(ctx);
+  st.details++;
   const d = await fetchDetailJson(ctx, id, listing.url);
-  if (d === null || isGoneOffer(d)) return null;
+  if (d === null || isGoneOffer(d)) {
+    // Pojistka: nabídka je v DNEŠNÍM výpisu, a detail přesto hlásí konec. Pár takových je normální (skončila mezi
+    // výpisem a detailem), hromadně to znamená změnu API (jiná adresa → 404, jiné stavy) – pak raději chyba, než
+    // označit všechny nové nabídky jako zmizelé.
+    if (st.listed.has(id) && ++st.goneListed > Math.max(5, st.details * 0.3)) {
+      throw new Error(`Aukro: detail hlásí konec u ${st.goneListed} nabídek z dnešního výpisu – změnilo se API? Neoznačuji jako zmizelé.`);
+    }
+    return null;
+  }
+  checkDetailId(d, id);
   const item = normalizeDetail(d);
   if (!item) throw new Error(`Aukro: neočekávaná odpověď detailu nabídky ${id}`);
   return item;
@@ -573,6 +640,7 @@ async function confirmGone(ctx, listing) {
   try {
     const d = await fetchDetailJson(ctx, id, listing.url);
     if (d === null || isGoneOffer(d)) return true;
+    checkDetailId(d, id);
     return String(d.state || '').toUpperCase() === 'ACTIVE' ? false : null;
   } catch (e) {
     if (ctx.signal?.aborted) throw e;

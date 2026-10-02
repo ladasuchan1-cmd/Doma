@@ -392,6 +392,81 @@ test('detail: 404/410, ukončená nabídka nebo přesun mimo kola → null', asy
   await assert.rejects(aukro.detail(ctx, { source_id: 'abc', url: 'https://aukro.cz/x' }), /neplatné id/);
 });
 
+test('detail: odpověď jiné nabídky → chyba; jen list stromu kategorií ≠ přesun mimo kola', async () => {
+  const base = detailFx(7123865595);
+  const f = fakeAukro(apiRoutes({ details: { 555: base, 6: { ...base, itemId: 6, id: 6, category: [base.category.at(-1)] } } }));
+  const ctx = makeCtx(f.http);
+  await assert.rejects(aukro.detail(ctx, { source_id: '555', url: 'https://aukro.cz/x-555' }), /vrátil nabídku 7123865595/);
+  assert.equal((await aukro.detail(ctx, { source_id: '6', url: 'https://aukro.cz/x-6' })).sourceId, '6');
+  assert.equal(aukro.isGoneOffer({ state: 'ACTIVE', category: [{ id: 17594, seoUrl: 'horska-mtb-kola' }] }), false);
+  assert.equal(aukro.isGoneOffer({ state: 'ACTIVE', category: [{ id: 17533 }, { id: 17570, seoUrl: 'cyklistika' }] }), true);
+  assert.equal(aukro.isGoneOffer({ state: 'active' }), false);
+});
+
+test('detail: hromadné „zmizení“ nabídek z dnešního výpisu (změna API → 404) → chyba místo null', async () => {
+  // výpis projde normálně, detail API ale pro všechno vrací 404 (např. přesunuté na jinou adresu)
+  const f = fakeAukro(apiRoutes({ details: () => 404 }));
+  const ctx = makeCtx(f.http);
+  await aukro.scan(ctx);
+  const ids = ctx.items.map((i) => i.sourceId);
+  const out = [];
+  for (const id of ids.slice(0, 12)) {
+    try {
+      out.push(await aukro.detail(ctx, { source_id: id, url: `https://aukro.cz/x-${id}` }));
+    } catch (e) {
+      out.push(e.message);
+    }
+  }
+  assert.deepEqual(out.slice(0, 5), [null, null, null, null, null], 'pár skončených mezi výpisem a detailem je normální');
+  assert.match(String(out[5]), /změnilo se API/);
+  assert.ok(out.slice(5).every((x) => typeof x === 'string'));
+  // nabídka, která v dnešním výpisu nebyla, se pořád smí označit jako zmizelá
+  assert.equal(await aukro.detail(ctx, { source_id: '42', url: 'https://aukro.cz/x-42' }), null);
+});
+
+test('scan: API vrátí jinou kategorii (ignoruje tělo hledání) → výjimka; cizí kategorie u položky se přeskočí', async () => {
+  const other = LIST.map((p) => ({ ...p, categoryPath: [{ id: 17533, seoUrl: 'sport-a-turistika' }, { id: 17570, seoUrl: 'cyklistika' }] }));
+  let f = fakeAukro(apiRoutes({ pages: other }));
+  let ctx = makeCtx(f.http);
+  await assert.rejects(aukro.scan(ctx), /není kategorie kol/);
+  assert.equal(ctx.items.length, 0, 'nic neuloženo');
+
+  // jedna položka mimo kola (např. přesunutá do „Cyklistika › Duše“) – přeskočí se, výpis zůstane úplný
+  const pages = structuredClone(LIST);
+  const moved = pages[0].content.find((c) => c.itemId === 7134953681);
+  moved.categoryPath = [{ id: 17533 }, { id: 17570, seoUrl: 'cyklistika' }, { id: 99999, seoUrl: 'duse' }];
+  f = fakeAukro(apiRoutes({ pages }));
+  ctx = makeCtx(f.http);
+  const res = await aukro.scan(ctx);
+  assert.equal(res.offCategory, 1);
+  assert.equal(res.complete, true);
+  assert.ok(!ctx.items.some((i) => i.sourceId === '7134953681'));
+
+  // bez režimu (mimo pipeline) se výpis za úplný nevydává
+  f = fakeAukro(apiRoutes());
+  assert.equal((await aukro.scan(makeCtx(f.http, { mode: undefined }))).complete, false);
+});
+
+test('normalizace: entity v textu, PSČ s předponou / nezlomitelnou mezerou, fotka bez protokolu, slug', () => {
+  const r = raw(7123865595);
+  const it = aukro.normalizeListItem({
+    ...r,
+    itemName: 'Kolo &quot;Author&quot; &amp; nosič\r\n',
+    location: 'Praha&nbsp;6 , Česká republika',
+    postcode: 'CZ-160 00',
+    titleImageUrl: '//cdn.aukro.cz/images/sk1/thumbnail/x.jpeg',
+    seoUrl: 'kolo/../../evil?x=1',
+  });
+  assert.equal(it.title, 'Kolo "Author" & nosič');
+  assert.equal(it.locationText, 'Praha 6');
+  assert.equal(it.psc, '16000');
+  assert.equal(aukro.isForeignSeller({ ...r, postcode: 'CZ-160 00' }), false);
+  assert.equal(aukro.isForeignSeller({ ...r, postcode: '079 01' }), true, 'SK zůstává zahraniční');
+  assert.equal(it.photoUrl, 'https://cdn.aukro.cz/images/sk1/730x548/x.jpeg');
+  assert.equal(it.url, 'https://aukro.cz/koloevilx1-7123865595');
+  assert.equal(aukro.normalizeListItem({ ...r, titleImageUrl: 'javascript:alert(1)', titleImage: null }).photoUrl, undefined);
+});
+
 test('detail: API odpoví 403 → HTML stránka nabídky (ng-state); dál už rovnou HTML', async () => {
   const f = fakeAukro(apiRoutes({ details: { 7135472950: 403 }, html: { [SSR_URL]: SSR_HTML } }));
   const ctx = makeCtx(f.http);
@@ -411,10 +486,25 @@ test('detail: API odpoví 403 → HTML stránka nabídky (ng-state); dál už ro
   assert.match(d.description, /^Specialized Crosstrail 2018 – 28” – odpružená vidlice\n/);
   assert.match(d.description, /rok 2018/);
   assert.doesNotMatch(JSON.stringify(d), PII);
-  // druhý detail ve stejném běhu: API se už nezkouší
+  // API odmítá opakovaně: po 3 odmítnutích po sobě se do konce běhu API už nezkouší
   await aukro.detail(ctx, listing);
-  assert.equal(f.calls.length, 3);
-  assert.equal(f.calls[2].url, SSR_URL);
+  await aukro.detail(ctx, listing);
+  assert.equal(f.calls.length, 6, '3× (API 403 + HTML)');
+  await aukro.detail(ctx, listing);
+  assert.equal(f.calls.length, 7);
+  assert.equal(f.calls[6].url, SSR_URL, 'rovnou HTML');
+
+  // jednorázové odmítnutí (400 u jedné nabídky) NEpřepne celý běh na 1MB HTML stránky
+  const one = fakeAukro(
+    apiRoutes({ details: { 7135472950: 400, 7123865595: detailFx(7123865595) }, html: { [SSR_URL]: SSR_HTML } })
+  );
+  const ctx1 = makeCtx(one.http);
+  assert.equal((await aukro.detail(ctx1, listing)).title, 'Kolo Specialized crosstrail L');
+  assert.equal((await aukro.detail(ctx1, { source_id: '7123865595', url: 'https://aukro.cz/x-7123865595' })).priceCzk, null);
+  assert.deepEqual(
+    one.calls.map((c) => c.url.replace(/\?.*/, '')),
+    ['https://aukro.cz/backend-web/api/offers/7135472950/offerDetail', SSR_URL, 'https://aukro.cz/backend-web/api/offers/7123865595/offerDetail']
+  );
 
   // 404 i na HTML stránce → nabídka neexistuje
   const g = fakeAukro(apiRoutes({ details: { 9: 403 }, html: { 'https://aukro.cz/x-9': 404 } }));
@@ -487,6 +577,17 @@ test('formatCzDateTime / parseCzDateTime: pražský čas (letní i zimní)', () 
   assert.equal(new Date(aukro.parseCzDateTime('25. 12. 2026 0:30')).toISOString(), '2026-12-24T23:30:00.000Z');
   assert.equal(aukro.parseCzDateTime('32. 1. 2026 10:00'), null);
   assert.equal(aukro.parseCzDateTime(null), null);
+  // noci přechodu letní/zimní čas: format → parse vrátí stejný okamžik (mimo nejednoznačnou hodinu 2:00–2:59 v říjnu)
+  for (const [from, to] of [
+    [Date.UTC(2026, 2, 28, 20), Date.UTC(2026, 2, 29, 4)],
+    [Date.UTC(2026, 9, 24, 20), Date.UTC(2026, 9, 25, 4)],
+  ]) {
+    for (let t = from; t < to; t += 15 * 60000) {
+      const s = aukro.formatCzDateTime(new Date(t).toISOString());
+      if (/^25\. 10\. 2026 2:/.test(s)) continue;
+      assert.equal(aukro.parseCzDateTime(s), t, s);
+    }
+  }
 });
 
 // ---------------------------------------------------------------------------------------------------------------
@@ -523,16 +624,20 @@ test('pipeline: Aukro → DB (nové, detaily, geolokace), další den změna cen
   const { openDb } = require('../src/db');
   const { loadConfig } = require('../src/config');
   const config = { ...loadConfig({}), sources: ['aukro'], maxDetails: 1000, minPrice: 500, ai: { enabled: false } };
-  const fixtures = Object.fromEntries([7122702822, 7123865595, 7127870584, 7131634758].map((id) => [String(id), detailFx(id)]));
+  // Konec všech nabídek posunutý do budoucna → confirmGone se musí ptát API (test nezávisí na dnešním datu).
+  const END = new Date(Date.now() + 7 * 86400000).toISOString();
+  const LIVE = LIST.map((p) => ({ ...p, content: p.content.map((c) => ({ ...c, endingTime: END })) }));
+  const liveRaw = (id) => LIVE.flatMap((p) => p.content).find((c) => c.itemId === id);
+  const fixtures = Object.fromEntries([7122702822, 7123865595, 7127870584, 7131634758].map((id) => [String(id), { ...detailFx(id), endingTime: END }]));
 
-  let pages = LIST; // mění se mezi běhy
+  let pages = LIVE; // mění se mezi běhy
   let goneIds = new Set();
   const detailCalls = [];
   const details = (id) => {
     detailCalls.push(id);
     if (goneIds.has(id)) return 404;
     if (fixtures[id]) return fixtures[id];
-    const r = raw(Number(id));
+    const r = liveRaw(Number(id));
     return r ? detailFromList(r) : undefined;
   };
   const g = fakeAukro((req) => apiRoutes({ pages, details })(req));
@@ -574,15 +679,15 @@ test('pipeline: Aukro → DB (nové, detaily, geolokace), další den změna cen
   assert.doesNotMatch(dump, /REDACTED|700 000 000/, 'v DB nejsou údaje o prodávajícím ani telefon');
 
   // 2. den: poslední stránka zmizela (nabídky skončily), u jedné nabídky klesla cena Kup teď
-  const p2Emitted = LIST[2].content.map((c) => String(c.itemId)).filter((id) => row(id));
+  const p2Emitted = LIVE[2].content.map((c) => String(c.itemId)).filter((id) => row(id));
   assert.ok(p2Emitted.length >= 8);
   goneIds = new Set(p2Emitted);
-  const keptUnique = new Set([...LIST[0].content, ...LIST[1].content].map((c) => c.itemId)).size;
-  const cheaper = structuredClone(LIST[0]);
+  const keptUnique = new Set([...LIVE[0].content, ...LIVE[1].content].map((c) => c.itemId)).size;
+  const cheaper = structuredClone(LIVE[0]);
   const amulet = cheaper.content.find((c) => c.itemId === 7134953681);
   amulet.buyNowPrice.amount = 5900;
   amulet.price.amount = 5900;
-  pages = [cheaper, LIST[1]].map((p, n) => ({ ...p, page: { number: n, size: 180, totalElements: keptUnique, totalPages: 2 } }));
+  pages = [cheaper, LIVE[1]].map((p, n) => ({ ...p, page: { number: n, size: 180, totalElements: keptUnique, totalPages: 2 } }));
   db.prepare("UPDATE settings SET value = ? WHERE key = 'lastFullScan:aukro'").run(JSON.stringify('2000-01-01T00:00:00Z'));
   detailCalls.length = 0;
   const r2 = await runPipeline({ db, config, sources: [aukro], http: g.http, trigger: 'test' });
@@ -592,7 +697,8 @@ test('pipeline: Aukro → DB (nové, detaily, geolokace), další den změna cen
   assert.equal(s2.new, 0);
   assert.equal(s2.details, 0, 'detaily se znovu nestahují');
   assert.equal(s2.gone, p2Emitted.length);
-  assert.ok(detailCalls.every((id) => goneIds.has(id)), 'API detailu jen pro ověření zmizelých');
+  assert.deepEqual([...new Set(detailCalls)].sort(), [...goneIds].sort(), 'API detailu jen (a právě) pro ověření zmizelých');
+  assert.equal(s2.changed, 1, 'jen změna ceny; params výpisu a detailu se shodují');
   for (const id of p2Emitted) assert.ok(row(id).gone_at, `${id} zmizel`);
   assert.equal(db.prepare("SELECT COUNT(*) n FROM listings WHERE source = 'aukro' AND gone_at IS NULL").get().n, 48 - p2Emitted.length);
   assert.equal(row(7134953681).price_czk, 5900);

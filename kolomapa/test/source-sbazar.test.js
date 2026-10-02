@@ -25,7 +25,9 @@ const clone = (x) => JSON.parse(JSON.stringify(x));
  *          locs?: Record<string, object>, override?: (u: URL) => ({status: number, body: any, ct?: string}|null)}} o
  */
 function fakeSbazar(o = {}) {
-  const items = o.items ?? [...L628, ...L437];
+  // výchozí data: fixtures Kola + Dětská kola a jedno odrážedlo (každá kategorie má aspoň 1 inzerát – prázdná
+  // kategorie znamená neúplný výpis)
+  const items = o.items ?? [...L628, ...L437, ...synth(1, { cat: 291, idBase: 960000000, price: () => 2500 })];
   const locs = o.locs ?? LOCS;
   const calls = [];
   const respond = (url, okStatuses, { status, body, ct = 'application/json; charset=utf-8' }) => {
@@ -99,6 +101,13 @@ function makeCtx(http, o = {}) {
   };
   return { ctx, emitted, logs };
 }
+
+/** Po jednom inzerátu v pásmu Kola od 5 000 Kč a v kategoriích 437 a 291 (prázdný segment = neúplný výpis). */
+const others = () => [
+  ...synth(1, { cat: 628, idBase: 940000000, price: () => 12000 }),
+  ...synth(1, { cat: 437, idBase: 950000000, price: () => 9000 }),
+  ...synth(1, { cat: 291, idBase: 960000000, price: () => 2500 }),
+];
 
 /** Prague-local „YYYY-MM-DDTHH:MM:SS“ z milisekund (jen pro řazení v testech). */
 const localStr = (ms) => new Date(ms).toISOString().slice(0, 19);
@@ -183,7 +192,9 @@ test('priceInfo: dohodou, 0 Kč, běžná cena, původní cena jen v detailu', (
   assert.deepEqual(sbazar.priceInfo({ price: 9000, price_original: 9000 }, true), { priceCzk: 9000, priceNote: null });
   assert.deepEqual(sbazar.priceInfo({ price: 0, price_by_agreement: true, price_original: 5000 }, true), { priceCzk: null, priceNote: 'Dohodou' });
   assert.deepEqual(sbazar.priceInfo({ price: -5 }), { priceCzk: null, priceNote: null });
-  assert.deepEqual(sbazar.priceInfo({ price: '6300' }), { priceCzk: null, priceNote: null });
+  // číslo jako řetězec (změna formátu API) se ještě přečte, nesmysl ne
+  assert.deepEqual(sbazar.priceInfo({ price: '6300' }), { priceCzk: 6300, priceNote: null });
+  assert.deepEqual(sbazar.priceInfo({ price: '6 300 Kč' }), { priceCzk: null, priceNote: null });
   assert.deepEqual(sbazar.priceInfo({}), { priceCzk: null, priceNote: null });
 });
 
@@ -280,7 +291,7 @@ test('scan full: kategorie, cenová pásma, jedno timestamp_to, duplicity „doh
   assert.ok(!ids.includes('234507753'));
   assert.ok(ids.includes('234510066'), '500 Kč = minimální cena projde');
   assert.ok(ids.includes('234515025'), '0 Kč bez dohody (cena v textu) projde');
-  assert.equal(emitted.length, L628.length - 1 + L437.length);
+  assert.equal(emitted.length, L628.length - 1 + L437.length + 1);
   assert.equal(res.duplicates, 1);
   assert.equal(res.cheap, 1);
   // souřadnice z překladu lokalit (vzorky ve fixtures), ostatní bez lat/lon
@@ -306,12 +317,12 @@ test('scan full: kategorie, cenová pásma, jedno timestamp_to, duplicity „doh
 test('scan full: pásmo nad limitem 10 000 se rekurzivně rozdělí podle ceny, nic se neztratí ani nezdvojí', async () => {
   const lower = synth(9800, { price: (i) => (i % 97 === 0 ? 'dohodou' : 100 + ((i * 7919) % 4900)), idBase: 400000000 });
   const upper = synth(300, { price: (i) => 5000 + i * 10, idBase: 500000000 });
-  const srv = fakeSbazar({ items: [...lower, ...upper], locs: {} });
+  const srv = fakeSbazar({ items: [...lower, ...upper, ...others()], locs: {} });
   const { ctx, emitted, logs } = makeCtx(srv.http, { minPrice: 0, config: { sbazarMaxResolve: 0 } });
   const res = await sbazar.scan(ctx);
   assert.equal(res.complete, true);
-  assert.equal(emitted.length, 10100);
-  assert.equal(new Set(emitted.map((i) => i.sourceId)).size, 10100);
+  assert.equal(emitted.length, 10103);
+  assert.equal(new Set(emitted.map((i) => i.sourceId)).size, 10103);
   assert.ok(logs.warn.some((m) => /dělím na do 2 499 Kč a 2 500–4 999 Kč/.test(m)), logs.warn.join('\n'));
   for (const u of srv.searches()) {
     const q = new URL(u).searchParams;
@@ -322,25 +333,35 @@ test('scan full: pásmo nad limitem 10 000 se rekurzivně rozdělí podle ceny, 
 });
 
 test('scan full: pásmo, které už nejde dělit (jedna cena), projde jen do limitu → neúplné', async () => {
-  const items = synth(10300, { price: () => 1000, idBase: 600000000 });
+  const items = [...synth(10300, { price: () => 1000, idBase: 600000000 }), ...others()];
   const srv = fakeSbazar({ items, locs: {} });
   const { ctx, emitted, logs } = makeCtx(srv.http, { minPrice: 0, config: { sbazarMaxResolve: 0 } });
   const res = await sbazar.scan(ctx);
   assert.equal(res.complete, false);
-  assert.equal(emitted.length, 10000);
+  assert.equal(emitted.length, 10003);
   assert.ok(logs.warn.some((m) => /nejde dál dělit/.test(m)));
   assert.ok(srv.searches().every((u) => Number(new URL(u).searchParams.get('offset')) <= 9500));
+  // 9 700 inzerátů za jednu cenu: dělit nejde, ale pod limitem 10 000 projde pásmo celé → úplné
+  const srv2 = fakeSbazar({ items: [...synth(9700, { price: () => 1000, idBase: 610000000 }), ...others()], locs: {} });
+  const r2 = makeCtx(srv2.http, { minPrice: 0, config: { sbazarMaxResolve: 0 } });
+  assert.equal((await sbazar.scan(r2.ctx)).complete, true);
+  assert.equal(r2.emitted.length, 9703);
 });
 
-test('scan full: limit stránek → neúplné', async () => {
-  const items = synth(1200, { price: () => 8000 });
+test('scan full: limit stránek platí pro každý segment zvlášť → neúplné', async () => {
+  const items = [...synth(1200, { price: () => 8000 }), ...synth(700, { price: () => 2000, idBase: 900000000 })];
   const srv = fakeSbazar({ items, locs: {} });
-  const { ctx, emitted, logs } = makeCtx(srv.http, { maxPages: 2, config: { sbazarMaxResolve: 0 } });
+  const { ctx, emitted, logs } = makeCtx(srv.http, { maxPages: 1, config: { sbazarMaxResolve: 0 } });
   const res = await sbazar.scan(ctx);
   assert.equal(res.complete, false);
-  // 628: pásmo do 4 999 (1 stránka) + od 5 000 (1 stránka) → limit 2 stránek kategorie vyčerpán
-  assert.equal(emitted.length, 500);
-  assert.ok(logs.warn.some((m) => /limit 2 stránek/.test(m)));
+  // 628: pásmo do 4 999 i od 5 000 dostane po 1 stránce (spodní pásmo nevyčerpá limit hornímu)
+  const q = srv.searches().map((u) => new URL(u).searchParams);
+  assert.deepEqual(q.filter((x) => x.get('category_id') === '628').map((x) => [x.get('price_to'), x.get('price_from'), x.get('offset')]), [
+    ['4999', null, '0'],
+    [null, '5000', '0'],
+  ]);
+  assert.equal(emitted.length, 1000);
+  assert.ok(logs.warn.some((m) => /limit 1 stránek/.test(m)));
 });
 
 test('scan incremental: konec na stránce jen se známými inzeráty staršími než nejnovější známý − 1 den', async () => {
@@ -380,12 +401,13 @@ test('scan incremental: konec na stránce jen se známými inzeráty staršími 
     assert.ok(emitted.some((i) => i.sourceId === ids[700]));
     assert.ok(!emitted.some((i) => i.sourceId === ids[1700]));
   }
-  // d) maxPages platí i v inkrementálním režimu
+  // d) maxPages platí i v inkrementálním režimu (na segment)
   {
     const srv = fakeSbazar({ items, locs: {} });
-    const { ctx } = makeCtx(srv.http, { mode: 'incremental', maxPages: 1 });
+    const { ctx, emitted } = makeCtx(srv.http, { mode: 'incremental', maxPages: 1 });
     await sbazar.scan(ctx);
-    assert.equal(srv.searches().filter((u) => new URL(u).searchParams.get('category_id') === '628').length, 1);
+    assert.equal(srv.searches().filter((u) => new URL(u).searchParams.get('price_from') === '5000').length, 1);
+    assert.equal(emitted.length, 500);
   }
 });
 

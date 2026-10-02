@@ -1,0 +1,80 @@
+{
+  "_doc": {
+    "účel": "Znalostní báze pro nacenění kol, když chybí data (pravidla) a jako apriorní odhad k naučenému modelu. Ceny v Kč vč. DPH, úroveň inzerovaných (požadovaných) cen na českém bazarovém trhu 2025–2026; převod na skutečné prodejní ceny dělá askToSale + kalibrace na vlastní prodeje obchodu.",
+    "newPrice": "Typická cena NOVÉHO kola podle typu a brandTier 1–5 (index 0 = tier 1). Značky a jejich tier jsou v src/classify/brands.js.",
+    "groupsetNewPrice": "Typická cena nového kola podle třídy sady komponent (groupsetTier 1–6) pro rodinu kol; když je sada známá, kombinuje se s newPrice (geometrický průměr).",
+    "kidsNewPrice": "Dětská kola podle velikosti kol (palce) a tier 1–5; prémiové dětské značky (Woom, Early Rider, Kubikes, Academy, Puky) mají tier 4–5.",
+    "depreciation": "Podíl ceny nového kola, za který se kolo daného stáří inzeruje (věk v letech → podíl; mezi body lineární interpolace). unknownAge = typické stáří bazarového kola, když rok není znám.",
+    "condition": "Násobitel podle stavu (good = 1).",
+    "ebike": "Násobitele e-kol podle třídy motoru a kapacity baterie (za každých 100 Wh nad/pod 500 Wh).",
+    "frameOnly": "Samotný rám ≈ podíl hodnoty kompletního kola.",
+    "askToSale": "Apriorní poměr skutečná prodejní / inzerovaná cena (smlouvání, neprodané předražené inzeráty).",
+    "calibration": "Meze a síla apriorna pro kalibraci na vlastní prodeje (BAZAR): výsledný faktor = vážený geometrický průměr (počet prodejů vs. priorWeight), oříznutý do [min, max].",
+    "buyRatio": "Výchozí poměr výkupní / prodejní cena, když nejsou k dispozici vlastní prodeje (medián BAZAR prodejů obchodu je ~0,65)."
+  },
+  "version": 1,
+  "newPrice": {
+    "mtb_hardtail": [8000, 14000, 21000, 30000, 42000],
+    "mtb_full": [16000, 30000, 48000, 72000, 105000],
+    "road": [9000, 18000, 32000, 55000, 100000],
+    "gravel": [11000, 20000, 33000, 52000, 85000],
+    "cyclocross": [11000, 20000, 33000, 50000, 80000],
+    "trekking": [8000, 13000, 19000, 27000, 38000],
+    "cross": [7000, 12000, 17000, 24000, 33000],
+    "city": [6000, 10000, 15000, 22000, 35000],
+    "kids": [3000, 5000, 7500, 10000, 13000],
+    "balance": [800, 1500, 2500, 4000, 6000],
+    "bmx": [5000, 8000, 12000, 17000, 24000],
+    "dirt": [9000, 15000, 22000, 32000, 45000],
+    "fatbike": [10000, 17000, 28000, 42000, 65000],
+    "folding": [5000, 9000, 16000, 32000, 50000],
+    "cargo": [15000, 28000, 42000, 60000, 80000],
+    "tandem": [10000, 20000, 32000, 48000, 75000],
+    "ebike_mtb": [25000, 38000, 55000, 75000, 100000],
+    "ebike_mtb_full": [38000, 60000, 85000, 115000, 155000],
+    "ebike_trekking": [22000, 33000, 48000, 65000, 90000],
+    "ebike_city": [18000, 28000, 42000, 58000, 85000],
+    "ebike_road": [40000, 58000, 80000, 105000, 145000],
+    "ebike_cargo": [40000, 65000, 95000, 130000, 175000],
+    "ebike_kids": [20000, 28000, 38000, 48000, 60000],
+    "other": [6000, 11000, 17000, 26000, 38000]
+  },
+  "groupsetNewPrice": {
+    "mtb_hardtail": { "1": 9000, "2": 13000, "3": 20000, "4": 30000, "5": 45000, "6": 80000 },
+    "mtb_full": { "1": 15000, "2": 22000, "3": 38000, "4": 55000, "5": 80000, "6": 125000 },
+    "road": { "1": 13000, "2": 18000, "3": 26000, "4": 40000, "5": 65000, "6": 120000 },
+    "gravel": { "1": 14000, "2": 19000, "3": 27000, "4": 40000, "5": 62000, "6": 100000 },
+    "trekking": { "1": 9000, "2": 13000, "3": 20000, "4": 28000, "5": 38000, "6": 50000 },
+    "ebike": { "1": 30000, "2": 38000, "3": 55000, "4": 75000, "5": 100000, "6": 140000 }
+  },
+  "kidsNewPrice": {
+    "12": [1500, 2500, 3500, 5000, 7000],
+    "14": [1800, 3000, 4500, 6500, 8500],
+    "16": [2500, 4000, 6000, 8500, 10500],
+    "20": [3500, 6000, 9000, 12000, 14500],
+    "24": [4500, 8000, 12000, 15000, 18500],
+    "26+": [6000, 10000, 15000, 20000, 25000],
+    "unknown": [2500, 4500, 7000, 10000, 13000]
+  },
+  "depreciation": {
+    "default": { "0": 0.78, "1": 0.66, "2": 0.58, "3": 0.52, "4": 0.47, "5": 0.43, "6": 0.39, "8": 0.32, "10": 0.26, "15": 0.17, "20": 0.11, "40": 0.08 },
+    "ebike": { "0": 0.75, "1": 0.62, "2": 0.53, "3": 0.45, "4": 0.38, "5": 0.32, "6": 0.27, "8": 0.2, "10": 0.14, "15": 0.08 },
+    "kids": { "0": 0.68, "1": 0.58, "2": 0.5, "3": 0.45, "5": 0.37, "8": 0.27, "12": 0.18 },
+    "kidsPremium": { "0": 0.82, "1": 0.74, "2": 0.68, "3": 0.63, "5": 0.55, "8": 0.45, "12": 0.35 },
+    "unknownAge": { "default": 0.4, "ebike": 0.36, "kids": 0.42, "kidsPremium": 0.62 }
+  },
+  "condition": { "new": 1.22, "like_new": 1.12, "very_good": 1.05, "good": 1.0, "fair": 0.82, "poor": 0.6, "parts": 0.32 },
+  "ebike": {
+    "motorClass": { "premium": 1.12, "mid": 1.0, "hub": 0.62 },
+    "batteryPer100Wh": 0.04,
+    "batteryRefWh": 500
+  },
+  "frameOnly": 0.35,
+  "vintage": 0.9,
+  "shop": 1.08,
+  "askToSale": 0.9,
+  "calibration": { "min": 0.6, "max": 1.1, "priorWeight": 10 },
+  "buyRatio": 0.65,
+  "minTrainPrice": { "default": 500, "kids": 200, "balance": 150, "ebike": 3000 },
+  "maxTrainPrice": 450000
+}

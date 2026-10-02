@@ -128,6 +128,16 @@ function fakeSite({ lists = {}, apiCap = Infinity, pageSize = 20, details = {}, 
   };
 }
 
+/** Výpisy pro všechny kategorie: chybějící kategorie dostanou pár starších inzerátů (prázdná kategorie s koly = neúplný průchod). */
+function withAll(lists, n = 3) {
+  const out = lists;
+  bazos.CATEGORIES.forEach((c, i) => {
+    if (!out[c.id]) out[c.id] = synthItems(n, { firstId: 210000000 + i * 1000, cat: c, from: Date.parse('2026-09-01T12:00:00+02:00') });
+  });
+  return out;
+}
+const FILLER = (given) => bazos.CATEGORIES.filter((c) => !given.includes(c.id)).length * 3;
+
 function makeHttp(handler) {
   const calls = [];
   const http = createHttp({
@@ -138,10 +148,12 @@ function makeHttp(handler) {
       calls.push(url);
       const r = (await handler(url)) || { status: 404, body: 'Not found' };
       const isText = typeof r.body === 'string';
-      return new Response(isText ? r.body : JSON.stringify(r.body), {
+      const res = new Response(isText ? r.body : JSON.stringify(r.body), {
         status: r.status ?? 200,
         headers: { 'content-type': isText ? 'text/html; charset=utf-8' : 'application/json' },
       });
+      if (r.finalUrl) Object.defineProperty(res, 'url', { value: r.finalUrl }); // výsledek přesměrování
+      return res;
     },
   });
   return { http, calls };
@@ -367,7 +379,7 @@ test('parseListHtml: reálné stránky – 1. stránka (TOP, „Další“) a po
 
 test('scan (celý průchod): API po stránkách až do prázdné stránky + ověření konce přes HTML', async () => {
   const kids = synthItems(7, { firstId: 224500000, tops: 1, cat: CAT.detska });
-  const { http, calls } = makeHttp(fakeSite({ lists: { 256: LIST, 456: kids } }));
+  const { http, calls } = makeHttp(fakeSite({ lists: withAll({ 256: LIST, 456: kids }) }));
   const { ctx, emitted, warns } = makeCtx(http, { mode: 'full', minPrice: 500 });
   const res = await bazos.scan(ctx);
   assert.deepEqual(res, { complete: true });
@@ -381,7 +393,7 @@ test('scan (celý průchod): API po stránkách až do prázdné stránky + ově
   // 499 Kč je pod minimální cenou → přeskočeno; 1 Kč (cena neuvedena) zůstává
   const ids = emitted.map((x) => x.sourceId);
   assert.equal(new Set(ids).size, ids.length, 'žádné duplicity');
-  assert.equal(ids.length, LIST.length - 1 + kids.length);
+  assert.equal(ids.length, LIST.length - 1 + kids.length + FILLER(['256', '456']));
   assert.ok(!emitted.some((x) => x.priceCzk === 499));
   assert.ok(emitted.some((x) => /1 Kč/.test(x.priceNote || '')));
   assert.ok(emitted.filter((x) => x.categorySrc === 'Dětská kola').length === 7);
@@ -391,7 +403,7 @@ test('scan (celý průchod): API po stránkách až do prázdné stránky + ově
 
 test('scan (celý průchod): API vrátí jen část výpisu → pokračuje HTML stránkami až na konec', async () => {
   const items = synthItems(95, { tops: 5 });
-  const { http, calls } = makeHttp(fakeSite({ lists: { 256: items }, apiCap: 40 }));
+  const { http, calls } = makeHttp(fakeSite({ lists: withAll({ 256: items }), apiCap: 40 }));
   const { ctx, emitted, warns } = makeCtx(http, { mode: 'full' });
   const res = await bazos.scan(ctx);
   assert.equal(res.complete, true);
@@ -412,14 +424,14 @@ test('scan (jen novinky): skončí po 2 stránkách samých známých inzerátů
   const known = new Map();
   const items = synthItems(120, { tops: 6 });
   {
-    const { http } = makeHttp(fakeSite({ lists: { 256: items } }));
+    const { http } = makeHttp(fakeSite({ lists: withAll({ 256: items }) }));
     const { ctx } = makeCtx(http, { mode: 'full', known });
     assert.equal((await bazos.scan(ctx)).complete, true);
   }
   // 5 nových ne-TOP inzerátů za TOP blokem
   const fresh = synthItems(5, { firstId: 224700000 });
   const next = [...items.slice(0, 6), ...fresh, ...items.slice(6)];
-  const { http, calls } = makeHttp(fakeSite({ lists: { 256: next } }));
+  const { http, calls } = makeHttp(fakeSite({ lists: withAll({ 256: next }) }));
   const { ctx, emitted } = makeCtx(http, { mode: 'incremental', known });
   const res = await bazos.scan(ctx);
   assert.equal(res.complete, false, 'inkrementální průchod nikdy není úplný');
@@ -429,7 +441,7 @@ test('scan (jen novinky): skončí po 2 stránkách samých známých inzerátů
   for (const f of fresh) assert.ok(emitted.some((x) => x.sourceId === f.id));
   // změna ceny známého inzerátu na 2. stránce → stránka se nepočítá jako „stará“
   const changed = next.map((x, i) => (i === 25 ? { ...x, price_formatted: '1 234 Kč' } : x));
-  const h2 = makeHttp(fakeSite({ lists: { 256: changed } }));
+  const h2 = makeHttp(fakeSite({ lists: withAll({ 256: changed }) }));
   const c2 = makeCtx(h2.http, { mode: 'incremental', known });
   await bazos.scan(c2.ctx);
   assert.equal(apiCalls(h2.calls, 256).length, 4);
@@ -437,7 +449,7 @@ test('scan (jen novinky): skončí po 2 stránkách samých známých inzerátů
 
 test('scan: respektuje ctx.maxPages (neúplný průchod)', async () => {
   const items = synthItems(70, { tops: 2 });
-  const { http, calls } = makeHttp(fakeSite({ lists: { 256: items } }));
+  const { http, calls } = makeHttp(fakeSite({ lists: withAll({ 256: items }) }));
   const { ctx, emitted, warns } = makeCtx(http, { mode: 'full', maxPages: 2 });
   const res = await bazos.scan(ctx);
   assert.equal(res.complete, false);
@@ -483,6 +495,132 @@ test('scan: API kategorie nefunguje → záloha přes HTML výpis; chyba jiné k
   assert.ok(emitted.some((x) => x.categorySrc === 'Ostatní cyklistika') || apiCalls(calls, 259).length === 1, 'pokračuje dalšími kategoriemi');
   assert.ok(emitted.filter((x) => x.categorySrc === 'Horská kola').length > 0);
   assert.ok(warns.some((w) => /API nefunguje/.test(w)));
+});
+
+// ---------------------------------------------------------------- pojistky proti falešně „úplnému“ průchodu
+// (úplný průchod = pipeline označí neviděné inzeráty jako zmizelé → chyba tady maže živé inzeráty z mapy)
+
+/** HTML stránka, jakou Bazoš vrací pro NEEXISTUJÍCÍ kategorii (ověřeno živě): HTTP 404, ale s výpisem celé sekce Sport. */
+const sectionPage404 = () => ({
+  status: 404,
+  body: renderListHtml(synthItems(20, { firstId: 199000000 }).map((x) => ({ ...x, title: `Lyže ${x.id}` })), 0, 86074, { path: '/' }),
+});
+
+test('scan: neexistující kategorie (API [] se stavem 200, HTML 404 s výpisem celé sekce) → chyba, cizí inzeráty se neuloží', async () => {
+  for (const api of [{ body: [] }, { status: 404, body: '<html>Not found</html>' }]) {
+    const lists = withAll({ 256: LIST });
+    const { http, calls } = makeHttp(
+      fakeSite({ lists, routes: { [bazos.apiListUrl(CAT.horska, 0)]: api, 'https://sport.bazos.cz/horska/': sectionPage404() } })
+    );
+    const { ctx, emitted } = makeCtx(http, { mode: 'full' });
+    await assert.rejects(bazos.scan(ctx), /Horská kola: .*neexistuje \(HTTP 404/);
+    assert.equal(emitted.filter((x) => x.categorySrc === 'Horská kola').length, 0, 'inzeráty celé sekce Sport se nesmí uložit jako horská kola');
+    assert.ok(!calls.includes('https://sport.bazos.cz/20/'), '„Další“ mimo kategorii se nenásleduje');
+    assert.ok(emitted.some((x) => x.categorySrc === 'Elektrokola'), 'ostatní kategorie pokračují');
+  }
+  // prostá 404 bez inzerátů na začátku výpisu také není „konec výpisu“
+  const { http } = makeHttp(
+    fakeSite({ lists: withAll({ 256: LIST }), routes: { [bazos.apiListUrl(CAT.horska, 0)]: { body: [] }, 'https://sport.bazos.cz/horska/': { status: 404, body: '<html>Stránka nenalezena</html>' } } })
+  );
+  await assert.rejects(bazos.scan(makeCtx(http, { mode: 'full' }).ctx), /neexistuje \(HTTP 404/);
+});
+
+test('scan: prázdná 1. stránka API → záloha přes HTML i v režimu jen novinky', async () => {
+  const ebikes = synthItems(30, { firstId: 224400000, tops: 3, cat: CAT.elektrokola });
+  const { http, calls } = makeHttp(fakeSite({ lists: withAll({ 465: ebikes }), routes: { [bazos.apiListUrl(CAT.elektrokola, 0)]: { body: [] } } }));
+  const { ctx, emitted } = makeCtx(http, { mode: 'incremental' });
+  await bazos.scan(ctx);
+  assert.equal(emitted.filter((x) => x.categorySrc === 'Elektrokola').length, 30);
+  assert.deepEqual(htmlCalls(calls), ['https://sport.bazos.cz/elektrokola/', 'https://sport.bazos.cz/elektrokola/20/']);
+});
+
+test('scan: „Další“ nebo přesměrování mimo výpis kategorie → nenásledovat, průchod neúplný', async () => {
+  const ebikes = synthItems(30, { firstId: 224400000, cat: CAT.elektrokola });
+  const page0 = renderListHtml(ebikes.slice(0, 20), 0, 30, CAT.elektrokola).replace('href="/elektrokola/20/"', 'href="/20/"');
+  {
+    const { http, calls } = makeHttp(
+      fakeSite({ lists: withAll({ 465: ebikes }), routes: { [bazos.apiListUrl(CAT.elektrokola, 0)]: { status: 404, body: 'x' }, 'https://sport.bazos.cz/elektrokola/': { body: page0 } } })
+    );
+    const { ctx, warns } = makeCtx(http, { mode: 'full' });
+    assert.equal((await bazos.scan(ctx)).complete, false);
+    assert.ok(!calls.includes('https://sport.bazos.cz/20/'));
+    assert.ok(warns.some((w) => /nevede dál ve výpisu kategorie/.test(w)));
+  }
+  {
+    // přesměrování zrušené kategorie na úvod sekce (200) → chyba, nic se neuloží
+    const { http } = makeHttp(
+      fakeSite({
+        lists: withAll({ 465: ebikes }),
+        routes: {
+          [bazos.apiListUrl(CAT.elektrokola, 0)]: { status: 404, body: 'x' },
+          'https://sport.bazos.cz/elektrokola/': { body: renderListHtml(ebikes.slice(0, 20), 0, 86074, { path: '/' }), finalUrl: 'https://sport.bazos.cz/' },
+        },
+      })
+    );
+    const { ctx, emitted } = makeCtx(http, { mode: 'full' });
+    await assert.rejects(bazos.scan(ctx), /Elektrokola: .*přesměrován jinam/);
+    assert.equal(emitted.filter((x) => x.categorySrc === 'Elektrokola').length, 0);
+  }
+});
+
+test('scan: prázdná stránka API hned po plné stránce + selhané ověření přes HTML → neúplný; po kratší stránce platí API', async () => {
+  const items = synthItems(300);
+  const verifyUrl = 'https://sport.bazos.cz/horska/180/';
+  // API vrátí 200 položek a pak [] (např. omezení ze strany webu), HTML ověření selže 503
+  const a = makeHttp(fakeSite({ lists: withAll({ 256: items }), apiCap: 200, pageSize: 200, routes: { [verifyUrl]: { status: 503, body: 'Service Unavailable' } } }));
+  const ca = makeCtx(a.http, { mode: 'full' });
+  assert.equal((await bazos.scan(ca.ctx)).complete, false);
+  assert.ok(a.calls.includes(verifyUrl));
+  assert.ok(ca.warns.some((w) => /podezřele/.test(w)));
+  // přirozený konec (poslední stránka kratší než limit) a nedostupné HTML → výsledek API platí
+  const short = items.slice(0, 190);
+  const b = makeHttp(fakeSite({ lists: withAll({ 256: short }), pageSize: 200, routes: { [verifyUrl]: { status: 503, body: 'Service Unavailable' } } }));
+  const cb = makeCtx(b.http, { mode: 'full' });
+  assert.equal((await bazos.scan(cb.ctx)).complete, true);
+  assert.ok(cb.warns.some((w) => /beru výsledek API/.test(w)));
+});
+
+test('scan: nové inzeráty během průchodu posunou výpis – krátká poslední stránka samých viděných ID není anomálie', async () => {
+  const lists = withAll({ 256: synthItems(40) });
+  const site = fakeSite({ lists });
+  let n = 0;
+  const { http, calls } = makeHttp((url) => {
+    // před 3. stránkou přibude nahoře nový inzerát → stránka od offsetu 40 vrátí jen už viděný inzerát č. 40
+    if (url.includes('/api/v1/ads.php') && url.endsWith('category=256') && ++n === 3) lists[256] = [...synthItems(1, { firstId: 224700000 }), ...lists[256]];
+    return site(url);
+  });
+  const { ctx, warns } = makeCtx(http, { mode: 'full' });
+  assert.equal((await bazos.scan(ctx)).complete, true);
+  assert.deepEqual(apiCalls(calls, 256).map((u) => new URL(u).searchParams.get('offset')), ['0', '20', '40', '41']);
+  assert.deepEqual(warns, []);
+});
+
+test('scan: viděno výrazně méně inzerátů, než uvádí web (API vrací duplicity) → neúplný průchod', async () => {
+  const items = synthItems(100);
+  // API: každá stránka vrátí polovinu nových a polovinu už viděných položek → offset dojde na konec, ale ID chybí
+  const lists = withAll({ 256: items });
+  const site = fakeSite({ lists });
+  const { http } = makeHttp((url) => {
+    const u = new URL(url);
+    if (u.pathname === '/api/v1/ads.php' && u.searchParams.get('category') === '256') {
+      const off = Number(u.searchParams.get('offset'));
+      if (off >= 100) return { body: [] };
+      return { body: [...items.slice(off / 2, off / 2 + 10), ...items.slice(Math.max(0, off / 2 - 10), off / 2)] };
+    }
+    return site(url);
+  });
+  const { ctx, warns } = makeCtx(http, { mode: 'full' });
+  assert.equal((await bazos.scan(ctx)).complete, false);
+  assert.ok(warns.some((w) => /viděno jen \d+ z 100/.test(w)), warns.join('\n'));
+});
+
+test('API: chybový JSON „too many requests“ = blokace; detail s místním časem se nečte v pásmu serveru', async () => {
+  const { http, calls } = makeHttp(fakeSite({ lists: withAll({ 256: LIST }), routes: { [bazos.apiListUrl(CAT.horska, 0)]: { body: { error: 'Too many requests, try later' } } } }));
+  const { ctx } = makeCtx(http);
+  await assert.rejects(bazos.scan(ctx), (e) => e instanceof bazos.BazosBlockedError);
+  assert.equal(calls.length, 1);
+  const d = bazos.parseApiDetail({ ...DETAIL_TPL, from: '2026-10-02 15:22:25' }, DETAIL_TPL.id).item;
+  assert.equal(d.postedAt, '2026-10-02T13:22:25.000Z');
 });
 
 test('detail / confirmGone: aktivní, smazaný (410), jiná kategorie, chyba serveru', async () => {
@@ -545,7 +683,7 @@ test('pipeline: Bazoš přes runPipeline – uložení, detaily, zmizelé po pot
   const { log } = makeLog();
 
   const items = synthItems(25, { tops: 2 });
-  const lists = { 256: items };
+  const lists = withAll({ 256: items });
   const details = {};
   const { http, calls } = makeHttp((url) => fakeSite({ lists, details })(url));
 
@@ -554,7 +692,7 @@ test('pipeline: Bazoš přes runPipeline – uložení, detaily, zmizelé po pot
   const s1 = r1.stats.sources.bazos;
   assert.equal(s1.mode, 'full');
   assert.equal(s1.complete, true);
-  assert.equal(s1.new, 25);
+  assert.equal(s1.new, 25 + FILLER(['256']));
   assert.equal(s1.details, 10);
   const row = db.prepare("SELECT * FROM listings WHERE source = 'bazos' AND source_id = ?").get(items[2].id);
   assert.equal(row.url, items[2].url);
@@ -569,7 +707,7 @@ test('pipeline: Bazoš přes runPipeline – uložení, detaily, zmizelé po pot
   assert.equal(row.posted_at, bazos.pragueLocalToIso(items[2].from));
   const topRow = db.prepare('SELECT posted_at FROM listings WHERE source_id = ?').get(items[0].id);
   assert.equal(topRow.posted_at, null, 'TOP bez data');
-  assert.equal(db.prepare('SELECT COUNT(*) AS n FROM listings WHERE kraj IS NOT NULL').get().n, 25, 'všechny geolokované (lokalita / souřadnice)');
+  assert.equal(db.prepare('SELECT COUNT(*) AS n FROM listings WHERE kraj IS NULL').get().n, 0, 'všechny geolokované (lokalita / souřadnice)');
 
   // 2. celý průchod: 2 inzeráty z výpisu zmizely – jeden smazaný (410), druhý ještě existuje (přesunutý níž mimo průchod)
   const goneId = items[10].id;

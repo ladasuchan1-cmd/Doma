@@ -1,0 +1,840 @@
+{
+ "_doc": "Ručně označený náhodný vzorek titulků z Bazoš „Ostatní cyklistika“ (seed 20261002, 170 inzerátů, duplicitní titulky sloučené). isBike = celé jízdní kolo (vč. dětských, odrážedel, BMX a samotných rámů); bikeType „other“ = typ z titulku nelze určit (u „other“ se při hodnocení akceptuje i city/trekking/cross/road). price = cena z výpisu (pro kontext).",
+ "labels": {
+  "Cyklo dres BE maniax": {
+   "isBike": false,
+   "bikeType": null,
+   "price": "100 Kč"
+  },
+  "Dětská cyklistická přilba Uvex": {
+   "isBike": false,
+   "bikeType": null,
+   "price": "200 Kč"
+  },
+  "Dětské kolo Specialized 16”": {
+   "isBike": true,
+   "bikeType": "kids",
+   "price": "800 Kč"
+  },
+  "Cyklistické tretry Bontrager": {
+   "isBike": false,
+   "bikeType": null,
+   "price": "500 Kč"
+  },
+  "Specialized SX Trail 1": {
+   "isBike": true,
+   "bikeType": "mtb_full",
+   "price": "25 000 Kč"
+  },
+  "Cestovní / Trekkingové kolo Kilimandžáro L": {
+   "isBike": true,
+   "bikeType": "trekking",
+   "price": "2 200 Kč"
+  },
+  "Brašna na nosič kola černá": {
+   "isBike": false,
+   "bikeType": null,
+   "price": "300 Kč"
+  },
+  "Stojan na 3 kola": {
+   "isBike": false,
+   "bikeType": null,
+   "price": "199 Kč"
+  },
+  "Tretry na kolo Rockrider vel. 39": {
+   "isBike": false,
+   "bikeType": null,
+   "price": "500 Kč"
+  },
+  "Pronájmu nosic kol zn.amber na 4 kola": {
+   "isBike": false,
+   "bikeType": null,
+   "price": "100 Kč"
+  },
+  "Dětské kolo California": {
+   "isBike": true,
+   "bikeType": "kids",
+   "price": "3 390 Kč"
+  },
+  "Dětské kolo": {
+   "isBike": true,
+   "bikeType": "kids",
+   "price": "500 Kč"
+  },
+  "Odrážedlo FUNNY WHEELS Rider SuperSport 2v1 JAWA (bílá)": {
+   "isBike": true,
+   "bikeType": "balance",
+   "price": "999 Kč"
+  },
+  "Cyklistická helma": {
+   "isBike": false,
+   "bikeType": null,
+   "price": "500 Kč"
+  },
+  "Nosič kol Thule na tažné zařízení pro 3 kola": {
+   "isBike": false,
+   "bikeType": null,
+   "price": "8 000 Kč"
+  },
+  "Dětské celo odpružené kolo velikost 18 značka olpran": {
+   "isBike": true,
+   "bikeType": "kids",
+   "price": "500 Kč"
+  },
+  "Cannondale tričko": {
+   "isBike": false,
+   "bikeType": null,
+   "price": "500 Kč"
+  },
+  "BMX kolo": {
+   "isBike": true,
+   "bikeType": "bmx",
+   "price": "1 900 Kč"
+  },
+  "CYKLO PŘILBA SAFE - TEC TYR 3": {
+   "isBike": false,
+   "bikeType": null,
+   "price": "899 Kč"
+  },
+  "Prodám sedačku na kolo": {
+   "isBike": false,
+   "bikeType": null,
+   "price": "800 Kč"
+  },
+  "Dětské kolo 20 CARRERA": {
+   "isBike": true,
+   "bikeType": "kids",
+   "price": "990 Kč"
+  },
+  "CamelBak QuickLink konverzní kit 2x": {
+   "isBike": false,
+   "bikeType": null,
+   "price": "200 Kč"
+  },
+  "NALINI - pánský cyklodres (vel.L)": {
+   "isBike": false,
+   "bikeType": null,
+   "price": "250 Kč"
+  },
+  "Carbonové zapletené kola - XDR sram ořech.": {
+   "isBike": false,
+   "bikeType": null,
+   "price": "9 870 Kč"
+  },
+  "MTB boty tretry CUBE, Five Ten, Specialized TAHOE vel.39": {
+   "isBike": false,
+   "bikeType": null,
+   "price": "900 Kč"
+  },
+  "Cannondale košík na bidon.": {
+   "isBike": false,
+   "bikeType": null,
+   "price": "249 Kč"
+  },
+  "Magicshine Monteer 12000lm - cyklo svetlo- v záruke": {
+   "isBike": false,
+   "bikeType": null,
+   "price": "V textu"
+  },
+  "Cyklystická přilba": {
+   "isBike": false,
+   "bikeType": null,
+   "price": "200 Kč"
+  },
+  "Detska sedacka": {
+   "isBike": false,
+   "bikeType": null,
+   "price": "400 Kč"
+  },
+  "Dámské kolo": {
+   "isBike": true,
+   "bikeType": "other",
+   "price": "3 000 Kč"
+  },
+  "Dívčí kolo 16 Leader fox": {
+   "isBike": true,
+   "bikeType": "kids",
+   "price": "1 000 Kč"
+  },
+  "Dětské kolo Maxbike M304 velikost 24\"": {
+   "isBike": true,
+   "bikeType": "kids",
+   "price": "4 500 Kč"
+  },
+  "Cyklistická helma velikost L": {
+   "isBike": false,
+   "bikeType": null,
+   "price": "200 Kč"
+  },
+  "Author": {
+   "isBike": true,
+   "bikeType": "other",
+   "price": "12 000 Kč"
+  },
+  "Přilba POC - Myelin Granite Grey/Lemon Calcite 55-58": {
+   "isBike": false,
+   "bikeType": null,
+   "price": "800 Kč"
+  },
+  "8 - Starších jízdních kol.": {
+   "isBike": true,
+   "bikeType": "other",
+   "price": "Dohodou"
+  },
+  "Cyklistická přilba Etape Vesper S/M": {
+   "isBike": false,
+   "bikeType": null,
+   "price": "350 Kč"
+  },
+  "Spinningove kolo SCHWINN": {
+   "isBike": false,
+   "bikeType": null,
+   "price": "5 000 Kč"
+  },
+  "Střešní nosič pro kola Piccola-M pro Škoda Superb 4D": {
+   "isBike": false,
+   "bikeType": null,
+   "price": "1 500 Kč"
+  },
+  "Detske jizdni kolo": {
+   "isBike": true,
+   "bikeType": "kids",
+   "price": "400 Kč"
+  },
+  "Feva dětská sedačka na kolo": {
+   "isBike": false,
+   "bikeType": null,
+   "price": "900 Kč"
+  },
+  "Prodám staré kolo Favorit": {
+   "isBike": true,
+   "bikeType": "road",
+   "price": "2 500 Kč"
+  },
+  "Dětské kolo Rock Machine": {
+   "isBike": true,
+   "bikeType": "kids",
+   "price": "2 500 Kč"
+  },
+  "Woom 2 powder pink": {
+   "isBike": true,
+   "bikeType": "kids",
+   "price": "8 200 Kč"
+  },
+  "P: Cyklo boty Scott MTB Comp RS": {
+   "isBike": false,
+   "bikeType": null,
+   "price": "500 Kč"
+  },
+  "Stropní držák na kolo 2 ks": {
+   "isBike": false,
+   "bikeType": null,
+   "price": "200 Kč"
+  },
+  "Dětská přilba na kolo": {
+   "isBike": false,
+   "bikeType": null,
+   "price": "300 Kč"
+  },
+  "Sedačka Hamax Siesta a Polisport": {
+   "isBike": false,
+   "bikeType": null,
+   "price": "500 Kč"
+  },
+  "Prodám pánské cyklotretry Shimano": {
+   "isBike": false,
+   "bikeType": null,
+   "price": "1 390 Kč"
+  },
+  "Dětská cyklistická helma": {
+   "isBike": false,
+   "bikeType": null,
+   "price": "400 Kč"
+  },
+  "Northwave Revolution": {
+   "isBike": false,
+   "bikeType": null,
+   "price": "1 500 Kč"
+  },
+  "Nové cyklistické SPD pedály Shimano PD-M324": {
+   "isBike": false,
+   "bikeType": null,
+   "price": "800 Kč"
+  },
+  "Prodám staré kolo Eska": {
+   "isBike": true,
+   "bikeType": "other",
+   "price": "2 000 Kč"
+  },
+  "Cyklosedačka Hamax": {
+   "isBike": false,
+   "bikeType": null,
+   "price": "300 Kč"
+  },
+  "Přilba SULOV MATTEO L 58-61cm + pouzdro na rám zdarma": {
+   "isBike": false,
+   "bikeType": null,
+   "price": "299 Kč"
+  },
+  "Dámské kolo FAV NEX-3": {
+   "isBike": true,
+   "bikeType": "other",
+   "price": "2 500 Kč"
+  },
+  "Teleskopickou sedlovku": {
+   "isBike": false,
+   "bikeType": null,
+   "price": "1 200 Kč"
+  },
+  "Vozík za kolo CROOZER CARGO": {
+   "isBike": false,
+   "bikeType": null,
+   "price": "4 800 Kč"
+  },
+  "Dětská přilba Author": {
+   "isBike": false,
+   "bikeType": null,
+   "price": "100 Kč"
+  },
+  "Pánské kolo Olpran Pánské pro dospělého": {
+   "isBike": true,
+   "bikeType": "other",
+   "price": "300 Kč"
+  },
+  "Motokolo": {
+   "isBike": false,
+   "bikeType": null,
+   "price": "2 500 Kč"
+  },
+  "kellys whip 30 L": {
+   "isBike": true,
+   "bikeType": "dirt",
+   "price": "11 000 Kč"
+  },
+  "Cyklo svítilna na řídítka": {
+   "isBike": false,
+   "bikeType": null,
+   "price": "450 Kč"
+  },
+  "BMX 21.25 RHD": {
+   "isBike": true,
+   "bikeType": "bmx",
+   "price": "18 000 Kč"
+  },
+  "NOVÉ CYKLISTICKÉ FREERIDE KALHOTY - KRAŤASY - MACE - XL": {
+   "isBike": false,
+   "bikeType": null,
+   "price": "450 Kč"
+  },
+  "Puky - odráželo": {
+   "isBike": true,
+   "bikeType": "balance",
+   "price": "600 Kč"
+  },
+  "Dres na kolo APACHE - cyklodres": {
+   "isBike": false,
+   "bikeType": null,
+   "price": "799 Kč"
+  },
+  "Uvex viva 2 - cyklistická helma": {
+   "isBike": false,
+   "bikeType": null,
+   "price": "400 Kč"
+  },
+  "Dětská helma Specialized s blikackou": {
+   "isBike": false,
+   "bikeType": null,
+   "price": "600 Kč"
+  },
+  "Dětské kolo 16 značky Apache": {
+   "isBike": true,
+   "bikeType": "kids",
+   "price": "600 Kč"
+  },
+  "Trenažér ELITE qubo": {
+   "isBike": false,
+   "bikeType": null,
+   "price": "900 Kč"
+  },
+  "Držák na kolo Thule": {
+   "isBike": false,
+   "bikeType": null,
+   "price": "5 200 Kč"
+  },
+  "Nosič na staré kolo": {
+   "isBike": false,
+   "bikeType": null,
+   "price": "300 Kč"
+  },
+  "Nosič kol Cruz race dark": {
+   "isBike": false,
+   "bikeType": null,
+   "price": "V textu"
+  },
+  "Sedlo na kolo Selle Royal Crussis dámské / LADY": {
+   "isBike": false,
+   "bikeType": null,
+   "price": "399 Kč"
+  },
+  "Chrániče loktů POC Oseus VPD Elbow": {
+   "isBike": false,
+   "bikeType": null,
+   "price": "1 300 Kč"
+  },
+  "Damske kolo": {
+   "isBike": true,
+   "bikeType": "other",
+   "price": "900 Kč"
+  },
+  "Dívčí kolo": {
+   "isBike": true,
+   "bikeType": "kids",
+   "price": "3 800 Kč"
+  },
+  "Cyklotrenažér": {
+   "isBike": false,
+   "bikeType": null,
+   "price": "Nabídněte"
+  },
+  "Dětské kolo author": {
+   "isBike": true,
+   "bikeType": "kids",
+   "price": "4 000 Kč"
+  },
+  "Pedalsport PDS-DK-K - držák kola na stěnu": {
+   "isBike": false,
+   "bikeType": null,
+   "price": "150 Kč"
+  },
+  "Střešní nosič kol / držák kola na auto": {
+   "isBike": false,
+   "bikeType": null,
+   "price": "300 Kč"
+  },
+  "Nová helma na kolo MET UAE velikost L": {
+   "isBike": false,
+   "bikeType": null,
+   "price": "2 000 Kč"
+  },
+  "Giro Rincon vel. 43": {
+   "isBike": false,
+   "bikeType": null,
+   "price": "1 200 Kč"
+  },
+  "Prodám kolo": {
+   "isBike": true,
+   "bikeType": "other",
+   "price": "200 Kč"
+  },
+  "Cyklosedačka Thule ridealong": {
+   "isBike": false,
+   "bikeType": null,
+   "price": "700 Kč"
+  },
+  "HELMA O'NEAL BLADE RIO - RED": {
+   "isBike": false,
+   "bikeType": null,
+   "price": "1 800 Kč"
+  },
+  "cyklistické kraťasy Pantani Santini Italy": {
+   "isBike": false,
+   "bikeType": null,
+   "price": "3 000 Kč"
+  },
+  "ABUS StormChaser ACE flip flop purple vel. Small": {
+   "isBike": false,
+   "bikeType": null,
+   "price": "2 499 Kč"
+  },
+  "Cyklistické tretry": {
+   "isBike": false,
+   "bikeType": null,
+   "price": "300 Kč"
+  },
+  "Prodej kola": {
+   "isBike": true,
+   "bikeType": "other",
+   "price": "3 900 Kč"
+  },
+  "Dámské/dívčí kolo MIFA, alu rám, vel. 26": {
+   "isBike": true,
+   "bikeType": "other",
+   "price": "1 900 Kč"
+  },
+  "Detske kolo 16": {
+   "isBike": true,
+   "bikeType": "kids",
+   "price": "700 Kč"
+  },
+  "Cyklistická helma ALPINA MYTHOS - vel. 57 - 62 cm": {
+   "isBike": false,
+   "bikeType": null,
+   "price": "509 Kč"
+  },
+  "Top move nosic zavazadel na kolo": {
+   "isBike": false,
+   "bikeType": null,
+   "price": "200 Kč"
+  },
+  "Helma zn. Giro, vel. 50-57": {
+   "isBike": false,
+   "bikeType": null,
+   "price": "450 Kč"
+  },
+  "Jízdní kola": {
+   "isBike": true,
+   "bikeType": "other",
+   "price": "V textu"
+  },
+  "Prodám světla na kolo": {
+   "isBike": false,
+   "bikeType": null,
+   "price": "100 Kč"
+  },
+  "Cyklisticka prilba Array vel.L/ 58-62": {
+   "isBike": false,
+   "bikeType": null,
+   "price": "300 Kč"
+  },
+  "krabice na kolo": {
+   "isBike": false,
+   "bikeType": null,
+   "price": "Nabídněte"
+  },
+  "Retro kolo": {
+   "isBike": true,
+   "bikeType": "other",
+   "price": "500 Kč"
+  },
+  "Dětské kolo 20": {
+   "isBike": true,
+   "bikeType": "kids",
+   "price": "500 Kč"
+  },
+  "Sugoi cyklistický dres": {
+   "isBike": false,
+   "bikeType": null,
+   "price": "99 Kč"
+  },
+  "dětské jízdní kolo": {
+   "isBike": true,
+   "bikeType": "kids",
+   "price": "1 500 Kč"
+  },
+  "Detske kolo Bobbin": {
+   "isBike": true,
+   "bikeType": "kids",
+   "price": "2 900 Kč"
+  },
+  "Potah na sedlo Geltech": {
+   "isBike": false,
+   "bikeType": null,
+   "price": "90 Kč"
+  },
+  "Garmin Edge Explore 2 GPS cyklopočítač": {
+   "isBike": false,
+   "bikeType": null,
+   "price": "4 400 Kč"
+  },
+  "Držák kola na pricniky": {
+   "isBike": false,
+   "bikeType": null,
+   "price": "100 Kč"
+  },
+  "Prodám novou přilbu ROCK MACHINE Edge vel. 58-61": {
+   "isBike": false,
+   "bikeType": null,
+   "price": "500 Kč"
+  },
+  "Kolo favorit eska": {
+   "isBike": true,
+   "bikeType": "road",
+   "price": "499 Kč"
+  },
+  "Prodám kola": {
+   "isBike": true,
+   "bikeType": "other",
+   "price": "Dohodou"
+  },
+  "Karbonový gravel PELLS Raw 2(Shimano GRX 1×12) velikost M": {
+   "isBike": true,
+   "bikeType": "gravel",
+   "price": "39 000 Kč"
+  },
+  "Sedačka na kolo": {
+   "isBike": false,
+   "bikeType": null,
+   "price": "180 Kč"
+  },
+  "Bmx gt Calafia 2014": {
+   "isBike": true,
+   "bikeType": "bmx",
+   "price": "8 000 Kč"
+  },
+  "Kolo Merida i s dětskou sedačkou": {
+   "isBike": true,
+   "bikeType": "other",
+   "price": "1 500 Kč"
+  },
+  "Dětské kolo Kellys Lumi 50 s 20\" koly": {
+   "isBike": true,
+   "bikeType": "kids",
+   "price": "2 000 Kč"
+  },
+  "Kolo BMX": {
+   "isBike": true,
+   "bikeType": "bmx",
+   "price": "500 Kč"
+  },
+  "Mix oblečení na kolo": {
+   "isBike": false,
+   "bikeType": null,
+   "price": "V textu"
+  },
+  "cyklo sada LED svítidel na kolo": {
+   "isBike": false,
+   "bikeType": null,
+   "price": "150 Kč"
+  },
+  "Croozer 737": {
+   "isBike": false,
+   "bikeType": null,
+   "price": "1 000 Kč"
+  },
+  "Prodám Kalhoty Diadora na enduro": {
+   "isBike": false,
+   "bikeType": null,
+   "price": "500 Kč"
+  },
+  "Dětská helma HI-TEC": {
+   "isBike": false,
+   "bikeType": null,
+   "price": "250 Kč"
+  },
+  "Staré kolo": {
+   "isBike": true,
+   "bikeType": "other",
+   "price": "Zdarma"
+  },
+  "Kolo Kellys Trekking Cross CRX": {
+   "isBike": true,
+   "bikeType": "trekking",
+   "price": "3 000 Kč"
+  },
+  "Cyklistický dres Cannondale SLV Goodfight": {
+   "isBike": false,
+   "bikeType": null,
+   "price": "500 Kč"
+  },
+  "Liberta": {
+   "isBike": true,
+   "bikeType": "other",
+   "price": "500 Kč"
+  },
+  "Gravel Scott": {
+   "isBike": true,
+   "bikeType": "gravel",
+   "price": "33 000 Kč"
+  },
+  "SJEZDOVÉ JÍZDNÍ KOLO TREK": {
+   "isBike": true,
+   "bikeType": "mtb_full",
+   "price": "25 000 Kč"
+  },
+  "Cyklistické kalhoty - zateplené": {
+   "isBike": false,
+   "bikeType": null,
+   "price": "200 Kč"
+  },
+  "Helma": {
+   "isBike": false,
+   "bikeType": null,
+   "price": "100 Kč"
+  },
+  "Fatbike-SCOTT": {
+   "isBike": true,
+   "bikeType": "fatbike",
+   "price": "9 000 Kč"
+  },
+  "Odražedlo firstboke": {
+   "isBike": true,
+   "bikeType": "balance",
+   "price": "1 000 Kč"
+  },
+  "AUTHOR DALLAS TREKOVÉ KOLO 17": {
+   "isBike": true,
+   "bikeType": "trekking",
+   "price": "1 199 Kč"
+  },
+  "Helma Scott": {
+   "isBike": false,
+   "bikeType": null,
+   "price": "490 Kč"
+  },
+  "Kolo": {
+   "isBike": true,
+   "bikeType": "other",
+   "price": "1 500 Kč"
+  },
+  "Nosič kol Thule VeloSpace XT3 + 1 nosič na 4 kola": {
+   "isBike": false,
+   "bikeType": null,
+   "price": "15 999 Kč"
+  },
+  "Dámské starší kolo velikost 26 značka lady 26": {
+   "isBike": true,
+   "bikeType": "other",
+   "price": "500 Kč"
+  },
+  "Koloběžka": {
+   "isBike": false,
+   "bikeType": null,
+   "price": "800 Kč"
+  },
+  "SPD tretry Shimano": {
+   "isBike": false,
+   "bikeType": null,
+   "price": "700 Kč"
+  },
+  "Střešní nosič BMW": {
+   "isBike": false,
+   "bikeType": null,
+   "price": "3 000 Kč"
+  },
+  "Sedačka na kolo - Feva": {
+   "isBike": false,
+   "bikeType": null,
+   "price": "550 Kč"
+  },
+  "Brompton Háček k Držáku Blatníku": {
+   "isBike": false,
+   "bikeType": null,
+   "price": "67 Kč"
+  },
+  "Dětská helma ABUS Smiley 3.0 růžová VEL. S": {
+   "isBike": false,
+   "bikeType": null,
+   "price": "500 Kč"
+  },
+  "Cyklistické tretry Northwave, R2 a cyklistické ponožky Lawi": {
+   "isBike": false,
+   "bikeType": null,
+   "price": "Dohodou"
+  },
+  "Roval Rapide Roadbar": {
+   "isBike": false,
+   "bikeType": null,
+   "price": "5 900 Kč"
+  },
+  "Dětská cyklosedačka Hamax Sleepy": {
+   "isBike": false,
+   "bikeType": null,
+   "price": "400 Kč"
+  },
+  "Gravel-Cannondale Topstone Carbon Rival-6/2023": {
+   "isBike": true,
+   "bikeType": "gravel",
+   "price": "60 000 Kč"
+  },
+  "Vozik za kolo/kolobezku": {
+   "isBike": false,
+   "bikeType": null,
+   "price": "1 500 Kč"
+  },
+  "cyklohelma/přilba zn. kelly's , vel.M - dobrý stav": {
+   "isBike": false,
+   "bikeType": null,
+   "price": "170 Kč"
+  },
+  "Dětské odrážedlo 12\"": {
+   "isBike": true,
+   "bikeType": "balance",
+   "price": "800 Kč"
+  },
+  "Cyklistická helma POC Kortal Race MIPS Black Matt/Hydrogen W": {
+   "isBike": false,
+   "bikeType": null,
+   "price": "3 499 Kč"
+  },
+  "DÁMSKÉ CYKLISTICKÉ KRAŤASY S VLOŽKOU- vel.XS": {
+   "isBike": false,
+   "bikeType": null,
+   "price": "120 Kč"
+  },
+  "Držák na mobil na řídítka - Benguo X-81": {
+   "isBike": false,
+   "bikeType": null,
+   "price": "109 Kč"
+  },
+  "Odrážedlo Decathlon": {
+   "isBike": true,
+   "bikeType": "balance",
+   "price": "500 Kč"
+  },
+  "Gravel BMC": {
+   "isBike": true,
+   "bikeType": "gravel",
+   "price": "105 000 Kč"
+  },
+  "Fox Racing Youth Ranger Water Jacket – dětská nepromokavá MT": {
+   "isBike": false,
+   "bikeType": null,
+   "price": "800 Kč"
+  },
+  "Cyklokalhoty SILVINI Vel.L": {
+   "isBike": false,
+   "bikeType": null,
+   "price": "200 Kč"
+  },
+  "Dětská cyklistická helma 52 - 56 cm": {
+   "isBike": false,
+   "bikeType": null,
+   "price": "80 Kč"
+  },
+  "Retro kolo skládačka": {
+   "isBike": true,
+   "bikeType": "folding",
+   "price": "300 Kč"
+  },
+  "Dětské cyklistické rukavice Author": {
+   "isBike": false,
+   "bikeType": null,
+   "price": "50 Kč"
+  },
+  "Prodám NOVÝ dres Vermarc Ferro": {
+   "isBike": false,
+   "bikeType": null,
+   "price": "799 Kč"
+  },
+  "BMX 12” Kink": {
+   "isBike": true,
+   "bikeType": "bmx",
+   "price": "6 000 Kč"
+  },
+  "Dynamo na kolo": {
+   "isBike": false,
+   "bikeType": null,
+   "price": "200 Kč"
+  },
+  "Bmx": {
+   "isBike": true,
+   "bikeType": "bmx",
+   "price": "1 500 Kč"
+  },
+  "Košík na zadní nosič (nový).": {
+   "isBike": false,
+   "bikeType": null,
+   "price": "300 Kč"
+  },
+  "Canyon Handlebar Bag": {
+   "isBike": false,
+   "bikeType": null,
+   "price": "800 Kč"
+  },
+  "Roztahovač pístků kotoučové brzdy kola": {
+   "isBike": false,
+   "bikeType": null,
+   "price": "99 Kč"
+  }
+ }
+}

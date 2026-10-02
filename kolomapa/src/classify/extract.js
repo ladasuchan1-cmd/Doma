@@ -162,7 +162,10 @@ function extractWheel(title, desc, p, { kidsHint = false } = {}) {
       if (!w) return;
       // velikost rámu v palcích („rám 20\"“, „vel. 18\"“) není velikost kol
       const before = t.slice(Math.max(0, idx - 14), idx);
-      if (/(ram\w*|vel\w*|velikost|size|frame|vyska\w*)\s*[:.]?\s*$/.test(before) && weight < 3) return;
+      if (/(ram\w*|vel\w*|velikost|size|frame|vyska\w*)\s*[:.]?\s*$/.test(before) && weight < 3) {
+        // u dětských kol „velikost 16“ = velikost kol
+        if (!(kidsHint && /vel\w*\s*[:.]?\s*$/.test(before) && !/ram\w*\s*(vel\w*)?\s*[:.]?\s*$/.test(before) && ['12', '14', '16', '20', '24'].includes(w))) return;
+      }
       if (w === '18' && weight < 3) return;
       cands.push({ w, weight: weight + (src === 'title' ? 0.5 : 0), idx, src });
     };
@@ -172,6 +175,8 @@ function extractWheel(title, desc, p, { kidsHint = false } = {}) {
     for (const m of t.matchAll(/(?<![\d.,])(12|14|16|18|20|24|26|27[.,]5|28|29|700)\s*x\s*\d/g)) add(m.index, m[1], 3);
     // „29er“, „27,5+“
     for (const m of t.matchAll(/(?<![\d.,])(26|27[.,]5|29)\s*(?:er\b|\+)/g)) add(m.index, m[1], 3);
+    // dětská kola: „velikost 16“, „vel. 20“
+    if (kidsHint) for (const m of t.matchAll(/\bvel(?:ikost\w*)?\.?\s*(12|14|16|20|24)(?![\d.,]?\d)(?!\s*(?:cm|mm|let|kg))/g)) add(m.index + m[0].length - m[1].length, m[1], 2);
     // „650b“, „700c“
     for (const m of t.matchAll(/(?<![\d.,])(650\s*b|700\s*c)\b/g)) add(m.index, m[1], 3);
     // palce: 29" 29'' 29 palců 29 inch
@@ -286,9 +291,9 @@ function extractFrameSize(title, desc, p, roadish) {
         const unit = mm[2] || '';
         if (unit === 'cm' || (v >= 44 && v <= 64 && unit === '')) {
           if (v >= 38 && v <= 66) return { frameSize: labelFromCm(v, roadish || (unit === '' && v >= 47)), frameSizeRaw: `${v} cm` };
-        } else if (v >= 12 && v <= 24 && ![12, 14, 16, 20, 24].includes(v) ? true : v >= 13 && v <= 23 && unit !== '' ) {
+        } else if (v >= 13 && v <= 23 && (unit !== '' || /ram/.test(m[0])) && !(unit === '' && [14, 16, 20].includes(v) && !/ram/.test(m[0]))) {
           return { frameSize: labelFromInch(v), frameSizeRaw: `${v}"` };
-        } else if (v >= 13 && v <= 23 && unit === '' && /ram/.test(m[0])) {
+        } else if (v >= 13 && v <= 23 && unit === '' && ![14, 16, 20].includes(v)) {
           return { frameSize: labelFromInch(v), frameSizeRaw: `${v}"` };
         }
       }
@@ -446,10 +451,18 @@ function extractBattery(title, desc, p) {
     if (cands.length) break;
     for (const m of t.matchAll(/\b(?:powertube|powerpack|power\s*tube|power\s*pack|m2\s*-?|baterie|baterii|akumulator\w*)\s*(\d{3})\b/g)) cands.push(Number(m[1]));
     if (cands.length) break;
-    const va = t.match(/\b(24|36|48|52)\s*v\b[^\d\n]{0,12}(\d{1,2}(?:[.,]\d)?)\s*ah\b/) || t.match(/\b(\d{1,2}(?:[.,]\d)?)\s*ah\b[^\d\n]{0,12}(24|36|48|52)\s*v\b/);
+    let va = t.match(/\b(24|36|48|52)\s*v\b[^\d\n]{0,12}?(\d{1,2}(?:[.,]\d)?)\s*ah\b/);
+    let volts = va ? Number(va[1]) : null;
+    let amps = va ? Number(va[2].replace(',', '.')) : null;
+    if (!va) {
+      va = t.match(/\b(\d{1,2}(?:[.,]\d)?)\s*ah\b[^\d\n]{0,12}?(24|36|48|52)\s*v\b/);
+      if (va) {
+        amps = Number(va[1].replace(',', '.'));
+        volts = Number(va[2]);
+      }
+    }
     if (va) {
-      const [v, ah] = /ah/.test(va[0].slice(0, va[0].indexOf(va[2]) + va[2].length + 3)) && Number(va[1]) <= 30 && !/\bv\b/.test(va[0].slice(0, 4)) ? [Number(va[2]), Number(String(va[1]).replace(',', '.'))] : [Number(va[1]), Number(String(va[2]).replace(',', '.'))];
-      const wh = Math.round(v * ah);
+      const wh = Math.round(volts * amps);
       if (wh >= 150 && wh <= 2000) cands.push(wh);
     }
     if (cands.length) break;

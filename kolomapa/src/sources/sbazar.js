@@ -58,6 +58,10 @@ const CATEGORY_BY_ID = new Map(CATEGORIES.map((c) => [c.id, c]));
 // Pomocníci
 
 const clean = (s) => (typeof s === 'string' || typeof s === 'number' ? String(s).replace(/\s+/g, ' ').trim() : '');
+/** Číslo z API (i jako řetězec „6300“ – kdyby se změnil formát); jinak NaN. */
+const num = (v) => (typeof v === 'number' ? v : typeof v === 'string' && /^\s*\d+(?:\.\d+)?\s*$/.test(v) ? Number(v) : Number.NaN);
+/** Adresa obrázku z položky pole images ({url} nebo přímo řetězec). */
+const imageUrl = (x) => (typeof x === 'string' ? x : typeof x?.url === 'string' ? x.url : undefined);
 
 function throwIfAborted(signal) {
   if (signal?.aborted) throw signal.reason || new Error('Přerušeno');
@@ -101,8 +105,8 @@ function splitBand({ from, to }) {
 }
 
 /** Adresa výpisu jedné stránky. */
-function searchUrl(categoryId, { from = null, to = null } = {}, offset, timestampTo) {
-  const q = [`category_id=${categoryId}`, `offset=${offset}`, `limit=${PAGE_SIZE}`, 'sort=-create_date', `timestamp_to=${timestampTo}`];
+function searchUrl(categoryId, { from = null, to = null } = {}, offset, timestampTo, limit = PAGE_SIZE) {
+  const q = [`category_id=${categoryId}`, `offset=${offset}`, `limit=${limit}`, 'sort=-create_date', `timestamp_to=${timestampTo}`];
   if (from > 0) q.push(`price_from=${from}`);
   if (to != null) q.push(`price_to=${to}`);
   return `${API}/items/search?${q.join('&')}`;
@@ -172,13 +176,14 @@ function photoUrlOf(u) {
  */
 function priceInfo(r, withOriginal = false) {
   if (r?.price_by_agreement === true) return { priceCzk: null, priceNote: 'Dohodou' };
-  const p = typeof r?.price === 'number' ? r.price : Number.NaN;
+  const p = num(r?.price);
   if (p === 0) return { priceCzk: null, priceNote: 'Zdarma / v textu' };
   if (!Number.isFinite(p) || p < 0) return { priceCzk: null, priceNote: null };
   const priceCzk = Math.round(p);
   let priceNote = null;
-  if (withOriginal && typeof r.price_original === 'number' && Number.isFinite(r.price_original) && r.price_original > 0) {
-    const orig = Math.round(r.price_original);
+  const po = num(r?.price_original);
+  if (withOriginal && Number.isFinite(po) && po > 0) {
+    const orig = Math.round(po);
     if (orig !== priceCzk) priceNote = `původně ${fmtKc(orig)}`;
   }
   return { priceCzk, priceNote };
@@ -261,7 +266,7 @@ function normalizeListItem(r, cat) {
     postedAt: pragueToIso(r.create_date),
     categorySrc: categoryLabel(r.category, cat),
     ...locationOf(r.locality),
-    photoUrl: photoUrlOf(Array.isArray(r.images) ? r.images[0]?.url : undefined),
+    photoUrl: photoUrlOf(Array.isArray(r.images) ? imageUrl(r.images[0]) : undefined),
     params: siteFacts(r),
     sellerType: r.premise && typeof r.premise === 'object' ? 'company' : 'private',
     detailComplete: false,
@@ -289,7 +294,7 @@ function cleanDescription(s) {
 function normalizeDetail(r) {
   const id = validId(r?.id);
   if (!id) return null;
-  const images = Array.isArray(r.images) ? r.images.filter((x) => x && typeof x.url === 'string') : [];
+  const images = Array.isArray(r.images) ? r.images.map(imageUrl).filter(Boolean) : [];
   const { priceCzk, priceNote } = priceInfo(r, true);
   const params = siteFacts(r);
   const validTo = czDate(r.valid_to);
@@ -305,7 +310,7 @@ function normalizeDetail(r) {
     postedAt: pragueToIso(r.create_date),
     categorySrc: categoryLabel(r.category),
     ...locationOf(main),
-    photoUrl: photoUrlOf(images[0]?.url),
+    photoUrl: photoUrlOf(images[0]),
     photoCount: images.length,
     params,
     // Bez firemního profilu typ neměníme – „obchod“ podle počtu inzerátů určuje scan.
@@ -373,9 +378,9 @@ async function fetchApi(ctx, url, { okStatuses = [], what = 'data' } = {}) {
 /**
  * Jedna stránka výpisu. Vrací {results, total} nebo {tooHigh: true} (API odmítlo offset nad 10 000).
  */
-async function fetchPage(ctx, cat, band, offset, timestampTo) {
+async function fetchPage(ctx, cat, band, offset, timestampTo, limit = PAGE_SIZE) {
   const what = `výpisu ${cat.label} (${fmtBand(band)}, od ${offset})`;
-  const { status, body } = await fetchApi(ctx, searchUrl(cat.id, band, offset, timestampTo), { okStatuses: [422], what });
+  const { status, body } = await fetchApi(ctx, searchUrl(cat.id, band, offset, timestampTo, limit), { okStatuses: [422], what });
   if (status === 422) {
     const codes = Array.isArray(body?.errors) ? body.errors.map((e) => e?.error_code) : [];
     if (codes.includes('too_high_offset')) return { tooHigh: true };
@@ -396,13 +401,16 @@ async function fetchDetail(ctx, id) {
   return r;
 }
 
-/** Souřadnice lokality („ward:14682“) → {lat, lon} | null (lokalita bez bodu v ČR). */
+/**
+ * Souřadnice lokality („ward:14682“) → {lat, lon} | null (API lokalitu nezná – 404 – nebo nemá bod v ČR).
+ * Jiná chyba (400/422 = změna API, 5xx, síť) → výjimka; taková lokalita se do cache jako „bez bodu“ neuloží.
+ */
 async function resolveLocality(ctx, key) {
   const [type, id] = key.split(':');
-  const { status, body } = await fetchApi(ctx, resolveUrl(type, id), { okStatuses: [400, 404, 422], what: `lokality ${key}` });
-  if (status !== 200) return null;
-  const lat = Number(body?.result?.gps_lat);
-  const lon = Number(body?.result?.gps_lon);
+  const { status, body } = await fetchApi(ctx, resolveUrl(type, id), { okStatuses: [404], what: `lokality ${key}` });
+  if (status === 404) return null;
+  const lat = num(body?.result?.gps_lat);
+  const lon = num(body?.result?.gps_lon);
   if (!Number.isFinite(lat) || !Number.isFinite(lon) || lat < 48.4 || lat > 51.2 || lon < 11.9 || lon > 19) return null;
   return { lat: Math.round(lat * 1e6) / 1e6, lon: Math.round(lon * 1e6) / 1e6 };
 }
@@ -437,7 +445,7 @@ function cacheSet(cache, key, value, log) {
  * {considered, allKnown, newestKnownMs, newestMs}.
  */
 function collect(st, cat, results) {
-  const page = { considered: 0, allKnown: true, newestKnownMs: -Infinity, newestMs: -Infinity };
+  const page = { considered: 0, allKnown: true, newestKnownMs: -Infinity, newestMs: -Infinity, foreign: 0 };
   const note = (entry) => {
     page.considered++;
     if (!entry.known) page.allKnown = false;
@@ -450,6 +458,13 @@ function collect(st, cat, results) {
     const id = validId(r?.id);
     if (!id) {
       st.invalid++;
+      continue;
+    }
+    // Inzerát jiné kategorie (přesunutý během průchodu, nebo API přestalo filtrovat podle category_id) → přeskočit.
+    const catId = Number(r.category?.id);
+    if (Number.isInteger(catId) && catId > 0 && catId !== cat.id) {
+      st.foreign++;
+      page.foreign++;
       continue;
     }
     const prev = st.items.get(id);
@@ -490,55 +505,76 @@ function collect(st, cat, results) {
 }
 
 /**
- * Projde jedno cenové pásmo kategorie (od nejnovějších). Při úplném průchodu a příliš velkém pásmu ho rozdělí podle
- * ceny a projde poloviny. Chyby požadavků propadnou volajícímu.
+ * Kontrola stránky výpisu: většina inzerátů z jiné kategorie = API přestalo filtrovat podle category_id → chyba
+ * (pásmo selže, výpis je neúplný a do DB se nedostanou auta ani nábytek).
  */
-async function sweepBand(st, cat, band, depth = 0) {
+function checkForeign(info, n, where) {
+  if (info.foreign > Math.max(5, n * 0.2)) {
+    throw new Error(`Sbazar: výpis ${where} vrací inzeráty jiných kategorií (${info.foreign} z ${n}) – změnilo se API?`);
+  }
+}
+
+/**
+ * Projde jedno cenové pásmo kategorie (od nejnovějších). Při úplném průchodu a příliš velkém pásmu ho rozdělí podle
+ * ceny a projde poloviny. Limit stránek (ctx.maxPages) platí pro výchozí pásmo z CATEGORIES (segment) včetně jeho
+ * polovin. Chyby požadavků propadnou volajícímu.
+ * Úplnost pásma se posuzuje podle počtu RŮZNÝCH id, která přišla (API, které by ignorovalo offset nebo vracelo
+ * kratší stránky, tak neprojde jako úplné). Offset se posouvá o skutečný počet vrácených položek.
+ * @param {string} seg klíč segmentu pro počítání stránek
+ */
+async function sweepBand(st, cat, band, seg, depth = 0) {
   const { ctx } = st;
   const log = ctx.log;
+  const where = `${cat.label} (${fmtBand(band)})`;
+  const ids = new Set();
   let offset = 0;
-  let received = 0;
   let total = null;
   let newestKnown = -Infinity;
   for (;;) {
     throwIfAborted(ctx.signal);
-    if ((st.pages.get(cat.id) || 0) >= st.maxPages) {
-      if (st.full) log?.warn?.(`Sbazar: ${cat.label} – dosažen limit ${st.maxPages} stránek, výpis není úplný`);
-      st.complete = false;
-      st.capped = true;
-      return;
-    }
-    if (offset + PAGE_SIZE > OFFSET_CAP) {
-      log?.warn?.(`Sbazar: ${cat.label} (${fmtBand(band)}) – API nedovolí jít za ${OFFSET_CAP} inzerátů, zbytek pásma vynechávám`);
+    if ((st.pages.get(seg) || 0) >= st.maxPages) {
+      if (st.full) log?.warn?.(`Sbazar: ${where} – dosažen limit ${st.maxPages} stránek, výpis není úplný`);
       st.complete = false;
       return;
     }
-    const page = await fetchPage(ctx, cat, band, offset, st.timestampTo);
-    st.pages.set(cat.id, (st.pages.get(cat.id) || 0) + 1);
+    if (offset >= OFFSET_CAP) {
+      log?.warn?.(`Sbazar: ${where} – API nedovolí jít za ${OFFSET_CAP} inzerátů, zbytek pásma vynechávám`);
+      st.complete = false;
+      return;
+    }
+    const page = await fetchPage(ctx, cat, band, offset, st.timestampTo, Math.min(PAGE_SIZE, OFFSET_CAP - offset));
+    st.pages.set(seg, (st.pages.get(seg) || 0) + 1);
     st.requests++;
     if (page.tooHigh) {
-      log?.warn?.(`Sbazar: ${cat.label} (${fmtBand(band)}) – API odmítlo offset ${offset} (too_high_offset), výpis není úplný`);
+      log?.warn?.(`Sbazar: ${where} – API odmítlo offset ${offset} (too_high_offset), výpis není úplný`);
       st.complete = false;
       return;
     }
     total = page.total;
+    if (offset === 0 && depth === 0 && st.full && total === 0) {
+      // Kategorie kol nikdy nejsou prázdné → spíš změna API / blokace; neúplné, ať pipeline nemaže živé inzeráty.
+      log?.warn?.(`Sbazar: ${where} – API vrátilo 0 inzerátů, výpis beru jako neúplný (zmizelé inzeráty tentokrát neoznačuji)`);
+      st.complete = false;
+    }
     if (offset === 0 && st.full && total > SPLIT_THRESHOLD) {
       const parts = depth < MAX_SPLIT_DEPTH ? splitBand(band) : null;
       if (parts) {
-        log?.warn?.(
-          `Sbazar: ${cat.label} (${fmtBand(band)}) má ${total} inzerátů – víc, než API dovolí projít (${OFFSET_CAP}); dělím na ${fmtBand(parts[0])} a ${fmtBand(parts[1])}`
-        );
-        collect(st, cat, page.results); // platné položky, v polovinách se jen přeskočí jako duplicitní
-        for (const p of parts) await sweepBand(st, cat, p, depth + 1);
+        log?.warn?.(`Sbazar: ${where} má ${total} inzerátů – víc, než API dovolí projít (${OFFSET_CAP}); dělím na ${fmtBand(parts[0])} a ${fmtBand(parts[1])}`);
+        checkForeign(collect(st, cat, page.results), page.results.length, where); // v polovinách se jen přeskočí jako duplicitní
+        for (const p of parts) await sweepBand(st, cat, p, seg, depth + 1);
         return;
       }
-      log?.warn?.(`Sbazar: ${cat.label} (${fmtBand(band)}) má ${total} inzerátů a podle ceny už nejde dál dělit – projdu jen prvních ${OFFSET_CAP}`);
-      st.complete = false;
+      // Úplnost rozhodne limit offsetu níže (do 10 000 inzerátů projde pásmo celé).
+      log?.warn?.(`Sbazar: ${where} má ${total} inzerátů a podle ceny už nejde dál dělit – projdu nejvýš prvních ${OFFSET_CAP}`);
     }
     const info = collect(st, cat, page.results);
-    received += page.results.length;
-    offset += PAGE_SIZE;
-    if (!page.results.length || page.results.length < PAGE_SIZE || offset >= total) break;
+    checkForeign(info, page.results.length, where);
+    for (const r of page.results) {
+      const id = validId(r?.id);
+      if (id) ids.add(id);
+    }
+    offset += page.results.length;
+    if (!page.results.length || offset >= total) break;
     if (!st.full) {
       // Inkrementálně: konec, když jsou na stránce jen známé inzeráty starší než nejnovější známý − 1 den
       // (později schválené inzeráty mají starší datum vložení než ty nejnovější).
@@ -551,8 +587,8 @@ async function sweepBand(st, cat, band, depth = 0) {
   }
   if (st.full && total != null) {
     const tolerance = Math.max(3, Math.ceil(total * 0.01));
-    if (received + tolerance < total) {
-      log?.warn?.(`Sbazar: ${cat.label} (${fmtBand(band)}) – přišlo ${received} z ${total} inzerátů, výpis beru jako neúplný`);
+    if (ids.size + tolerance < total) {
+      log?.warn?.(`Sbazar: ${where} – přišlo ${ids.size} různých z ${total} inzerátů, výpis beru jako neúplný`);
       st.complete = false;
     }
   }
@@ -578,17 +614,26 @@ async function resolveCoords(st) {
   const limit = Math.max(0, Number(ctx.config?.sbazarMaxResolve ?? MAX_RESOLVE_PER_RUN) || 0);
   let resolved = 0;
   let failedInRow = 0;
+  // „Bez bodu“ se do cache zapíše, jen když v tomtéž běhu aspoň jedna lokalita prošla – kdyby API lokalit přestalo
+  // fungovat (např. 404 na všechno), nezablokuje se tím překlad na RESOLVE_RETRY_DAYS dní.
+  const nones = [];
   for (const [key] of todo.slice(0, limit)) {
     throwIfAborted(ctx.signal);
     try {
-      const c = await resolveLocality(ctx, key);
       st.requests++;
+      const c = await resolveLocality(ctx, key);
       failedInRow = 0;
       if (c) {
         coords.set(key, c);
         resolved++;
         cacheSet(cache, `loc:${key}`, c, log);
-      } else cacheSet(cache, `loc:${key}`, { none: true, at: new Date().toISOString() }, log);
+      } else {
+        nones.push(key);
+        if (!resolved && nones.length >= 10) {
+          log?.warn?.('Sbazar: API lokalit nevrací souřadnice ani pro jednu lokalitu – změnilo se? Zkusím v dalším běhu');
+          break;
+        }
+      }
     } catch (e) {
       if (ctx.signal?.aborted) throw e;
       if (e?.fatal) {
@@ -601,6 +646,10 @@ async function resolveCoords(st) {
         break;
       }
     }
+  }
+  if (resolved) {
+    const at = new Date().toISOString();
+    for (const key of nones) cacheSet(cache, `loc:${key}`, { none: true, at }, log);
   }
   if (todo.length > limit) log?.info?.(`Sbazar: souřadnice pro ${limit} z ${todo.length} nových lokalit, zbytek v dalších bězích`);
   return { coords, resolved, pending: Math.max(0, todo.length - resolved) };
@@ -624,12 +673,12 @@ async function scan(ctx) {
     items: new Map(), // id → {item, known, uid, ts, locKey}
     skipped: new Set(),
     users: new Map(), // id účtu → počet inzerátů (jen v paměti během běhu)
-    pages: new Map(),
+    pages: new Map(), // segment → stažené stránky
     memCache: new Map(),
     complete: true,
-    capped: false,
     raw: 0,
     invalid: 0,
+    foreign: 0,
     cheap: 0,
     duplicates: 0,
     requests: 0,
@@ -641,7 +690,7 @@ async function scan(ctx) {
   outer: for (const cat of CATEGORIES) {
     for (const band of cat.bands) {
       try {
-        await sweepBand(st, cat, band);
+        await sweepBand(st, cat, band, `${cat.id}:${cat.bands.indexOf(band)}`);
         bandsOk++;
       } catch (e) {
         if (ctx.signal?.aborted) throw e;
@@ -656,10 +705,14 @@ async function scan(ctx) {
     }
   }
 
-  const sane = st.invalid <= Math.max(3, st.raw * 0.05);
+  const sane = st.invalid + st.foreign <= Math.max(3, st.raw * 0.05);
   if (!sane) {
     st.complete = false;
-    log?.warn?.('Sbazar: podezřele mnoho neúplných inzerátů – změnilo se API? Zmizelé inzeráty tentokrát neoznačuji', { invalid: st.invalid, raw: st.raw });
+    log?.warn?.('Sbazar: podezřele mnoho neúplných inzerátů nebo inzerátů jiných kategorií – změnilo se API? Zmizelé inzeráty tentokrát neoznačuji', {
+      invalid: st.invalid,
+      foreign: st.foreign,
+      raw: st.raw,
+    });
   }
 
   // Souřadnice (při zablokování webem už žádné další požadavky)

@@ -1,0 +1,53 @@
+'use strict';
+// Klíčová slova pro rozlišení kolo × nekolo a typu kola. Vše nad složeným textem (malá písmena, bez diakritiky).
+
+/**
+ * Nekola – podstatná jména (kmeny) podle skupin. Rozhoduje to, co je v titulku dřív než slovo „kolo“
+ * („Sedačka na kolo“, „Helma Giro“ → nekolo; „Kolo Author + helma zdarma“ → kolo).
+ * [skupina, česká příčina, regex]
+ */
+const NON_BIKE_GROUPS = [
+  ['part', 'díl / komponenta', '(vidlic\\w*|tlumic\\w*|sedlovk\\w*|sedl[oaue]\\b|sedylk\\w*|riditk\\w*|predstav[ce]\\w*|grip[ysu]?\\b|gripy|rohy\\b|pedal\\w*|naslap\\w*|klik[ayu]?\\b|stredov\\w*|stredni\\s+osa|prevodnik\\w*|kazet\\w*|retez\\w*|prehazovac\\w*|prehazk\\w*|presmykac\\w*|radic\\w*|radick\\w*|pack[ay]\\b|brzd[ayu]\\b|brzdy|brzdov\\w*|kotouc\\w*|desticky|desticek|rafek|rafk\\w*|naboj\\w*|vyplet\\w*|drat[yu]\\b|paprsk\\w*|plast\\b|plaste\\b|plastu\\b|plaste\\w*|pneu\\w*|duse\\b|dusi\\b|dus\\b|galusk\\w*|blatnik\\w*|stojan\\w*|stojanek|zvon\\w*|svetl[aoe]\\w*|svetylk\\w*|blikac\\w*|odrazk\\w*|hlavov\\w*|lozisk\\w*|objimk\\w*|patk[ay]\\b|lank[aoy]\\b|bowden\\w*|bateri\\w*|baterk\\w*|akumulator\\w*|akubaterie|powerpack|powertube|nabijec\\w*|nabijeck\\w*|motor\\b|motory\\b|motoru\\b|displej\\w*|display|ovladac\\w*|controller|regulator\\w*|senzor\\w*|snimac\\w*|cip\\b|tuning\\w*|prestavb\\w*|kit\\b|kolecka|kolecko|pridavn\\w*\\s+kolec\\w*|ozuben\\w*|komponent\\w*|naradi|sada\\s+naradi|klic\\b|klice\\b|klicu\\b|mazivo|olej\\w*|cistic\\w*|montazn\\w*|centrovac\\w*|teleskop\\w*|hustilk\\w*|ventil\\w*|lepeni|lepenk\\w*|zaplat\\w*|tmel\\w*|tubeless\\s+sad\\w*|patka|rafkov\\w*\\s+pask\\w*|setrvac\\w*|pastork\\w*|chranic\\w*\\s+(ramu|retezu|prehaz\\w*))'],
+  ['accessory', 'příslušenství', '(bras(na|ny|nu|nicka|nick\\w*)|task[ayu]\\b|tasky|tasticka|kaps[ayu]\\w*|kapsick\\w*|batoh\\w*|ledvink\\w*|nosic\\w*|drzak\\w*|drzaky|zaves\\w*|vesak\\w*|pumpa\\b|pumpu\\b|pumpick\\w*|pump[iy]\\b|kompresor\\w*|zamek\\b|zamky\\b|zamk[ue]\\b|lahev\\b|lahve\\b|lahvi\\b|bidon\\w*|kosik\\w*\\s+na\\s+lahev|kosik\\w*\\s+na\\s+lahve|tachometr\\w*|computer\\w*|cyklocomputer\\w*|cyklopocitac\\w*|pocitac\\w*|navigac\\w*|gps\\b|garmin|wahoo\\s+(elemnt|bolt|roam|kickr)|edge\\s+\\d{3,4}|sigma\\s+(rox|bc|pure)|hodinky|sporttester\\w*|radar\\w*|kamera|gopro|pouzdr\\w*|obal\\b|obaly|obalu\\b|kufr\\w*|bike\\s*box\\w*|bikebox|krabic\\w*|polep\\w*|samolep\\w*|nalepk\\w*|wattmetr\\w*|powermetr\\w*|power\\s*metr|kadenc\\w*|zrcatk\\w*|houkack\\w*|klakson\\w*|stojan\\w*\\s+na\\s+kol\\w*|montazni\\s+stojan|servisni\\s+stojan|uchyt\\w*|adapter\\w*|plachta|plachty|pristresek|kryt\\b|kryty\\b|zastera|bag|bags|handlebar\\w*|saddle\\w*|helmet\\w*|shoes|jersey|gloves|pedals|wheelset\\w*|wheels|tyres?|tires?|pump|lights?|rack|bottle|cage|seatpost|stem|grips|chain|cassette|crankset|derailleur|brakes?|rotors?|hubs?|rims?|tubes?|tool\\s?kit|multitool)'],
+  ['clothing', 'oblečení / výbava jezdce', '(dres\\b|dress\\b|dresy|dresu|cyklodres\\w*|kalhot\\w*|cyklokalhot\\w*|kratas\\w*|kratk[ye]\\s+kalhot\\w*|bund[ayu]\\b|bundy|cyklobund\\w*|vest[ayu]\\b|vesty|rukavic\\w*|cyklorukavic\\w*|navlek\\w*|cepic\\w*|satek|buff\\b|ponozk\\w*|trik[oa]\\b|tricko|tricka|mikin\\w*|kombinez\\w*|obleceni|obleck\\w*|tretr\\w*|cyklotretr\\w*|boty\\b|botu\\b|bot\\b|obuv\\w*|cyklobot\\w*|helm[ayu]\\b|helmy|helmu|cyklohelm\\w*|prilb\\w*|cykloprilb\\w*|brysle|bryle|cyklobryle|chranic\\w*|chranice|paterak\\w*|pater\\s|kolenni|loketni|kukla|kukly|dresik|cyklistick\\w*\\s+obleceni|podvlek\\w*|nakolenik\\w*|chranice\\s+kolen|integral\\b|integralk\\w*)'],
+  ['trainer', 'trenažér / rotoped', '(trenazer\\w*|trenazor\\w*|cyklotrenazer\\w*|trenaze\\w*|valce\\b|valec\\b|rotoped\\w*|spinning\\w*|spinningov\\w*|spinner\\w*|kickr|tacx|zwift|elite\\s+(qubo|novo|direto|suito|tuo|justo|volano|arion|nero|rampa|avant)\\w*|flux\\s+s|stacionarn\\w*|ergometr\\w*|smart\\s+trainer|cyklotrenazor)'],
+  ['child_seat', 'dětská sedačka', '(sedack\\w*|cyklosedack\\w*|yepp|hamax|bellelli|romer\\s+jockey|kids\\s+ride\\s+shotgun|shotgun|ride\\s*along)'],
+  ['trailer', 'vozík / tažná tyč', '(vozik\\w*|privesn\\w*|prives\\w*|croozer|chariot|burley|qeridoo|thule\\s+(coaster|cadence)|tazn\\w*\\s+tyc\\w*|tyc\\b|tyce\\b|trailgator|followme|follow\\s+me|tazne\\s+zarizeni|vlecn\\w*)'],
+  ['scooter', 'koloběžka / jiné vozítko', '(kolobez\\w*|elektrokolobez\\w*|e\\s?kolobez\\w*|hulajnog\\w*|skateboard\\w*|longboard\\w*|brusl\\w*|segway|hoverboard\\w*|monowheel|jednokol\\w*|scooter\\w*|trojkolk\\w*\\s+drift|drift\\w*\\s+(trik|trojk)\\w*|driftovac\\w*|odstrkovadl\\w*|kocar\\w*|autosedack\\w*)'],
+  ['motor', 'motorka / moped', '(motork\\w*|motocykl\\w*|moped\\w*|skutr\\w*|pitbike\\w*|pit\\s+bike|minibike\\w*|ctyrkolk\\w*|atv\\b|motokros\\w*|motocross\\w*|babet\\w*|jawa\\b|simson\\w*|ccm\\b|cm3\\b|\\d{2,3}\\s?ccm|sur\\s?ron|surron|talaria|kingfox|motorov\\w*\\s+kol\\w*|moto\\s?kol\\w*|elektromotork\\w*|minicross\\w*|minimoto|dvoutakt\\w*|benzin\\w*|motorovy\\s+bicykl)'],
+  ['other', 'jiné zboží', '(dvd|vhs|videokazet\\w*|knih[ay]\\b|kniha|cykloatlas|cyklo\\s+atlas|cykloprovodce|cykloprůvodce|map[ayu]\\b|casopis\\w*|plakat\\w*|obraz\\w*|kalendar\\w*|hrack\\w*|lego|miniatur\\w*|model\\s+kola|figur\\w*|puzzle|hrnek|lyz\\w*|snowboard\\w*|sane\\b|boby\\b|kajak\\w*|kanoe|paddle\\w*|stan\\b|stany\\b|spacak\\w*|karimatk\\w*|poukaz\\w*|voucher\\w*|vstupenk\\w*|startovn\\w*|registrac\\w*|disk[yu]?\\b|pneumatik\\w*|r1[3-9]\\b|kola\\s+na\\s+auto|zimni\\s+kola|letni\\s+kola|plechov\\w*\\s+disk\\w*|sklad\\s+na\\s+kola|garaz\\w*|kontejner\\w*|dum\\b|byt\\b|pozemek|chata)'],
+];
+
+/** Služby (půjčovna, servis …) – v titulku. */
+const SERVICE_RE = /(^\s*(servis|oprav[ayu]|cykloservis|pujcovn\w*|pronajem|pujceni|zapujceni|vypujceni|doprava|preprava|uschov\w*|skoleni|kurz)\b|\b(pujcovn\w*|pronajem|pronajmu|k\s+zapujceni|zapujcim|vypujcim|pujcim|servis\s+(kol|jizdnich|elektrokol|bicyk\w*|odpruzeni|vidlic\w*|tlumic\w*)|cyklo\s*servis|oprav[ayu]\s+(kol|jizdnich|elektrokol|bicyk\w*)|opravim|seridim|preprava\s+kol|doprava\s+kol|odvoz\s+kol|uschovn\w*|zajezd\w*|cyklozajezd\w*|ubytovani|vylet\w*\s+na\s+kol|treninkov\w*\s+plan|trener\w*\s+cykl|cena\s+za\s+den|kc\s*\/\s*den|za\s+den\b|na\s+den\b|denni\s+pronajem))/;
+
+/** Poptávka (koupím / sháním / hledám) – v titulku nebo na začátku popisu. */
+const WANTED_RE = /(^\s*[!*\-–\s]*(koupim|kupim|koupime|kupime|kupuju|kupuji|shanim|shanime|hledam|hledame|poptavam|poptavame|vykoupim|vykoupime|vykup|vymenim\s+za|zajem\s+o)\b|\b(koupim|kupim|koupime|shanim|poptavam|vykoupim|vykupuji|vykupujeme)\b)/;
+
+/** Silné důkazy kola (podstatná jména). */
+const BIKE_STRONG_RE = /\b(kolo|kola|kol|kolko|kolecko\s+kolo|jizdni\s+kol\w*|bicyk\w*|bicykl\w*|bycik\w*|bicik\w*|bajk\w*|bike|biky|bikes|e\s?-?\s?bike\w*|ebike\w*|elektrokol\w*|elektro\s+kol\w*|el\s?\.?\s?kol\w*|e\s?-?\s?kolo|elektricke\s+kolo|elektricky\s+bicykl|pedelec|mtb|e\s?-?\s?mtb|emtb|horak\w*|silnick[ayu]\b|silnicak\w*|gravel\w*|gravl\w*|fully|celoodpruz\w*|celoperov\w*|celopero|hardtail\w*|downhill\w*|freeride\w*|bmx\w*|odrazedl\w*|odrazadl\w*|odrazedlo|balance\s*bike|dirt\s*jump\w*|dirtjump\w*|dirtak\w*|fat\s?bike\w*|fatbik\w*|tandem\w*|dvojkol\w*|skladack\w*|velociped\w*|cyklokros\w*|cyclocross|triatlonov\w*|casovkov\w*|singlespeed|single\s+speed|fixie|fixed\s+gear|cruiser|favorit\w*|enduro|ebik)\b/g;
+
+/** Slabé důkazy (přídavná jména) – platí, jen když v titulku není žádné „nekolo“. */
+const BIKE_WEAK_RE = /\b(horsk[eaiy]\w*|silnicni|treking\w*|trekking\w*|trekov\w*|krosov\w*|crossov\w*|mestsk[eiy]\w*|detsk[eiy]\b|damsk[eiy]\b|pansk[eiy]\b|juniorsk\w*|chlapeck\w*|divci\b|holcic\w*|klucic\w*|gravelov\w*|xc\b|trail\b|retro\b|veteran\w*|historick\w*|starozitn\w*|sberatelsk\w*|elektro\b|celoodpruzen\w*|odpruzen\w*)\b/g;
+
+/** Fráze „na kolo / pro kola / za kolo / do elektrokola“ – zamaskovat (nejde o prodej kola). */
+const NEUTRAL_RE = /\b(na|pro|za|ke|k|do|z|ze|od|pod|nad|pred|u|po|s)\s+(\d+\s*(x\s*)?)?((jizdni|detsk\w*|horsk\w*|silnicn\w*|elektro|damsk\w*|pansk\w*|vsechn\w*|kazde|libovoln\w*|vase|sve|tvoje|me|moje|zadni|predni|stresni|tazne\w*|trekov\w*|krosov\w*|mestsk\w*|gravel\w*)\s+)?(kolo|kola|kol|kolu|kole|kolum|kolech|elektrokol\w*|bike|biky|bikes|ebike\w*|e\s?-?\s?bike\w*|mtb|kolobezk\w*|bicyk\w*|bicykl\w*)\b/g;
+
+/** Kola ve smyslu „zapletená kola“ (díl), ne jízdní kola. */
+const WHEEL_PART_RE = /\b(zaplet\w*|vyplet\w*|predni|zadni|nahradni|sada|par)\s+(kolo|kola|kol)\b|\b(kolo|kola)\s+(predni|zadni|zapleten\w*|vyplet\w*)\b|\bsada\s+kol\b|\bpar\s+kol\b|\bwheelset\w*|\b(kolo|kola)\s+\d{2,3}\s*mm\b|\b(kolo|kola)\s+(na|pro)\s+(tubeless|osu|naboj)\b/;
+const WHEEL_BRAND_RE = /\b(mavic|dt\s+swiss|dtswiss|zipp|roval|fulcrum|newmen|hunt|enve|reynolds|novatec|ksyrium|aksium|crossmax|bora|shamal|zonda|scirocco|hyperon|aeolus|hope\s+pro|stans|stan\s+s|syntace|spank|e\s*thirteen|xm\s*1700|xr\s*1501|m\s*1900|ex\s*1700|campagnolo|elitewheels|elite\s+wheels|giant\s+slr|cadex|princeton|lightweight|corima|vision\s+metron|ffwd|scope|swiss\s*side|bontrager\s+(aeolus|line|kovee))\b/;
+
+/** Značky jen příslušenství / dílů / oblečení (bez kol) – samotná značka v titulku = nekolo. */
+const NONBIKE_BRAND_RE = /\b(shimano|sram|rock\s*shox|rockshox|fox\s+(36|38|34|32|40|float|factory|performance|dhx|dpx|transfer|racing)|marzocchi|manitou|suntour|ohlins|magura|hayes|tektro|trp|formula|hope|dt\s+swiss|mavic|zipp|roval|fulcrum|newmen|continental|schwalbe|maxxis|michelin|vittoria|pirelli|wtb|ergon|fizik|selle\s+italia|selle\s+smp|brooks|crankbrothers|crank\s+brothers|race\s*face|renthal|chromag|deity|oneup|one\s+up|burgtec|garmin|wahoo|sigma|polar|bryton|tacx|thule|uebler|buzz\s*rack|hakr|peruzzo|hamax|yepp|croozer|burley|qeridoo|poc|alpina|uvex|abus|met\b|giro|bell\b|kask|lazer|smith|oakley|100\s*%|leatt|troy\s+lee|fox\s+racing|o\s*neal|oneal|ixs|endura|rapha|castelli|assos|sportful|craft|gore\b|northwave|sidi|dmt|five\s+ten|fiveten|crivit\s+(helm|obleceni|dres)|muc\s*off|camelbak|osprey|evoc|topeak|lezyne|park\s+tool|wolf\s+tooth|kmc|sunrace|bontrager|syncros|reverse|sixpack|nukeproof\s+horizon|ritchey|pro\s+(vibe|stealth|tharsis)|vision|cateye|knog|lupine|exposure|lezyne|ass\s*savers|zefal|xlc|force\b|kellys\s+(helm|prilb)|r2\b|rogelli|etape|husky|look\s+keo|speedplay|quarq|stages|favero|assioma|sram\s+axs|fox\s+transfer|bikeyoke|kind\s*shock|kindshock|x\s*fusion|cane\s+creek|dvo|ohlins|elite\s+(fly|custom|vico))\b/;
+
+module.exports = {
+  NON_BIKE_GROUPS,
+  SERVICE_RE,
+  WANTED_RE,
+  BIKE_STRONG_RE,
+  BIKE_WEAK_RE,
+  NEUTRAL_RE,
+  WHEEL_PART_RE,
+  WHEEL_BRAND_RE,
+  NONBIKE_BRAND_RE,
+};
