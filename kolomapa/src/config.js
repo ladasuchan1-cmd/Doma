@@ -19,7 +19,13 @@
 //   KOLOMAPA_MIN_PRICE          nové inzeráty s cenou pod touto hranicí se ignorují (výchozí 200 Kč – levná dětská kola)
 //   KOLOMAPA_GONE_KEEP_DAYS     jak dlouho držet zmizelé inzeráty v DB (historie cen pro učení, výchozí 365)
 //   KOLOMAPA_BROWSER            cesta k Chromiu pro Cyklobazar (výchozí: Chromium z balíčku playwright)
-//   KOLOMAPA_BROWSER_ARGS       další argumenty prohlížeče oddělené mezerou
+//   KOLOMAPA_BROWSER_ARGS       další argumenty prohlížeče oddělené mezerou (argumenty skrývající automatizaci se
+//                               ignorují – viz src/sources/browser.js)
+//   KOLOMAPA_CYKLOBAZAR_DELAY_MS        pauza mezi stránkami Cyklobazaru v ms (výchozí 20000, nejméně 10000 – při
+//                               rychlejším stahování Cloudflare žádá ověření „jste člověk?“ a zdroj se na 12 h zastaví)
+//   KOLOMAPA_CYKLOBAZAR_MAX_LIST_PAGES  max. stránek výpisu Cyklobazaru za běh (výchozí 60 ≈ 20 min; celý výpis má
+//                               ~445 stránek ≈ 2,5 h, projde se proto postupně během několika dní; prodané/smazané
+//                               inzeráty pozná zdroj ze sitemapy webu; 0 = jen sitemapa a detaily)
 //   ANTHROPIC_API_KEY           klíč k Claude API – zapne AI nacenění podle fotky (jinak jen výpočetní model)
 //   KOLOMAPA_AI_MODEL           model pro AI nacenění (výchozí claude-opus-5-5)
 //   KOLOMAPA_AI_MAX_PER_RUN     max. AI nacenění za běh (výchozí 150 – hlídá útratu)
@@ -114,6 +120,9 @@ function loadConfig(env = process.env) {
     goneKeepDays: envInt(env.KOLOMAPA_GONE_KEEP_DAYS, 365, { min: 1, max: 10000 }),
     browserPath: envStr(env.KOLOMAPA_BROWSER),
     browserArgs: (envStr(env.KOLOMAPA_BROWSER_ARGS) || '').split(/\s+/).filter(Boolean),
+    // Cyklobazar (za Cloudflare): pauza mezi stránkami nikdy pod 10 s, limit stránek výpisu na běh
+    cyklobazarDelayMs: Math.max(10000, envInt(env.KOLOMAPA_CYKLOBAZAR_DELAY_MS, 20000, { min: 0, max: 600000 })),
+    cyklobazarMaxListPages: envInt(env.KOLOMAPA_CYKLOBAZAR_MAX_LIST_PAGES, 60, { min: 0, max: 1000 }),
     ai: {
       enabled: !!aiKey,
       apiKey: aiKey,
