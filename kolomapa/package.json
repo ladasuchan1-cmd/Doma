@@ -1,0 +1,24 @@
+{
+  "name": "kolomapa",
+  "version": "0.1.0",
+  "description": "Kolomapa – denně stáhne inzeráty kol z Bazoše, Sbazaru, Aukra a Cyklobazaru, ukáže je na mapě ČR po krajích a nacení jejich tržní hodnotu.",
+  "private": true,
+  "main": "server.js",
+  "engines": {
+    "node": ">=22.13"
+  },
+  "scripts": {
+    "start": "node --disable-warning=ExperimentalWarning server.js",
+    "run": "node --disable-warning=ExperimentalWarning tools/run.js",
+    "export": "node --disable-warning=ExperimentalWarning tools/export-static.js",
+    "import-sales": "node --disable-warning=ExperimentalWarning tools/import-sales.js",
+    "demo": "node --disable-warning=ExperimentalWarning tools/demo-data.js",
+    "build-geo": "node tools/build-geo.js",
+    "test": "node --disable-warning=ExperimentalWarning --test \"test/**/*.test.js\""
+  },
+  "optionalDependencies": {
+    "@anthropic-ai/sdk": "^0.70.0",
+    "playwright": "^1.56.0"
+  },
+  "license": "MIT"
+}

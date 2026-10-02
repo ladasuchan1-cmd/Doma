@@ -1,0 +1,80 @@
+# Kolomapa – denní stažení inzerátů a zveřejnění mapy na GitHub Pages.
+#
+# VYPNUTO, dokud to výslovně nepovolíte: v repozitáři Settings → Secrets and variables → Actions → Variables
+# přidejte proměnnou KOLOMAPA_PAGES = true a v Settings → Pages zvolte „Source: GitHub Actions“.
+# Pozor: repozitář je veřejný → mapa (včetně odhadů cen a výkupních cen) bude veřejná pro každého, kdo zná adresu.
+#
+# Volitelně: secret ANTHROPIC_API_KEY zapne AI nacenění podle fotek (placené; limit KOLOMAPA_AI_MAX_PER_RUN).
+# Plánované workflow GitHub spouští jen na výchozí větvi repozitáře.
+name: Kolomapa – denní běh
+
+on:
+  schedule:
+    - cron: "35 3 * * *" # 05:35 SELČ / 04:35 SEČ
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: kolomapa-denne
+  cancel-in-progress: false
+
+jobs:
+  run:
+    if: vars.KOLOMAPA_PAGES == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+    defaults:
+      run:
+        working-directory: kolomapa
+    env:
+      KOLOMAPA_DB: data/kolomapa.db
+      ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+      KOLOMAPA_AI_MAX_PER_RUN: ${{ vars.KOLOMAPA_AI_MAX_PER_RUN || '100' }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      # Databáze se přenáší mezi běhy přes cache (historie cen, zmizelé inzeráty, učení modelu).
+      - name: Obnovit databázi
+        uses: actions/cache/restore@v4
+        with:
+          path: kolomapa/data
+          key: kolomapa-db-${{ github.run_id }}
+          restore-keys: kolomapa-db-
+
+      - name: Volitelné závislosti (Chromium pro Cyklobazar, Claude SDK)
+        run: |
+          npm install --no-save --no-package-lock playwright @anthropic-ai/sdk
+          npx playwright install --with-deps chromium
+
+      - name: Stáhnout inzeráty, nacenit, vyexportovat mapu
+        run: node --disable-warning=ExperimentalWarning tools/run.js --export
+
+      - name: Uložit databázi
+        if: always()
+        uses: actions/cache/save@v4
+        with:
+          path: kolomapa/data
+          key: kolomapa-db-${{ github.run_id }}
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: kolomapa/dist
+
+  deploy:
+    needs: run
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

@@ -1,0 +1,30 @@
+# Testy Kolomapy (složka kolomapa/) – offline nad uloženými ukázkami stránek, bez stahování z webů.
+name: Kolomapa
+
+on:
+  push:
+    branches: ["**"]
+    paths:
+      - "kolomapa/**"
+      - ".github/workflows/kolomapa.yml"
+  pull_request:
+    paths:
+      - "kolomapa/**"
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: kolomapa
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Testy
+        run: npm test
