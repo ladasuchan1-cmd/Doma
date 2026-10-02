@@ -96,7 +96,22 @@ chybí ve dvou úplných průchodech po sobě (offsetové stránkování se běh
 
 ## API serveru (stejné tvary vrací statický export)
 
-- `GET /data/summary.json` – `{generatedAt, lastRun, kraje: {PHA: {name, count, deals, newToday}}, sources: {...}, mode: 'server'|'static'}`
-- `GET /data/kraj/<KOD>.json` – `{kraj, generatedAt, listings: [kompaktní inzeráty]}`
-- `GET /api/listing/:id` – plný detail (jen server)
-- `POST /api/run` – spustit běh hned (jen server), `GET /api/run` – stav posledního běhu
+- `GET /data/summary.json` – `{generatedAt, mode: 'server'|'static', lastRun, totals, kraje: {PHA: {name, count, deals,
+  newToday, medianPrice}, …}, sources, topDeals: [kompaktní inzeráty], unlocated, newSince, demo,
+  thresholds: {deal: 0.85, high: 1.15, minConfidence: 0.45, newHours: 36}}`
+- `GET /data/kraj/<KOD>.json` – `{kraj, name, generatedAt, listings: [kompaktní inzeráty]}`; kompaktní klíče viz
+  `src/server/data.js` (`id, s, u, t, p, pn, la, lo, g, c, k, ph, bt, b, m, y, ws, fs, mat, eb, mo, wh, gs, cond,
+  e, el, eh, ec, em, d, mb, ai, fx, w, f, ps, v, st, de, pa`)
+- `GET /data/kraje.geojson`
+- `GET /api/listing/:id` – plný detail + historie cen (jen server)
+- `POST /api/run` – spustit běh hned (jen server; vyžaduje hlavičku `X-Requested-With: kolomapa` – ochrana proti CSRF),
+  `GET /api/run` – stav a průběh posledního běhu. Server i `tools/run.js` sdílí zámek `<db>.run-lock`.
+
+„Výhodné“ = `deal_ratio ≤ 0.85` a `est_confidence ≥ 0.45`; `deal_ratio` počítá nacenění z AI odhadu, je-li aktuální,
+jinak z odhadu modelu.
+
+## Prohlížeč pro zdroje za Cloudflare (`src/sources/browser.js`)
+
+`getBrowser({config, log})` → sdílená instance (Playwright Chromium, líně spuštěná při prvním použití; když
+`playwright` není nainstalovaný, vyhodí srozumitelnou chybu a zdroj se pro běh přeskočí), `closeBrowser()` po běhu.
+Cesta k prohlížeči `KOLOMAPA_BROWSER`, další argumenty `KOLOMAPA_BROWSER_ARGS`, proxy z `HTTPS_PROXY`.
