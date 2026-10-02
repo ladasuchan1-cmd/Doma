@@ -164,7 +164,9 @@ function compactListing(r) {
   put(o, 'em', r.est_method);
   put(o, 'd', round(r.deal_ratio, 3));
   put(o, 'mb', round(r.max_buy_czk));
-  if (r.ai_czk != null) {
+  // AI jen aktuální (spočítané pro současný obsah inzerátu) – výhodnost i výkupní cena počítají jen s ním; zastaralý
+  // odhad (inzerát se mezitím změnil) by v UI ukazoval jiné číslo, než z jakého vyšla výhodnost.
+  if (r.ai_czk != null && r.ai_input_hash != null && r.ai_input_hash === r.content_hash) {
     const ai = {};
     put(ai, 'e', round(r.ai_czk));
     put(ai, 'l', round(r.ai_low));

@@ -364,6 +364,7 @@ function generateDemo({ count = 400, seed = 42, now = new Date() } = {}) {
       est_at: est ? iso(nowMs - 3600000) : null,
       deal_ratio: dealRatio,
       max_buy_czk: est ? roundTo(est * 0.62, 100) : null,
+      content_hash: `demo-${sid}`,
     };
     if (ai) {
       const aiEst = roundTo(est * between(rand, 0.9, 1.1), 500);
@@ -375,6 +376,7 @@ function generateDemo({ count = 400, seed = 42, now = new Date() } = {}) {
         ai_notes: pick(rand, AI_NOTES),
         ai_model: 'demo',
         ai_at: iso(nowMs - 3600000),
+        ai_input_hash: row.content_hash, // AI odhad aktuální (UI ukazuje jen aktuální)
       });
     }
     // historie ceny: u části inzerátů zlevnění
@@ -393,7 +395,7 @@ const COLUMNS = [
   'source', 'source_id', 'url', 'title', 'description', 'price_czk', 'price_note', 'posted_at', 'category_src', 'location_text', 'okres', 'kraj',
   'lat', 'lon', 'geo_precision', 'photo_url', 'photo_count', 'params', 'seller_type', 'views', 'is_bike', 'bike_type', 'features', 'est_czk', 'est_low',
   'est_high', 'est_confidence', 'est_method', 'est_factors', 'est_at', 'deal_ratio', 'max_buy_czk', 'ai_czk', 'ai_low', 'ai_high', 'ai_condition',
-  'ai_notes', 'ai_model', 'ai_at', 'first_seen_at', 'last_seen_at', 'detail_at', 'gone_at',
+  'ai_notes', 'ai_model', 'ai_at', 'ai_input_hash', 'content_hash', 'first_seen_at', 'last_seen_at', 'detail_at', 'gone_at',
 ];
 
 /** Počet skutečných (ne-demo) inzerátů v DB. */

@@ -149,9 +149,9 @@ test('priceAll zapíše est_*, deal_ratio, max_buy_czk; nekola vyčistí; placeh
   insertRows(db, rows);
   db.prepare("UPDATE listings SET est_czk = 1234, est_factors = '[\"x\"]' WHERE id = 5002").run();
   db.prepare("INSERT INTO sales (kind, title, price_czk, cost_czk) VALUES ('bazar', 'Trek Slash 8 celoodpružené horské kolo', 40000, 26000)").run();
-  const model = pricing.trainModel(db, { config: {} });
+  const model = pricing.trainModel(db, { config: {}, salesFile: '/neexistuje/prodeje.json' });
   assert.equal(model.mode, 'model');
-  assert.equal(model.calibration.n, 1); // prodeje z tabulky sales mají přednost před souborem
+  assert.equal(model.calibration.n, 1); // prodej z tabulky sales
   const n = pricing.priceAll(db, model, { config: {} });
   assert.equal(n, 401);
   const r = db.prepare('SELECT * FROM listings WHERE id = 1').get();
@@ -207,4 +207,53 @@ test('srovnatelné inzeráty pro AI a UI', () => {
     assert.match(c.url, /^https:\/\/example\.cz\//);
   }
   assert.deepEqual(pricing.comparables(model, item('Kolo', 'other', {}), 5), []);
+});
+
+test('loadSales: sjednotí tabulku sales a training/ (stejný prodej jednou, opakované prodeje téhož dne zůstanou)', () => {
+  const os = require('node:os');
+  const fsx = require('node:fs');
+  const pathx = require('node:path');
+  const dir = fsx.mkdtempSync(pathx.join(os.tmpdir(), 'kolomapa-sales-'));
+  try {
+    const file = pathx.join(dir, 'prodeje.json');
+    const sale = (date, title, priceCzk) => ({ kind: 'bazar', date, title, priceCzk });
+    fsx.writeFileSync(
+      file,
+      '\uFEFF' + JSON.stringify({ sales: [sale('2025-03-01', 'Trek Marlin 7', 15000), sale('2026-05-01', 'Kellys Spider 10', 9000), sale('2026-05-01', 'Kellys Spider 10', 9000), { title: 'bez ceny' }] })
+    );
+    const db = openDb(':memory:');
+    // čerstvá DB po importu nového exportu: jen novější prodeje (jeden z nich je i v souboru)
+    const ins = db.prepare("INSERT INTO sales (kind, date, title, price_czk) VALUES ('bazar', ?, ?, ?)");
+    ins.run('2026-05-01', 'Kellys Spider 10', 9000);
+    ins.run('2026-09-01', 'Cube Reaction', 21000);
+    const all = pricing.loadSales(db, file);
+    assert.deepEqual(all.map((x) => `${x.date} ${x.title}`).sort(), [
+      '2025-03-01 Trek Marlin 7',
+      '2026-05-01 Kellys Spider 10',
+      '2026-05-01 Kellys Spider 10',
+      '2026-09-01 Cube Reaction',
+    ]);
+    assert.equal(pricing.loadSales(db, pathx.join(dir, 'chybi.json')).length, 2, 'bez souboru jen DB');
+  } finally {
+    fsx.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('trainModel: ukázková data se z učení vynechají, jakmile jsou v DB skutečné inzeráty', () => {
+  const db = openDb(':memory:');
+  const rows = synthRows(200, 5);
+  insertRows(db, rows);
+  const base = pricing.trainModel(db, { config: {}, salesFile: '/neexistuje/prodeje.json' });
+  // stejná kola jako demo s nesmyslnými cenami → model se nesmí změnit
+  const demo = synthRows(200, 5).map((r, i) => ({ ...r, id: 10000 + i, url: `https://example.cz/demo/${i}`, price_czk: r.price_czk * 10 }));
+  insertRows(db, demo);
+  db.prepare("UPDATE listings SET params = '{\"demo\":\"1\"}' WHERE id >= 10000").run();
+  const withDemo = pricing.trainModel(db, { config: {}, salesFile: '/neexistuje/prodeje.json' });
+  const { ms: _a, ...a } = withDemo.summary;
+  const { ms: _b, ...b } = base.summary;
+  assert.equal(a.bikes, 200);
+  assert.deepEqual(a, b);
+  // samostatná demo DB (jen ukázková data) se z nich učí, aby ukázka měla odhady
+  db.prepare('DELETE FROM listings WHERE id < 10000').run();
+  assert.equal(pricing.trainModel(db, { config: {}, salesFile: '/neexistuje/prodeje.json' }).summary.bikes, 200);
 });

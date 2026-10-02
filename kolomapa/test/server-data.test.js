@@ -141,6 +141,8 @@ test('compactListing: nebezpečné URL zahodí, popis zkrátí, AI a varování 
     ai_high: 17000,
     ai_condition: 'good',
     ai_notes: 'Opotřebený řetěz.',
+    ai_input_hash: 'obsah-1',
+    content_hash: 'obsah-1',
     features: { brand: 'Cube', isEbike: true, batteryWh: 625, motor: 'Bosch CX', warnings: ['Chybí doklad.'], wheelSize: '29"', frameSize: 'L', material: 'alu', groupset: 'Shimano Deore', condition: 'good' },
     params: { 'Velikost rámu': 'L' },
     views: 0,
@@ -150,6 +152,10 @@ test('compactListing: nebezpečné URL zahodí, popis zkrátí, AI a varování 
   assert.ok(l.de.endsWith('…'));
   assert.equal(l.ph, 'https://img.bazos.cz/1.jpg');
   assert.deepEqual(l.ai, { e: 15000, l: 13000, h: 17000, c: 'good', n: 'Opotřebený řetěz.' });
+  // inzerát se po AI nacenění změnil → zastaralý AI odhad se neposílá (výhodnost se počítá z modelu)
+  db.prepare("UPDATE listings SET content_hash = 'obsah-2' WHERE id = ?").run(id);
+  assert.equal('ai' in data.buildKraj(db, 'JHM').listings.find((x) => x.id === id), false);
+  db.prepare("UPDATE listings SET content_hash = 'obsah-1' WHERE id = ?").run(id);
   assert.equal(l.eb, true);
   assert.equal(l.wh, 625);
   assert.equal(l.mo, 'Bosch CX');

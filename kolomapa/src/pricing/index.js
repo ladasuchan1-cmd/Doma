@@ -681,31 +681,56 @@ function buyRatioFrom(sales, config, kb = KB) {
 }
 
 /** Prodeje obchodu: tabulka sales, jinak training/koloshop-prodeje.json. */
-function loadSales(db) {
+function loadSales(db, file = TRAINING_SALES_FILE) {
+  let rows = [];
   try {
-    const rows = db.prepare('SELECT kind, date, title, size, brand, price_czk, cost_czk FROM sales ORDER BY date, id').all();
-    if (rows.length) return rows.map((r) => ({ kind: r.kind, date: r.date, title: r.title, size: r.size, brand: r.brand, priceCzk: r.price_czk, costCzk: r.cost_czk }));
+    rows = db
+      .prepare('SELECT kind, date, title, size, brand, price_czk, cost_czk FROM sales ORDER BY date, id')
+      .all()
+      .map((r) => ({ kind: r.kind, date: r.date, title: r.title, size: r.size, brand: r.brand, priceCzk: r.price_czk, costCzk: r.cost_czk }));
   } catch {
-    // tabulka nemusí existovat (starší DB) – použije se soubor
+    // tabulka nemusí existovat (starší DB) – použije se jen soubor
   }
+  let fromFile = [];
   try {
-    return JSON.parse(fs.readFileSync(TRAINING_SALES_FILE, 'utf8')).sales || [];
+    fromFile = JSON.parse(fs.readFileSync(file, 'utf8').replace(/^\uFEFF/, '')).sales || [];
   } catch {
-    return [];
+    /* soubor chybí / je poškozený */
   }
+  if (!Array.isArray(fromFile)) fromFile = [];
+  // Sjednocení DB a souboru: import nového exportu do čerstvé DB uloží jen nové prodeje, starší jsou jen v souboru.
+  // Stejný prodej (datum, název, cena) v obou se započte jednou; opakované stejné prodeje téhož dne zůstanou.
+  const key = (x) => [x.date || '', x.title, x.priceCzk].join('|');
+  const inDb = new Map();
+  for (const r of rows) inDb.set(key(r), (inDb.get(key(r)) || 0) + 1);
+  for (const x of fromFile) {
+    if (!x || typeof x !== 'object' || !x.title || !(Number(x.priceCzk) > 0)) continue;
+    const k = key(x);
+    if (inDb.get(k) > 0) inDb.set(k, inDb.get(k) - 1);
+    else rows.push(x);
+  }
+  return rows;
 }
 
 /**
  * Naučí model nacenění z databáze (aktivní i zmizelé inzeráty kol) a zkalibruje ho na vlastní prodeje.
  * @param {import('node:sqlite').DatabaseSync} db
- * @param {{config?: object, log?: object}} [o]
+ * @param {{config?: object, log?: object, salesFile?: string}} [o] salesFile = jiný soubor vlastních prodejů (testy)
  * @returns {object} model s `summary`
  */
-function trainModel(db, { config, log } = {}) {
+function trainModel(db, { config, log, salesFile } = {}) {
+  // Ukázková data (npm run demo) se z učení vynechají, jakmile jsou v DB skutečné inzeráty – jinak by vymyšlené
+  // ceny zkreslily odhady. V samostatné demo DB se učí z nich (aby ukázka měla odhady).
+  // nikdy NULL (řádky bez params / s neplatným JSON nejsou demo) – jinak by NOT (…) skutečné inzeráty vyřadil
+  const DEMO = "IFNULL(json_extract(CASE WHEN json_valid(params) THEN params END, '$.demo'), '') = '1'";
+  const real = db.prepare(`SELECT 1 FROM listings WHERE is_bike = 1 AND NOT (${DEMO}) LIMIT 1`).get();
   const rows = db
-    .prepare('SELECT id, source, url, title, price_czk, is_bike, bike_type, features, gone_at FROM listings WHERE is_bike = 1 AND price_czk IS NOT NULL')
+    .prepare(
+      `SELECT id, source, url, title, price_czk, is_bike, bike_type, features, gone_at FROM listings
+        WHERE is_bike = 1 AND price_czk IS NOT NULL${real ? ` AND NOT (${DEMO})` : ''}`
+    )
     .all();
-  return trainFromRows(rows, { sales: loadSales(db), config, log });
+  return trainFromRows(rows, { sales: loadSales(db, salesFile), config, log });
 }
 
 // ---------------------------------------------------------------------------------------------------------------

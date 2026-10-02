@@ -198,7 +198,7 @@ test('veřejný export (výchozí): bez max. výkupní ceny, poznámek AI a kali
   const { dir, config } = setup();
   const { db, ids } = sampleDb();
   try {
-    db.prepare("UPDATE listings SET ai_czk = 58000, ai_low = 52000, ai_high = 63000, ai_notes = 'Koloshop prodal podobné za 41 000 Kč', est_factors = ? WHERE id = ?").run(
+    db.prepare("UPDATE listings SET ai_czk = 58000, ai_low = 52000, ai_high = 63000, ai_notes = 'Koloshop prodal podobné za 41 000 Kč', ai_input_hash = 'h1', content_hash = 'h1', est_factors = ? WHERE id = ?").run(
       JSON.stringify(['Stáří 4 roky: −40 %', 'Kalibrace na vlastní prodeje obchodu: ×0,9']),
       ids.dealJhm
     );
