@@ -7,7 +7,7 @@ test('výchozí konfigurace', () => {
   const c = loadConfig({});
   assert.equal(c.port, 8090);
   assert.equal(c.host, '127.0.0.1');
-  assert.deepEqual(c.sources, ['bazos', 'sbazar', 'cyklobazar']);
+  assert.deepEqual(c.sources, ['bazos', 'sbazar']);
   assert.deepEqual(c.schedule, { hour: 5, minute: 30 });
   assert.equal(c.ai.enabled, false);
   assert.equal(c.ai.model, 'claude-opus-5-5');

@@ -302,6 +302,17 @@ async function runPipeline(o) {
         maxPages: config.maxPages,
         minPrice: config.minPrice,
         cache: makeCache(db, src.key),
+        /**
+         * Inzerát je na webu stále aktivní (např. podle sitemapy), i když ho výpis v tomto běhu nevrátil.
+         * refreshDetail = web hlásí změnu (lastmod) → detail stáhnout znovu. Vrací true, pokud inzerát známe.
+         */
+        markSeen: (sourceId, { refreshDetail = false } = {}) => {
+          const row = db.prepare('SELECT id FROM listings WHERE source = ? AND source_id = ?').get(src.key, String(sourceId));
+          if (!row) return false;
+          seenIds.add(row.id);
+          db.prepare(`UPDATE listings SET last_seen_at = ?, missed_scans = 0, gone_at = NULL${refreshDetail ? ', detail_at = NULL' : ''} WHERE id = ?`).run(nowIso(), row.id);
+          return true;
+        },
         isKnown: (sourceId) => db.prepare('SELECT id, price_czk, title, detail_at, gone_at FROM listings WHERE source = ? AND source_id = ?').get(src.key, String(sourceId)) || null,
         emit: async (item) => {
           s.scanned++;

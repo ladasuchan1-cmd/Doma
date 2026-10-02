@@ -5,8 +5,9 @@
 //   KOLOMAPA_HOST               adresa pro naslouchání (výchozí 127.0.0.1 – jen tento počítač; 0.0.0.0 = celá síť)
 //   KOLOMAPA_DB                 soubor databáze (výchozí <projekt>/data/kolomapa.db; ':memory:' pro testy)
 //   KOLOMAPA_PUBLIC_DIR         adresář s UI (výchozí <projekt>/public)
-//   KOLOMAPA_SOURCES            zapnuté zdroje, čárkou (výchozí bazos,sbazar,cyklobazar; aukro jen na vyžádání –
-//                               jeho robots.txt blokuje ClaudeBota, rozhodnutí je na provozovateli)
+//   KOLOMAPA_SOURCES            zapnuté zdroje, čárkou (výchozí bazos,sbazar). Na vyžádání: aukro (robots.txt blokuje
+//                               ClaudeBota) a cyklobazar (Cloudflare omezuje roboty; potřebuje Playwright, jde velmi
+//                               pomalu a při ověření „jste člověk?“ se zastaví) – rozhodnutí je na provozovateli.
 //   KOLOMAPA_SCHEDULE           čas denního běhu „HH:MM“ v místním čase (výchozí 05:30); „off“ = bez plánovače
 //   KOLOMAPA_RUN_ON_START       1 = při startu serveru hned spustit stahování, pokud dnes ještě neproběhlo (výchozí 1)
 //   KOLOMAPA_DELAY_MS           pauza mezi požadavky na jeden web v ms (výchozí 1200 – šetrné k webům)
@@ -33,7 +34,7 @@ const path = require('node:path');
 
 const PROJECT_DIR = path.join(__dirname, '..');
 const ALL_SOURCES = ['bazos', 'sbazar', 'aukro', 'cyklobazar'];
-const DEFAULT_SOURCES = ['bazos', 'sbazar', 'cyklobazar'];
+const DEFAULT_SOURCES = ['bazos', 'sbazar'];
 
 function envBool(v, fallback) {
   if (v == null || String(v).trim() === '') return fallback;

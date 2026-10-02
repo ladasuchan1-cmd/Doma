@@ -1,6 +1,6 @@
 # 🚲 Kolomapa
 
-Jednou denně projde inzeráty kol na **Bazoši, Sbazaru a Cyklobazaru** (volitelně i **Aukru**), ukáže je na **mapě ČR
+Jednou denně projde inzeráty kol na **Bazoši a Sbazaru** (volitelně i na **Cyklobazaru a Aukru**), ukáže je na **mapě ČR
 po krajích**, u každého si vezme **jednu fotku a všechno, co o kole píše prodávající**, a **nacení tržní hodnotu**.
 Výhodné nabídky (cena pod odhadem) jsou zeleně, u každého kola je i **doporučená maximální výkupní cena** pro obchod.
 
@@ -22,7 +22,7 @@ npm start              # http://localhost:8090 – mapa + denní stahování v 0
 Při prvním startu se hned spustí první stahování (trvá desítky minut – inzerátů jsou desetitisíce; detaily se
 dočítají postupně během prvních dní). Tlačítkem **Stáhnout teď** v aplikaci ho lze spustit kdykoli ručně.
 
-### Cyklobazar (Cloudflare) a AI nacenění – volitelné doplňky
+### Cyklobazar a AI nacenění – volitelné doplňky
 
 ```bash
 cd kolomapa
@@ -30,7 +30,13 @@ npm install                    # nainstaluje volitelné balíčky: playwright (p
 npx playwright install chromium
 ```
 
-Bez nich aplikace běží dál – Cyklobazar se jen přeskočí a nacenění jede bez AI.
+Bez nich aplikace běží dál – jen bez Cyklobazaru a bez AI nacenění.
+
+**Cyklobazar** se chrání službou Cloudflare: obyčejné stahování odmítá a i skutečný prohlížeč po pár rychlých
+dotazech zastaví ověřením „Potvrďte, že jste člověk“. Kolomapa proto Cyklobazar čte jen na vyžádání
+(`KOLOMAPA_SOURCES=bazos,sbazar,cyklobazar`), přes obyčejný Chromium **bez jakéhokoli maskování**, velmi pomalu
+(1 stránka za 20 s, denně jedna sitemapa + nové inzeráty) a při první výzvě k ověření se na 12 hodin zastaví – ověření
+nikdy neobchází. Spolehlivější cesta je požádat Cyklobazar o datový export / spolupráci.
 
 ### Jednorázový běh (Plánovač úloh Windows / cron) a statická verze
 
@@ -51,10 +57,10 @@ veřejný, takže i mapa s odhady a výkupními cenami by byla veřejná.
 | `KOLOMAPA_PORT` | port | `8090` |
 | `KOLOMAPA_HOST` | `0.0.0.0` = přístupné z celé sítě (pak nastavte i heslo) | `127.0.0.1` |
 | `KOLOMAPA_PASSWORD` | heslo do aplikace (HTTP Basic) | – |
-| `KOLOMAPA_SOURCES` | zdroje, např. `bazos,sbazar,cyklobazar,aukro` nebo `all` | `bazos,sbazar,cyklobazar` |
+| `KOLOMAPA_SOURCES` | zdroje, např. `bazos,sbazar,cyklobazar,aukro` nebo `all` | `bazos,sbazar` |
 | `KOLOMAPA_SCHEDULE` | čas denního běhu `HH:MM`, `off` = vypnout | `05:30` |
 | `KOLOMAPA_DELAY_MS` | pauza mezi dotazy na jeden web | `1200` |
-| `KOLOMAPA_MAX_DETAILS` | max. detailů inzerátů na zdroj za běh | `1500` |
+| `KOLOMAPA_MAX_DETAILS` | max. detailů inzerátů na zdroj za běh | podle zdroje (Bazoš 4000, Sbazar 2000, Aukro 300, Cyklobazar 120) |
 | `ANTHROPIC_API_KEY` | zapne AI nacenění podle fotek | – |
 | `KOLOMAPA_AI_MODEL` | model pro AI nacenění | `claude-opus-5-5` |
 | `KOLOMAPA_AI_MAX_PER_RUN` | max. AI nacenění za den (hlídá útratu) | `150` |

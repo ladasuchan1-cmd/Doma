@@ -186,3 +186,35 @@ test('geolokace: souřadnice z webu s přesností „psc“ → rozptyl pinů; n
   const r = db.prepare('SELECT lat, lon, kraj, geo_precision, src_lat FROM listings').get();
   assert.deepEqual([r.lat, r.lon, r.kraj, r.geo_precision, r.src_lat], [49.289978, 16.575022, 'JHM', 'psc', 49.289978]);
 });
+
+test('ctx.markSeen: aktivní podle sitemapy → není zmizelý; refreshDetail vynutí nový detail', async () => {
+  const db = openDb(':memory:');
+  let run = 0;
+  const src = {
+    key: 'sm',
+    label: 'SM',
+    detailCalls: [],
+    async scan(ctx) {
+      run++;
+      if (run === 1) {
+        await ctx.emit(item('a'));
+        await ctx.emit(item('b'));
+      } else {
+        assert.equal(ctx.markSeen('a'), true);
+        assert.equal(ctx.markSeen('b', { refreshDetail: true }), true);
+        assert.equal(ctx.markSeen('neznamy'), false);
+      }
+      return { complete: true };
+    },
+    async detail(ctx, l) {
+      this.detailCalls.push(`${run}:${l.source_id}`);
+      return { description: 'x' };
+    },
+  };
+  const cfg = { ...config, fullScanDays: 1 };
+  await runPipeline({ db, config: cfg, sources: [src] });
+  db.prepare("UPDATE settings SET value = ? WHERE key = 'lastFullScan:sm'").run(JSON.stringify('2000-01-01T00:00:00Z'));
+  await runPipeline({ db, config: cfg, sources: [src] });
+  assert.equal(db.prepare('SELECT COUNT(*) AS n FROM listings WHERE gone_at IS NOT NULL').get().n, 0);
+  assert.deepEqual(src.detailCalls.sort(), ['1:a', '1:b', '2:b']);
+});
