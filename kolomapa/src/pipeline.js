@@ -16,7 +16,7 @@
 //       sellerType, views, detailComplete (true = položka už obsahuje vše z detailu).
 
 const { tx, nowIso, bind, parseJson, getSetting, setSetting } = require('./db');
-const { hash, scrubContacts } = require('./util/text');
+const { hash, scrubContacts, SCRUB_VERSION } = require('./util/text');
 const { classifyListing, CLASSIFIER_VERSION } = require('./classify');
 const { resolveLocation, KRAJE, GEO_VERSION } = require('./geo');
 const pricing = require('./pricing');
@@ -48,6 +48,15 @@ const FIELD_MAP = {
 // aby se kvůli nim znovu neklasifikovalo a hlavně znovu neplatilo AI nacenění.
 const VOLATILE_PARAMS = new Set(['Konec', 'Typ nabídky', 'Platnost do', 'Rezervováno', 'Ochrana kupujícího', 'Upraveno']);
 
+/** Textová pole položky, ve kterých může prodávající nechat telefon / e-mail – před uložením se skryjí. */
+const SCRUB_FIELDS = new Set(['title', 'description', 'priceNote', 'locationText']);
+
+/** Parametry inzerátu se skrytými kontakty v textových hodnotách (klíče se nemění). */
+function scrubParams(p) {
+  if (!p || typeof p !== 'object' || Array.isArray(p)) return {};
+  return Object.fromEntries(Object.entries(p).map(([k, v]) => [k, typeof v === 'string' ? scrubContacts(v) : v]));
+}
+
 function contentHash(row) {
   const params = Object.fromEntries(Object.entries(row.params || {}).filter(([k]) => !VOLATILE_PARAMS.has(k)));
   return hash([row.title, row.price_czk, row.description, JSON.stringify(params)].join('\u0001'));
@@ -75,8 +84,8 @@ function upsertItemTx(db, source, item, at, fromDetail) {
   for (const [k, col] of Object.entries(FIELD_MAP)) {
     if (item[k] === undefined) continue;
     let v = item[k];
-    if (k === 'params') v = JSON.stringify(v && typeof v === 'object' ? v : {});
-    if (k === 'description' || k === 'title') v = scrubContacts(v);
+    if (k === 'params') v = JSON.stringify(scrubParams(v));
+    if (SCRUB_FIELDS.has(k)) v = scrubContacts(v);
     row[col] = v;
   }
   if (!existing) {
@@ -251,6 +260,38 @@ function geocodePending(db, { all = false } = {}) {
 }
 
 /**
+ * Jednorázově projde uložené inzeráty novými pravidly skrývání kontaktů (settings.scrubVersion < SCRUB_VERSION).
+ * Platné AI nacenění zůstává platné (skrytí kontaktu kolo nemění) – jinak by se za něj platilo znovu.
+ * @returns {number} počet upravených inzerátů
+ */
+function rescrubStored(db) {
+  if ((Number(getSetting(db, 'scrubVersion', 0)) || 0) >= SCRUB_VERSION) return 0;
+  const rows = db.prepare('SELECT id, title, description, price_note, location_text, params, price_czk, content_hash, ai_input_hash FROM listings').all();
+  const upd = db.prepare(
+    'UPDATE listings SET title = ?, description = ?, price_note = ?, location_text = ?, params = ?, content_hash = ?, ai_input_hash = ? WHERE id = ?'
+  );
+  let n = 0;
+  tx(db, () => {
+    for (const r of rows) {
+      const title = scrubContacts(r.title);
+      const description = scrubContacts(r.description);
+      const priceNote = scrubContacts(r.price_note);
+      const location = scrubContacts(r.location_text);
+      const paramsObj = scrubParams(parseJson(r.params, {}));
+      const params = r.params == null ? null : JSON.stringify(paramsObj);
+      const same = title === r.title && description === r.description && priceNote === r.price_note && location === r.location_text;
+      if (same && (r.params == null || JSON.stringify(parseJson(r.params, {})) === params)) continue;
+      const newHash = contentHash({ title, price_czk: r.price_czk, description, params: paramsObj });
+      const aiHash = r.ai_input_hash != null && r.ai_input_hash === r.content_hash ? newHash : r.ai_input_hash;
+      upd.run(title, description, priceNote, location, params, newHash, aiHash, r.id);
+      n++;
+    }
+    setSetting(db, 'scrubVersion', SCRUB_VERSION);
+  });
+  return n;
+}
+
+/**
  * Po úplném průchodu výpisu: inzeráty, které v něm chyběly (seenIds = id řádků viděných v tomto průchodu). Stránkování po offsetu se během průchodu posouvá
  * (mazání inzerátů), proto jedno chybění nestačí: zmizelý = chyběl ve 2 průchodech po sobě, nebo zdroj smazání
  * potvrdí přes confirmGone(ctx, listing) → true (smazáno) | false (existuje) | null (nevím).
@@ -311,6 +352,8 @@ async function runPipeline(o) {
   // Běhy, které zůstaly „running“ po pádu / kill -9 procesu (volající drží zámek běhu, jiný běh tedy neběží).
   db.prepare("UPDATE runs SET status = 'error', finished_at = ?, error = COALESCE(error, 'Běh nebyl dokončen – proces skončil nebo spadl.') WHERE status = 'running'").run(startedAt);
   const runId = Number(db.prepare("INSERT INTO runs (started_at, status, trigger) VALUES (?, 'running', ?)").run(startedAt, o.trigger || 'manual').lastInsertRowid);
+  const rescrubbed = rescrubStored(db);
+  if (rescrubbed) log?.info?.(`Skryty kontakty v ${rescrubbed} dříve uložených inzerátech (nová pravidla)`);
   const stats = { sources: {}, classified: 0, geocoded: 0, priced: 0, ai: 0, gone: 0, pruned: 0 };
   const progress = (msg, meta) => {
     log?.info?.(msg, meta);
@@ -447,7 +490,14 @@ async function runPipeline(o) {
     // Úklid: zmizelé inzeráty starší než goneKeepDays
     const cutoff = new Date(Date.parse(startedAt) - config.goneKeepDays * 86400000).toISOString();
     stats.pruned = Number(db.prepare('DELETE FROM listings WHERE gone_at IS NOT NULL AND gone_at < ?').run(cutoff).changes);
-    if (Object.values(stats.sources).some((s) => s.error)) status = 'partial';
+    const srcStats = Object.values(stats.sources);
+    if (srcStats.some((s) => s.error)) status = 'partial';
+    // Všechny zdroje selhaly a nic nestáhly (blokace, výpadek sítě) → chyba, ne „částečný“ běh: přehled pak nehlásí
+    // čerstvá data a restart serveru téhož dne stahování zkusí znovu.
+    if (srcStats.length && srcStats.every((s) => s.error && !s.scanned)) {
+      status = 'error';
+      error = srcStats.map((s) => s.error).join('; ');
+    }
   } catch (e) {
     status = 'error';
     error = e.message;
@@ -465,4 +515,4 @@ async function runPipeline(o) {
   return { runId, status, stats, error };
 }
 
-module.exports = { runPipeline, upsertItem, classifyPending, geocodePending, contentHash, markMissing, makeCache, VOLATILE_PARAMS };
+module.exports = { runPipeline, upsertItem, rescrubStored, classifyPending, geocodePending, contentHash, markMissing, makeCache, VOLATILE_PARAMS };

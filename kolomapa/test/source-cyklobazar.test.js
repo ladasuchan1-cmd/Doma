@@ -787,7 +787,7 @@ test('pipeline: první plnění, detaily, zmizelé podle sitemapy, změna podle 
   challenge = true;
   site.requests.length = 0;
   const r3 = await run();
-  assert.equal(r3.status, 'partial');
+  assert.equal(r3.status, 'error', 'jediný zdroj selhal a nic nestáhl → chyba, ne „částečný“ běh');
   assert.match(r3.stats.sources.cyklobazar.error, /Cloudflare žádá ověření/);
   assert.deepEqual(site.urls(), [cb.SITEMAP_URL]);
   assert.equal(db.prepare('SELECT COUNT(*) AS n FROM listings WHERE gone_at IS NOT NULL').get().n, 1); // nic nového nezmizelo

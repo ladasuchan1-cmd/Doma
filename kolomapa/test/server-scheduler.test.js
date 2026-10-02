@@ -156,6 +156,17 @@ test('zámek běhu mezi procesy', () => {
     assert.ok(!c.busy);
     c.release();
     assert.equal(fs.existsSync(`${dbFile}.run-lock`), false);
+    // živý PID, ale zámek je starší než spuštění počítače / než den (PID po restartu dostal jiný program) → mrtvý
+    const lockOf = (ms) => JSON.stringify({ pid: process.pid, host: os.hostname(), startedAt: new Date(Date.now() - ms).toISOString() });
+    fs.writeFileSync(`${dbFile}.run-lock`, lockOf(os.uptime() * 1000 + 3600e3));
+    assert.equal(sch.lockHolder(dbFile), null, 'zámek z doby před spuštěním počítače');
+    fs.writeFileSync(`${dbFile}.run-lock`, lockOf(25 * 3600e3));
+    assert.equal(sch.lockHolder(dbFile), null, 'zámek starší než den');
+    fs.writeFileSync(`${dbFile}.run-lock`, lockOf(1000));
+    assert.equal(sch.lockHolder(dbFile).pid, process.pid, 'čerstvý zámek živého procesu platí');
+    fs.writeFileSync(`${dbFile}.run-lock`, JSON.stringify({ pid: process.pid, host: os.hostname(), startedAt: 'nesmysl' }));
+    assert.equal(sch.lockHolder(dbFile), null, 'zámek bez platného času');
+    fs.unlinkSync(`${dbFile}.run-lock`);
     // in-memory DB zámek nepotřebuje
     assert.ok(!sch.acquireRunLock(':memory:').busy);
   } finally {

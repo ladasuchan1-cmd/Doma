@@ -2,7 +2,11 @@
 'use strict';
 // Statická verze mapy (bez serveru) – např. pro GitHub Pages, Netlify nebo sdílený disk.
 //
-//   node tools/export-static.js [--out=DIR] [--db=SOUBOR]
+//   node tools/export-static.js [--out=DIR] [--db=SOUBOR] [--interni]
+//
+// Statická verze bývá veřejná (GitHub Pages, Netlify) → ve výchozím stavu NEobsahuje interní údaje obchodu:
+// max. výkupní cenu, poznámky AI (AI vidí tabulku vlastních prodejů) ani kalibraci na vlastní prodeje.
+// --interni (nebo KOLOMAPA_STATIC_INTERNAL=1) je ponechá – jen pro neveřejné umístění (sdílený disk, intranet).
 //
 // Zapíše do config.staticDir (výchozí dist/, KOLOMAPA_STATIC_DIR):
 //   index.html, app.js, styles.css, vendor/ …   kopie public/
@@ -20,7 +24,7 @@ const path = require('node:path');
 const { loadConfig } = require('../src/config');
 const { openDb } = require('../src/db');
 const defaultLog = require('../src/util/log');
-const { buildSummary, buildKraj, KRAJ_CODES } = require('../src/server/data');
+const { buildSummary, buildKraj, publicListing, KRAJ_CODES } = require('../src/server/data');
 const { GEOJSON_FILE } = require('../src/server/http');
 
 const MARKER = '.kolomapa-export';
@@ -119,10 +123,12 @@ function writeJson(file, obj) {
 
 /**
  * Zapíše statickou verzi mapy.
- * @param {{db, config, log?, outDir?: string, now?: Date}} o
- * @returns {Promise<{outDir: string, files: number, bytes: number, listings: number}>}
+ * @param {{db, config, log?, outDir?: string, now?: Date, internal?: boolean}} o internal = ponechat interní údaje
+ *   obchodu (výchozí config.staticInternal, jinak ne)
+ * @returns {Promise<{outDir: string, files: number, bytes: number, listings: number, internal: boolean}>}
  */
-async function exportStatic({ db, config, log = defaultLog, outDir, now = new Date() }) {
+async function exportStatic({ db, config, log = defaultLog, outDir, now = new Date(), internal = !!config.staticInternal }) {
+  const view = internal ? (x) => x : publicListing;
   const out = checkOutDir(outDir || config.staticDir, config);
   if (!fs.existsSync(path.join(config.publicDir, 'index.html'))) throw new Error(`Chybí UI (${config.publicDir}/index.html).`);
   // Starý export smazat (je označený značkou) a zapsat celý znovu – neplatné soubory nezůstanou. Symlinky se mažou
@@ -139,11 +145,13 @@ async function exportStatic({ db, config, log = defaultLog, outDir, now = new Da
 
   const dataDir = path.join(out, 'data');
   const summary = buildSummary(db, { mode: 'static', now });
+  summary.topDeals = summary.topDeals.map(view);
   bytes += writeJson(path.join(dataDir, 'summary.json'), summary);
   files++;
   let listings = 0;
   for (const code of KRAJ_CODES) {
     const k = buildKraj(db, code, { now });
+    k.listings = k.listings.map(view);
     listings += k.listings.length;
     bytes += writeJson(path.join(dataDir, 'kraj', `${code}.json`), k);
     files++;
@@ -152,7 +160,8 @@ async function exportStatic({ db, config, log = defaultLog, outDir, now = new Da
   files++;
   bytes += fs.statSync(path.join(dataDir, 'kraje.geojson')).size;
   log.info(`Statická verze zapsána do ${out}`, { files, MB: Math.round((bytes / 1048576) * 10) / 10, listings });
-  return { outDir: out, files, bytes, listings };
+  if (internal) log.warn('Statická verze obsahuje interní údaje obchodu (max. výkupní ceny, poznámky AI) – nenahrávejte ji na veřejný web.');
+  return { outDir: out, files, bytes, listings, internal };
 }
 
 async function main(argv) {
@@ -163,12 +172,16 @@ async function main(argv) {
     })
   );
   if (args.help || args.h) {
-    console.log('Použití: node tools/export-static.js [--out=DIR] [--db=SOUBOR]\nZapíše statickou verzi mapy (výchozí dist/, KOLOMAPA_STATIC_DIR).');
+    console.log(
+      'Použití: node tools/export-static.js [--out=DIR] [--db=SOUBOR] [--interni]\nZapíše statickou verzi mapy (výchozí dist/, KOLOMAPA_STATIC_DIR).\n' +
+        '--interni ponechá max. výkupní ceny a poznámky AI (jen pro neveřejné umístění).'
+    );
     return;
   }
   const config = loadConfig(process.env);
   if (typeof args.db === 'string') config.dbFile = path.resolve(args.db);
   if (typeof args.out === 'string') config.staticDir = path.resolve(args.out);
+  if (args.interni || args.internal) config.staticInternal = true;
   if (config.dbFile !== ':memory:' && !fs.existsSync(config.dbFile)) {
     console.error(`Databáze ${config.dbFile} neexistuje – nejdřív spusťte stahování (npm run run) nebo demo data (npm run demo).`);
     process.exitCode = 1;

@@ -44,6 +44,7 @@
 //                               prodejů, jinak 0.35)
 //   KOLOMAPA_STATIC_DIR         kam „npm run export“ zapíše statickou verzi mapy (výchozí <projekt>/dist)
 //   KOLOMAPA_EXPORT_AFTER_RUN   1 = po každém běhu (server i tools/run.js) zapsat i statickou verzi (výchozí 0)
+//   KOLOMAPA_STATIC_INTERNAL    1 = statická verze ponechá max. výkupní ceny a poznámky AI (výchozí 0 – bývá veřejná)
 //   KOLOMAPA_USER_AGENT         identifikace robota v dotazech (výchozí „Mozilla/5.0 (compatible; Kolomapa/1.0; +…)“)
 //   KOLOMAPA_PASSWORD           heslo pro přístup k webu (HTTP Basic, jméno libovolné); prázdné = bez hesla
 //   KOLOMAPA_EVAL_DIR           data pro tools/eval-pricing.js (výchozí data/eval)
@@ -69,6 +70,7 @@ const KNOWN_KEYS = new Set([
   'KOLOMAPA_DB',
   'KOLOMAPA_PUBLIC_DIR',
   'KOLOMAPA_STATIC_DIR',
+  'KOLOMAPA_STATIC_INTERNAL',
   'KOLOMAPA_EXPORT_AFTER_RUN',
   'KOLOMAPA_PASSWORD',
   'KOLOMAPA_USER_AGENT',
@@ -389,6 +391,7 @@ function loadConfig(env = process.env) {
     publicDir: dir('KOLOMAPA_PUBLIC_DIR', path.join(PROJECT_DIR, 'public')),
     staticDir: dir('KOLOMAPA_STATIC_DIR', path.join(PROJECT_DIR, 'dist')),
     exportAfterRun: bool('KOLOMAPA_EXPORT_AFTER_RUN', false),
+    staticInternal: bool('KOLOMAPA_STATIC_INTERNAL', false),
     // heslo se neořezává – mezery na začátku/konci jsou jeho součástí (jen prázdné = bez hesla)
     password: env.KOLOMAPA_PASSWORD != null && String(env.KOLOMAPA_PASSWORD) !== '' ? String(env.KOLOMAPA_PASSWORD) : null,
     userAgent: envStr(env.KOLOMAPA_USER_AGENT),

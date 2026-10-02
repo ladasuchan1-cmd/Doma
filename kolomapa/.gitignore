@@ -3,3 +3,7 @@
 node_modules/
 /nastaveni.txt
 /nastaveni.txt.txt
+# Surové exporty z POHODY obsahují jména zákazníků – do gitu jen anonymizovaný training/koloshop-prodeje.json
+*.xlsx
+*.xls
+*.csv

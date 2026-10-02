@@ -193,3 +193,34 @@ test('statický přehled: chybové hlášky běhu bez cest a přihlašovacích �
     fs.rmSync(dir, { recursive: true, force: true });
   }
 });
+
+test('veřejný export (výchozí): bez max. výkupní ceny, poznámek AI a kalibrace na vlastní prodeje; --interni je ponechá', async () => {
+  const { dir, config } = setup();
+  const { db, ids } = sampleDb();
+  try {
+    db.prepare("UPDATE listings SET ai_czk = 58000, ai_low = 52000, ai_high = 63000, ai_notes = 'Koloshop prodal podobné za 41 000 Kč', est_factors = ? WHERE id = ?").run(
+      JSON.stringify(['Stáří 4 roky: −40 %', 'Kalibrace na vlastní prodeje obchodu: ×0,9']),
+      ids.dealJhm
+    );
+    const r = await exportStatic({ db, config, log });
+    assert.equal(r.internal, false);
+    const read = (f) => fs.readFileSync(path.join(config.staticDir, 'data', f), 'utf8');
+    for (const text of [read('summary.json'), read('kraj/JHM.json'), read('kraj/PHA.json')]) {
+      assert.doesNotMatch(text, /"mb":|Koloshop prodal|vlastní prodeje obchodu/);
+    }
+    const l = JSON.parse(read('kraj/JHM.json')).listings.find((x) => x.id === ids.dealJhm);
+    assert.deepEqual(l.ai, { e: 58000, l: 52000, h: 63000 }, 'AI odhad zůstává, poznámky ne');
+    assert.deepEqual(l.fx, ['Stáří 4 roky: −40 %']);
+    // neveřejné umístění: vše jako na serveru
+    const warns = [];
+    const r2 = await exportStatic({ db, config: { ...config, staticInternal: true }, log: { ...log, warn: (m) => warns.push(m) } });
+    assert.equal(r2.internal, true);
+    const l2 = JSON.parse(read('kraj/JHM.json')).listings.find((x) => x.id === ids.dealJhm);
+    assert.equal(l2.mb, 7400);
+    assert.match(l2.ai.n, /Koloshop/);
+    assert.ok(warns.some((w) => /nenahrávejte ji na veřejný web/.test(w)));
+  } finally {
+    db.close();
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});

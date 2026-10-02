@@ -62,6 +62,9 @@ function hasGoodRunToday(db, now = new Date()) {
 // ---------------------------------------------------------------------------------------------------------
 // Zámek mezi procesy (server × tools/run.js nad stejnou databází)
 
+/** Žádný běh netrvá den – starší zámek je po pádu. */
+const LOCK_MAX_AGE_MS = 24 * 3600 * 1000;
+
 function lockPath(dbFile) {
   return !dbFile || dbFile === ':memory:' ? null : `${dbFile}.run-lock`;
 }
@@ -90,8 +93,13 @@ function lockHolder(dbFile) {
     return null;
   }
   if (!info || typeof info !== 'object') return null;
+  const started = Date.parse(info.startedAt);
+  const age = Number.isFinite(started) ? Date.now() - started : Infinity;
   // Zámek z jiného počítače (sdílený disk) nejde ověřit – bereme ho vážně 12 h.
-  if (info.host && info.host !== os.hostname()) return Date.now() - Date.parse(info.startedAt) < 12 * 3600 * 1000 ? info : null;
+  if (info.host && info.host !== os.hostname()) return age < 12 * 3600 * 1000 ? info : null;
+  // Zámek starší než spuštění počítače (pád / vypnutí uprostřed běhu) nebo starší než den je mrtvý, i když jeho PID
+  // mezitím dostal jiný program (Windows čísla procesů rychle recykluje).
+  if (age > LOCK_MAX_AGE_MS || age > os.uptime() * 1000 + 60e3) return null;
   return pidAlive(info.pid) ? info : null;
 }
 

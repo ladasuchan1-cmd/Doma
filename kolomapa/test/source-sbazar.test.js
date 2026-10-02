@@ -642,7 +642,7 @@ test('detail: popis, počet fotek, fotka, platnost, původní cena; 404 → null
   await assert.rejects(sbazar.detail(makeCtx(srvHtml.http).ctx, { source_id: '111' }), /HTML stránku/);
 });
 
-test('confirmGone: 404 → true, aktivní → false, jiný stav → null, mimo kola / pod minimální cenou → true', async () => {
+test('confirmGone: 404 / neaktivní → true, aktivní → false, chyba → null, mimo kola / pod minimální cenou → true', async () => {
   const active = load('detail_234515478.json');
   const inactive = clone(active);
   inactive.result.id = 2;
@@ -660,7 +660,8 @@ test('confirmGone: 404 → true, aktivní → false, jiný stav → null, mimo k
   const { ctx } = makeCtx(srv.http, { minPrice: 500 });
   assert.equal(await sbazar.confirmGone(ctx, { source_id: '1' }), true);
   assert.equal(await sbazar.confirmGone(ctx, { source_id: '234515478' }), false);
-  assert.equal(await sbazar.confirmGone(ctx, { source_id: '2' }), null);
+  assert.equal(await sbazar.confirmGone(ctx, { source_id: '2' }), true, 'neaktivní / smazaný stav = zmizelý');
+  assert.equal(await sbazar.detail(ctx, { source_id: '2' }), null);
   assert.equal(await sbazar.confirmGone(ctx, { source_id: '3' }), true);
   assert.equal(await sbazar.confirmGone(ctx, { source_id: '4' }), true);
   assert.equal(await sbazar.confirmGone(ctx, { source_id: '5' }), null);

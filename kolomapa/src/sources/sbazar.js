@@ -1,6 +1,10 @@
 'use strict';
 // Zdroj Sbazar (sbazar.cz) – veřejné JSON API, které používá samotný web (bez cookies, přihlášení i prohlížeče).
 //
+// VE VÝCHOZÍM STAVU VYPNUTÝ: robots.txt Sbazaru (ověřeno 2. 10. 2026) má pro všechny roboty „Disallow: /“.
+// Zapnout ho (KOLOMAPA_SOURCES=bazos,sbazar) je rozhodnutí provozovatele – ideálně s výslovným souhlasem Sbazaru
+// (Seznam.cz), např. přes oficiální export / partnerský přístup.
+//
 // Kategorie (Sbazar nemá podkategorie kol – vše je v jedné kategorii, ~15–20 % tvoří díly a doplňky):
 //   628 Sport › Letní sporty › Kola (~10 000 inzerátů), 437 Dětský bazar › Kola a koloběžky, 291 Dětský bazar › Odrážedla.
 //
@@ -395,12 +399,17 @@ async function fetchPage(ctx, cat, band, offset, timestampTo, limit = PAGE_SIZE)
   return { results, total };
 }
 
-/** Detail inzerátu; 404/410 = neexistuje → null. */
+/**
+ * Detail inzerátu; 404/410 = neexistuje → null. Detail se stavem jiným než „active“ (smazaný, neaktivní, prodaný …)
+ * se také bere jako zmizelý – koupit se teď nedá; když se inzerát vrátí do výpisu, pipeline ho zase zobrazí.
+ */
 async function fetchDetail(ctx, id) {
   const { status, body } = await fetchApi(ctx, detailUrl(id), { okStatuses: [404, 410], what: `detailu inzerátu ${id}` });
   if (status === 404 || status === 410) return null;
   const r = body?.result;
   if (!r || typeof r !== 'object' || validId(r.id) !== id) throw new Error(`Sbazar: neočekávaná odpověď detailu inzerátu ${id}`);
+  const st = String(r.status ?? '').trim().toLowerCase();
+  if (st && st !== 'active') return null;
   return r;
 }
 
@@ -783,7 +792,7 @@ async function detail(ctx, listing) {
 
 /**
  * Ověří, zda inzerát chybějící v úplném výpisu opravdu zmizel.
- * @returns {Promise<boolean|null>} true = smazán (404) / přesunut mimo kola / pod minimální cenou,
+ * @returns {Promise<boolean|null>} true = smazán (404) / neaktivní / přesunut mimo kola / pod minimální cenou,
  *   false = stále aktivní, null = nevím
  */
 async function confirmGone(ctx, listing) {
@@ -796,7 +805,6 @@ async function confirmGone(ctx, listing) {
   try {
     const r = await fetchDetail(ctx, id);
     if (r === null) return true;
-    if (String(r.status ?? '').toLowerCase() !== 'active') return null;
     const catId = Number(r.category?.id);
     if (Number.isInteger(catId) && catId > 0 && !CATEGORY_BY_ID.has(catId)) return true;
     const minPrice = Number(ctx.minPrice) > 0 ? Number(ctx.minPrice) : 0;

@@ -24,7 +24,7 @@ Module._load = function (request, parent, isMain) {
   }
   return origLoad.apply(this, arguments);
 };
-const { runPipeline, upsertItem } = require('../src/pipeline');
+const { runPipeline, upsertItem, rescrubStored, contentHash } = require('../src/pipeline');
 Module._load = origLoad;
 const { openDb } = require('../src/db');
 const { loadConfig } = require('../src/config');
@@ -75,6 +75,40 @@ test('upsertItem: zkrácený popis z výpisu nepřepíše plný popis z detailu'
   const row = db.prepare('SELECT description, detail_at FROM listings').get();
   assert.equal(row.description, 'Krátký popis a ještě mnohem delší text z detailu');
   assert.ok(row.detail_at);
+});
+
+test('upsertItem: kontakty se skryjí i v poznámce k ceně, lokalitě a parametrech', () => {
+  const db = openDb(':memory:');
+  upsertItem(
+    db,
+    'fake',
+    item('1', { priceNote: 'Dohodou, volejte 777 123 456', locationText: 'Brno, tel. 608123456', params: { Stav: 'Použité', Kontakt: 'jan.novak@seznam.cz', Rok: 2021 } }),
+    '2026-10-01T00:00:00Z'
+  );
+  const row = db.prepare('SELECT price_note, location_text, params FROM listings').get();
+  assert.doesNotMatch(JSON.stringify(row), /777 123 456|608123456|novak@/);
+  assert.match(row.price_note, /^Dohodou, volejte \[telefon skryt\]/);
+  assert.deepEqual(JSON.parse(row.params), { Stav: 'Použité', Kontakt: '[e-mail skryt]', Rok: 2021 });
+});
+
+test('rescrubStored: jednorázově skryje kontakty ve starších záznamech, platné AI nacenění zůstane platné', () => {
+  const db = openDb(':memory:');
+  const raw = { title: 'Kolo Trek', description: 'Pište na jan.novak@seznam.cz', price_czk: 9000, params: {} };
+  const h = contentHash(raw);
+  db.prepare(
+    "INSERT INTO listings (source, source_id, url, title, description, price_czk, price_note, params, content_hash, ai_czk, ai_input_hash, first_seen_at, last_seen_at) VALUES ('fake', '1', 'https://x.cz/1', ?, ?, 9000, 'tel 777 123 456', '{}', ?, 9500, ?, 'x', 'x')"
+  ).run(raw.title, raw.description, h, h);
+  db.prepare(
+    "INSERT INTO listings (source, source_id, url, title, price_czk, content_hash, first_seen_at, last_seen_at) VALUES ('fake', '2', 'https://x.cz/2', 'Čisté kolo', 5000, 'abc', 'x', 'x')"
+  ).run();
+  assert.equal(rescrubStored(db), 1);
+  const r = db.prepare("SELECT * FROM listings WHERE source_id = '1'").get();
+  assert.equal(r.description, 'Pište na [e-mail skryt]');
+  assert.equal(r.price_note, 'tel [telefon skryt]');
+  assert.notEqual(r.content_hash, h);
+  assert.equal(r.ai_input_hash, r.content_hash, 'AI odhad zůstává aktuální – za nacenění se znovu neplatí');
+  assert.equal(db.prepare("SELECT content_hash FROM listings WHERE source_id = '2'").get().content_hash, 'abc', 'čisté záznamy beze změny');
+  assert.equal(rescrubStored(db), 0, 'podruhé už nic');
 });
 
 test('runPipeline: detaily, klasifikace, geolokace, nacenění', async () => {
@@ -133,6 +167,11 @@ test('runPipeline: chyba zdroje → partial, ostatní kroky proběhnou', async (
   assert.equal(r.status, 'partial');
   assert.equal(r.stats.sources.bad.error, 'captcha');
   assert.equal(r.stats.sources.fake.new, 1);
+  // všechny zdroje selhaly a nic nestáhly → chyba (ne „částečný“ běh), kroky po stažení přesto proběhnou
+  const all = await runPipeline({ db, config, sources: [bad] });
+  assert.equal(all.status, 'error');
+  assert.equal(all.error, 'captcha');
+  assert.equal(db.prepare('SELECT status FROM runs WHERE id = ?').get(all.runId).status, 'error');
 });
 
 test('ctx.cache: trvalá cache zdroje přes běhy', async () => {

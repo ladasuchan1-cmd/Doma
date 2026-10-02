@@ -370,8 +370,31 @@ function buildListing(db, id) {
   return l;
 }
 
+/** Faktor odhadu, který prozrazuje interní čísla obchodu (kalibrace na vlastní prodeje). */
+const INTERNAL_FACTOR_RX = /vlastní prodeje obchodu/i;
+
+/**
+ * Inzerát pro veřejný statický export: bez max. výkupní ceny (nákupní strategie obchodu), bez poznámek AI (AI vidí
+ * tabulku vlastních prodejů obchodu a může z ní citovat) a bez faktoru kalibrace na vlastní prodeje.
+ * @param {object} o výsledek compactListing
+ */
+function publicListing(o) {
+  const out = { ...o };
+  delete out.mb;
+  if (out.ai) {
+    out.ai = { ...out.ai };
+    delete out.ai.n;
+  }
+  if (Array.isArray(out.fx)) {
+    out.fx = out.fx.filter((x) => !INTERNAL_FACTOR_RX.test(x));
+    if (!out.fx.length) delete out.fx;
+  }
+  return out;
+}
+
 module.exports = {
   buildSummary,
+  publicListing,
   buildKraj,
   buildListing,
   compactListing,
