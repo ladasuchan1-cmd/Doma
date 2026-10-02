@@ -15,10 +15,10 @@
 //       postedAt, categorySrc, locationText, psc, okres, kraj, lat, lon, photoUrl, photoCount, params,
 //       sellerType, views, detailComplete (true = položka už obsahuje vše z detailu).
 
-const { tx, nowIso, bind, parseJson } = require('./db');
+const { tx, nowIso, bind, parseJson, getSetting, setSetting } = require('./db');
 const { hash, scrubContacts } = require('./util/text');
 const { classifyListing, CLASSIFIER_VERSION } = require('./classify');
-const { resolveLocation } = require('./geo');
+const { resolveLocation, KRAJE, GEO_VERSION } = require('./geo');
 const pricing = require('./pricing');
 
 const FIELD_MAP = {
@@ -31,8 +31,9 @@ const FIELD_MAP = {
   categorySrc: 'category_src',
   locationText: 'location_text',
   psc: 'psc',
-  okres: 'okres',
-  kraj: 'kraj',
+  // okres/kraj z webu: sloupce okres/kraj jsou výsledek geolokace (kód kraje) – zdroj je nesmí přepsat textem
+  okres: 'src_okres',
+  kraj: 'src_kraj',
   lat: 'src_lat',
   lon: 'src_lon',
   latLonPrecision: 'src_geo_precision',
@@ -61,6 +62,14 @@ const AUTHORITATIVE = new Set(['price_czk', 'price_note']);
  */
 function upsertItem(db, source, item, at, { fromDetail = false } = {}) {
   if (!item || !item.sourceId || !item.url || !item.title) throw new Error(`Neúplná položka ze zdroje ${source}`);
+  // inzerát + historie cen atomicky (pád procesu mezi nimi by ztratil změnu ceny)
+  return tx(db, () => upsertItemTx(db, source, item, at, fromDetail));
+}
+
+/** Pole, ze kterých geolokace počítá polohu – jejich změna = spočítat polohu znovu. */
+const GEO_INPUTS = ['location_text', 'psc', 'src_okres', 'src_kraj'];
+
+function upsertItemTx(db, source, item, at, fromDetail) {
   const existing = db.prepare('SELECT * FROM listings WHERE source = ? AND source_id = ?').get(source, String(item.sourceId));
   const row = {};
   for (const [k, col] of Object.entries(FIELD_MAP)) {
@@ -115,10 +124,11 @@ function upsertItem(db, source, item, at, { fromDetail = false } = {}) {
   }
   // priceCzk bez priceNote (číselná cena po „Dohodou“) → poznámku smazat
   if (row.price_czk != null && item.priceNote === undefined && existing.price_note != null) row.price_note = null;
-  // Web dodal nové souřadnice → geolokace je musí přepočítat
+  // Web dodal nové souřadnice nebo jinou lokalitu (prodávající změnil místo) → geolokace je musí přepočítat
   if (row.src_lat !== undefined && row.src_lon !== undefined && (row.src_lat !== existing.src_lat || row.src_lon !== existing.src_lon)) {
     row.geo_precision = null;
   }
+  if (GEO_INPUTS.some((c) => row[c] !== undefined && row[c] !== existing[c])) row.geo_precision = null;
   const merged = { ...existing, ...row, params: parseJson(row.params ?? existing.params, {}) };
   const newHash = contentHash(merged);
   const changed = newHash !== existing.content_hash;
@@ -191,13 +201,22 @@ function classifyPending(db, { all = false } = {}) {
 
 /**
  * Geolokace aktivních inzerátů. Souřadnice z webu (src_lat/src_lon) mají přednost a dostanou přesnost, kterou zdroj
- * uvedl (src_geo_precision; bez uvedení 'exact'); jinak PSČ + text lokality. Zapisuje jen změny.
+ * uvedl (src_geo_precision; bez uvedení 'exact'); jinak PSČ + text lokality + okres/kraj z webu (src_okres/src_kraj).
+ * Výsledek jde do lat/lon/kraj (kód)/okres/geo_precision. Počítá jen nové / změněné inzeráty, nepřesně umístěné a ty,
+ * jejichž kraj není platný kód; po změně logiky geolokace (geo.GEO_VERSION) všechny. Zapisuje jen změny.
  */
 function geocodePending(db, { all = false } = {}) {
+  const versionChanged = getSetting(db, 'geoVersion') !== GEO_VERSION;
+  if (versionChanged) all = true;
+  const codes = Object.keys(KRAJE)
+    .map((k) => `'${k}'`)
+    .join(', ');
   const rows = db
     .prepare(
-      `SELECT id, location_text, psc, okres, kraj, lat, lon, geo_precision, src_lat, src_lon, src_geo_precision
-       FROM listings WHERE gone_at IS NULL ${all ? '' : 'AND (geo_precision IS NULL OR src_lat IS NOT NULL OR geo_precision NOT IN (\'exact\', \'city\'))'}`
+      `SELECT id, location_text, psc, okres, kraj, src_okres, src_kraj, lat, lon, geo_precision, src_lat, src_lon, src_geo_precision
+       FROM listings WHERE gone_at IS NULL ${
+         all ? '' : `AND (geo_precision IS NULL OR src_lat IS NOT NULL OR geo_precision NOT IN ('exact', 'city') OR kraj IS NULL OR kraj NOT IN (${codes}))`
+       }`
     )
     .all();
   const upd = db.prepare('UPDATE listings SET lat = ?, lon = ?, kraj = ?, okres = ?, geo_precision = ? WHERE id = ?');
@@ -209,18 +228,24 @@ function geocodePending(db, { all = false } = {}) {
         lon: r.src_lon,
         psc: r.psc,
         locationText: r.location_text,
-        okres: r.okres,
-        kraj: r.kraj,
+        okres: r.src_okres,
+        kraj: r.src_kraj,
       });
       if (g.precision === 'exact' && r.src_geo_precision) g.precision = r.src_geo_precision;
       if (!g.precision) {
-        if (r.geo_precision != null) upd.run(null, null, r.kraj, r.okres, null, r.id);
+        // neznámé místo / zahraničí → bez polohy i kraje (jinak by se počítal do kraje, kde na mapě není)
+        if (r.geo_precision != null || r.lat != null || r.kraj != null || r.okres != null) {
+          upd.run(null, null, null, null, null, r.id);
+          n++;
+        }
         continue;
       }
-      if (g.precision === r.geo_precision && g.lat === r.lat && g.lon === r.lon && g.kraj === r.kraj) continue;
-      upd.run(g.lat, g.lon, g.kraj, g.okres || r.okres || null, g.precision, r.id);
+      const okres = g.okres || null;
+      if (g.precision === r.geo_precision && g.lat === r.lat && g.lon === r.lon && g.kraj === r.kraj && okres === r.okres) continue;
+      upd.run(g.lat, g.lon, g.kraj, okres, g.precision, r.id);
       n++;
     }
+    if (versionChanged) setSetting(db, 'geoVersion', GEO_VERSION);
   });
   return n;
 }
@@ -231,10 +256,12 @@ function geocodePending(db, { all = false } = {}) {
  * potvrdí přes confirmGone(ctx, listing) → true (smazáno) | false (existuje) | null (nevím).
  */
 async function markMissing(db, src, ctx, seenIds, { log, signal } = {}) {
+  // jen id + počítadlo (celý řádek až pro ověření) – zdroj má desítky tisíc aktivních inzerátů
   const missing = db
-    .prepare('SELECT * FROM listings WHERE source = ? AND gone_at IS NULL')
+    .prepare('SELECT id, missed_scans FROM listings WHERE source = ? AND gone_at IS NULL')
     .all(src.key)
     .filter((r) => !seenIds.has(r.id));
+  const fullRow = db.prepare('SELECT * FROM listings WHERE id = ?');
   const setGone = db.prepare('UPDATE listings SET gone_at = ?, missed_scans = missed_scans + 1 WHERE id = ?');
   const bump = db.prepare('UPDATE listings SET missed_scans = missed_scans + 1 WHERE id = ?');
   const seen = db.prepare('UPDATE listings SET missed_scans = 0, last_seen_at = ? WHERE id = ?');
@@ -251,10 +278,11 @@ async function markMissing(db, src, ctx, seenIds, { log, signal } = {}) {
     if (typeof src.confirmGone === 'function' && confirms < maxConfirm) {
       confirms++;
       let r = null;
+      const full = fullRow.get(row.id);
       try {
-        r = await src.confirmGone(ctx, { ...row, params: parseJson(row.params, {}) });
+        r = await src.confirmGone(ctx, { ...full, params: parseJson(full.params, {}) });
       } catch (e) {
-        log?.debug?.(`${src.label}: ověření zmizení selhalo`, { url: row.url, error: e.message });
+        log?.debug?.(`${src.label}: ověření zmizení selhalo`, { url: full.url, error: e.message });
       }
       if (r === true) {
         setGone.run(nowIso(), row.id);
@@ -266,6 +294,12 @@ async function markMissing(db, src, ctx, seenIds, { log, signal } = {}) {
   return gone;
 }
 
+/** Pořadové číslo místního kalendářního dne (pro „jednou denně“ podle místního času, jako plánovač). */
+function localDay(iso) {
+  const d = new Date(iso);
+  return Math.floor((d.getTime() - d.getTimezoneOffset() * 60000) / 86400000);
+}
+
 /**
  * Hlavní běh.
  * @param {{db, config, log, sources: object[], signal?: AbortSignal, trigger?: string, http?: object,
@@ -274,6 +308,8 @@ async function markMissing(db, src, ctx, seenIds, { log, signal } = {}) {
 async function runPipeline(o) {
   const { db, config, log } = o;
   const startedAt = nowIso();
+  // Běhy, které zůstaly „running“ po pádu / kill -9 procesu (volající drží zámek běhu, jiný běh tedy neběží).
+  db.prepare("UPDATE runs SET status = 'error', finished_at = ?, error = COALESCE(error, 'Běh nebyl dokončen – proces skončil nebo spadl.') WHERE status = 'running'").run(startedAt);
   const runId = Number(db.prepare("INSERT INTO runs (started_at, status, trigger) VALUES (?, 'running', ?)").run(startedAt, o.trigger || 'manual').lastInsertRowid);
   const stats = { sources: {}, classified: 0, geocoded: 0, priced: 0, ai: 0, gone: 0, pruned: 0 };
   const progress = (msg, meta) => {
@@ -289,7 +325,13 @@ async function runPipeline(o) {
       stats.sources[src.key] = s;
       const lastFull = db.prepare("SELECT value FROM settings WHERE key = ?").get(`lastFullScan:${src.key}`);
       const lastFullAt = lastFull ? parseJson(lastFull.value, null) : null;
-      const fullDue = !lastFullAt || Date.parse(startedAt) - Date.parse(lastFullAt) >= (config.fullScanDays * 24 - 2) * 3600 * 1000;
+      // Celý průchod jednou za fullScanDays: podle uplynulého času, ale i podle místního kalendářního dne – denní běh
+      // v 05:30 po běhu při startu serveru včera v 15:00 (jen 14,5 h) musí být celý, jinak se zmizelé inzeráty
+      // dohledají až o den později.
+      const fullDue =
+        !lastFullAt ||
+        Date.parse(startedAt) - Date.parse(lastFullAt) >= (config.fullScanDays * 24 - 2) * 3600 * 1000 ||
+        localDay(startedAt) - localDay(lastFullAt) >= config.fullScanDays;
       s.mode = fullDue ? 'full' : 'incremental';
       const seenIds = new Set();
       const ctx = {
@@ -367,14 +409,20 @@ async function runPipeline(o) {
           }
         }
       }
-      if (s.complete && s.mode === 'full' && !s.error) {
+      // Přerušený běh (ukončení serveru během detailů / ověřování) se za úplný průchod nepočítá – jinak by se příští
+      // běh spustil jen jako „novinky“ a zmizelé inzeráty by se o den později dohledávaly.
+      if (s.complete && s.mode === 'full' && !s.error && !o.signal?.aborted) {
         s.gone += await markMissing(db, src, ctx, seenIds, { log, signal: o.signal });
-        db.prepare("INSERT INTO settings (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value").run(`lastFullScan:${src.key}`, JSON.stringify(startedAt));
+        if (!o.signal?.aborted) {
+          db.prepare("INSERT INTO settings (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value").run(`lastFullScan:${src.key}`, JSON.stringify(startedAt));
+        }
       }
       stats.gone += s.gone;
       progress(`${src.label}: hotovo`, s);
     }
 
+    // přerušeno během posledního zdroje (detaily, ověřování) → nehlásit běh jako úspěšný
+    if (o.signal?.aborted) throw o.signal.reason || new Error('Přerušeno');
     progress('Klasifikuji inzeráty…');
     stats.classified += classifyPending(db);
     progress('Určuji polohu…');
@@ -404,6 +452,14 @@ async function runPipeline(o) {
     log?.error?.('Běh selhal', { error: e });
   }
   db.prepare('UPDATE runs SET finished_at = ?, status = ?, stats = ?, error = ? WHERE id = ?').run(nowIso(), status, JSON.stringify(stats), error, runId);
+  // Po běhu (tisíce zapsaných řádků) přenést WAL do databáze a zkrátit ho; server drží spojení otevřené, takže by
+  // jinak WAL zůstal v plné velikosti. Když zrovna někdo čte, nic se neděje (zkusí se po dalším běhu).
+  try {
+    db.prepare('PRAGMA wal_checkpoint(TRUNCATE)').get();
+    db.exec('PRAGMA optimize');
+  } catch (e) {
+    log?.debug?.('Údržba databáze po běhu selhala', { error: e.message });
+  }
   return { runId, status, stats, error };
 }
 

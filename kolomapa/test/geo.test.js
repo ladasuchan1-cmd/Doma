@@ -96,3 +96,46 @@ test('resolveLocation: zahraniční okres (Slovensko) se neumístí na českou o
   assert.equal(resolveLocation({ locationText: 'Březí', okres: 'Břeclav' }).kraj, 'JHM');
   assert.equal(resolveLocation({ locationText: 'Praha 9', okres: 'Hlavní město Praha' }).kraj, 'PHA');
 });
+
+test('resolveLocation: Bazoš uvádí okres – název okresu i obce bez dalšího údaje = přesnost okres, s PSČ poloha podle PSČ', () => {
+  const label = resolveLocation({ locationText: 'Nový Jičín' });
+  assert.deepEqual([label.kraj, label.precision, label.place], ['MSK', 'okres', 'Nový Jičín']);
+  // PSČ 744 01 = Frenštát pod Radhoštěm (okres Nový Jičín) → přesněji podle PSČ
+  const withPsc = resolveLocation({ locationText: 'Nový Jičín', psc: '74401' });
+  assert.deepEqual([withPsc.kraj, withPsc.precision, withPsc.place], ['MSK', 'psc', 'Frenštát pod Radhoštěm']);
+  // PSČ samotného okresního města → obec
+  assert.equal(resolveLocation({ locationText: 'Nový Jičín', psc: '74101' }).precision, 'city');
+  // Sbazar / Cyklobazar uvádějí okres zvlášť → v textu je obec
+  const town = resolveLocation({ locationText: 'Nový Jičín', okres: 'Nový Jičín' });
+  assert.deepEqual([town.kraj, town.precision], ['MSK', 'city']);
+  // bod okresu = okresní město, ne největší obec okresu (Havířov)
+  assert.equal(resolveLocation({ locationText: 'Karviná' }).place, 'Karviná');
+});
+
+test('resolveLocation: chybné souřadnice v datech GeoNames (PSČ / místo v jiném kraji) se nepoužijí', () => {
+  // PSČ 156 00 Praha-Zbraslav, 197 00 Praha-Kbely, 153 00 Praha-Radotín mají v datech body u Krumlova / Plzně / Benešova
+  for (const psc of ['15600', '19700', '15300']) {
+    const r = resolveLocation({ psc });
+    assert.equal(r.kraj, 'PHA', psc);
+    assert.equal(krajAt(r.lat, r.lon), 'PHA', psc);
+  }
+  // 384 01 má chybný kraj (Středočeský), souřadnice i sousední PSČ jsou z Jihočeského kraje
+  const p = resolveLocation({ psc: '38401' });
+  assert.equal(p.kraj, 'JHC');
+  assert.equal(krajAt(p.lat, p.lon), 'JHC');
+  const part = resolveLocation({ locationText: 'Praha 5-Zbraslav' });
+  assert.equal(part.kraj, 'PHA');
+  assert.equal(krajAt(part.lat, part.lon), 'PHA');
+});
+
+test('resolveLocation: každé PSČ leží ve svém kraji (nebo těsně za hranicí)', () => {
+  const { psc } = require('../src/geo').load();
+  const bad = [];
+  for (const code of Object.keys(psc)) {
+    const r = resolveLocation({ psc: code });
+    if (!r.lat) continue;
+    const k = krajAt(r.lat, r.lon);
+    if (k && k !== r.kraj) bad.push(`${code}: ${r.kraj} × ${k}`);
+  }
+  assert.deepEqual(bad, []);
+});

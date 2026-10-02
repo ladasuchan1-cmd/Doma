@@ -9,10 +9,13 @@
   },
   "scripts": {
     "start": "node --disable-warning=ExperimentalWarning server.js",
+    "start-browser": "node --disable-warning=ExperimentalWarning tools/start.js",
     "run": "node --disable-warning=ExperimentalWarning tools/run.js",
+    "run-export": "node --disable-warning=ExperimentalWarning tools/run.js --export",
     "export": "node --disable-warning=ExperimentalWarning tools/export-static.js",
     "import-sales": "node --disable-warning=ExperimentalWarning tools/import-sales.js",
     "demo": "node --disable-warning=ExperimentalWarning tools/demo-data.js",
+    "demo-clear": "node --disable-warning=ExperimentalWarning tools/demo-data.js --clear",
     "build-geo": "node tools/build-geo.js",
     "ui-smoke": "node --disable-warning=ExperimentalWarning tools/ui-smoke.js",
     "test": "node --disable-warning=ExperimentalWarning --test \"test/**/*.test.js\""

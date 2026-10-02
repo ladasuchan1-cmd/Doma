@@ -9,7 +9,8 @@ const path = require('node:path');
 const { loadConfig } = require('../src/config');
 const { createLogger } = require('../src/util/log');
 const { exportStatic, checkOutDir, MARKER } = require('../tools/export-static');
-const { KRAJ_CODES } = require('../src/server/data');
+const data = require('../src/server/data');
+const { KRAJ_CODES } = data;
 const { sampleDb } = require('./server-helpers');
 
 const log = createLogger({ level: 'silent' });
@@ -77,6 +78,116 @@ test('export opakovaně přepíše starý export, cizí neprázdný adresář ne
     assert.throws(() => checkOutDir(config.projectDir, config), /nezapíšu/);
     assert.throws(() => checkOutDir(config.publicDir, config), /nezapíšu/);
     assert.throws(() => checkOutDir(path.join(config.publicDir, 'x'), config), /nezapíšu/);
+  } finally {
+    db.close();
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+/** Umí systém symlinky? (Windows bez vývojářského režimu ne) */
+function canSymlink(dir) {
+  try {
+    fs.symlinkSync(dir, path.join(dir, '.symlink-test'), 'dir');
+    fs.unlinkSync(path.join(dir, '.symlink-test'));
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+test('export: symlinky z public/ jen dovnitř public/ (obsah, ne odkaz), bez cyklů; .git a CNAME zůstanou', async (t) => {
+  const { dir, config } = setup();
+  if (!canSymlink(dir)) {
+    fs.rmSync(dir, { recursive: true, force: true });
+    return t.skip('systém neumí symlinky');
+  }
+  const { db } = sampleDb();
+  try {
+    // vlastní public/ se symlinky: ven (tajný soubor), dovnitř (alias adresáře), cyklus, rozbitý odkaz
+    const pub = path.join(dir, 'pub');
+    fs.mkdirSync(path.join(pub, 'vendor'), { recursive: true });
+    fs.mkdirSync(path.join(dir, 'secret'));
+    fs.writeFileSync(path.join(dir, 'secret', 'key.txt'), 'TAJNE');
+    fs.writeFileSync(path.join(pub, 'index.html'), '<!doctype html>');
+    fs.writeFileSync(path.join(pub, 'vendor', 'lib.js'), '/* lib */');
+    fs.writeFileSync(path.join(pub, '.env'), 'TAJNE');
+    fs.symlinkSync(path.join(dir, 'secret'), path.join(pub, 'leak'), 'dir');
+    fs.symlinkSync(path.join(dir, 'secret', 'key.txt'), path.join(pub, 'vendor', 'key.txt'));
+    fs.symlinkSync('vendor', path.join(pub, 'alias'), 'dir');
+    fs.symlinkSync('..', path.join(pub, 'vendor', 'loop'), 'dir');
+    fs.symlinkSync('neexistuje.js', path.join(pub, 'broken.js'));
+    const cfg = { ...config, publicDir: pub };
+
+    // pracovní kopie gh-pages: .git + CNAME, bez značky → smí se použít a nesmaže se
+    const out = cfg.staticDir;
+    fs.mkdirSync(path.join(out, '.git'), { recursive: true });
+    fs.writeFileSync(path.join(out, '.git', 'HEAD'), 'ref: refs/heads/gh-pages\n');
+    fs.writeFileSync(path.join(out, 'CNAME'), 'kolomapa.example.cz\n');
+    const warns = [];
+    const r = await exportStatic({ db, config: cfg, log: { info() {}, warn: (...a) => warns.push(a) } });
+    await exportStatic({ db, config: cfg, log: { info() {}, warn() {} } }); // podruhé přes značku
+
+    assert.equal(fs.readFileSync(path.join(out, '.git', 'HEAD'), 'utf8'), 'ref: refs/heads/gh-pages\n');
+    assert.equal(fs.readFileSync(path.join(out, 'CNAME'), 'utf8'), 'kolomapa.example.cz\n');
+    assert.equal(fs.readFileSync(path.join(out, 'alias', 'lib.js'), 'utf8'), '/* lib */');
+    assert.equal(fs.lstatSync(path.join(out, 'alias')).isSymbolicLink(), false);
+    for (const p of ['leak', 'vendor/key.txt', 'vendor/loop', 'broken.js', '.env']) assert.equal(fs.existsSync(path.join(out, p)), false, p);
+    const walk = (d) => fs.readdirSync(d, { withFileTypes: true }).flatMap((e) => (e.isSymbolicLink() ? [path.join(d, e.name)] : e.isDirectory() ? walk(path.join(d, e.name)) : []));
+    assert.deepEqual(walk(out), [], 'export nesmí obsahovat symlinky');
+    assert.ok(warns.length && JSON.stringify(warns).includes('leak'));
+    assert.ok(r.files > 0);
+  } finally {
+    db.close();
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('checkOutDir: symlink na zakázaný adresář (domov, projekt) se odmítne', (t) => {
+  const { dir, config } = setup();
+  if (!canSymlink(dir)) {
+    fs.rmSync(dir, { recursive: true, force: true });
+    return t.skip('systém neumí symlinky');
+  }
+  try {
+    const toHome = path.join(dir, 'home-link');
+    fs.symlinkSync(os.homedir(), toHome, 'dir');
+    assert.throws(() => checkOutDir(toHome, config), /nezapíšu/);
+    const toProject = path.join(dir, 'proj-link');
+    fs.symlinkSync(config.projectDir, toProject, 'dir');
+    assert.throws(() => checkOutDir(toProject, config), /nezapíšu/);
+    assert.throws(() => checkOutDir(path.join(toProject, 'public', 'nove'), config), /nezapíšu/);
+    assert.equal(checkOutDir(path.join(dir, 'novy'), config), path.join(dir, 'novy'));
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('statický přehled: chybové hlášky běhu bez cest a přihlašovacích údajů', async () => {
+  const { dir, config } = setup();
+  const { db } = sampleDb();
+  try {
+    const stats = {
+      sources: { bazos: { error: 'Cannot find module playwright\nRequire stack:\n- /home/user/kolomapa/src/sources/browser.js', scanned: 10 }, sbazar: { error: null } },
+      aiError: 'connect ECONNREFUSED http://user:tajne@proxy.firma.cz:3128',
+      model: { mode: 'model', buyRatio: 0.652, calibration: 0.885, salesUsed: 38 },
+    };
+    db.prepare("INSERT INTO runs (started_at, finished_at, status, trigger, stats, error) VALUES (?, ?, 'partial', 'cli', ?, ?)").run(
+      '2026-10-01T05:00:00Z',
+      '2026-10-01T05:30:00Z',
+      JSON.stringify(stats),
+      "ENOENT: no such file or directory, open '/home/user/kolomapa/data/kolomapa.db'"
+    );
+    await exportStatic({ db, config, log });
+    const text = fs.readFileSync(path.join(config.staticDir, 'data', 'summary.json'), 'utf8');
+    assert.doesNotMatch(text, /\/home\/user|tajne|Require stack/);
+    const s = JSON.parse(text);
+    assert.equal(s.lastRun.error, "ENOENT: no such file or directory, open '…/kolomapa.db'");
+    assert.equal(s.lastRun.stats.sources.bazos.error, 'Cannot find module playwright');
+    assert.equal(s.lastRun.stats.aiError, 'connect ECONNREFUSED http://proxy.firma.cz:3128');
+    assert.equal(s.lastRun.stats.sources.bazos.scanned, 10);
+    assert.equal('model' in s.lastRun.stats, false, 'interní čísla modelu (výkupní poměr) nepatří do veřejného exportu');
+    // server (pro provozovatele) dál ukazuje vše
+    assert.equal(data.buildSummary(db, { mode: 'server' }).lastRun.stats.model.buyRatio, 0.652);
   } finally {
     db.close();
     fs.rmSync(dir, { recursive: true, force: true });

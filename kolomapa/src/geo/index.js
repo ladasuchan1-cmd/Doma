@@ -7,6 +7,11 @@
 //   kraje.geojson 14 krajů {code, name}
 //
 // Přesnost (precision): exact (souřadnice z webu) > city (obec/část obce, případně potvrzená PSČ) > psc > okres > kraj.
+//
+// Kontrola dat (líně, při prvním použití záznamu): GeoNames má u pár desítek míst a PSČ souřadnice v JINÉM kraji,
+// než uvádí ten samý záznam (např. PSČ 156 00 Praha-Zbraslav leží podle souřadnic u Českého Krumlova). Taková místa
+// se při hledání přeskočí; PSČ se opraví podle stejnojmenné obce (nebo podle souřadnic, když kraj nesedí ani
+// sousedním PSČ), jinak se nepoužije. Body těsně za státní hranicí (nepřesnost hranic) se berou jako platné.
 
 const fs = require('node:fs');
 const path = require('node:path');
@@ -56,6 +61,12 @@ const KRAJ_ALIASES = [
   ['MSK', ['moravskoslezsky', 'severomoravsky']],
 ];
 
+/**
+ * Verze logiky geolokace – zvýšit při změně pravidel nebo dat (src/geo/data); pipeline pak přepočítá polohu všech
+ * aktivních inzerátů (jinak jen nových / změněných).
+ */
+const GEO_VERSION = '2026-10-02.2';
+
 let cache = null;
 
 /** Klíč názvu místa: bez diakritiky, „n.“ → „nad“, „p.“ → „pod“, jen písmena/číslice. */
@@ -89,15 +100,15 @@ function load() {
     }
     byKey.get(key).push(p);
   };
-  const okresSeat = new Map(); // fold(okres) → největší sídlo okresu
+  const okresPlaces = new Map(); // klíč okresu → místa okresu (stejnojmenná obec, pak podle velikosti)
   const prahaParts = new Map(); // „praha 4“ → [místa]
   for (const [n, k, o, lat, lon, pop] of placesRaw) {
     const p = { n, k, o, lat, lon, pop };
     add(placeKey(n), p);
     if (o) {
       const ok = placeKey(o);
-      const cur = okresSeat.get(ok);
-      if (!cur || pop > cur.pop) okresSeat.set(ok, p);
+      if (!okresPlaces.has(ok)) okresPlaces.set(ok, []);
+      okresPlaces.get(ok).push(p);
     }
     const m = n.match(/^Praha (\d{1,2})\b/);
     if (m) {
@@ -106,17 +117,91 @@ function load() {
       prahaParts.get(key).push(p);
     }
   }
-  // „Praha 4“ = střed všech částí Prahy 4
+  // Bod okresu = stejnojmenná obec (okresní město; „Karviná“, ne větší Havířov), jinak největší obec okresu.
+  for (const [ok, list] of okresPlaces) list.sort((a, b) => (placeKey(b.n) === ok) - (placeKey(a.n) === ok) || b.pop - a.pop);
+  const seats = new Map();
+  const okresSeat = {
+    has: (key) => okresPlaces.has(key),
+    get(key) {
+      if (!seats.has(key)) seats.set(key, (okresPlaces.get(key) || []).find(validPlace) || null);
+      return seats.get(key) || undefined;
+    },
+  };
+  const features = kraje.features.map((f) => ({ code: f.properties.code, name: f.properties.name, geom: f.geometry, bbox: bboxOf(f.geometry) }));
+  // pro kontrolu PSČ: kraj podle prvních 3 (2) číslic PSČ → počty
+  const pscPrefix = new Map();
+  for (const [code, e] of Object.entries(psc)) {
+    for (const pre of [code.slice(0, 3), code.slice(0, 2)]) {
+      if (!pscPrefix.has(pre)) pscPrefix.set(pre, {});
+      const c = pscPrefix.get(pre);
+      c[e[2]] = (c[e[2]] || 0) + 1;
+    }
+  }
+  cache = { psc, pscChecked: new Map(), pscPrefix, byKey, byFirst, okresSeat, features, placesRaw };
+  // „Praha 4“ = střed všech (platných) částí Prahy 4
   for (const [key, list] of prahaParts) {
     if (byKey.has(key)) continue;
-    const lat = list.reduce((a, p) => a + p.lat, 0) / list.length;
-    const lon = list.reduce((a, p) => a + p.lon, 0) / list.length;
-    add(key, { n: `Praha ${key.split(' ')[1]}`, k: 'PHA', o: 'Praha', lat, lon, pop: 100000 });
+    const ok = list.filter(validPlace);
+    if (!ok.length) continue;
+    const lat = ok.reduce((a, p) => a + p.lat, 0) / ok.length;
+    const lon = ok.reduce((a, p) => a + p.lon, 0) / ok.length;
+    add(key, { n: `Praha ${key.split(' ')[1]}`, k: 'PHA', o: 'Praha', lat, lon, pop: 100000, valid: true });
   }
-  // okres „Praha-východ“ apod. jako místo (pro „okres Praha-východ“)
-  const features = kraje.features.map((f) => ({ code: f.properties.code, name: f.properties.name, geom: f.geometry, bbox: bboxOf(f.geometry) }));
-  cache = { psc, byKey, byFirst, okresSeat, features };
   return cache;
+}
+
+/** Leží místo (podle souřadnic) v kraji, který uvádí jeho záznam? Bod mimo polygony ČR (hranice) = platný. */
+function validPlace(p) {
+  if (p.valid === undefined) {
+    const k = krajAt(p.lat, p.lon);
+    p.valid = !k || k === p.k;
+  }
+  return p.valid;
+}
+
+/**
+ * Záznam PSČ [lat, lon, kraj, okres, obec] po kontrole: souřadnice v jiném kraji, než uvádí záznam →
+ * pokud kraj souřadnic odpovídá sousedním PSČ (stejné první 3 číslice), opraví se kraj/okres podle souřadnic,
+ * jinak se souřadnice vezmou ze stejnojmenné obce v uvedeném kraji/okrese; když nic nesedí → null.
+ */
+function pscEntry(code) {
+  const c = load();
+  if (!code) return null;
+  if (c.pscChecked.has(code)) return c.pscChecked.get(code);
+  let e = c.psc[code] || null;
+  if (e) {
+    const [lat, lon, k, o, obec] = e;
+    const at = krajAt(lat, lon);
+    if (at && at !== k) {
+      e = null;
+      const majority = (pre) => {
+        const counts = { ...(c.pscPrefix.get(pre) || {}) };
+        counts[k] = (counts[k] || 0) - 1; // bez sebe sama
+        const best = Object.entries(counts).filter(([, n]) => n > 0).sort((a, b) => b[1] - a[1])[0];
+        return best ? best[0] : null;
+      };
+      const neighbours = majority(code.slice(0, 3)) || majority(code.slice(0, 2));
+      if (neighbours === at) {
+        // chybný kraj/okres záznamu, souřadnice sedí k sousedním PSČ → okres a obec podle nejbližšího místa
+        let best = null;
+        let bestD = Infinity;
+        for (const [n, pk, po, plat, plon] of c.placesRaw) {
+          if (pk !== at || !po) continue;
+          const d = d2({ lat: plat, lon: plon }, lat, lon);
+          if (d < bestD) [best, bestD] = [{ n, o: po }, d];
+        }
+        if (best) e = [lat, lon, at, best.o, best.n];
+      } else {
+        const ok = o ? placeKey(o) : null;
+        const cands = (c.byKey.get(placeKey(obec)) || []).filter((p) => p.k === k && validPlace(p) && krajAt(p.lat, p.lon) === k);
+        const same = cands.filter((p) => !ok || (p.o && placeKey(p.o) === ok));
+        const p = (same.length ? same : cands).sort((a, b) => b.pop - a.pop)[0] || (ok ? c.okresSeat.get(ok) : null);
+        if (p && krajAt(p.lat, p.lon) === k) e = [p.lat, p.lon, k, o, obec];
+      }
+    }
+  }
+  c.pscChecked.set(code, e);
+  return e;
 }
 
 function bboxOf(geom) {
@@ -186,8 +271,8 @@ function d2(a, lat, lon) {
  */
 function lookup(key) {
   const { byKey, byFirst } = load();
-  const exact = byKey.get(key);
-  if (exact && exact.length) return exact;
+  const exact = (byKey.get(key) || []).filter(validPlace);
+  if (exact.length) return exact;
   const q = key.split(' ');
   if (q.length < 2 || !q.slice(1).some((t) => t.length <= 4)) return null;
   const out = [];
@@ -195,7 +280,7 @@ function lookup(key) {
     const c = cand.split(' ');
     if (c.length < q.length) continue;
     // u víceslovných názvů („Brandýs nad Labem-Stará Boleslav“) stačí shoda začátku
-    if (q.every((t, i) => c[i].startsWith(t))) out.push(...byKey.get(cand));
+    if (q.every((t, i) => c[i].startsWith(t))) out.push(...byKey.get(cand).filter(validPlace));
   }
   return out.length ? out : null;
 }
@@ -247,7 +332,7 @@ function findPlace(text, { kraj, okres, near } = {}) {
  * @returns {{lat: number|null, lon: number|null, kraj: string|null, okres: string|null, precision: string|null, place?: string}}
  */
 function resolveLocation(loc = {}) {
-  const { psc: pscTable, okresSeat } = load();
+  const { okresSeat } = load();
   const lat = Number(loc.lat);
   const lon = Number(loc.lon);
   if (Number.isFinite(lat) && Number.isFinite(lon) && lat > 48.4 && lat < 51.2 && lon > 11.9 && lon < 19) {
@@ -274,22 +359,41 @@ function resolveLocation(loc = {}) {
   }
   rawText = kept.join(', ');
   const pscKey = parsePsc(loc.psc) || parsePsc(loc.locationText);
-  const pscHit = pscKey ? pscTable[pscKey] : null;
+  const pscHit = pscEntry(pscKey);
   const near = pscHit ? { lat: pscHit[0], lon: pscHit[1] } : null;
+  const fromPsc = () => ({ lat: pscHit[0], lon: pscHit[1], kraj: pscHit[2], okres: pscHit[3], precision: 'psc', place: pscHit[4] });
 
   const text = rawText.replace(/\b\d{3}\s?\d{2}\b/g, ' ').trim();
-  // Celý text je název okresu („Praha - východ“, „Brno venkov“ – Bazoš uvádí okres) a ne obce → okres.
+  // Celý text je název okresu. Bazoš uvádí VŽDY okres (u PSČ 744 01 Frenštát p. R. píše „Nový Jičín“), takže
+  // název, který je zároveň okresem i obcí („Nový Jičín“, „Jindřichův Hradec“), bez jiného údaje o okrese
+  // znamená jen okres: přesnost 'okres' (ne „střed obce“), s PSČ ze stejného okresu poloha podle PSČ.
+  // Zdroje, které okres uvádí zvlášť (Sbazar, Cyklobazar – loc.okres), mají v textu obec.
   const fullKey = placeKey(text.replace(/\bokres\b/gi, ' '));
-  if (fullKey && !lookup(fullKey) && okresSeat.has(fullKey)) {
-    if (pscHit) return { lat: pscHit[0], lon: pscHit[1], kraj: pscHit[2], okres: pscHit[3], precision: 'psc', place: pscHit[4] };
-    const seat = okresSeat.get(fullKey);
-    return { lat: seat.lat, lon: seat.lon, kraj: seat.k, okres: seat.o, precision: 'okres', place: seat.n };
+  if (fullKey && okresSeat.has(fullKey)) {
+    const okresOnly = (seat) => ({ lat: seat.lat, lon: seat.lon, kraj: seat.k, okres: seat.o, precision: 'okres', place: seat.n });
+    if (!lookup(fullKey)) {
+      // jen okres („Praha - východ“, „Brno venkov“)
+      if (pscHit) return fromPsc();
+      const seat = okresSeat.get(fullKey);
+      if (seat) return okresOnly(seat);
+    } else if (!loc.okres) {
+      if (pscHit && placeKey(pscHit[3] || '') === fullKey) {
+        // PSČ ve stejném okrese: PSČ samotného okresního města („Pelhřimov 393 01“, bod PSČ do ~5 km od města)
+        // → obec (níže), jinak poloha podle PSČ (obec někde v okrese)
+        const town = findPlace(text, { okres: text, near });
+        if (!town || d2(town, pscHit[0], pscHit[1]) > 0.045 * 0.045) return fromPsc();
+      } else if (!pscHit) {
+        const seat = okresSeat.get(fullKey);
+        if (seat) return okresOnly(seat);
+      }
+      // PSČ z jiného okresu → obecná logika níže (obec × PSČ podle vzdálenosti)
+    }
   }
   const place = text ? findPlace(text, { kraj: krajHint || (pscHit && pscHit[2]) || null, okres: loc.okres || (okresSeat.has(fullKey) ? text : null), near }) : null;
   if (place && (!pscHit || d2(place, pscHit[0], pscHit[1]) < 0.35 * 0.35)) {
     return { lat: place.lat, lon: place.lon, kraj: place.k, okres: place.o, precision: 'city', place: place.n };
   }
-  if (pscHit) return { lat: pscHit[0], lon: pscHit[1], kraj: pscHit[2], okres: pscHit[3], precision: 'psc', place: pscHit[4] };
+  if (pscHit) return fromPsc();
   if (place) return { lat: place.lat, lon: place.lon, kraj: place.k, okres: place.o, precision: 'city', place: place.n };
 
   // okres (text „okres Jihlava“, „Brno-venkov“ nebo samostatné pole okres)
@@ -317,4 +421,4 @@ function jitter(lat, lon, precision, seed) {
   return [lat + r * Math.sin((a * Math.PI) / 180), lon + (r * Math.cos((a * Math.PI) / 180)) / Math.cos((lat * Math.PI) / 180)];
 }
 
-module.exports = { resolveLocation, krajAt, krajFromText, findPlace, placeKey, jitter, KRAJE, KRAJ_POINT, load };
+module.exports = { resolveLocation, krajAt, krajFromText, findPlace, placeKey, jitter, pscEntry, KRAJE, KRAJ_POINT, GEO_VERSION, load };

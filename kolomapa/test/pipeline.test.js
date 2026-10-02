@@ -225,3 +225,166 @@ test('contentHash: čas úpravy („Upraveno“) nemění otisk (žádné zbyte�
   assert.equal(contentHash({ ...base, params: { Upraveno: '1. 10. 2026' } }), contentHash({ ...base, params: { Upraveno: '2. 10. 2026' } }));
   assert.notEqual(contentHash({ ...base, params: { Velikost: 'M' } }), contentHash({ ...base, params: { Velikost: 'L' } }));
 });
+
+test('geolokace: okres/kraj z webu (Sbazar) nepřepíše kód kraje – inzerát zůstane v kraji i v dalších bězích', async () => {
+  const db = openDb(':memory:');
+  const it = item('1', { locationText: 'Smilovice', okres: 'Frýdek-Místek', kraj: 'Moravskoslezský kraj' });
+  const src = makeSource([[it], [it], [it]]);
+  for (let i = 0; i < 3; i++) {
+    await runPipeline({ db, config, sources: [src] });
+    const r = db.prepare('SELECT kraj, okres, src_kraj, src_okres, geo_precision FROM listings').get();
+    assert.deepEqual([r.kraj, r.okres, r.geo_precision], ['MSK', 'Frýdek-Místek', 'city'], `běh ${i + 1}`);
+    assert.deepEqual([r.src_kraj, r.src_okres], ['Moravskoslezský kraj', 'Frýdek-Místek']);
+  }
+  // ani samotné uložení položky (mezi uložením a geolokací v běhu) kód kraje nepřepíše
+  upsertItem(db, 'fake', it, '2026-10-05T00:00:00Z');
+  assert.equal(db.prepare('SELECT kraj FROM listings').get().kraj, 'MSK');
+});
+
+test('geolokace: prodávající změní lokalitu → poloha se spočítá znovu; neznámé místo nemá kraj', async () => {
+  const db = openDb(':memory:');
+  const src = makeSource([[item('1', { locationText: 'Brno' })], [item('1', { locationText: 'Pelhřimov' })], [item('1', { locationText: 'Xyzzy Qwerty' })]]);
+  await runPipeline({ db, config, sources: [src] });
+  assert.equal(db.prepare('SELECT kraj FROM listings').get().kraj, 'JHM');
+  await runPipeline({ db, config, sources: [src] });
+  assert.equal(db.prepare('SELECT kraj FROM listings').get().kraj, 'VYS');
+  await runPipeline({ db, config, sources: [src] });
+  const r = db.prepare('SELECT kraj, lat, geo_precision FROM listings').get();
+  assert.deepEqual([r.kraj, r.lat, r.geo_precision], [null, null, null]);
+});
+
+test('geolokace: po změně logiky (GEO_VERSION) se přepočítají i inzeráty s přesností obce', async () => {
+  const db = openDb(':memory:');
+  const src = makeSource([[item('1', { locationText: 'Pelhřimov' })]]);
+  await runPipeline({ db, config, sources: [src] });
+  // stará verze geolokace uložila chybnou polohu s přesností „city“ (běžně se už nepřepočítává)
+  db.prepare("UPDATE listings SET lat = 50.1, lon = 14.4, kraj = 'PHA', geo_precision = 'city'").run();
+  await runPipeline({ db, config, sources: [src] });
+  assert.equal(db.prepare('SELECT kraj FROM listings').get().kraj, 'PHA', 'beze změny verze zůstává');
+  db.prepare("UPDATE settings SET value = '\"stara\"' WHERE key = 'geoVersion'").run();
+  await runPipeline({ db, config, sources: [src] });
+  assert.equal(db.prepare('SELECT kraj FROM listings').get().kraj, 'VYS');
+});
+
+test('migrace v4: okres/kraj Sbazaru → src_okres/src_kraj, text místo kódu kraje → nová geolokace', async () => {
+  const { DatabaseSync } = require('node:sqlite');
+  const { MIGRATIONS, migrate } = require('../src/db');
+  const { geocodePending } = require('../src/pipeline');
+  const db = new DatabaseSync(':memory:');
+  for (const sql of MIGRATIONS.slice(0, 3)) db.exec(sql);
+  db.exec('PRAGMA user_version = 3');
+  const ins = db.prepare(
+    "INSERT INTO listings (source, source_id, url, title, location_text, okres, kraj, lat, lon, geo_precision, first_seen_at, last_seen_at) VALUES (?, ?, 'u', 't', ?, ?, ?, ?, ?, ?, 'x', 'x')"
+  );
+  ins.run('sbazar', '1', 'Smilovice', 'Frýdek-Místek', 'Moravskoslezský kraj', 49.66, 18.57, 'city'); // poškozený řádek
+  ins.run('cyklobazar', '2', 'Žilina', 'Žilina', null, null, null, null); // zahraničí
+  ins.run('bazos', '3', 'Brno', 'Brno-město', 'JHM', 49.2, 16.6, 'city');
+  migrate(db);
+  const rows = db.prepare('SELECT source, src_okres, src_kraj, geo_precision FROM listings ORDER BY id').all();
+  assert.deepEqual(rows.map((r) => [r.src_okres, r.src_kraj, r.geo_precision]), [
+    ['Frýdek-Místek', 'Moravskoslezský kraj', null],
+    ['Žilina', null, null],
+    [null, null, 'city'],
+  ]);
+  geocodePending(db);
+  const after = db.prepare('SELECT kraj, lat FROM listings ORDER BY id').all();
+  assert.deepEqual(after.map((r) => r.kraj), ['MSK', null, 'JHM']);
+  assert.equal(after[1].lat, null, 'zahraniční okres zůstane bez polohy');
+});
+
+test('runPipeline: běh nedokončený po pádu procesu („running“) se při dalším běhu uzavře jako chyba', async () => {
+  const db = openDb(':memory:');
+  db.prepare("INSERT INTO runs (started_at, status, trigger) VALUES ('2026-10-01T05:30:00.000Z', 'running', 'schedule')").run();
+  const r = await runPipeline({ db, config, sources: [makeSource([[item('1')]])] });
+  const runs = db.prepare('SELECT id, status, finished_at, error FROM runs ORDER BY id').all();
+  assert.equal(runs[0].status, 'error');
+  assert.ok(runs[0].finished_at && /nebyl dokončen/.test(runs[0].error));
+  assert.equal(runs[1].id, r.runId);
+  assert.equal(runs[1].status, 'ok');
+});
+
+test('upsertItem: změna ceny a záznam do historie cen jsou jedna transakce', () => {
+  const db = openDb(':memory:');
+  upsertItem(db, 'fake', item('1', { priceCzk: 9000 }), '2026-10-01T00:00:00Z');
+  // zápis do historie selže (jako pád procesu mezi dvěma příkazy) → nesmí zůstat nová cena bez historie
+  db.exec("CREATE TRIGGER fail_hist BEFORE INSERT ON price_history BEGIN SELECT RAISE(ABORT, 'disk plný'); END");
+  assert.throws(() => upsertItem(db, 'fake', item('1', { priceCzk: 8000 }), '2026-10-02T00:00:00Z'), /disk plný/);
+  assert.equal(db.prepare('SELECT price_czk FROM listings').get().price_czk, 9000);
+  db.exec('DROP TRIGGER fail_hist');
+  // uvnitř vnější transakce (SAVEPOINT) se chová stejně
+  db.exec('BEGIN');
+  upsertItem(db, 'fake', item('1', { priceCzk: 8000 }), '2026-10-02T00:00:00Z');
+  db.exec('COMMIT');
+  assert.deepEqual(db.prepare('SELECT price_czk FROM price_history ORDER BY at').all().map((x) => x.price_czk), [9000, 8000]);
+});
+
+test('migrate: migraci, kterou mezitím provedl jiný proces (server × tools/run.js), nespustí podruhé', () => {
+  const fs = require('node:fs');
+  const os = require('node:os');
+  const { DatabaseSync } = require('node:sqlite');
+  const { migrate, MIGRATIONS } = require('../src/db');
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'kolomapa-mig-'));
+  const file = path.join(dir, 'k.db');
+  try {
+    const a = new DatabaseSync(file);
+    for (const sql of MIGRATIONS.slice(0, 3)) a.exec(sql);
+    a.exec('PRAGMA user_version = 3');
+    const b = new DatabaseSync(file);
+    // proces B si přečte verzi 3 …
+    let stale = true;
+    const bView = {
+      exec: (sql) => b.exec(sql),
+      prepare(sql) {
+        if (stale && /user_version/.test(sql)) {
+          stale = false;
+          return { get: () => ({ user_version: 3 }) };
+        }
+        return b.prepare(sql);
+      },
+    };
+    // … mezitím proces A dokončí migraci …
+    migrate(a);
+    // … a B nesmí spadnout na „duplicate column name“
+    assert.doesNotThrow(() => migrate(bView));
+    assert.equal(b.prepare('PRAGMA user_version').get().user_version, MIGRATIONS.length);
+    a.close();
+    b.close();
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('runPipeline: přerušený celý průchod se nezapíše jako úplný (příští běh je zase celý)', async () => {
+  const db = openDb(':memory:');
+  const controller = new AbortController();
+  const src = {
+    key: 'ab',
+    label: 'AB',
+    async scan(ctx) {
+      await ctx.emit(item('1'));
+      await ctx.emit(item('2'));
+      return { complete: true };
+    },
+    async detail() {
+      controller.abort(new Error('Ukončuji server'));
+      return { description: 'x' };
+    },
+  };
+  const r = await runPipeline({ db, config: { ...config, fullScanDays: 1 }, sources: [src], signal: controller.signal });
+  assert.equal(r.status, 'error');
+  assert.equal(db.prepare("SELECT value FROM settings WHERE key = 'lastFullScan:ab'").get(), undefined);
+});
+
+test('runPipeline: celý průchod jednou za místní kalendářní den (i když od včerejšího běhu uplynulo < 22 h)', async () => {
+  const db = openDb(':memory:');
+  const src = makeSource([[item('1')]]);
+  // poslední celý průchod: včera 23:59 místního času
+  const now = new Date();
+  const yesterday = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1, 23, 59, 0, 0);
+  db.prepare("INSERT INTO settings (key, value) VALUES ('lastFullScan:fake', ?)").run(JSON.stringify(yesterday.toISOString()));
+  const r = await runPipeline({ db, config: { ...config, fullScanDays: 1 }, sources: [src] });
+  assert.equal(r.stats.sources.fake.mode, 'full');
+  // druhý běh téhož dne → jen novinky
+  const r2 = await runPipeline({ db, config: { ...config, fullScanDays: 1 }, sources: [src] });
+  assert.equal(r2.stats.sources.fake.mode, 'incremental');
+});

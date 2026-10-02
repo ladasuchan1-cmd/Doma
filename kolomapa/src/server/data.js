@@ -211,6 +211,37 @@ function lastFinishedRun(db) {
 }
 
 /**
+ * Chybová hláška pro veřejný statický export: jen první řádek (bez „Require stack“ apod.), absolutní cesty
+ * zkrácené na název souboru, bez přihlašovacích údajů v adresách (proxy).
+ * @param {unknown} msg
+ * @returns {string|null}
+ */
+function publicError(msg) {
+  if (msg == null || msg === '') return null;
+  const line = String(msg).split(/\r?\n/)[0].slice(0, 300);
+  return line
+    .replace(/\b([a-z][a-z0-9+.-]*:\/\/)[^\s/@]*@/gi, '$1')
+    .replace(/(?<![:/\w.])(?:[A-Za-z]:)?(?:[\\/][^\\/\s'"():,]+){2,}/g, (m) => `…/${m.split(/[\\/]/).pop()}`);
+}
+
+/**
+ * Běh pro statický export (může být veřejný, např. GitHub Pages): chybové hlášky přes publicError, bez souhrnu
+ * modelu nacenění (výkupní poměr, kalibrace na vlastní prodeje – interní čísla obchodu, UI je nepoužívá).
+ */
+function publicRun(run) {
+  if (!run) return run;
+  const stats = run.stats && typeof run.stats === 'object' ? { ...run.stats } : {};
+  delete stats.model;
+  if (stats.sources && typeof stats.sources === 'object') {
+    stats.sources = Object.fromEntries(
+      Object.entries(stats.sources).map(([k, v]) => [k, v && typeof v === 'object' ? { ...v, error: publicError(v.error) } : v])
+    );
+  }
+  for (const k of ['aiError', 'exportError']) if (k in stats) stats[k] = publicError(stats[k]);
+  return { ...run, stats, error: publicError(run.error) };
+}
+
+/**
  * Od kdy je inzerát „nový“: max(teď − NEW_HOURS, konec prvního úspěšného běhu). Inzeráty z úplně prvního
  * stažení tak nejsou všechny „nové“.
  */
@@ -288,7 +319,7 @@ function buildSummary(db, { mode = 'server', now = new Date(), topDeals = TOP_DE
   return {
     generatedAt: now.toISOString(),
     mode: mode === 'static' ? 'static' : 'server',
-    lastRun: lastFinishedRun(db),
+    lastRun: mode === 'static' ? publicRun(lastFinishedRun(db)) : lastFinishedRun(db),
     totals,
     kraje,
     sources,
@@ -347,6 +378,7 @@ module.exports = {
   isDeal,
   safeUrl,
   truncate,
+  publicError,
   KRAJ_CODES,
   DEAL_RATIO,
   SUSPICIOUS_RATIO,

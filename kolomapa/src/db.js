@@ -31,8 +31,8 @@ const MIGRATIONS = [
     category_src TEXT,                 -- kategorie na webu
     location_text TEXT,                -- město / lokalita, jak ji uvádí web
     psc TEXT,
-    okres TEXT,
-    kraj TEXT,                         -- kód kraje (PHA, STC, JHC, PLK, KVK, ULK, LBK, HKK, PAK, VYS, JHM, OLK, ZLK, MSK)
+    okres TEXT,                        -- výsledek geolokace (okres podle obce / PSČ); text z webu je v src_okres (v4)
+    kraj TEXT,                         -- kód kraje (PHA, STC, JHC, PLK, KVK, ULK, LBK, HKK, PAK, VYS, JHM, OLK, ZLK, MSK) z geolokace; text z webu v src_kraj
     lat REAL,                          -- zobrazená poloha (výsledek geolokace; viz src_lat/src_lon z v3)
     lon REAL,
     geo_precision TEXT,                -- exact | city | psc | okres | kraj | NULL
@@ -119,6 +119,17 @@ const MIGRATIONS = [
   ALTER TABLE listings ADD COLUMN src_geo_precision TEXT;
   UPDATE listings SET src_lat = lat, src_lon = lon, src_geo_precision = 'exact' WHERE geo_precision = 'exact';
   `,
+  // v4 – okres a kraj tak, jak je uvádí web (src_okres / src_kraj), odděleně od výsledku geolokace (okres / kraj = kód).
+  // Dřív zdroj přepsal kód kraje textem („Jihomoravský kraj“) a inzeráty bez nové geolokace zmizely z map krajů.
+  // Okres/kraj v DB uvádějí ze zdrojů jen Sbazar a Cyklobazar (u ostatních je v okres/kraj jen výsledek geolokace);
+  // inzeráty s textem místo kódu kraje se znovu geolokují.
+  `
+  ALTER TABLE listings ADD COLUMN src_okres TEXT;
+  ALTER TABLE listings ADD COLUMN src_kraj TEXT;
+  UPDATE listings SET src_okres = okres, src_kraj = kraj WHERE source IN ('sbazar', 'cyklobazar');
+  UPDATE listings SET geo_precision = NULL
+   WHERE kraj IS NOT NULL AND kraj NOT IN ('PHA', 'STC', 'JHC', 'PLK', 'KVK', 'ULK', 'LBK', 'HKK', 'PAK', 'VYS', 'JHM', 'OLK', 'ZLK', 'MSK');
+  `,
 ];
 
 function nowIso(d = new Date()) {
@@ -168,19 +179,29 @@ function openDb(file) {
   if (file !== ':memory:') {
     db.exec('PRAGMA journal_mode = WAL');
     db.exec('PRAGMA synchronous = NORMAL');
+    // WAL po velkém běhu (nacenění přepíše tisíce řádků) nedržet na disku v plné velikosti
+    db.exec('PRAGMA journal_size_limit = 16777216');
   }
   db.exec('PRAGMA busy_timeout = 5000');
   migrate(db);
   return db;
 }
 
+/**
+ * Migrace schématu. Server a tools/run.js mohou databázi otevřít současně: verze se proto čte znovu uvnitř zápisové
+ * transakce (BEGIN IMMEDIATE) – migraci, kterou mezitím provedl jiný proces, nespustíme podruhé (ALTER TABLE by
+ * selhal na „duplicate column“ a proces by nenastartoval).
+ */
 function migrate(db) {
-  const version = Number(db.prepare('PRAGMA user_version').get().user_version) || 0;
-  for (let v = version; v < MIGRATIONS.length; v++) {
-    db.exec('BEGIN');
+  const userVersion = () => Number(db.prepare('PRAGMA user_version').get().user_version) || 0;
+  while (userVersion() < MIGRATIONS.length) {
+    db.exec('BEGIN IMMEDIATE');
     try {
-      db.exec(MIGRATIONS[v]);
-      db.exec(`PRAGMA user_version = ${v + 1}`);
+      const v = userVersion();
+      if (v < MIGRATIONS.length) {
+        db.exec(MIGRATIONS[v]);
+        db.exec(`PRAGMA user_version = ${v + 1}`);
+      }
       db.exec('COMMIT');
     } catch (e) {
       db.exec('ROLLBACK');
@@ -189,9 +210,28 @@ function migrate(db) {
   }
 }
 
+/**
+ * Zahájí transakci; vrací true, pokud už jedna běží (pak se má použít SAVEPOINT). db.isTransaction má node:sqlite
+ * až od Node 22.16 / 24.0 – na starších (engines: >= 22.13) se to pozná podle chyby BEGIN uvnitř transakce.
+ */
+function beginOrNested(db) {
+  if (typeof db.isTransaction === 'boolean') {
+    if (db.isTransaction) return true;
+    db.exec('BEGIN');
+    return false;
+  }
+  try {
+    db.exec('BEGIN');
+    return false;
+  } catch (e) {
+    if (/within a transaction/i.test(String(e?.message))) return true;
+    throw e;
+  }
+}
+
 /** Spustí fn v transakci (vnořené volání použije SAVEPOINT). */
 function tx(db, fn) {
-  if (db.isTransaction) {
+  if (beginOrNested(db)) {
     const name = `sp_${Math.random().toString(36).slice(2, 10)}`;
     db.exec(`SAVEPOINT ${name}`);
     try {
@@ -204,7 +244,6 @@ function tx(db, fn) {
       throw e;
     }
   }
-  db.exec('BEGIN');
   try {
     const r = fn();
     db.exec('COMMIT');

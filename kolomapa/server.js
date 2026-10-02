@@ -14,6 +14,22 @@ const defaultLog = require('./src/util/log');
 const { createApp, publicDirStatus } = require('./src/server/http');
 const { createRunner, startScheduler, lockHolder } = require('./src/server/scheduler');
 
+/** „kolomapa.firma.cz, dilna:8090“ → ['kolomapa.firma.cz', 'dilna'] (malými písmeny, bez portu). */
+function parseHostList(v) {
+  return String(v || '')
+    .split(/[\s,;]+/)
+    .map((h) => h.trim().toLowerCase().replace(/^\[|\](:\d+)?$/g, '').replace(/^([^:]+):\d+$/, '$1'))
+    .filter(Boolean);
+}
+
+/** Stavový kód pro chybu parseru HTTP (clientError). */
+function clientErrorStatus(err) {
+  const code = err && err.code;
+  if (code === 'HPE_HEADER_OVERFLOW') return '431 Request Header Fields Too Large';
+  if (code === 'ERR_HTTP_REQUEST_TIMEOUT') return '408 Request Timeout';
+  return '400 Bad Request';
+}
+
 function displayUrl(host, port) {
   const h = !host || host === '0.0.0.0' || host === '::' ? 'localhost' : host.includes(':') ? `[${host}]` : host;
   return `http://${h}:${port}`;
@@ -46,6 +62,8 @@ async function start(options = {}) {
   const { env, db: givenDb, log: givenLog, runFn, scheduler: schedulerOpts = {}, ...overrides } = options;
   const log = givenLog || defaultLog;
   const config = { ...loadConfig(env || process.env) };
+  // Další jména serveru povolená bez hesla (ochrana proti DNS rebinding, viz src/server/http.js), čárkou.
+  if (config.allowedHosts == null) config.allowedHosts = parseHostList((env || process.env).KOLOMAPA_ALLOWED_HOSTS);
   for (const [k, v] of Object.entries(overrides)) if (v !== undefined) config[k] = v;
   if (!givenLog && env && typeof log.setLevel === 'function') log.setLevel(config.logLevel);
 
@@ -66,7 +84,7 @@ async function start(options = {}) {
     server.keepAliveTimeout = 5 * 1000;
     server.on('clientError', (err, socket) => {
       try {
-        if (socket.writable && !socket.destroyed) socket.end('HTTP/1.1 400 Bad Request\r\nConnection: close\r\n\r\n');
+        if (socket.writable && !socket.destroyed) socket.end(`HTTP/1.1 ${clientErrorStatus(err)}\r\nContent-Length: 0\r\nConnection: close\r\n\r\n`);
         else socket.destroy();
       } catch {
         /* nic */
@@ -149,6 +167,8 @@ async function main(argv) {
         '  PORT / KOLOMAPA_PORT     port (výchozí 8090)',
         '  KOLOMAPA_HOST            adresa (výchozí 127.0.0.1; 0.0.0.0 = celá síť – pak nastavte heslo)',
         '  KOLOMAPA_PASSWORD        heslo pro přístup (HTTP Basic)',
+        '  KOLOMAPA_ALLOWED_HOSTS   bez hesla: další jména serveru (veřejná doména za proxy), čárkou; jinak jen IP,',
+        '                           localhost, jméno počítače a .local/.lan … (ochrana proti DNS rebinding)',
         '  KOLOMAPA_SCHEDULE        čas denního běhu HH:MM nebo off (výchozí 05:30)',
         '  KOLOMAPA_RUN_ON_START    1/0 – stáhnout po startu, pokud dnes ještě neproběhlo (výchozí 1)',
       ].join('\n')
@@ -200,4 +220,4 @@ if (require.main === module) {
   main(process.argv.slice(2));
 }
 
-module.exports = { start, main, recoverInterrupted, displayUrl };
+module.exports = { start, main, recoverInterrupted, displayUrl, parseHostList, clientErrorStatus };

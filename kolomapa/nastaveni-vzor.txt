@@ -1,0 +1,27 @@
+# Nastavení Kolomapy
+# Řádek platí, když nezačíná znakem #. Změna se projeví po novém spuštění (zavřete okno Kolomapy, spusťte start.cmd).
+# Úplný seznam nastavení je v README.md (a v src/config.js). Neplatná hodnota se v okně Kolomapy ohlásí.
+# Tento soubor se nenahrává na GitHub – heslo a klíč k Claude API jsou tu v bezpečí.
+
+# Adresa mapy bude http://localhost:8090 – jiný port, když 8090 používá jiný program:
+#KOLOMAPA_PORT=8091
+
+# Přístup z jiných počítačů v obchodě (pak nastavte i heslo; Windows se zeptá na povolení ve firewallu):
+#KOLOMAPA_HOST=0.0.0.0
+#KOLOMAPA_PASSWORD=zvolte-heslo
+
+# Weby: bazos,sbazar (výchozí), all = všechny. cyklobazar a aukro viz README.md.
+#KOLOMAPA_SOURCES=bazos,sbazar
+
+# Čas denního stahování (HH:MM). Stahujete-li přes Plánovač úloh (stahnout.cmd), dejte off.
+#KOLOMAPA_SCHEDULE=05:30
+
+# AI nacenění podle fotek (placené, klíč z https://console.anthropic.com; potřebuje npm install):
+#ANTHROPIC_API_KEY=
+#KOLOMAPA_AI_MAX_PER_RUN=150
+
+# Cílová marže při výkupu; bez nastavení se spočítá z vlastních prodejů (asi 35 %):
+#KOLOMAPA_BUY_MARGIN=35 %
+
+# Pauza mezi dotazy na jeden web v ms (víc = šetrnější a pomalejší):
+#KOLOMAPA_DELAY_MS=1200

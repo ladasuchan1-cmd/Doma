@@ -3,11 +3,13 @@
 // UKÁZKOVÁ (DEMO) data pro vývoj a vyzkoušení UI, dokud nefungují skutečné scrapery.
 //
 //   node tools/demo-data.js [--count=400] [--seed=42] [--db=SOUBOR]   vloží demo inzeráty (staré demo nahradí)
-//   node tools/demo-data.js --clear [--db=SOUBOR]                      smaže všechny demo inzeráty
+//   node tools/demo-data.js --clear [--db=SOUBOR]                      smaže všechny demo inzeráty (npm run demo-clear)
 //
 // Inzeráty jsou vymyšlené (značky a modely skutečné, ceny přibližné), rozložené do všech 14 krajů do skutečných
 // obcí ze src/geo/data/places.json. Poznáte je podle params.demo = "1" a odkazu s „#demo-…“. Nemají fotky.
 // Nikdy je nepouštějte do databáze, ze které se dělá veřejný export, aniž byste je pak smazali (--clear).
+// Do databáze se skutečnými inzeráty je nástroj nevloží (demo ceny by se míchaly do učení modelu) – jen s --force;
+// pro vyzkoušení UI použijte samostatnou databázi: node tools/demo-data.js --db=data/demo.db a KOLOMAPA_DB=data/demo.db.
 
 const fs = require('node:fs');
 const path = require('node:path');
@@ -394,6 +396,13 @@ const COLUMNS = [
   'ai_notes', 'ai_model', 'ai_at', 'first_seen_at', 'last_seen_at', 'detail_at', 'gone_at',
 ];
 
+/** Počet skutečných (ne-demo) inzerátů v DB. */
+function realListingCount(db) {
+  return Number(
+    db.prepare("SELECT COUNT(*) AS n FROM listings WHERE NOT (json_valid(params) AND json_extract(params, '$.demo') IS NOT NULL AND json_extract(params, '$.demo') = '1')").get().n
+  );
+}
+
 /** Smaže demo inzeráty (params.demo = "1"). Vrací počet. */
 function clearDemo(db) {
   return Number(db.prepare("DELETE FROM listings WHERE json_valid(params) AND json_extract(params, '$.demo') = '1'").run().changes);
@@ -434,7 +443,7 @@ function main(argv) {
     })
   );
   if (args.help || args.h) {
-    console.log('Použití: node tools/demo-data.js [--count=400] [--seed=42] [--db=SOUBOR] | --clear');
+    console.log('Použití: node tools/demo-data.js [--count=400] [--seed=42] [--db=SOUBOR] [--force] | --clear');
     return 0;
   }
   const config = loadConfig(process.env);
@@ -446,13 +455,27 @@ function main(argv) {
       console.log(`Smazáno ${n} demo inzerátů z ${dbFile}.`);
       return 0;
     }
+    const real = realListingCount(db);
+    if (real > 0 && !args.force) {
+      console.error(
+        [
+          '',
+          `  Databáze ${dbFile} už obsahuje ${real} skutečných inzerátů – ukázková data do ní nevložím`,
+          '  (vymyšlené ceny by se míchaly do učení odhadu cen a do exportu).',
+          '  Pro vyzkoušení použijte samostatnou databázi:  node tools/demo-data.js --db=data/demo.db',
+          '  a spusťte server s ní (v nastaveni.txt řádek KOLOMAPA_DB=data/demo.db).  Vynutit: --force',
+          '',
+        ].join('\n')
+      );
+      return 1;
+    }
     const count = Math.max(14, Math.min(20000, Number(args.count) || 400));
     const seed = Number.isFinite(Number(args.seed)) ? Number(args.seed) : 42;
     const r = seedDemo(db, { count, seed });
     console.log('');
     console.log('  POZOR: vloženy UKÁZKOVÉ (DEMO) inzeráty – nejsou skutečné!');
     console.log(`  ${r.inserted} demo inzerátů do ${dbFile}${r.removed ? ` (nahrazeno ${r.removed} starších)` : ''}.`);
-    console.log('  Poznáte je podle params.demo = "1" a odkazu „#demo-…“. Smažete je: npm run demo -- --clear');
+    console.log('  Poznáte je podle params.demo = "1" a odkazu „#demo-…“. Smažete je: npm run demo-clear');
     console.log(`  Stav k ${nowIso()}.`);
     console.log('');
     return 0;
@@ -463,4 +486,4 @@ function main(argv) {
 
 if (require.main === module) process.exitCode = main(process.argv.slice(2));
 
-module.exports = { generateDemo, seedDemo, clearDemo };
+module.exports = { generateDemo, seedDemo, clearDemo, realListingCount, main };

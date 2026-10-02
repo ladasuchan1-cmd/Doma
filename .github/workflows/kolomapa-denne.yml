@@ -4,19 +4,22 @@
 # přidejte proměnnou KOLOMAPA_PAGES = true a v Settings → Pages zvolte „Source: GitHub Actions“.
 # Pozor: repozitář je veřejný → mapa (včetně odhadů cen a výkupních cen) bude veřejná pro každého, kdo zná adresu.
 #
-# Volitelně: secret ANTHROPIC_API_KEY zapne AI nacenění podle fotek (placené; limit KOLOMAPA_AI_MAX_PER_RUN).
-# Plánované workflow GitHub spouští jen na výchozí větvi repozitáře.
+# Volitelně (Variables): KOLOMAPA_SOURCES (výchozí bazos,sbazar; cyklobazar doinstaluje prohlížeč),
+# KOLOMAPA_MAX_DETAILS (výchozí 1500 detailů na web za běh – první běh se tak vejde do časového limitu, zbytek
+# se dočte další dny), KOLOMAPA_AI_MAX_PER_RUN. Secret ANTHROPIC_API_KEY zapne AI nacenění podle fotek (placené).
+#
+# Plánované spouštění (schedule) GitHub provádí jen z výchozí větve repozitáře (main) – soubor tam musí být.
+# Ve veřejném repozitáři GitHub plánované běhy sám vypne po 60 dnech bez commitu; znovu je zapnete
+# v záložce Actions → „Kolomapa – denní běh“ → Enable workflow. Ručně: Actions → Run workflow.
 name: Kolomapa – denní běh
 
 on:
   schedule:
-    - cron: "35 3 * * *" # 05:35 SELČ / 04:35 SEČ
+    - cron: "35 3 * * *" # 05:35 SELČ / 04:35 SEČ (GitHub plánované běhy často o desítky minut zpozdí)
   workflow_dispatch:
 
 permissions:
   contents: read
-  pages: write
-  id-token: write
 
 concurrency:
   group: kolomapa-denne
@@ -26,12 +29,16 @@ jobs:
   run:
     if: vars.KOLOMAPA_PAGES == 'true'
     runs-on: ubuntu-latest
-    timeout-minutes: 180
+    timeout-minutes: 200
+    permissions:
+      contents: read
     defaults:
       run:
         working-directory: kolomapa
     env:
       KOLOMAPA_DB: data/kolomapa.db
+      KOLOMAPA_SOURCES: ${{ vars.KOLOMAPA_SOURCES || 'bazos,sbazar' }}
+      KOLOMAPA_MAX_DETAILS: ${{ vars.KOLOMAPA_MAX_DETAILS || '1500' }}
       ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
       KOLOMAPA_AI_MAX_PER_RUN: ${{ vars.KOLOMAPA_AI_MAX_PER_RUN || '100' }}
     steps:
@@ -42,20 +49,33 @@ jobs:
         with:
           node-version: "22"
 
-      # Databáze se přenáší mezi běhy přes cache (historie cen, zmizelé inzeráty, učení modelu).
+      # Databáze se přenáší mezi běhy přes cache (historie cen, zmizelé inzeráty, učení modelu). Obnoví se
+      # nejnovější uložená (prefix kolomapa-db-); cache nepoužitá 7 dní GitHub smaže → pak se začne znovu.
       - name: Obnovit databázi
         uses: actions/cache/restore@v4
         with:
           path: kolomapa/data
-          key: kolomapa-db-${{ github.run_id }}
+          key: kolomapa-db-${{ github.run_id }}-${{ github.run_attempt }}
           restore-keys: kolomapa-db-
 
-      - name: Volitelné závislosti (Chromium pro Cyklobazar, Claude SDK)
+      # Zámek běhu z přerušeného běhu (jiný počítač → bral by se vážně 12 h). Souběh hlídá concurrency výše.
+      - name: Uvolnit zámek po přerušeném běhu
+        run: rm -f data/*.run-lock
+
+      - name: Prohlížeč pro Cyklobazar (jen když je zapnutý)
+        if: contains(env.KOLOMAPA_SOURCES, 'cyklobazar') || contains(env.KOLOMAPA_SOURCES, 'all')
         run: |
-          npm install --no-save --no-package-lock playwright @anthropic-ai/sdk
+          npm install --no-save --no-package-lock --no-audit --no-fund playwright
           npx playwright install --with-deps chromium
 
+      - name: Claude SDK (jen s ANTHROPIC_API_KEY)
+        if: env.ANTHROPIC_API_KEY != ''
+        run: npm install --no-save --no-package-lock --no-audit --no-fund @anthropic-ai/sdk
+
+      # Krok má vlastní limit, aby po něm vždy zbyl čas uložit databázi (při vypršení limitu celé úlohy by se
+      # uložení nemuselo stihnout). Přerušený běh nic nepokazí – co se stáhlo, je v DB, zbytek dočte další den.
       - name: Stáhnout inzeráty, nacenit, vyexportovat mapu
+        timeout-minutes: 170
         run: node --disable-warning=ExperimentalWarning tools/run.js --export
 
       - name: Uložit databázi
@@ -63,7 +83,7 @@ jobs:
         uses: actions/cache/save@v4
         with:
           path: kolomapa/data
-          key: kolomapa-db-${{ github.run_id }}
+          key: kolomapa-db-${{ github.run_id }}-${{ github.run_attempt }}
 
       - uses: actions/upload-pages-artifact@v3
         with:
@@ -72,6 +92,9 @@ jobs:
   deploy:
     needs: run
     runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}

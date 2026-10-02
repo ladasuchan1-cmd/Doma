@@ -1,17 +1,24 @@
 # Kolomapa – architektura
 
-Node.js ≥ 22.13, CommonJS, `'use strict'`, **bez povinných závislostí** (stejně jako `repricing/`). Volitelné:
+Node.js ≥ 22.13 (node:sqlite bez přepínače; CI testuje 22.13, 24 a Windows), CommonJS, `'use strict'`, **bez
+povinných závislostí** (stejně jako `repricing/`). Volitelné:
 `playwright` (Cyklobazar je za Cloudflare → potřebuje skutečný prohlížeč) a `@anthropic-ai/sdk` (AI nacenění podle fotky).
 Komentáře a hlášky česky, JSDoc u exportů. Testy `node --test` (bez frameworku), offline nad fixtures v `test/fixtures/`.
 
 ```
 kolomapa/
   server.js                 HTTP server (UI + JSON API) + denní plánovač
-  tools/run.js              jednorázový běh (pro cron / Plánovač úloh / GitHub Actions)
+  start.cmd                 Windows: dvojklik → tools/start.js (server + otevře prohlížeč; běží-li už, jen otevře mapu)
+  stahnout.cmd              Windows: Plánovač úloh → tools/run.js, výstup do data\stahovani.log
+  nastaveni-vzor.txt        vzor nastaveni.txt (KLÍČ=hodnota; nastaveni.txt je v .gitignore – heslo, API klíč)
+  tools/start.js            spuštění pro majitele obchodu (pozná běžící Kolomapu / cizí program na portu)
+  tools/run.js              jednorázový běh (pro cron / Plánovač úloh / GitHub Actions); česká rada k chybám,
+                            návratový kód 1 i když se nestáhl žádný web
   tools/export-static.js    statická verze mapy do dist/ (GitHub Pages apod.)
   tools/import-sales.js     import vlastních prodejů z POHODY (xlsx) → training/ + DB
   tools/build-geo.js        přegeneruje src/geo/data (GeoNames, ČÚZK)
-  src/config.js             proměnné prostředí
+  src/config.js             proměnné prostředí + nastaveni.txt; neplatné hodnoty → výchozí + české varování
+                            (config.warnings); kontrola verze Node.js; tlumí ExperimentalWarning u node:sqlite
   src/db.js                 SQLite schéma (tabulky listings, price_history, sales, runs, settings)
   src/pipeline.js           denní běh: zdroje → upsert → detaily → klasifikace → geo → nacenění → zmizelé
   src/sources/{bazos,sbazar,aukro,cyklobazar}.js   scrapery (kontrakt níže)
@@ -153,3 +160,16 @@ jinak z odhadu modelu.
 `getBrowser({config, log})` → sdílená instance (Playwright Chromium, líně spuštěná při prvním použití; když
 `playwright` není nainstalovaný, vyhodí srozumitelnou chybu a zdroj se pro běh přeskočí), `closeBrowser()` po běhu.
 Cesta k prohlížeči `KOLOMAPA_BROWSER`, další argumenty `KOLOMAPA_BROWSER_ARGS`, proxy z `HTTPS_PROXY`.
+
+## Provoz (Windows, majitel obchodu)
+
+- Provozní vstupní body (server.js, tools/start|run|import-sales|export-static|demo-data|try-source) načtou jako
+  první `src/config.js`: ten při starší verzi Node.js skončí českou hláškou, načte
+  `nastaveni.txt` do `process.env` (proměnné prostředí mají přednost; při `node --test` se soubor nečte) a vypne
+  „ExperimentalWarning: SQLite …“. Relativní cesty v nastavení se berou vůči složce `kolomapa` (Plánovač úloh startuje
+  v `C:\Windows\System32`).
+- `loadConfig(process.env)` vrací `warnings` a každé vypíše jednou do logu; `loadConfig(objekt)` (testy) jen vrací.
+- `tools/run.js`: 0 = ok / částečně, 1 = chyba, busy, nebo žádný zdroj nic nestáhl (pipeline v tom případě hlásí
+  `partial`). Souhrn je v místním čase a ke známým chybám přidá radu („→ Nefunguje internet …“).
+- Zámek běhu `<db>.run-lock` (PID + jméno počítače): `tools/run.js` ho uvolní i při zavření okna (SIGHUP) a Ctrl+Break.
+
