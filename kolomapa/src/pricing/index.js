@@ -221,9 +221,12 @@ function modelTokens(it) {
   return { first, toks };
 }
 
+/** Zástupné texty za skryté kontakty („[telefon skryt]“, „[jméno skryto]“) – nejsou vlastností kola. */
+const SCRUB_PLACEHOLDER_RX = /\[[^\]]{1,30}\bskryt[oéa]?\]/gi;
+
 function titleTokens(title) {
   const out = new Set();
-  for (const t of keyOf(title).split(' ')) {
+  for (const t of keyOf(String(title ?? '').replace(SCRUB_PLACEHOLDER_RX, ' ')).split(' ')) {
     if (!t || TOKEN_STOP.has(t)) continue;
     if (t.length < 2 && !/\d/.test(t)) continue;
     if (/^(19|20)\d\d$/.test(t)) continue;

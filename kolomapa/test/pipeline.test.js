@@ -174,6 +174,22 @@ test('runPipeline: chyba zdroje → partial, ostatní kroky proběhnou', async (
   assert.equal(db.prepare('SELECT status FROM runs WHERE id = ?').get(all.runId).status, 'error');
 });
 
+test('runPipeline: u dávno zmizelých inzerátů smaže popis a parametry, čerstvě zmizelé a aktivní nechá', async () => {
+  const db = openDb(':memory:');
+  const src = makeSource([[item('1', { description: 'Aktivní kolo' }), item('2', { description: 'Zmizelé dávno' }), item('3', { description: 'Zmizelé včera' })]], { complete: false });
+  await runPipeline({ db, config, sources: [src] });
+  const day = 86400000;
+  db.prepare("UPDATE listings SET params = '{\"Stav\":\"Použité\"}', detail_at = '2026-01-01T00:00:00Z'").run();
+  db.prepare("UPDATE listings SET gone_at = ? WHERE source_id = '2'").run(new Date(Date.now() - 40 * day).toISOString());
+  db.prepare("UPDATE listings SET gone_at = ? WHERE source_id = '3'").run(new Date(Date.now() - day).toISOString());
+  const r = await runPipeline({ db, config, sources: [makeSource([[]], { complete: false })] });
+  assert.equal(r.stats.minimized, 1);
+  const row = (id) => db.prepare('SELECT description, params, detail_at, title, price_czk FROM listings WHERE source_id = ?').get(id);
+  assert.deepEqual({ ...row('2') }, { description: null, params: '{}', detail_at: null, title: 'Kolo 2', price_czk: 8000 });
+  assert.equal(row('3').description, 'Plný popis 3', 'čerstvě zmizelé zůstává celé');
+  assert.equal(row('1').description, 'Plný popis 1');
+});
+
 test('ctx.cache: trvalá cache zdroje přes běhy', async () => {
   const db = openDb(':memory:');
   const seen = [];

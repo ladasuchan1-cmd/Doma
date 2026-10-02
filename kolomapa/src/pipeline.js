@@ -48,6 +48,9 @@ const FIELD_MAP = {
 // aby se kvůli nim znovu neklasifikovalo a hlavně znovu neplatilo AI nacenění.
 const VOLATILE_PARAMS = new Set(['Konec', 'Typ nabídky', 'Platnost do', 'Rezervováno', 'Ochrana kupujícího', 'Upraveno']);
 
+/** Po kolika dnech od zmizení inzerátu smazat jeho popis a parametry (minimalizace osobních údajů). */
+const MINIMIZE_AFTER_DAYS = 30;
+
 /** Textová pole položky, ve kterých může prodávající nechat telefon / e-mail – před uložením se skryjí. */
 const SCRUB_FIELDS = new Set(['title', 'description', 'priceNote', 'locationText']);
 
@@ -490,6 +493,14 @@ async function runPipeline(o) {
     // Úklid: zmizelé inzeráty starší než goneKeepDays
     const cutoff = new Date(Date.parse(startedAt) - config.goneKeepDays * 86400000).toISOString();
     stats.pruned = Number(db.prepare('DELETE FROM listings WHERE gone_at IS NOT NULL AND gone_at < ?').run(cutoff).changes);
+    // Minimalizace dat: u inzerátů zmizelých před víc než MINIMIZE_AFTER_DAYS dny smazat popis a parametry – pro učení
+    // modelu stačí titulek, cena a vytěžené vlastnosti (features). Vrátí-li se inzerát, detail se stáhne znovu.
+    const minCutoff = new Date(Date.parse(startedAt) - MINIMIZE_AFTER_DAYS * 86400000).toISOString();
+    stats.minimized = Number(
+      db
+        .prepare("UPDATE listings SET description = NULL, params = '{}', detail_at = NULL WHERE gone_at IS NOT NULL AND gone_at < ? AND (description IS NOT NULL OR params <> '{}')")
+        .run(minCutoff).changes
+    );
     const srcStats = Object.values(stats.sources);
     if (srcStats.some((s) => s.error)) status = 'partial';
     // Všechny zdroje selhaly a nic nestáhly (blokace, výpadek sítě) → chyba, ne „částečný“ běh: přehled pak nehlásí

@@ -175,15 +175,28 @@ function openDb(file) {
   } catch (e) {
     throw new Error(`Nelze otevřít databázi ${file}: ${e.message} – zkontrolujte, že adresář je zapisovatelný.`);
   }
-  db.exec('PRAGMA foreign_keys = ON');
-  if (file !== ':memory:') {
-    db.exec('PRAGMA journal_mode = WAL');
-    db.exec('PRAGMA synchronous = NORMAL');
-    // WAL po velkém běhu (nacenění přepíše tisíce řádků) nedržet na disku v plné velikosti
-    db.exec('PRAGMA journal_size_limit = 16777216');
+  try {
+    db.exec('PRAGMA busy_timeout = 5000');
+    db.exec('PRAGMA foreign_keys = ON');
+    if (file !== ':memory:') {
+      db.exec('PRAGMA journal_mode = WAL');
+      db.exec('PRAGMA synchronous = NORMAL');
+      // WAL po velkém běhu (nacenění přepíše tisíce řádků) nedržet na disku v plné velikosti
+      db.exec('PRAGMA journal_size_limit = 16777216');
+    }
+    migrate(db);
+  } catch (e) {
+    // Neuzavřené spojení by ve Windows drželo soubor zamčený (nešel by přejmenovat ani smazat).
+    try {
+      db.close();
+    } catch {
+      /* už zavřené */
+    }
+    if (/readonly|read-only|EACCES|EPERM|permission/i.test(e.message)) {
+      throw new Error(`Databáze ${file} je jen pro čtení (${e.message}) – zkontrolujte oprávnění složky a že soubor nemá atribut „jen pro čtení“.`);
+    }
+    throw e;
   }
-  db.exec('PRAGMA busy_timeout = 5000');
-  migrate(db);
   return db;
 }
 
