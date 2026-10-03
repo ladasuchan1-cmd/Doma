@@ -9,6 +9,9 @@ Výhodné nabídky (cena pod odhadem) jsou zeleně, u každého kola je i **dopo
 - Detail: fotka, cena, odhad s rozpětím a vysvětlením „proč“, značka/model/rok/velikost/motor…, odkaz na inzerát.
 - Odhad ceny se **učí z trhu** (tisíce inzerátů, srovnatelné nabídky) a **kalibruje na vlastní prodeje obchodu**
   (`training/koloshop-prodeje.json`). S klíčem k Claude API umí nacenit i **podle fotky** (stav kola, výbava).
+- Přesnost (ověřeno na 22 866 kolech z Bazoše): u kol, ke kterým existují aspoň 3 podobné inzeráty, se odhad typicky
+  trefí do ~26 %, u vlastních prodejů BAZAR do ~27 %; u obecných inzerátů bez značky („Dámské kolo“) je jen orientační.
+  Rozpětí odhadu obsahuje skutečnou cenu zhruba v 80 % případů. Měření: `node tools/eval-pricing.js`.
 
 ## Spuštění
 

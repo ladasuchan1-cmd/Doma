@@ -27,6 +27,7 @@ kolomapa/
   src/classify/index.js     kolo × nekolo, typ kola, vytěžení údajů z textu
   src/geo/index.js          PSČ / obec / okres / kraj → souřadnice + kraj (offline data v src/geo/data)
   src/pricing/index.js      trénink modelu + nacenění všech inzerátů
+  src/pricing/gbdt.js       boosting rozhodovacích stromů (druhý stupeň nacenění)
   src/pricing/ai.js         volitelné AI nacenění (Claude, fotka + text)
   src/sales.js              import prodejů obchodu (anonymizace, DPH, vratky)
   src/util/{http,text,log}.js
@@ -127,9 +128,16 @@ motorka …) nebo silný důkaz kola (kolo, elektrokolo, MTB, BMX, odrážedlo, 
   baterie e-kol, velikost kol, stav, původní cena, příznaky (rám, obchod, retro …) a slova z titulků (modely). Pod 300
   použitelných kol jen pravidla z `kb.json`. Kalibrace inzerovaná → skutečná cena: medián skutečná/odhad u BAZAR prodejů
   (tabulka `sales`, jinak `training/koloshop-prodeje.json`) kombinovaný s `kb.askToSale` (0,9), oříznutý na 0,6–1,1.
+  Druhý stupeň (od 1 000 použitelných kol): boosting rozhodovacích stromů (`gbdt.js`, bez závislostí) nad zbytkovou
+  chybou prvního stupně, učený na odložených odhadech interní 3× CV. Vstupy: odhad 1. stupně, rozdíl proti srovnatelným,
+  pravidlům, původní ceně a podobným titulkům (k nejbližších podle vážených slov – i bez shody značky a modelu) a
+  vlastnosti kola. Inzeráty z trénovacích dat (všechny aktivní) nacení třetina modelu, která je neviděla
+  (cross-fitting: `model.cross`), aby odhad neopisoval vlastní cenu inzerátu. Trénink ~40 s, nacenění 25 tis.
+  inzerátů ~11 s.
 - `estimate(model, listing)` → `{estCzk, low, high, confidence, method: 'comps'|'model'|'rules', factors}`. Odhad =
-  model + posun podle srovnatelných inzerátů (stejná značka a model ± rok) + malá váha pravidel; `low/high` = 10./90.
-  percentil chyb na odložených datech (interní 3× CV) podle třídy důkazů; `confidence` = odhadnutá pravděpodobnost, že
+  model + posun podle srovnatelných inzerátů (stejná značka a model ± rok) + malá váha pravidel + druhý stupeň;
+  `low/high` = 10./90. percentil chyb na odložených datech (interní 3× CV) podle třídy důkazů a rodiny kola
+  (horská / silniční / e-kola / dětská / ostatní); `confidence` = odhadnutá pravděpodobnost, že
   inzerovaná cena srovnatelného kola leží v ±35 % odhadu (≈ ±25 % proti skutečné hodnotě) → práh 0,45 odděluje
   identifikovaná kola (značka + model / rok / srovnatelné) od obecných inzerátů.
 - `priceAll(db, model, {config})` zapíše `est_*`, `est_at`; `deal_ratio = price_czk / ref` a `max_buy_czk = ref × výkupní

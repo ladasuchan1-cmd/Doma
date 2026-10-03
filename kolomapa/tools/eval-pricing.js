@@ -20,7 +20,7 @@ const { openDb, parseJson } = require('../src/db');
 const { upsertItem, classifyPending } = require('../src/pipeline');
 const { classifyListing } = require('../src/classify');
 const pricing = require('../src/pricing');
-const { parseCzk, parseCzDate, hash } = require('../src/util/text');
+const { parseCzk, parseCzDate, hash, keyOf } = require('../src/util/text');
 
 const { _internal: P } = pricing;
 
@@ -170,12 +170,8 @@ function main() {
   const items = bikeRows.map(pricing.normItem).filter((it) => P.trainable(it));
   const withDesc = new Set(bikeRows.filter((r) => r.description && r.description.length > 30).map((r) => r.id));
   console.log(`\n=== Nacenění: ${FOLDS}× křížová validace na inzerovaných cenách (${items.length} použitelných kol z ${bikeRows.length}) ===`);
-  const fold = (it) => parseInt(hash(String(it.id)), 16) % FOLDS;
-  const variants = {
-    'model+srovnatelné': { useComps: true },
-    'jen model': { useComps: false },
-    'model bez slov z titulku': { useComps: true, useTokens: false },
-  };
+  // skupiny podle titulku: znovu vložený inzerát je celý v učení, nebo celý v kontrole (jinak by ho našly srovnatelné)
+  const fold = (it) => parseInt(hash(keyOf(it.title)), 16) % FOLDS;
   const res = {};
   const covRecs = [];
   let tTrain = 0;
@@ -189,7 +185,8 @@ function main() {
     for (const it of test) {
       const truth = Math.log(it.price);
       const out = {
-        'model+srovnatelné': P.rawLogEstimate(model.core, it, { useComps: true }),
+        'celý model (2 stupně)': P.askingLog(model, it),
+        '1. stupeň': P.rawLogEstimate(model.core, it, { useComps: true }),
         'jen model': P.rawLogEstimate(model.core, it, { useComps: false }),
         'model bez slov z titulku': P.rawLogEstimate(coreNoTok, it, { useComps: true }),
         'jen pravidla (kb.json)': { lp: Math.log(pricing.rulesEstimate(it).value), comps: [] },
@@ -201,7 +198,7 @@ function main() {
       const e = pricing.estimate({ ...model, calibration: { factor: 1 } }, it);
       const lowA = e.low;
       const highA = e.high;
-      covRecs.push({ conf: e.confidence, within: Math.abs(Math.exp(out['model+srovnatelné'].lp) / it.price - 1) <= pricing.CONF_TOLERANCE, covered: it.price >= lowA && it.price <= highA, method: e.method });
+      covRecs.push({ conf: e.confidence, within: Math.abs(Math.exp(out['celý model (2 stupně)'].lp) / it.price - 1) <= pricing.CONF_TOLERANCE, covered: it.price >= lowA && it.price <= highA, method: e.method });
     }
     process.stdout.write(`  fold ${k + 1}/${FOLDS} hotov\r`);
   }
@@ -220,13 +217,13 @@ function main() {
     if (cnt < 10) continue;
     console.log(`${pad(t === '*' ? 'VŠE' : t, 16)} ${lpad(cnt, 5)} | ${cells.join('| ')}`);
   }
-  const withC = res['model+srovnatelné'].filter((x) => x.comps >= 3);
-  const withC1 = res['model+srovnatelné'].filter((x) => x.comps >= 1 && x.comps < 3);
-  const noBrand = res['model+srovnatelné'].filter((x) => !x.brand);
-  const bm = res['model+srovnatelné'].filter((x) => x.brand && x.model);
-  const dsc = res['model+srovnatelné'].filter((x) => x.desc);
+  const withC = res['celý model (2 stupně)'].filter((x) => x.comps >= 3);
+  const withC1 = res['celý model (2 stupně)'].filter((x) => x.comps >= 1 && x.comps < 3);
+  const noBrand = res['celý model (2 stupně)'].filter((x) => !x.brand);
+  const bm = res['celý model (2 stupně)'].filter((x) => x.brand && x.model);
+  const dsc = res['celý model (2 stupně)'].filter((x) => x.desc);
   const dscNo = res['jen model'].filter((x) => x.desc);
-  console.log(`\nPodle důkazů (model+srovnatelné): ≥3 srovnatelné ${withC.length}× MdAPE ${pctS(summarize(withC).mdape)} (±25 %: ${pctS(summarize(withC).w25)}); 1–2 srovnatelné ${withC1.length}× ${pctS(summarize(withC1).mdape)}; značka+model ${bm.length}× ${pctS(summarize(bm).mdape)}; bez značky ${noBrand.length}× ${pctS(summarize(noBrand).mdape)}`);
+  console.log(`\nPodle důkazů (celý model): ≥3 srovnatelné ${withC.length}× MdAPE ${pctS(summarize(withC).mdape)} (±25 %: ${pctS(summarize(withC).w25)}); 1–2 srovnatelné ${withC1.length}× ${pctS(summarize(withC1).mdape)}; značka+model ${bm.length}× ${pctS(summarize(bm).mdape)}; bez značky ${noBrand.length}× ${pctS(summarize(noBrand).mdape)}`);
   console.log(`S plným popisem (detail): ${dsc.length}× MdAPE ${pctS(summarize(dsc).mdape)} (±25 %: ${pctS(summarize(dsc).w25)}); jen model ${pctS(summarize(dscNo).mdape)}`);
   // pokrytí intervalu a kalibrace jistoty
   const cov = covRecs.filter((r) => r.covered).length / covRecs.length;

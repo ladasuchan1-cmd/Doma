@@ -10,7 +10,16 @@
 //  b) srovnatelné inzeráty – stejná značka + model (± rok): medián jejich odchylky od modelu posune odhad
 //     („náhodný efekt“ modelu kola, smrštěný podle počtu shod);
 //  c) pravidla z kb.json – cena nového kola × amortizace × stav (nebo původní cena z textu); slabá váha, při malém
-//     množství dat (< MIN_TRAIN kol) jediný zdroj.
+//     množství dat (< MIN_TRAIN kol) jediný zdroj;
+//  d) druhý stupeň – boosting rozhodovacích stromů (gbdt.js) nad zbytkovou chybou a)–c): učí se kombinace, které
+//     lineární model nezachytí (stáří × třída značky, e-kolo × baterie × stáří, kdy věřit srovnatelným, pravidlům
+//     a původní ceně), a podobné titulky (k nejbližších podle vážených slov – i bez přesné shody značky a modelu).
+//     Učí se na odložených odhadech a)–c) (3× křížová validace při tréninku).
+// Inzeráty, které jsou v trénovacích datech (všechny aktivní), se naceňují tou třetinou modelu, která jejich cenu
+// neviděla (cross-fitting) – jinak by odhad částečně opisoval vlastní cenu a výhodné nabídky by vypadaly méně výhodně.
+// 5× křížová validace na 22 866 kolech z Bazoše (skupiny podle titulku), typická chyba (MdAPE) proti inzerovaným
+// cenám: celkem 41,2 % → 38,8 %, bez srovnatelných 48,8 → 46,9 %, ≥ 3 srovnatelné 27,7 → 26,0 %; vlastní prodeje
+// BAZAR 29,7 → 26,9 %; rozpětí pokrývá ~80 % cen v každé rodině kol (dřív silničky 75 %, e-kola 87 %).
 // Výsledek je na úrovni INZEROVANÝCH cen → převod na SKUTEČNÉ prodejní ceny kalibrací na vlastní prodeje obchodu
 // (BAZAR, medián skutečná / odhad) kombinovanou s apriorním poměrem kb.askToSale.
 // Rozpětí (low/high) a jistota vycházejí z rozdělení chyb na odložených datech (3násobná křížová validace při
@@ -25,9 +34,10 @@ const { tx, nowIso, parseJson } = require('../db');
 const { keyOf } = require('../util/text');
 const { classifyListing } = require('../classify');
 const { toCsr, huberRidge, median } = require('./ridge');
+const { fitBoost, predictBoost } = require('./gbdt');
 const KB = require('./kb.json');
 
-const MODEL_VERSION = 1;
+const MODEL_VERSION = 2;
 /** Tolerance pro jistotu odhadu (viz výše). */
 const CONF_TOLERANCE = 0.35;
 /** Pod tento počet použitelných kol se model neučí a naceňuje se jen podle pravidel. */
@@ -427,6 +437,78 @@ function findCompEntries(index, it, n = 12) {
   return out.slice(0, n);
 }
 
+// ---------------------------------------------------------------------------------------------------------------
+// Podobné titulky (k nejbližších podle vážených slov) – i bez přesné shody značky a modelu
+
+const KNN_K = 10;
+const KNN_MAX_DF = 0.05; // slova ve víc než 5 % titulků neslouží k hledání kandidátů (jen ke skóre)
+
+function knnGroup(it) {
+  const fam = familyOf(it.bikeType);
+  return fam === 'kids' ? 'k' : fam === 'ebike' ? 'e' : 'a';
+}
+
+/** Index titulků: slovo → položky, idf. */
+function buildKnn(items) {
+  const docs = items.map((it) => ({ id: it.id, toks: titleTokens(it.title), lp: Math.log(it.price), g: knnGroup(it) }));
+  const df = new Map();
+  for (const d of docs) for (const t of d.toks) df.set(t, (df.get(t) || 0) + 1);
+  const N = docs.length;
+  const idf = new Map();
+  for (const [t, c] of df) idf.set(t, Math.log(1 + N / c));
+  const post = new Map();
+  docs.forEach((d, i) => {
+    let nn = 0;
+    for (const t of d.toks) nn += idf.get(t) ** 2;
+    d.norm = Math.sqrt(nn) || 1;
+    for (const t of d.toks) {
+      if (df.get(t) > KNN_MAX_DF * N) continue;
+      if (!post.has(t)) post.set(t, []);
+      post.get(t).push(i);
+    }
+  });
+  return { docs, idf, post, N };
+}
+
+/** Nejpodobnější titulky ve stejné skupině (dospělá / dětská / e-kola) → {lp, top, n} nebo null. */
+function queryKnn(knn, it) {
+  if (!knn) return null;
+  const toks = titleTokens(it.title);
+  if (!toks.length) return null;
+  const g = knnGroup(it);
+  let qn = 0;
+  for (const t of toks) qn += (knn.idf.get(t) ?? Math.log(1 + knn.N)) ** 2;
+  qn = Math.sqrt(qn) || 1;
+  const acc = new Map();
+  for (const t of toks) {
+    const list = knn.post.get(t);
+    if (!list) continue;
+    const w = knn.idf.get(t) ** 2;
+    for (const i of list) acc.set(i, (acc.get(i) || 0) + w);
+  }
+  // příspěvek častých slov (bez seznamu) dopočítat jen u nalezených kandidátů
+  const common = toks.filter((t) => knn.idf.has(t) && !knn.post.has(t));
+  const res = [];
+  for (const [i, dot0] of acc) {
+    const d = knn.docs[i];
+    if (d.g !== g || (it.id != null && d.id === it.id)) continue;
+    let dot = dot0;
+    if (common.length) for (const t of common) if (d.toks.includes(t)) dot += knn.idf.get(t) ** 2;
+    res.push([dot / (qn * d.norm), d.lp]);
+  }
+  if (!res.length) return null;
+  res.sort((a, b) => b[0] - a[0]);
+  const top = res.slice(0, KNN_K);
+  let sw = 0;
+  let sl = 0;
+  for (const [sim, lp] of top) {
+    const w = sim * sim;
+    sw += w;
+    sl += w * lp;
+  }
+  return { lp: sw > 0 ? sl / sw : NaN, top: top[0][0], n: top.filter(([sim]) => sim >= 0.5).length };
+}
+
 function weightedMedian(vals, weights) {
   const arr = vals.map((v, i) => [v, weights[i]]).sort((a, b) => a[0] - b[0]);
   const tot = arr.reduce((s, x) => s + x[1], 0);
@@ -437,6 +519,70 @@ function weightedMedian(vals, weights) {
   }
   return arr.length ? arr[arr.length - 1][0] : 0;
 }
+
+// ---------------------------------------------------------------------------------------------------------------
+// Druhý stupeň (boosting stromů nad zbytkovou chybou prvního stupně)
+
+const FAM_CODE = { mtb: 0, road: 1, ebike: 2, kids: 3, other: 4 };
+const TYPE_CODES = Object.keys(TYPE_LABEL);
+const MAT_CODE = { steel: 1, alu: 2, carbon: 3, titanium: 4 };
+const COND_CODE = { parts: 0, poor: 1, fair: 2, good: 3, very_good: 4, like_new: 5, new: 6 };
+const MOTOR_CODE = { hub: 1, mid: 2, premium: 3 };
+const SUSP_CODE = { rigid: 0, hardtail: 1, full: 2 };
+const num = (v) => {
+  const n = typeof v === 'number' ? v : parseFloat(v);
+  return Number.isFinite(n) ? n : NaN;
+};
+
+/** Příznaky druhého stupně: výsledek prvního stupně (odhad, srovnatelné, pravidla) + vlastnosti kola. */
+function boostFeatures(it, r) {
+  const f = it.f;
+  const compLp = r.comps.length
+    ? weightedMedian(
+        r.comps.map((c) => Math.log(c.entry.price)),
+        r.comps.map((c) => c.score)
+      )
+    : NaN;
+  return [
+    r.lp,
+    r.modelLp != null ? r.modelLp - r.lp : NaN,
+    r.comps.length,
+    compLp - r.lp,
+    r.comps.length ? r.comps[0].score : NaN,
+    Math.log(r.rules.value) - r.lp,
+    FAM_CODE[familyOf(it.bikeType)],
+    TYPE_CODES.indexOf(it.bikeType || 'other'),
+    num(f.brandTier),
+    num(f.ageYears),
+    num(f.groupsetTier),
+    MAT_CODE[f.material] ?? NaN,
+    num(f.wheelSize),
+    num(f.kidsWheel),
+    MOTOR_CODE[f.motorClass] ?? NaN,
+    num(f.batteryWh),
+    COND_CODE[f.condition] ?? NaN,
+    f.originalPriceCzk ? Math.log(f.originalPriceCzk) - r.lp : NaN,
+    f.isFrameOnly ? 1 : 0,
+    f.isShop ? 1 : 0,
+    f.isVintage ? 1 : 0,
+    f.hasReceipt === true ? 1 : 0,
+    f.warranty === true ? 1 : 0,
+    f.electronicShifting ? 1 : 0,
+    f.brand ? 1 : 0,
+    modelTokens(it).first ? 1 : 0,
+    SUSP_CODE[f.suspension] ?? NaN,
+    titleTokens(it.title).length,
+    r.knn ? r.knn.lp - r.lp : NaN,
+    r.knn ? r.knn.top : NaN,
+    r.knn ? r.knn.n : 0,
+  ];
+}
+
+/**
+ * Nastavení boostingu. 5× křížová validace: 500 stromů / lr 0,03, hloubka 5 i hloubka 3 vycházejí v rámci šumu
+ * stejně (38,7–39,3 % celkem) – ponechána menší a rychlejší varianta.
+ */
+const BOOST = { trees: 250, depth: 4, lr: 0.05, minLeaf: 40, subsample: 0.8, l2: 5, delta: 0.4 };
 
 // ---------------------------------------------------------------------------------------------------------------
 // Trénink
@@ -467,18 +613,22 @@ function fitCore(items, { lambda = LAMBDA, minCount = MIN_COUNT, useTokens = tru
   const w = Float64Array.from(items.map(rowWeight));
   const fit = huberRidge(X, y, w, vocab.lambda);
   const comps = buildCompIndex(items.map((it, i) => compEntry(it, fit.resid[i])));
+  const knn = buildKnn(items);
   // průměrný příspěvek skupin (pro vysvětlení „proti průměrnému inzerátu“)
   const groupMean = {};
   for (const r of items) {
     for (const [j, v, g] of featurize(r, vocab)) groupMean[g] = (groupMean[g] || 0) + fit.beta[j] * v;
   }
   for (const g of Object.keys(groupMean)) groupMean[g] /= items.length;
-  return { vocab, beta: fit.beta, sigma: fit.sigma, comps, groupMean, n: items.length };
+  return { vocab, beta: fit.beta, sigma: fit.sigma, comps, knn, groupMean, n: items.length };
 }
 
+const FAM_CHAR = { mtb: 'm', road: 'r', ebike: 'e', kids: 'k', other: 'o' };
+
+/** Třída důkazů (značka, model, rok, srovnatelné) + rodina kola (rozpětí se u silniček a dětských kol liší). */
 function evidenceKey(it, nComps) {
   const f = it.f;
-  return `${f.brand ? 'B' : '-'}${modelTokens(it).first ? 'M' : '-'}${f.modelYear ? 'Y' : '-'}${nComps >= 3 ? 'C' : nComps > 0 ? 'c' : '-'}`;
+  return `${f.brand ? 'B' : '-'}${modelTokens(it).first ? 'M' : '-'}${f.modelYear ? 'Y' : '-'}${nComps >= 3 ? 'C' : nComps > 0 ? 'c' : '-'}${FAM_CHAR[familyOf(it.bikeType)]}`;
 }
 
 /** Log-odhad na úrovni inzerovaných cen (bez kalibrace) + diagnostika. */
@@ -487,13 +637,20 @@ function evidenceKey(it, nComps) {
 // blendMinComps 3 → 1: MdAPE u inzerátů s 1–2 srovnatelnými 33,9 % → 32,1 %, celkem 42,5 % → 42,3 %, BAZAR beze změny.
 const TUNE = { compBlend: 0.5, blendMinComps: 1 };
 
-function rawLogEstimate(core, it, { useComps = true, rulesWeight = 0.1, kb = KB } = {}) {
-  const x = featurize(it, core.vocab);
+/**
+ * @param {object} core model prvního stupně (srovnatelné a podobné titulky)
+ * @param {object} it normalizovaný inzerát
+ * @param {{useComps?: boolean, rulesWeight?: number, kb?: object, ridge?: object}} [o] ridge = jiná regrese (část
+ *   modelu, která inzerát neviděla – viz cross-fitting v trainFromRows), jinak core
+ */
+function rawLogEstimate(core, it, { useComps = true, rulesWeight = 0.1, kb = KB, ridge = null } = {}) {
+  const rc = ridge || core;
+  const x = featurize(it, rc.vocab);
   let lp = 0;
   const contrib = {};
   for (const [j, v, g] of x) {
-    lp += core.beta[j] * v;
-    contrib[g] = (contrib[g] || 0) + core.beta[j] * v;
+    lp += rc.beta[j] * v;
+    contrib[g] = (contrib[g] || 0) + rc.beta[j] * v;
   }
   const modelLp = lp;
   let comps = [];
@@ -526,7 +683,7 @@ function rawLogEstimate(core, it, { useComps = true, rulesWeight = 0.1, kb = KB 
   if (!it.f.brand && !it.f.modelYear) wr += 0.05;
   if (comps.length >= 3) wr *= 0.5;
   lp = (1 - wr) * lp + wr * Math.log(rules.value);
-  return { lp, modelLp, compShift, comps, rules, contrib, wr };
+  return { lp, modelLp, compShift, comps, rules, contrib, wr, knn: core.knn ? queryKnn(core.knn, it) : null, groupMean: rc.groupMean };
 }
 
 function quantile(sorted, q) {
@@ -546,6 +703,10 @@ function spreadStats(records) {
   };
   for (const { key, resid } of records) {
     add(key, resid);
+    if (key.length > 4) {
+      add(key.slice(0, 4), resid);
+      add(`${key[0]}${key[3] === 'C' ? 'C' : '-'}${key[4]}`, resid);
+    }
     add(`${key[0]}${key[3] === 'C' ? 'C' : '-'}`, resid);
     add('*', resid);
   }
@@ -560,7 +721,13 @@ function spreadStats(records) {
 }
 
 function spreadFor(stats, key) {
-  return stats[key] || stats[`${key[0]}${key[3] === 'C' ? 'C' : '-'}`] || stats['*'] || { q10: -0.45, q90: 0.4, med: 0, within: 0.4, n: 0 };
+  const coarse = `${key[0]}${key[3] === 'C' ? 'C' : '-'}`;
+  return (
+    stats[key] ||
+    (key.length > 4 && (stats[key.slice(0, 4)] || stats[coarse + key[4]])) ||
+    stats[coarse] ||
+    stats['*'] || { q10: -0.45, q90: 0.4, med: 0, within: 0.4, n: 0 }
+  );
 }
 
 /**
@@ -581,6 +748,8 @@ function trainFromRows(rawItems, o = {}) {
     useComps: o.useComps !== false,
     rulesWeight: o.rulesWeight ?? 0.1,
     core: null,
+    booster: null,
+    cross: null,
     spread: null,
     calibration: null,
     buyRatio: null,
@@ -592,15 +761,36 @@ function trainFromRows(rawItems, o = {}) {
     const recs = [];
     if (o.oof !== false) {
       const K = 3;
+      const oof = [];
+      model.cross = { cores: [], foldOf: new Map() };
       for (let k = 0; k < K; k++) {
         const train = items.filter((_, i) => i % K !== k);
         const test = items.filter((_, i) => i % K === k);
         const core = fitCore(train, { useTokens: o.useTokens !== false });
+        model.cross.cores.push({ vocab: core.vocab, beta: core.beta, groupMean: core.groupMean });
         for (const it of test) {
+          if (it.id != null) model.cross.foldOf.set(it.id, k);
           const r = rawLogEstimate(core, it, { useComps: model.useComps, rulesWeight: model.rulesWeight, kb });
-          recs.push({ key: evidenceKey(it, r.comps.length), resid: Math.log(it.price) - r.lp });
+          oof.push({ id: it.id, key: evidenceKey(it, r.comps.length), resid: Math.log(it.price) - r.lp, x: boostFeatures(it, r), w: rowWeight(it) });
         }
       }
+      const boostOpts = { ...BOOST, ...(o.boost || {}) };
+      if (o.boost !== false && oof.length >= 1000) {
+        // poctivé chyby po boostingu: boosting učený bez dané třetiny
+        model.cross.boosters = [];
+        model.cross.boostOf = new Map();
+        for (let k = 0; k < K; k++) {
+          const tr = oof.filter((_, i) => i % K !== k);
+          const bm = fitBoost(tr.map((x) => x.x), tr.map((x) => x.resid), { ...boostOpts, weights: tr.map((x) => x.w) });
+          model.cross.boosters.push(bm);
+          oof.forEach((x, i) => {
+            if (i % K !== k) return;
+            recs.push({ key: x.key, resid: x.resid - clamp(predictBoost(bm, x.x), -0.8, 0.8) });
+            if (x.id != null) model.cross.boostOf.set(x.id, k);
+          });
+        }
+        model.booster = fitBoost(oof.map((x) => x.x), oof.map((x) => x.resid), { ...boostOpts, weights: oof.map((x) => x.w) });
+      } else for (const x of oof) recs.push({ key: x.key, resid: x.resid });
     } else {
       for (const it of items) {
         const r = rawLogEstimate(model.core, it, { useComps: false, rulesWeight: model.rulesWeight, kb });
@@ -622,6 +812,7 @@ function trainFromRows(rawItems, o = {}) {
     bikes: all.length,
     trained: items.length,
     features: model.core?.vocab ? model.core.vocab.index.size : 0,
+    trees: model.booster ? model.booster.trees.length : 0,
     sigma: model.core?.sigma != null ? Number(model.core.sigma.toFixed(3)) : null,
     calibration: Number(model.calibration.factor.toFixed(3)),
     shopRatio: model.calibration.shopRatio != null ? Number(model.calibration.shopRatio.toFixed(3)) : null,
@@ -635,7 +826,21 @@ function trainFromRows(rawItems, o = {}) {
 
 /** Odhad na úrovni inzerovaných cen (log), použitelný i bez kalibrace. */
 function askingLog(model, it) {
-  if (model.mode === 'model') return rawLogEstimate(model.core, it, { useComps: model.useComps, rulesWeight: model.rulesWeight, kb: model.kb });
+  if (model.mode === 'model') {
+    // Inzerát z trénovacích dat nacenit regresí, která jeho cenu neviděla – jinak by odhad částečně opisoval
+    // vlastní cenu a výhodné nabídky by vypadaly méně výhodně (cross-fitting).
+    const k = it.id != null && model.cross ? model.cross.foldOf.get(it.id) : undefined;
+    const ridge = k != null ? model.cross.cores[k] : null;
+    const r = rawLogEstimate(model.core, it, { useComps: model.useComps, rulesWeight: model.rulesWeight, kb: model.kb, ridge });
+    r.boost = 0;
+    if (model.booster) {
+      const kb = it.id != null && model.cross?.boostOf ? model.cross.boostOf.get(it.id) : undefined;
+      const booster = kb != null ? model.cross.boosters[kb] : model.booster;
+      r.boost = clamp(predictBoost(booster, boostFeatures(it, r)), -0.8, 0.8);
+      r.lp += r.boost;
+    }
+    return r;
+  }
   const rules = rulesEstimate(it, model.kb);
   let lp = Math.log(rules.value);
   const comps = model.useComps ? findCompEntries(model.core.comps, it, 12) : [];
@@ -812,7 +1017,7 @@ function estimate(model, listing) {
     const eff = [];
     for (const [g, v] of Object.entries(r.contrib)) {
       if (!GROUP_LABEL[g] || g === 'tier') continue;
-      const d = v - (model.core.groupMean[g] || 0);
+      const d = v - ((r.groupMean || model.core.groupMean)[g] || 0);
       if (Math.abs(d) >= 0.08) eff.push([g, d]);
     }
     eff.sort((a, b) => Math.abs(b[1]) - Math.abs(a[1]));
@@ -827,6 +1032,7 @@ function estimate(model, listing) {
     }
     if (parts.length) factors.push(`Vliv proti průměrnému inzerátu: ${parts.join(', ')}`);
   } else factors.push('Odhad podle pravidel (v databázi je zatím málo kol pro naučený model)');
+  if (Math.abs(r.boost || 0) >= 0.08) factors.push(`Doladění podle kombinace vlastností a podobných titulků: ${pct(Math.exp(r.boost) - 1)}`);
   if (f.isFrameOnly) factors.push('Jen rám – hodnota rámu, ne celého kola');
   if (f.isMulti) factors.push('Inzerát nabízí více kol – odhad je za jedno kolo');
   factors.push(`Kalibrace na vlastní prodeje obchodu: ×${fmtNum(cal)}`);
@@ -963,5 +1169,5 @@ module.exports = {
   TYPE_LABEL,
   COND_LABEL,
   // pro evaluaci
-  _internal: { fitCore, rawLogEstimate, askingLog, trainable, evidenceKey, spreadStats, findCompEntries, calibrate, LAMBDA, MIN_COUNT, TUNE },
+  _internal: { fitCore, rawLogEstimate, askingLog, trainable, evidenceKey, spreadStats, findCompEntries, calibrate, boostFeatures, buildKnn, queryKnn, LAMBDA, MIN_COUNT, TUNE, BOOST },
 };

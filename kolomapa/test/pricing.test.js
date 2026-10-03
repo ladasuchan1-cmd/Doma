@@ -257,3 +257,29 @@ test('trainModel: ukázková data se z učení vynechají, jakmile jsou v DB sku
   db.prepare('DELETE FROM listings WHERE id < 10000').run();
   assert.equal(pricing.trainModel(db, { config: {}, salesFile: '/neexistuje/prodeje.json' }).summary.bikes, 200);
 });
+
+test('dva stupně: od 1000 kol boosting nad zbytkovou chybou; inzeráty z dat nacení část modelu, která je neviděla', () => {
+  const rows = synthRows(1300, 21);
+  const I = pricing._internal;
+  const model = pricing.trainFromRows(rows, { sales: [] });
+  assert.ok(model.booster, 'boosting naučen');
+  assert.ok(model.summary.trees > 0);
+  const train = rows.map(pricing.normItem).filter((it) => I.trainable(it));
+  assert.equal(model.cross.foldOf.size, train.length);
+  assert.equal(model.cross.boostOf.size, train.length);
+  // cross-fitting: s ním odhad neopisuje vlastní cenu (chyba proti vlastní ceně je větší než u odhadu, který ji viděl)
+  const med = (a) => a.slice().sort((x, y) => x - y)[a.length >> 1];
+  const cross = [];
+  const self = [];
+  for (const it of train) {
+    cross.push(Math.abs(I.askingLog(model, it).lp - Math.log(it.price)));
+    self.push(Math.abs(I.askingLog(model, { ...it, id: null }).lp - Math.log(it.price)));
+  }
+  assert.ok(med(cross) > med(self), `cross ${med(cross)} × self ${med(self)}`);
+  // nový inzerát (neznámé id) jde přes celý model; odhad má rozpětí a vysvětlení
+  const e = pricing.estimate(model, { title: 'Specialized Stumpjumper Comp 2021', bike_type: 'mtb_full', is_bike: 1, price_czk: null, features: { brand: 'Specialized', brandTier: 4, model: 'Stumpjumper Comp', modelYear: 2021, ageYears: 5 } });
+  assert.ok(e.estCzk > 0 && e.low < e.estCzk && e.high > e.estCzk);
+  assert.ok(e.factors.every((f) => typeof f === 'string'));
+  // pod 1000 kol (málo odložených odhadů) se boosting neučí
+  assert.equal(pricing.trainFromRows(synthRows(420, 5), { sales: [] }).booster, null);
+});
