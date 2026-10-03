@@ -1,0 +1,17 @@
+{
+  "name": "cyklo-ski-mapa",
+  "version": "0.1.0",
+  "description": "Interaktivní mapa ČR (kraje → okresy) s cyklotrasami, sjezdovkami a ubytováním, půjčovnami a infocentry v jejich okolí – obchodní nástroj pro oslovování provozovatelů.",
+  "private": true,
+  "type": "commonjs",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "start": "node server.js",
+    "build-data": "node tools/build-data.js",
+    "enrich": "node tools/enrich-web.js",
+    "test": "node --test \"test/**/*.test.js\""
+  },
+  "license": "MIT"
+}

@@ -1,0 +1,30 @@
+# Testy aplikace Cyklo & Ski mapa (složka cyklo-ski-mapa/).
+name: Cyklo & Ski mapa
+
+on:
+  push:
+    branches: ["**"]
+    paths:
+      - "cyklo-ski-mapa/**"
+      - ".github/workflows/cyklo-ski-mapa.yml"
+  pull_request:
+    paths:
+      - "cyklo-ski-mapa/**"
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: cyklo-ski-mapa
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Jednotkové testy, server a konzistence dat
+        run: npm test

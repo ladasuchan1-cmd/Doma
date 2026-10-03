@@ -9,3 +9,5 @@ android/.idea/
 tools/android-typecheck/build/
 tools/android-typecheck/.gradle/
 tools/android-typecheck/.kotlin/
+cyklo-ski-mapa/cache/
+cyklo-ski-mapa/data/stav.json
