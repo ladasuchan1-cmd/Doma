@@ -26,6 +26,12 @@ i další dny). Mapa se naplní, až doběhne – do té doby je nahoře stav �
 neběží, stáhne se po příštím spuštění. Tlačítkem
 **Stáhnout teď** lze stahování spustit kdykoli ručně.
 
+## Na vlastním serveru s doménou (web s heslem)
+
+Na Linuxovém serveru (Ubuntu/Debian) poběží Kolomapa jako služba se stahováním i mapou na `https://vase-domena`
+s heslem a automatickým HTTPS certifikátem – jedním příkazem `sudo bash deploy/instalace.sh mapa.vasedomena.cz`.
+Celý postup (DNS, stažení kódu ze soukromého repozitáře, zálohy, aktualizace): [deploy/NASAZENI.md](deploy/NASAZENI.md).
+
 ## Windows – krok za krokem
 
 1. **Node.js:** na https://nodejs.org stáhněte verzi **LTS** (Windows Installer) a nainstalujte ji s výchozími volbami.
@@ -125,6 +131,7 @@ Ve Windows v souboru `nastaveni.txt` (řádky `KLÍČ=hodnota`), jinde i jako pr
 | `KOLOMAPA_PORT` | port | `8090` |
 | `KOLOMAPA_HOST` | `0.0.0.0` = přístupné z celé sítě (pak nastavte i heslo) | `127.0.0.1` |
 | `KOLOMAPA_PASSWORD` | heslo do aplikace (HTTP Basic) | – |
+| `KOLOMAPA_TRUST_PROXY` | `1` = za reverzní proxy na stejném serveru (Caddy, nginx) – viz [deploy/NASAZENI.md](deploy/NASAZENI.md) | `0` |
 | `KOLOMAPA_SOURCES` | zdroje, např. `bazos,cyklobazar` nebo `all` (proč jen Bazoš – viz [Zdroje](#zdroje-šetrnost-a-pravidla)) | `bazos` |
 | `KOLOMAPA_SCHEDULE` | čas denního běhu `HH:MM` (místní čas), `off` = vypnout | `05:30` |
 | `KOLOMAPA_RUN_ON_START` | `0` = po spuštění nestahovat (jinak stáhne, pokud dnes ještě nestahoval) | `1` |

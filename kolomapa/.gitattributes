@@ -1,3 +1,6 @@
 # Dávkové soubory a vzor nastavení pro Windows: vždy s CRLF (cmd.exe a starý Poznámkový blok s LF zlobí).
 *.cmd text eol=crlf
 nastaveni-vzor.txt text eol=crlf
+*.sh text eol=lf
+deploy/kolomapa.service text eol=lf
+deploy/Caddyfile text eol=lf

@@ -10,6 +10,8 @@
 //   PORT / KOLOMAPA_PORT        port HTTP serveru (výchozí 8090)
 //   KOLOMAPA_HOST               adresa pro naslouchání (výchozí 127.0.0.1 – jen tento počítač; 0.0.0.0 = celá síť)
 //   KOLOMAPA_ALLOWED_HOSTS      další jména serveru povolená bez hesla (čte server.js; ochrana proti DNS rebinding)
+//   KOLOMAPA_TRUST_PROXY        1 = Kolomapa běží za reverzní proxy na stejném serveru (Caddy, nginx): adresa
+//                               návštěvníka pro ochranu proti hádání hesla se bere z X-Forwarded-For (výchozí 0)
 //   KOLOMAPA_DB                 soubor databáze (výchozí <projekt>/data/kolomapa.db; ':memory:' pro testy)
 //   KOLOMAPA_PUBLIC_DIR         adresář s UI (výchozí <projekt>/public)
 //   KOLOMAPA_SOURCES            zapnuté zdroje, čárkou (výchozí jen bazos – jediný web, jehož robots.txt potřebné stránky
@@ -67,6 +69,7 @@ const KNOWN_KEYS = new Set([
   'KOLOMAPA_PORT',
   'KOLOMAPA_HOST',
   'KOLOMAPA_ALLOWED_HOSTS',
+  'KOLOMAPA_TRUST_PROXY',
   'KOLOMAPA_DB',
   'KOLOMAPA_PUBLIC_DIR',
   'KOLOMAPA_STATIC_DIR',
@@ -391,6 +394,7 @@ function loadConfig(env = process.env) {
     publicDir: dir('KOLOMAPA_PUBLIC_DIR', path.join(PROJECT_DIR, 'public')),
     staticDir: dir('KOLOMAPA_STATIC_DIR', path.join(PROJECT_DIR, 'dist')),
     exportAfterRun: bool('KOLOMAPA_EXPORT_AFTER_RUN', false),
+    trustProxy: bool('KOLOMAPA_TRUST_PROXY', false),
     staticInternal: bool('KOLOMAPA_STATIC_INTERNAL', false),
     // heslo se neořezává – mezery na začátku/konci jsou jeho součástí (jen prázdné = bez hesla)
     password: env.KOLOMAPA_PASSWORD != null && String(env.KOLOMAPA_PASSWORD) !== '' ? String(env.KOLOMAPA_PASSWORD) : null,

@@ -12,7 +12,10 @@
 //                                  bez preflightu, který server nepovolí) a odmítá Sec-Fetch-Site ≠ same-origin.
 //
 // Volitelné heslo (config.password, KOLOMAPA_PASSWORD) → HTTP Basic, jméno libovolné, porovnání v konstantním čase,
-// po AUTH_MAX_FAILS špatných pokusech z jedné IP adresy 429 na AUTH_WINDOW_MS (hádání hesla v síti).
+// po AUTH_MAX_FAILS špatných pokusech z jedné IP adresy 429 na AUTH_WINDOW_MS (hádání hesla v síti). Za reverzní proxy
+// na stejném serveru (Caddy, nginx) přicházejí všechny požadavky z 127.0.0.1 → s config.trustProxy
+// (KOLOMAPA_TRUST_PROXY=1) se adresa návštěvníka bere z poslední položky X-Forwarded-For, jinak by jeden útočník
+// zablokoval všechny.
 // Bez hesla server přijímá jen hlavičku Host s IP adresou, localhost, jednoslovným jménem nebo neveřejnou doménou
 // (.local, .lan, .home.arpa …) či jménem z config.allowedHosts (KOLOMAPA_ALLOWED_HOSTS) – ochrana proti DNS rebinding
 // (cizí web by jinak přes vlastní doménu přeloženou na 127.0.0.1 četl data a spouštěl stahování).
@@ -161,6 +164,29 @@ function checkBasicAuth(header, password) {
   // porovnat vždy (i bez hlavičky), ať odpověď trvá stejně
   const ok = safeEqual(pass, password);
   return !!m && ok;
+}
+
+/** Adresa z tohoto počítače (127.0.0.0/8, ::1, IPv4 mapovaná do IPv6)? */
+function isLoopback(ip) {
+  const s = String(ip || '');
+  return s === '::1' || s.startsWith('127.') || s.startsWith('::ffff:127.');
+}
+
+/**
+ * IP adresa návštěvníka. S trustProxy a požadavkem z tohoto počítače (reverzní proxy na stejném serveru) poslední
+ * položka X-Forwarded-For – tu přidává proxy, předchozí si klient může vymyslet. Jinak adresa spojení.
+ * @param {import('node:http').IncomingMessage} req
+ * @param {boolean} trustProxy
+ */
+function clientIp(req, trustProxy) {
+  const peer = req.socket.remoteAddress || '';
+  if (!trustProxy || !isLoopback(peer)) return peer;
+  const list = String(req.headers['x-forwarded-for'] || '')
+    .split(',')
+    .map((x) => x.trim())
+    .filter(Boolean);
+  const last = list[list.length - 1];
+  return last && net.isIP(last) ? last : peer;
 }
 
 /** Jméno serveru z hlavičky Host (malými písmeny, bez portu, bez [] u IPv6 a koncové tečky); null = nesmyslná. */
@@ -485,7 +511,7 @@ function createApp({ db, config, log = defaultLog, runner = null, now: clock = (
         );
       }
       if (config.password) {
-        const ip = req.socket.remoteAddress || '';
+        const ip = clientIp(req, !!config.trustProxy);
         const now = Date.now();
         const blocked = authBlockedFor(ip, now);
         if (blocked > 0) {
@@ -537,6 +563,7 @@ function publicDirStatus(dir) {
 
 module.exports = {
   createApp,
+  clientIp,
   resolveStaticPath,
   checkBasicAuth,
   safeEqual,

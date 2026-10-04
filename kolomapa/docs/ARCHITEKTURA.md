@@ -15,6 +15,8 @@ kolomapa/
   tools/run.js              jednorázový běh (pro cron / Plánovač úloh / GitHub Actions); česká rada k chybám,
                             návratový kód 1 i když se nestáhl žádný web
   tools/export-static.js    statická verze mapy do dist/ (GitHub Pages apod.)
+  deploy/                   nasazení na vlastní Linux server: instalace.sh (služba systemd + Caddy/HTTPS + zálohy),
+                            aktualizovat.sh, šablony služby a proxy, návod NASAZENI.md
   tools/import-sales.js     import vlastních prodejů z POHODY (xlsx) → training/ + DB
   tools/build-geo.js        přegeneruje src/geo/data (GeoNames, ČÚZK)
   src/config.js             proměnné prostředí + nastaveni.txt; neplatné hodnoty → výchozí + české varování

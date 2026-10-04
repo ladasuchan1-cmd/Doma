@@ -1,0 +1,8 @@
+# Kolomapa za Caddy: HTTPS certifikát od Let's Encrypt se vyřídí a obnovuje sám.
+# Šablonu vyplní deploy/instalace.sh (doména a port Kolomapy).
+@DOMAIN@ {
+	reverse_proxy 127.0.0.1:@PORT@
+	header Strict-Transport-Security "max-age=31536000"
+	# vyhledávače a archivy na soukromou mapu nepouštět
+	header X-Robots-Tag "noindex, nofollow"
+}

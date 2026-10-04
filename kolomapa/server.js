@@ -169,6 +169,7 @@ async function main(argv) {
         '  KOLOMAPA_PASSWORD        heslo pro přístup (HTTP Basic)',
         '  KOLOMAPA_ALLOWED_HOSTS   bez hesla: další jména serveru (veřejná doména za proxy), čárkou; jinak jen IP,',
         '                           localhost, jméno počítače a .local/.lan … (ochrana proti DNS rebinding)',
+        '  KOLOMAPA_TRUST_PROXY     1 = za reverzní proxy na stejném serveru (adresa návštěvníka z X-Forwarded-For)',
         '  KOLOMAPA_SCHEDULE        čas denního běhu HH:MM nebo off (výchozí 05:30)',
         '  KOLOMAPA_RUN_ON_START    1/0 – stáhnout po startu, pokud dnes ještě neproběhlo (výchozí 1)',
       ].join('\n')

@@ -47,9 +47,9 @@ function rawTcp(port, text) {
   });
 }
 
-async function startApp({ password = null, allowedHosts, db: givenDb, runFn, now } = {}) {
+async function startApp({ password = null, allowedHosts, db: givenDb, runFn, now, trustProxy = false } = {}) {
   const { db } = givenDb ? { db: givenDb } : sampleDb();
-  const config = { ...loadConfig({}), dbFile: ':memory:', publicDir: PUBLIC_DIR, password, ...(allowedHosts ? { allowedHosts } : {}) };
+  const config = { ...loadConfig({}), dbFile: ':memory:', publicDir: PUBLIC_DIR, password, trustProxy, ...(allowedHosts ? { allowedHosts } : {}) };
   const runner = createRunner({ db, config, log, runFn: runFn || (async () => ({ status: 'ok' })) });
   const server = http.createServer(createApp({ db, config, log, runner, ...(now ? { now } : {}) }));
   await new Promise((r) => server.listen(0, '127.0.0.1', r));
@@ -149,6 +149,44 @@ test('heslo: po AUTH_MAX_FAILS špatných pokusech z jedné IP 429 (i se správn
   } finally {
     await s.close();
   }
+});
+
+test('za reverzní proxy (KOLOMAPA_TRUST_PROXY): hádání hesla zablokuje jen adresu útočníka z X-Forwarded-For', async () => {
+  const auth = (p) => ({ Authorization: 'Basic ' + Buffer.from(`x:${p}`).toString('base64') });
+  const via = (ip, p) => ({ ...auth(p), 'X-Forwarded-For': ip });
+  {
+    const s = await startApp({ password: 'spravne-heslo', trustProxy: true });
+    try {
+      // podvržená první položka nepomůže – rozhoduje poslední (přidává ji proxy)
+      for (let i = 0; i < AUTH_MAX_FAILS; i++) assert.equal((await raw(s.port, 'GET', '/data/summary.json', via(`10.9.9.${i}, 203.0.113.7`, `spatne-${i}`))).status, 401);
+      assert.equal((await raw(s.port, 'GET', '/data/summary.json', via('203.0.113.7', 'spravne-heslo'))).status, 429, 'útočník blokován');
+      assert.equal((await raw(s.port, 'GET', '/data/summary.json', via('198.51.100.20', 'spravne-heslo'))).status, 200, 'majitel se přihlásí');
+    } finally {
+      await s.close();
+    }
+  }
+  {
+    // bez KOLOMAPA_TRUST_PROXY se hlavička ignoruje (jinak by si ji útočník přímo na port volil sám)
+    const s = await startApp({ password: 'spravne-heslo' });
+    try {
+      for (let i = 0; i < AUTH_MAX_FAILS; i++) await raw(s.port, 'GET', '/data/summary.json', via(`203.0.113.${i}`, `spatne-${i}`));
+      assert.equal((await raw(s.port, 'GET', '/data/summary.json', via('198.51.100.20', 'spravne-heslo'))).status, 429);
+    } finally {
+      await s.close();
+    }
+  }
+});
+
+test('clientIp: X-Forwarded-For jen od proxy na stejném počítači, jen platná IP', () => {
+  const { clientIp } = require('../src/server/http');
+  const req = (remoteAddress, xff) => ({ socket: { remoteAddress }, headers: xff == null ? {} : { 'x-forwarded-for': xff } });
+  assert.equal(clientIp(req('127.0.0.1', '1.2.3.4'), true), '1.2.3.4');
+  assert.equal(clientIp(req('::ffff:127.0.0.1', '9.9.9.9, 1.2.3.4'), true), '1.2.3.4');
+  assert.equal(clientIp(req('::1', '2001:db8::1'), true), '2001:db8::1');
+  assert.equal(clientIp(req('192.0.2.5', '1.2.3.4'), true), '192.0.2.5', 'přímé spojení z internetu: hlavičce nevěřit');
+  assert.equal(clientIp(req('127.0.0.1', 'nesmysl'), true), '127.0.0.1');
+  assert.equal(clientIp(req('127.0.0.1'), true), '127.0.0.1');
+  assert.equal(clientIp(req('127.0.0.1', '1.2.3.4'), false), '127.0.0.1');
 });
 
 test('401 na HEAD bez těla; 413 pro velké tělo požadavku', async () => {

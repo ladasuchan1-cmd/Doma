@@ -1,0 +1,37 @@
+# Kolomapa jako služba systemd – šablonu vyplní deploy/instalace.sh (složka s kódem a cesta k Node.js).
+# Server s mapou + denní stahování (plánovač běží uvnitř). Nastavení: nastaveni.txt ve složce kolomapa.
+[Unit]
+Description=Kolomapa – mapa inzerátů kol
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=kolomapa
+Group=kolomapa
+WorkingDirectory=@APP_DIR@
+# Plánovač počítá s místním časem obchodu (denní stahování v 05:30 pražského času).
+Environment=TZ=Europe/Prague
+Environment=HOME=/var/lib/kolomapa
+ExecStart=@NODE@ --disable-warning=ExperimentalWarning @APP_DIR@/server.js
+Restart=on-failure
+RestartSec=10
+# Server po SIGTERM dokončí rozepsané zápisy a zavře databázi.
+TimeoutStopSec=60
+
+# Zabezpečení: kód jen pro čtení, zapisovat smí jen do databáze, trénovacích dat a domovské složky.
+StateDirectory=kolomapa
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+PrivateDevices=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+LockPersonality=true
+ReadWritePaths=@APP_DIR@/data @APP_DIR@/training
+
+[Install]
+WantedBy=multi-user.target
