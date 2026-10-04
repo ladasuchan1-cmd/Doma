@@ -1,9 +1,76 @@
 # Nasazení Cyklo & Ski mapy jako webu
 
 Aplikace je jeden Node.js proces (`server.js`): servíruje stránku, hlídá **přihlášení** a ukládá
-sdílený **stav oslovení** do `stav.json`. Před něj patří **Caddy** (HTTPS). Postup je stejný jako
-u R01 Sales (Docker kontejner + systémová Caddy + `deploy.sh` s cestou zpět), takže se na serveru
-Koloshopu chová stejně jako `sales.report`. Níže jsou tři varianty – vyberte podle serveru.
+sdílený **stav oslovení** do `stav.json`. Před něj patří **Caddy** (HTTPS). Varianty podle serveru:
+**Hetzner** (nebo jiný VPS s veřejnou adresou – doporučeno, níže), interní server Koloshopu se
+systémovou Caddy (varianta B) a běh bez Dockeru (varianta C).
+
+## Hetzner – postup od nuly (≈ 20 minut)
+
+Potřebujete: účet na [Hetzner Cloud](https://console.hetzner.cloud/), doménu (nebo subdoménu) a
+SSH klíč na svém počítači. Vše běží v Dockeru přes `deploy/docker-compose.yml`: kontejner aplikace
++ kontejner Caddy, který si sám vystaví certifikát z Let's Encrypt. Skript `deploy/hetzner.sh` dělá
+instalaci, aktualizace, zálohy i návrat zpět.
+
+**1. Server.** Hetzner Cloud → *Add Server*: lokace Norimberk nebo Falkenstein, image **Ubuntu 24.04**,
+typ **CX22** (2 vCPU, 4 GB; stačí i nejmenší – aplikace potřebuje ~150 MB RAM), váš **SSH klíč**,
+**Firewall** s pravidly příchozí TCP 22, 80, 443 a UDP 443, zapnuté **Backups** (7 % ceny, denní snapshot).
+Do pole **Cloud config** vložte obsah `deploy/hetzner-cloud-init.yml` – server si sám nainstaluje Docker,
+nastaví firewall a stáhne repozitář. (Bez cloud‑initu to udělá krok 3.)
+
+**2. DNS.** U registrátora domény přidejte **A záznam** `mapa` (nebo jiné jméno) → IPv4 serveru
+a **AAAA záznam** → IPv6 serveru (Hetzner ji dává zdarma; když AAAA nedáte, nic se neděje). Ověřte
+`ping mapa.vase-domena.cz`. Než se DNS rozšíří, Caddy certifikát nedostane – proto DNS dřív než krok 3.
+
+**3. Instalace.**
+
+```bash
+ssh root@IP_SERVERU
+apt-get install -y git && git clone https://github.com/ladasuchan1-cmd/Doma.git /opt/Doma   # (přeskočit, když klonoval cloud-init)
+bash /opt/Doma/cyklo-ski-mapa/deploy/hetzner.sh instalace mapa.vase-domena.cz
+```
+
+Skript doinstaluje Docker, zeptá se na **uživatele a hesla** (`jmeno:heslo;jmeno2:heslo2`; Enter =
+jedno náhodné heslo pro uživatele „tým“), zapíše `deploy/.env`, postaví a spustí aplikaci i Caddy a počká,
+až `https://mapa.vase-domena.cz/api/health` odpoví. Pak otevřete adresu v prohlížeči a přihlaste se.
+
+> Pokud aplikace zatím není v hlavní větvi repa, klonujte větev, kde je:
+> `git clone -b NAZEV_VETVE https://github.com/ladasuchan1-cmd/Doma.git /opt/Doma`.
+> Aktualizace pak sledují tuto větev, dokud ji na serveru nepřepnete (`git -C /opt/Doma checkout main`).
+
+**4. Zálohy a provoz.**
+
+```bash
+bash /opt/Doma/cyklo-ski-mapa/deploy/hetzner.sh zaloha --cron   # denní kopie stav.json do /opt/zalohy-cyklo-ski-mapa (60 posledních)
+bash /opt/Doma/cyklo-ski-mapa/deploy/hetzner.sh stav            # kontejnery, health, disk
+bash /opt/Doma/cyklo-ski-mapa/deploy/hetzner.sh log             # živý log
+bash /opt/Doma/cyklo-ski-mapa/deploy/hetzner.sh aktualizace     # nový kód z GitHubu → build → výměna (při chybě vrátí předchozí)
+bash /opt/Doma/cyklo-ski-mapa/deploy/hetzner.sh zpet            # ruční návrat k předchozí verzi
+```
+
+Uživatele měníte v `/opt/Doma/cyklo-ski-mapa/deploy/.env` (`CSM_USERS=…`) a `docker compose -f … up -d`
+(nebo `hetzner.sh aktualizace`). Stav oslovení žije v Docker svazku `deploy_data`; záloha je obyčejný JSON,
+obnova = `docker compose cp zaloha.json app:/data/stav.json && docker compose restart app`.
+
+**5. Automatické nasazení z GitHubu** (volitelné, doporučené): po každém pushi do hlavní větve, který se
+dotkne složky `cyklo-ski-mapa/`, proběhnou testy a pak se přes SSH na serveru spustí `hetzner.sh aktualizace`.
+
+1. Na svém počítači vytvořte klíč jen pro nasazení: `ssh-keygen -t ed25519 -f ~/.ssh/csm-deploy -N ""`
+   a veřejnou část přidejte na server: `ssh-copy-id -i ~/.ssh/csm-deploy.pub root@IP_SERVERU`.
+2. GitHub → repo **Doma** → Settings → Secrets and variables → Actions:
+   - **Secrets**: `HETZNER_HOST` = IP nebo doména serveru, `HETZNER_SSH_KEY` = obsah souboru `~/.ssh/csm-deploy`
+     (soukromý klíč, celý včetně hlaviček), volitelně `HETZNER_USER` (výchozí `root`) a `HETZNER_PORT` (22).
+   - **Variables**: `CSM_HETZNER` = `1` (zapíná job), volitelně `CSM_HETZNER_DIR` (výchozí `/opt/Doma/cyklo-ski-mapa`).
+3. Ruční spuštění: Actions → „Cyklo & Ski mapa“ → Run workflow (hlavní větev). Výsledek je vidět v logu jobu
+   `deploy-hetzner` včetně výstupu `/api/health` s verzí.
+
+**Když Caddy nedostane certifikát** (`hetzner.sh log` hlásí ACME chyby): DNS ještě nemíří na server, nebo
+nejsou otevřené porty 80/443 (Hetzner Firewall i `ufw status`). Po opravě Caddy zkouší dál sama.
+
+**Starý Hetzner s Caddy v kontejneru** (síť `web`, `/root/Caddyfile`): použijte
+`CSM_COMPOSE=docker-compose.caddy-externi.yml bash hetzner.sh instalace mapa.vase-domena.cz` a do Caddyfile
+přidejte blok z `deploy/Caddyfile.externi-blok` (`reverse_proxy cyklo-ski-mapa:8090`), pak
+`docker exec caddy caddy reload --config /etc/caddy/Caddyfile`.
 
 | Co | Kde (výchozí, lze přebít proměnnými `CSM_*`) |
 |---|---|
@@ -21,7 +88,7 @@ Koloshopu chová stejně jako `sales.report`. Níže jsou tři varianty – vybe
    u každé změny stavu se pak ukládá, **kdo** ji udělal. Nebo jedno společné `CSM_PASSWORD`.
    Bez hesla server při startu vygeneruje náhodné a `deploy.sh` nasazení odmítne.
 
-## A. Server Koloshopu (Docker + systémová Caddy) – doporučeno
+## B. Server Koloshopu (Docker + systémová Caddy)
 
 ```bash
 ssh suchan@172.18.9.31
@@ -77,18 +144,18 @@ které doporučuji.
 
 Runner staví ze svého workspace, takže `.env` i data zůstávají jen v `/home/suchan/cyklo-ski-mapa-data`.
 
-## B. Vlastní VPS s veřejnou doménou (Docker Compose + Caddy v kontejneru)
+## Ručně přes Docker Compose (bez hetzner.sh)
 
-Když na serveru Caddy ještě není. Certifikát z Let's Encrypt si Caddy vystaví sám (porty 80 a 443 otevřené).
+Totéž, co dělá `hetzner.sh`, ručně – na libovolném VPS:
 
 ```bash
-git clone https://github.com/ladasuchan1-cmd/Doma.git && cd Doma/cyklo-ski-mapa/deploy
-cp ../.env.example .env && nano .env            # CSM_USERS=…
-DOMAIN=mapa.vase-domena.cz docker compose up -d --build
+git clone https://github.com/ladasuchan1-cmd/Doma.git /opt/Doma && cd /opt/Doma/cyklo-ski-mapa/deploy
+cp ../.env.example .env && nano .env            # CSM_USERS=…  a přidat řádek DOMAIN=mapa.vase-domena.cz
+docker compose up -d --build
 docker compose logs -f app                      # „Cyklo & Ski mapa běží…, uživatelé: …“
 ```
 
-Aktualizace: `git pull && DOMAIN=… docker compose up -d --build`. Stav oslovení je ve svazku `deploy_data`
+Aktualizace: `git pull && docker compose up -d --build`. Stav oslovení je ve svazku `deploy_data`
 (`docker compose cp app:/data/stav.json ./zaloha.json` pro zálohu).
 
 ## C. Bez Dockeru (Node.js 22+ a systemd)

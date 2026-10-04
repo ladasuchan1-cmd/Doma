@@ -1,0 +1,31 @@
+# Varianta pro server, kde už běží Caddy jako KONTEJNER v Docker síti `web` (původní rozložení na Hetzneru:
+# kontejner `caddy`, Caddyfile v /root/Caddyfile). Spustí jen aplikaci, připojí ji do sítě `web` a nic
+# nepublikuje – Caddy se na ni odkazuje jménem kontejneru. Blok pro Caddyfile: deploy/Caddyfile.externi-blok.
+#
+#   cd /opt/Doma/cyklo-ski-mapa/deploy && cp ../.env.example .env   # vyplnit CSM_USERS
+#   CSM_COMPOSE=docker-compose.caddy-externi.yml bash hetzner.sh instalace mapa.vase-domena.cz
+#   (nebo přímo: docker compose -f docker-compose.caddy-externi.yml up -d --build)
+services:
+  app:
+    build:
+      context: ..
+      args:
+        APP_VERSION: ${APP_VERSION:-compose}
+    image: cyklo-ski-mapa:latest
+    container_name: cyklo-ski-mapa
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      CSM_STAV: /data/stav.json
+      CSM_TRUST_PROXY: "1"
+    volumes:
+      - data:/data
+    networks:
+      - web
+
+volumes:
+  data:
+
+networks:
+  web:
+    external: true

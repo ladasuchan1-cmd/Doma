@@ -41,8 +41,9 @@ Aplikace otevřená přes server vyžaduje přihlášení, sloučí lokální a 
 i se jménem, kdo ji udělal; ostatní ji uvidí po obnovení stránky. Proměnné popisuje `.env.example`
 (`CSM_USERS` / `CSM_PASSWORD`, `CSM_SESSION_DAYS`, `CSM_TRUST_PROXY`, `CSM_TOKEN`, `CSM_SECRET`, `CSM_STAV`, `PORT`).
 
-**Nasazení jako web** (Docker + Caddy, server Koloshopu nebo VPS s veřejnou doménou, automatické nasazení
-z GitHubu, měsíční obnova dat) popisuje **[NASAZENI.md](NASAZENI.md)**.
+**Nasazení jako web** popisuje **[NASAZENI.md](NASAZENI.md)**: Hetzner (Docker Compose + Caddy s automatickým
+HTTPS, skript `deploy/hetzner.sh` pro instalaci, aktualizace, zálohy a návrat zpět, nasazení z GitHubu přes SSH),
+interní server Koloshopu se systémovou Caddy, nebo běh bez Dockeru; měsíční obnova dat.
 
 ## Ovládání
 
@@ -98,7 +99,7 @@ lib/stav.js                      model stavu oslovení (sloučení, import/expor
 tools/build-data.js              sestavení dat (tools/lib/sources.js = dotazy a URL zdrojů, tools/lib/data-io.js = formát data/*.js)
 tools/enrich-web.js              obohacení z webů + ARES
 server.js                        web: přihlášení, statika (gzip, CSP), API /api/stav (sdílený stav v data/stav.json)
-Dockerfile, deploy.sh, deploy/   kontejner, nasazení s cestou zpět, Caddy, docker-compose, systemd (viz NASAZENI.md)
+Dockerfile, deploy.sh, deploy/   kontejner, nasazení s cestou zpět, Caddy, docker-compose, hetzner.sh, cloud-init, systemd (viz NASAZENI.md)
 data/                            vygenerovaná data (hranice, mista, trasy, ski, enrich, meta)
 vendor/                          Leaflet 1.9.4, Leaflet.markercluster 1.5.3
 test/                            node --test

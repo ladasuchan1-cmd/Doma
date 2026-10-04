@@ -1,0 +1,12 @@
+# Blok pro Caddy běžící v KONTEJNERU `caddy` ve stejné Docker síti `web` (docker-compose.caddy-externi.yml).
+# Přidejte do Caddyfile (na starém Hetzneru /root/Caddyfile), DOMENU nahraďte a Caddy znovu načtěte:
+#   docker exec caddy caddy reload --config /etc/caddy/Caddyfile     (nebo: docker restart caddy)
+# Certifikát z Let's Encrypt si Caddy vystaví sám – DNS domény musí mířit na server.
+DOMENA {
+	encode zstd gzip
+	reverse_proxy cyklo-ski-mapa:8090
+	header {
+		Strict-Transport-Security "max-age=31536000"
+		-Server
+	}
+}

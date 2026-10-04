@@ -2,9 +2,13 @@
 #
 # Testy běží na každém pushi a PR, který se složky dotkne. Nasazení běží jen po pushi do hlavní
 # větve repa (default branch – dnes `claude/terms-reader-app-dl4h8h`, po případném přejmenování `main`)
-# a jen když je v repu nastavená proměnná (Settings → Secrets and variables → Actions → Variables)
-# CSM_DEPLOY = 1 – bez ní by job čekal na runner, který neexistuje. Nasazuje self-hosted runner
-# na serveru s labelem `cyklo-ski-mapa` (registrace: cyklo-ski-mapa/NASAZENI.md), který spustí deploy.sh.
+# a jen když je zapnuté proměnnou repa (Settings → Secrets and variables → Actions → Variables):
+#   CSM_HETZNER = 1  → job `deploy-hetzner`: přes SSH spustí na serveru deploy/hetzner.sh aktualizace
+#                      (secrets HETZNER_HOST, HETZNER_SSH_KEY, volitelně HETZNER_USER, HETZNER_PORT;
+#                       variable CSM_HETZNER_DIR, výchozí /opt/Doma/cyklo-ski-mapa)
+#   CSM_DEPLOY = 1   → job `deploy`: self-hosted runner na serveru s labelem `cyklo-ski-mapa` spustí deploy.sh
+#                      (server bez veřejné adresy, jako u R01 Sales)
+# Bez proměnných by joby čekaly na neexistující runner / padaly na chybějících secrets. Postup: cyklo-ski-mapa/NASAZENI.md.
 name: Cyklo & Ski mapa
 
 on:
@@ -39,6 +43,31 @@ jobs:
       - name: Jednotkové testy, server a konzistence dat
         run: npm test
 
+  # Hetzner / jakýkoli VPS s veřejnou adresou: nasazení přes SSH z runneru GitHubu.
+  deploy-hetzner:
+    needs: test
+    if: github.event_name != 'pull_request' && github.ref_name == github.event.repository.default_branch && vars.CSM_HETZNER == '1'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Nasazení přes SSH (hetzner.sh aktualizace)
+        env:
+          HOST: ${{ secrets.HETZNER_HOST }}
+          USER: ${{ secrets.HETZNER_USER }}
+          PORT: ${{ secrets.HETZNER_PORT }}
+          KEY: ${{ secrets.HETZNER_SSH_KEY }}
+          DIR: ${{ vars.CSM_HETZNER_DIR }}
+        run: |
+          test -n "$HOST" || { echo "Chybí secret HETZNER_HOST"; exit 1; }
+          test -n "$KEY" || { echo "Chybí secret HETZNER_SSH_KEY"; exit 1; }
+          mkdir -p ~/.ssh
+          printf '%s\n' "$KEY" > ~/.ssh/id_deploy
+          chmod 600 ~/.ssh/id_deploy
+          ssh-keyscan -p "${PORT:-22}" -H "$HOST" >> ~/.ssh/known_hosts 2>/dev/null
+          ssh -i ~/.ssh/id_deploy -p "${PORT:-22}" -o StrictHostKeyChecking=yes "${USER:-root}@$HOST" \
+            "bash '${DIR:-/opt/Doma/cyklo-ski-mapa}/deploy/hetzner.sh' aktualizace"
+
+  # Interní server bez veřejné adresy (self-hosted runner), jako u R01 Sales.
   deploy:
     needs: test
     if: github.event_name != 'pull_request' && github.ref_name == github.event.repository.default_branch && vars.CSM_DEPLOY == '1'
