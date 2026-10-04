@@ -138,7 +138,7 @@
     sort: 'nazev',
     listLimit: 150,
     tableSort: { key: 'nazev', dir: 1 },
-    server: { on: false, url: 'api/stav' },
+    server: { on: false, url: 'api/stav', user: '' },
     saveTimers: new Map(),
   };
 
@@ -165,7 +165,19 @@
     if (location.protocol === 'file:') return;
     try {
       const res = await fetch(state.server.url, { signal: AbortSignal.timeout(4000) });
+      if (res.status === 401) {
+        location.href = 'login?next=' + encodeURIComponent(location.pathname + location.search + location.hash);
+        return;
+      }
       if (!res.ok) return;
+      try {
+        const me = await (await fetch('api/me', { signal: AbortSignal.timeout(4000) })).json();
+        if (me && me.prihlaseni && me.jmeno) {
+          state.server.user = me.jmeno;
+          $('#user-name').textContent = me.jmeno;
+          $('#user-box').classList.remove('hidden');
+        }
+      } catch (_e) { /* bez přihlášení */ }
       const json = await res.json();
       const remote = stavLib.importJson(json).stav || {};
       const merged = stavLib.merge(state.stav, remote);
@@ -185,7 +197,15 @@
   async function pushRecord(id, rec) {
     if (!state.server.on) return;
     try {
-      await fetch(state.server.url + '/' + encodeURIComponent(id), { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(rec) });
+      const res = await fetch(state.server.url + '/' + encodeURIComponent(id), { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(rec) });
+      if (res.status === 401) {
+        toast('Přihlášení vypršelo – obnovte stránku a přihlaste se.');
+        return;
+      }
+      if (res.ok && state.stav[id]) {
+        const j = await res.json().catch(() => null);
+        if (j && j.kdo) state.stav[id].kdo = j.kdo;
+      }
     } catch (_e) {
       toast('Server nedostupný – změna je zatím jen v tomto prohlížeči.');
     }
@@ -1051,7 +1071,7 @@
       <div class="field"><label>Telefon</label><input class="input" data-pole="telefon" value="${esc(r.telefon)}" placeholder="${esc(ef.telefon || '')}"></div>
       <div class="field"><label>E-mail</label><input class="input" data-pole="email" value="${esc(r.email)}" placeholder="${esc(ef.email || '')}"></div>
       <div class="field"><label>Web</label><input class="input" data-pole="web" value="${esc(r.web)}" placeholder="${esc(ef.web || '')}"><span class="hint">Šedě předvyplněné hodnoty jsou z dat (OSM / web); vlastní zápis má přednost.</span></div>
-      <div class="row between"><span class="saved" id="saved">${r.upraveno ? 'Uloženo ' + esc(fmtDateTime(r.upraveno)) : ''}</span>${stavLib.isEmpty(r) ? '' : '<button type="button" class="btn btn-sm btn-ghost" id="crm-clear">Smazat záznam</button>'}</div>`;
+      <div class="row between"><span class="saved" id="saved">${r.upraveno ? 'Uloženo ' + esc(fmtDateTime(r.upraveno)) + (r.kdo ? ' · ' + esc(r.kdo) : '') : ''}</span>${stavLib.isEmpty(r) ? '' : '<button type="button" class="btn btn-sm btn-ghost" id="crm-clear">Smazat záznam</button>'}</div>`;
   }
   function bindCrmForm(root, id, m, en) {
     root.querySelectorAll('[data-stav]').forEach((i) => i.addEventListener('change', () => {
@@ -1093,7 +1113,7 @@
   }
   function markSaved(root) {
     const el = $('#saved', root);
-    if (el) el.textContent = 'Uloženo ' + fmtDateTime(new Date().toISOString());
+    if (el) el.textContent = 'Uloženo ' + fmtDateTime(new Date().toISOString()) + (state.server.user ? ' · ' + state.server.user : '');
   }
 
   function renderTrasaDetail(root, t) {
@@ -1173,6 +1193,8 @@
     { key: 'skiKm', label: 'km od skiareálu', get: (m) => (m.blizko.ski[0] ? (m.blizko.ski[0][1] / 1000).toFixed(1).replace('.', ',') : ''), sortGet: (m) => (m.blizko.ski[0] ? m.blizko.ski[0][1] : Infinity) },
     ...stavLib.STAVY.map((s) => ({ key: s.key, label: s.label, stav: true, get: (m) => (state.stav[m.id] && state.stav[m.id][s.key] ? 'ano' + (state.stav[m.id].datumy[s.key] ? ' (' + fmtDate(state.stav[m.id].datumy[s.key]) + ')' : '') : ''), sortGet: (m) => (state.stav[m.id] && state.stav[m.id][s.key] ? 0 : 1) })),
     { key: 'poznamka', label: 'Poznámka', get: (m) => (state.stav[m.id] ? state.stav[m.id].poznamka : ''), wrap: true },
+    { key: 'kdo', label: 'Upravil', get: (m) => (state.stav[m.id] ? state.stav[m.id].kdo || '' : '') },
+    { key: 'upraveno', label: 'Upraveno', get: (m) => (state.stav[m.id] && state.stav[m.id].upraveno ? fmtDateTime(state.stav[m.id].upraveno) : ''), sortGet: (m) => (state.stav[m.id] && state.stav[m.id].upraveno ? Date.parse(state.stav[m.id].upraveno) : 0) },
     { key: 'osm', label: 'OSM', get: (m) => 'https://www.openstreetmap.org/' + m.osm },
     { key: 'lat', label: 'Zem. šířka', get: (m) => String(m.lat) },
     { key: 'lon', label: 'Zem. délka', get: (m) => String(m.lon) },
@@ -1285,7 +1307,7 @@
         else if (arealById.has(id)) {
           const a = arealById.get(id);
           const r = state.stav[id];
-          data.push(COLUMNS.map((c) => (c.key === 'nazev' ? '⛷ ' + a.nazev : c.key === 'typ' ? 'Skiareál' : c.key === 'okres' ? okresName(a.okres) : c.key === 'kraj' ? krajName(a.kraj) : c.stav ? (r[c.key] ? 'ano' : '') : c.key === 'poznamka' ? r.poznamka : c.key === 'provozovatel' ? r.provozovatel || a.operator || '' : c.key === 'telefon' ? r.telefon || a.telefon || '' : c.key === 'email' ? r.email || a.email || '' : c.key === 'web' ? r.web || a.web[0] || '' : c.key === 'lat' ? String(a.lat) : c.key === 'lon' ? String(a.lon) : '')));
+          data.push(COLUMNS.map((c) => (c.key === 'nazev' ? '⛷ ' + a.nazev : c.key === 'typ' ? 'Skiareál' : c.key === 'okres' ? okresName(a.okres) : c.key === 'kraj' ? krajName(a.kraj) : c.stav ? (r[c.key] ? 'ano' : '') : c.key === 'poznamka' ? r.poznamka : c.key === 'kdo' ? r.kdo || '' : c.key === 'upraveno' ? (r.upraveno ? fmtDateTime(r.upraveno) : '') : c.key === 'provozovatel' ? r.provozovatel || a.operator || '' : c.key === 'telefon' ? r.telefon || a.telefon || '' : c.key === 'email' ? r.email || a.email || '' : c.key === 'web' ? r.web || a.web[0] || '' : c.key === 'lat' ? String(a.lat) : c.key === 'lon' ? String(a.lon) : '')));
         }
       }
       download(`stav-osloveni-${new Date().toISOString().slice(0, 10)}.csv`, csvLib.serialize(data), 'text/csv;charset=utf-8');

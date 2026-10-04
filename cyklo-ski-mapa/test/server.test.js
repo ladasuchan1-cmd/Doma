@@ -9,6 +9,7 @@ const path = require('node:path');
 const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'csm-stav-'));
 process.env.CSM_STAV = path.join(tmp, 'stav.json');
 process.env.CSM_TOKEN = '';
+process.env.CSM_AUTH = '0'; // přihlášení testuje server-auth.test.js
 const { server, writeStav, STAV_FILE } = require('../server.js');
 
 let base;
@@ -23,7 +24,7 @@ test.after(async () => {
 
 test('health a prázdný stav', async () => {
   const h = await (await fetch(base + '/api/health')).json();
-  assert.deepStrictEqual(h, { ok: true, zaznamu: 0 });
+  assert.deepStrictEqual({ ok: h.ok, zaznamu: h.zaznamu, zapis: h.zapis }, { ok: true, zaznamu: 0, zapis: true });
   const s = await (await fetch(base + '/api/stav')).json();
   assert.strictEqual(s.app, 'cyklo-ski-mapa');
   assert.deepStrictEqual(s.stav, {});
@@ -82,11 +83,13 @@ test('statické soubory a zakázané cesty', async () => {
   assert.strictEqual((await fetch(base + '/test/server.test.js')).status, 404);
   assert.strictEqual((await fetch(base + '/tools/build-data.js')).status, 404);
   assert.strictEqual((await fetch(base + '/.gitignore')).status, 404);
-  // %2e%2e normalizuje už URL parser na kořen → dostaneme package.json aplikace, nikdy nadřazený adresář
-  const pkg = await fetch(base + '/%2e%2e/package.json');
-  assert.strictEqual(pkg.status, 200);
-  assert.match(await pkg.text(), /"name": "cyklo-ski-mapa"/);
+  // %2e%2e normalizuje už URL parser na kořen; package.json, deploy.sh ani Dockerfile se neservírují
+  assert.strictEqual((await fetch(base + '/%2e%2e/package.json')).status, 404);
   assert.strictEqual((await fetch(base + '/..%2fpackage.json')).status, 404);
+  assert.strictEqual((await fetch(base + '/deploy.sh')).status, 404);
+  assert.strictEqual((await fetch(base + '/Dockerfile')).status, 404);
+  assert.strictEqual((await fetch(base + '/deploy/docker-compose.yml')).status, 404);
+  assert.strictEqual((await fetch(base + '/login', { redirect: 'manual' })).status, 302); // vypnuté přihlášení → zpět na /
   assert.strictEqual((await fetch(base + '/neexistuje.html')).status, 404);
   assert.strictEqual((await fetch(base + '/', { method: 'POST' })).status, 405);
 });

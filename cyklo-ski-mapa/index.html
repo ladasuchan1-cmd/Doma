@@ -29,6 +29,7 @@
         <button id="btn-export" class="btn" type="button" title="Export aktuálního výběru do CSV (Excel)">Export CSV</button>
         <button id="btn-stav" class="btn" type="button" title="Zálohovat / načíst stav oslovení">Stav oslovení</button>
         <button id="btn-theme" class="btn btn-icon" type="button" title="Tmavý / světlý režim" aria-label="Přepnout motiv">◐</button>
+        <span id="user-box" class="user-box hidden"><span id="user-name"></span><a href="logout" class="btn btn-sm btn-ghost" title="Odhlásit se">Odhlásit</a></span>
       </div>
     </header>
 
@@ -67,7 +68,7 @@
   <script src="data/ski.js"></script>
   <script src="data/trasy.js"></script>
   <script src="data/mista.js"></script>
-  <script src="data/enrich.js" onerror="window.CSM_DATA = window.CSM_DATA || {}; window.CSM_DATA.enrich = window.CSM_DATA.enrich || {};"></script>
+  <script src="data/enrich.js"></script>
   <script src="app.js"></script>
 </body>
 </html>

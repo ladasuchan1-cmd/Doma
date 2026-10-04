@@ -29,16 +29,20 @@ Nejjednodušší: otevřít `index.html` v prohlížeči (Chrome, Edge, Firefox)
 `vendor/`, internet je potřeba jen na mapové podklady. Stav oslovení se ukládá do úložiště prohlížeče (localStorage)
 – zálohu nebo přenos jinam uděláte tlačítkem **Stav oslovení** (JSON soubor, při načtení se záznamy sloučí).
 
-Pro **sdílení stavu v týmu** spusťte malý server (Node.js 22+, žádné závislosti):
+Pro **sdílení stavu v týmu a web na vlastní doméně** slouží `server.js` (Node.js 22+, žádné závislosti):
 
 ```bash
 cd cyklo-ski-mapa
-npm start                 # http://localhost:8090 – stav oslovení v data/stav.json
+CSM_USERS="lada:heslo;obchod:heslo2" npm start     # http://localhost:8090 – přihlášení, stav v data/stav.json
+CSM_AUTH=0 npm start                               # bez přihlášení (jen vývoj / vnitřní síť)
 ```
 
-Aplikace otevřená přes server pozná API, sloučí lokální a serverový stav a každou změnu posílá na server; ostatní
-ji uvidí po obnovení stránky. Proměnné: `PORT`, `CSM_STAV` (cesta k souboru se stavem), `CSM_TOKEN` (volitelný
-Bearer token pro externí skripty).
+Aplikace otevřená přes server vyžaduje přihlášení, sloučí lokální a serverový stav a každou změnu posílá na server
+i se jménem, kdo ji udělal; ostatní ji uvidí po obnovení stránky. Proměnné popisuje `.env.example`
+(`CSM_USERS` / `CSM_PASSWORD`, `CSM_SESSION_DAYS`, `CSM_TRUST_PROXY`, `CSM_TOKEN`, `CSM_SECRET`, `CSM_STAV`, `PORT`).
+
+**Nasazení jako web** (Docker + Caddy, server Koloshopu nebo VPS s veřejnou doménou, automatické nasazení
+z GitHubu, měsíční obnova dat) popisuje **[NASAZENI.md](NASAZENI.md)**.
 
 ## Ovládání
 
@@ -93,7 +97,8 @@ lib/contacts.js                  e-maily, telefony, IČO, provozovatel, zmínky 
 lib/stav.js                      model stavu oslovení (sloučení, import/export, efektivní kontakt)
 tools/build-data.js              sestavení dat (tools/lib/sources.js = dotazy a URL zdrojů, tools/lib/data-io.js = formát data/*.js)
 tools/enrich-web.js              obohacení z webů + ARES
-server.js                        statický server + API /api/stav (sdílený stav v data/stav.json)
+server.js                        web: přihlášení, statika (gzip, CSP), API /api/stav (sdílený stav v data/stav.json)
+Dockerfile, deploy.sh, deploy/   kontejner, nasazení s cestou zpět, Caddy, docker-compose, systemd (viz NASAZENI.md)
 data/                            vygenerovaná data (hranice, mista, trasy, ski, enrich, meta)
 vendor/                          Leaflet 1.9.4, Leaflet.markercluster 1.5.3
 test/                            node --test
@@ -108,5 +113,5 @@ npm test                      # jednotkové testy knihoven, serveru a konzistenc
 - Úplnost a aktuálnost odpovídá OpenStreetMap – u míst bez kontaktů v OSM pomůže projití webu (`npm run enrich`)
   nebo odkazy v detailu. Zhruba pětina webů se automaticky načíst nedá (blokují roboty, neexistují).
 - „Půjčovna“ u ubytování je známá jen tam, kde to OSM nebo web uvádí; jinak je stav „neznámo“ a dá se zadat ručně.
-- Statická varianta (file://) ukládá stav jen v daném prohlížeči – pro tým použijte `npm start` nebo pravidelně
-  sdílejte zálohu JSON.
+- Statická varianta (file://) ukládá stav jen v daném prohlížeči – pro tým použijte server (NASAZENI.md) nebo
+  pravidelně sdílejte zálohu JSON.

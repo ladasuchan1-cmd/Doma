@@ -1,0 +1,17 @@
+# Caddy pro docker-compose.yml (Caddy běží v kontejneru vedle aplikace).
+# Doména se bere z proměnné DOMAIN; certifikát z Let's Encrypt si Caddy vystaví sám
+# (DNS A záznam domény musí mířit na server a porty 80/443 musí být otevřené).
+{$DOMAIN} {
+	encode zstd gzip
+	reverse_proxy app:8090
+	header {
+		Strict-Transport-Security "max-age=31536000"
+		-Server
+	}
+	log {
+		output file /data/access.log {
+			roll_size 20mb
+			roll_keep 5
+		}
+	}
+}

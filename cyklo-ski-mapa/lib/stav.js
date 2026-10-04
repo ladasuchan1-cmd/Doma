@@ -19,7 +19,7 @@
   const VERZE = 1;
 
   function emptyRecord() {
-    const r = { poznamka: '', pujcovna: '', provozovatel: '', telefon: '', email: '', web: '', datumy: {}, upraveno: null };
+    const r = { poznamka: '', pujcovna: '', provozovatel: '', telefon: '', email: '', web: '', datumy: {}, upraveno: null, kdo: '' };
     for (const k of STAV_KEYS) r[k] = false;
     return r;
   }
@@ -44,6 +44,7 @@
       for (const k of STAV_KEYS) if (r[k] && typeof raw.datumy[k] === 'string') r.datumy[k] = raw.datumy[k].slice(0, 10);
     }
     r.upraveno = typeof raw.upraveno === 'string' && !Number.isNaN(Date.parse(raw.upraveno)) ? raw.upraveno : null;
+    r.kdo = raw.kdo == null ? '' : String(raw.kdo).slice(0, 60);
     return r;
   }
 

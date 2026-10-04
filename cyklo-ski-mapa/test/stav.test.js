@@ -24,6 +24,9 @@ test('normalizeRecord – zahodí neznámé klíče, srovná typy, ořízne dél
   assert.strictEqual(r.pujcovna, '');
   assert.deepStrictEqual(r.datumy, { kontaktovat: '2026-10-03' }); // datum jen u zaškrtnutého stavu
   assert.strictEqual(r.upraveno, null);
+  assert.strictEqual(r.kdo, '');
+  assert.strictEqual(stav.normalizeRecord({ kdo: 'Jana' }).kdo, 'Jana');
+  assert.strictEqual(stav.normalizeRecord({ kdo: 'x'.repeat(100) }).kdo.length, 60);
 });
 
 test('toggleStav a setPole zapisují datum a upraveno', () => {
