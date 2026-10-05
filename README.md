@@ -89,6 +89,13 @@ e-mail → voláno → osobní návštěva, poznámka). Stačí otevřít `cyklo
 Dokumentace: [shrnutí na 1 stránku](cyklo-ski-mapa/docs/SHRNUTI.md) · [manuál pro obchodní tým](cyklo-ski-mapa/docs/MANUAL.md)
 · [metodika dat](cyklo-ski-mapa/docs/METODIKA.md) · [nasazení a provoz](cyklo-ski-mapa/NASAZENI.md).
 
+## Další projekt v repozitáři: Půjčovna kol (plán)
+
+Složka [`pujcovna-kol/`](pujcovna-kol/README.md) obsahuje **plán a rešerše** pro web půjčovny kol s rezervačním
+systémem, rezervačním poplatkem, platbami kartou / převodem / QR, mapou cyklostezek a tipy v okolí, obchodními
+podmínkami a GDPR – jako šablonu ve třech designech pro více půjčoven. Zatím bez kódu:
+[plán](pujcovna-kol/PLAN.md) · [rešerše](pujcovna-kol/docs/vyzkum/).
+
 ## Licence
 
 MIT
