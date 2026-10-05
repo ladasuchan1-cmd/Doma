@@ -152,6 +152,7 @@ function compactListing(r) {
   put(o, 'ws', str(f.wheelSize));
   put(o, 'fs', str(f.frameSize));
   put(o, 'mat', str(f.material));
+  put(o, 'su', str(f.suspension)); // full | hardtail | rigid – filtr „Odpružení“ v mapě
   if (f.isEbike) o.eb = true;
   put(o, 'mo', str(f.motor));
   put(o, 'wh', round(f.batteryWh));

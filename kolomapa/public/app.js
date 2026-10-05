@@ -71,13 +71,54 @@
     ebike_kids: 'elektro dětské',
     other: 'jiné',
   };
-  const TYPE_GROUPS = [
-    { key: 'mtb', label: 'Horská', types: ['mtb_hardtail', 'mtb_full', 'dirt', 'fatbike'] },
-    { key: 'road', label: 'Silniční a gravel', types: ['road', 'gravel', 'cyclocross'] },
-    { key: 'ebike', label: 'Elektrokola', types: [] },
-    { key: 'kids', label: 'Dětská', types: ['kids', 'balance'] },
-    { key: 'trek', label: 'Trek, město, kros', types: ['trekking', 'cross', 'city', 'folding'] },
+  // Filtry podle typu: tři nezávislé rozměry odvozené z bike_type a vytěžených údajů – kategorie, pohon, odpružení –
+  // aby šlo zaškrtnout „horská“ + „celoodpružená“ + „elektrokola“ zároveň a libovolně kombinovat.
+  const CATEGORIES = [
+    { key: 'mtb', label: 'Horská', types: ['mtb_hardtail', 'mtb_full', 'ebike_mtb', 'ebike_mtb_full'] },
+    { key: 'road', label: 'Silniční', types: ['road', 'ebike_road'] },
+    { key: 'gravel', label: 'Gravel a cyklokros', types: ['gravel', 'cyclocross'] },
+    { key: 'trek', label: 'Trekingová a krosová', types: ['trekking', 'cross', 'ebike_trekking'] },
+    { key: 'city', label: 'Městská a skládací', types: ['city', 'folding', 'ebike_city'] },
+    { key: 'kids', label: 'Dětská', types: ['kids', 'balance', 'ebike_kids'] },
+    { key: 'bmx', label: 'BMX, dirt, fatbike', types: ['bmx', 'dirt', 'fatbike'] },
+    { key: 'cargo', label: 'Nákladní a tandem', types: ['cargo', 'tandem', 'ebike_cargo'] },
     { key: 'other', label: 'Ostatní', types: [] },
+  ];
+  const DRIVES = [
+    { key: 'classic', label: 'Klasická' },
+    { key: 'ebike', label: 'Elektrokola' },
+  ];
+  const SUSPENSIONS = [
+    { key: 'full', label: 'Celoodpružená' },
+    { key: 'hardtail', label: 'Přední odpružení' },
+    { key: 'rigid', label: 'Bez odpružení' },
+    { key: 'unknown', label: 'Neuvedeno' },
+  ];
+  const SUSP_LABEL = { full: 'celoodpružené', hardtail: 'přední odpružení (hardtail)', rigid: 'bez odpružení' };
+  // Značka motoru z vytěženého názvu („Bosch Performance CX“ → Bosch); jen u elektrokol. Obecný popis bez značky
+  // („středový motor“, „motor v náboji“) se počítá jako neuvedená značka.
+  const MOTOR_BRANDS = [
+    ['Bosch', /^bosch/i],
+    ['Shimano', /^shimano/i],
+    ['Yamaha', /^yamaha/i],
+    ['Specialized / Brose', /^(specialized|brose)/i],
+    ['Bafang', /^bafang/i],
+    ['Fazua', /^fazua/i],
+    ['TQ', /^tq/i],
+    ['Mahle', /^mahle/i],
+    ['Panasonic', /^panasonic/i],
+    ['DJI Avinox', /^dji/i],
+  ];
+  const MOTOR_OTHER = 'Jiná značka';
+  const MOTOR_UNKNOWN = 'Neuvedený';
+  const MOTOR_GENERIC = /^(středový motor|motor v náboji)$/;
+  // Stáří inzerátu v hodinách – podle data vložení na web; když ho web neuvádí, podle prvního nalezení Kolomapou
+  const AGES = [
+    { key: '24', label: '24 hodin' },
+    { key: '72', label: '3 dny' },
+    { key: '168', label: '7 dní' },
+    { key: '336', label: '14 dní' },
+    { key: '720', label: '30 dní' },
   ];
   const CONDITION = { new: 'nové', like_new: 'jako nové', very_good: 'velmi dobrý', good: 'dobrý', fair: 'opotřebené', poor: 'špatný', parts: 'na díly' };
   const MATERIAL = { carbon: 'karbon', alu: 'hliník', steel: 'ocel', titanium: 'titan' };
@@ -260,6 +301,26 @@
 
   // =========================================================================================== stav
 
+  // Filtry se pamatují (localStorage) – obchod si jednou zaškrtne, co prodává, a mapa to drží; hledaný text ne.
+  const SET_FILTERS = ['sourcesOff', 'cats', 'drive', 'susp', 'motors'];
+  const EMPTY_FILTERS = () => ({ q: '', sourcesOff: new Set(), cats: new Set(), drive: new Set(), susp: new Set(), motors: new Set(), age: '', min: '', max: '', deals: false, fresh: false });
+  function loadFilters() {
+    const f = EMPTY_FILTERS();
+    const saved = storage.get('filters', null);
+    if (!saved || typeof saved !== 'object') return f;
+    for (const k of SET_FILTERS) if (Array.isArray(saved[k])) f[k] = new Set(saved[k].filter((v) => typeof v === 'string'));
+    for (const k of ['age', 'min', 'max']) if (typeof saved[k] === 'string') f[k] = saved[k];
+    for (const k of ['deals', 'fresh']) if (typeof saved[k] === 'boolean') f[k] = saved[k];
+    return f;
+  }
+  function saveFilters() {
+    const f = state.filters;
+    const out = {};
+    for (const k of SET_FILTERS) out[k] = [...f[k]];
+    for (const k of ['age', 'min', 'max', 'deals', 'fresh']) out[k] = f[k];
+    storage.set('filters', out);
+  }
+
   const state = {
     summary: null,
     mode: 'static',
@@ -271,7 +332,7 @@
     byId: new Map(),
     filtered: [],
     shown: 0,
-    filters: { q: '', sourcesOff: new Set(), groups: new Set(), min: '', max: '', deals: false, fresh: false },
+    filters: loadFilters(),
     filtersOpen: storage.get('filtersOpen', false),
     sort: storage.get('sort', 'deal'),
     tab: storage.get('tab', 'deals'),
@@ -303,11 +364,23 @@
   const isNew = (l) => !!(l.f && state.summary && l.f >= state.summary.newSince);
   const isEbike = (l) => !!(l.eb || (l.bt && l.bt.startsWith('ebike')));
 
-  function typeGroup(l) {
-    if (isEbike(l)) return 'ebike';
-    for (const g of TYPE_GROUPS) if (g.types.includes(l.bt)) return g.key;
+  function category(l) {
+    for (const c of CATEGORIES) if (c.types.includes(l.bt)) return c.key;
     return 'other';
   }
+  const drive = (l) => (isEbike(l) ? 'ebike' : 'classic');
+  const suspension = (l) => l.su || (/mtb_full$/.test(l.bt || '') ? 'full' : /^(mtb_hardtail|ebike_mtb)$/.test(l.bt || '') ? 'hardtail' : 'unknown');
+  function motorBrand(l) {
+    if (!isEbike(l)) return null;
+    if (!l.mo || MOTOR_GENERIC.test(l.mo)) return MOTOR_UNKNOWN;
+    for (const [name, re] of MOTOR_BRANDS) if (re.test(l.mo)) return name;
+    return MOTOR_OTHER;
+  }
+  const listingTime = (l) => Date.parse(l.ps || l.f || '') || 0;
+  const withinHours = (l, hours, now) => {
+    const t = listingTime(l);
+    return !!t && now - t <= Number(hours) * 3600e3;
+  };
 
   /** Odznak „−24 % pod odhadem“ (barva + šipka + text – nikdy jen barva). */
   function dealBadge(l) {
@@ -987,7 +1060,9 @@
 
   function activeFilterCount() {
     const f = state.filters;
-    return f.sourcesOff.size + f.groups.size + (f.min !== '' ? 1 : 0) + (f.max !== '' ? 1 : 0) + (f.deals ? 1 : 0) + (f.fresh ? 1 : 0);
+    return (
+      f.sourcesOff.size + f.cats.size + f.drive.size + f.susp.size + f.motors.size + (f.age ? 1 : 0) + (f.min !== '' ? 1 : 0) + (f.max !== '' ? 1 : 0) + (f.deals ? 1 : 0) + (f.fresh ? 1 : 0)
+    );
   }
 
   function renderKrajPanel(loading) {
@@ -1047,7 +1122,8 @@
     filters.hidden = !state.filtersOpen;
     const reset = el('button', { type: 'button', class: 'linkbtn', id: 'reset', hidden: !n }, 'Zrušit filtry');
     reset.addEventListener('click', () => {
-      Object.assign(state.filters, { q: '', sourcesOff: new Set(), groups: new Set(), min: '', max: '', deals: false, fresh: false });
+      Object.assign(state.filters, EMPTY_FILTERS());
+      saveFilters();
       renderKrajPanel(false);
       applyFilters();
     });
@@ -1063,11 +1139,18 @@
 
   function buildFilters() {
     const f = state.filters;
-    const counts = { src: {}, grp: {} };
+    const now = Date.now();
+    const counts = { src: {}, cat: {}, drive: {}, susp: {}, motor: {}, age: {} };
+    const inc = (o, k) => {
+      if (k != null) o[k] = (o[k] || 0) + 1;
+    };
     for (const l of state.listings) {
-      counts.src[l.s] = (counts.src[l.s] || 0) + 1;
-      const g = typeGroup(l);
-      counts.grp[g] = (counts.grp[g] || 0) + 1;
+      inc(counts.src, l.s);
+      inc(counts.cat, category(l));
+      inc(counts.drive, drive(l));
+      inc(counts.susp, suspension(l));
+      inc(counts.motor, motorBrand(l));
+      for (const a of AGES) if (withinHours(l, a.key, now)) inc(counts.age, a.key);
     }
     const srcKeys = [...new Set([...Object.keys(state.summary?.sources || {}), ...Object.keys(counts.src)])].filter((k) => counts.src[k]);
     const sources = el(
@@ -1084,20 +1167,43 @@
         return el('label', { class: 'chip' }, cb, sourceLabel(k), el('span', { class: 'count', text: fmtNum(counts.src[k]) }));
       })
     );
-    const groups = el(
+    /** Zaškrtávací čipy (více najednou) nad množinou f[setKey]; jen položky, které v kraji jsou. */
+    const chipSet = (items, setKey, countOf) =>
+      el(
+        'div',
+        { class: 'chips', role: 'group' },
+        items
+          .filter((it) => countOf[it.key])
+          .map((it) => {
+            const set = f[setKey];
+            const b = el('button', { type: 'button', class: 'chip', 'aria-pressed': String(set.has(it.key)) }, it.label, el('span', { class: 'count', text: fmtNum(countOf[it.key]) }));
+            b.addEventListener('click', () => {
+              if (set.has(it.key)) set.delete(it.key);
+              else set.add(it.key);
+              b.setAttribute('aria-pressed', String(set.has(it.key)));
+              onFiltersChanged();
+            });
+            return b;
+          })
+      );
+    /** Stáří: jedna volba (nebo žádná = vše) */
+    const ageChips = el(
       'div',
-      { class: 'chips' },
-      TYPE_GROUPS.filter((g) => counts.grp[g.key]).map((g) => {
-        const b = el('button', { type: 'button', class: 'chip', 'aria-pressed': String(f.groups.has(g.key)) }, g.label, el('span', { class: 'count', text: fmtNum(counts.grp[g.key]) }));
+      { class: 'chips', role: 'radiogroup', 'aria-label': 'Stáří inzerátu' },
+      AGES.map((a) => {
+        const b = el('button', { type: 'button', class: 'chip', role: 'radio', 'aria-checked': String(f.age === a.key), 'aria-pressed': String(f.age === a.key) }, a.label, el('span', { class: 'count', text: fmtNum(counts.age[a.key] || 0) }));
         b.addEventListener('click', () => {
-          if (f.groups.has(g.key)) f.groups.delete(g.key);
-          else f.groups.add(g.key);
-          b.setAttribute('aria-pressed', String(f.groups.has(g.key)));
+          f.age = f.age === a.key ? '' : a.key;
+          for (const x of ageChips.querySelectorAll('.chip')) {
+            x.setAttribute('aria-checked', String(x === b && f.age !== ''));
+            x.setAttribute('aria-pressed', String(x === b && f.age !== ''));
+          }
           onFiltersChanged();
         });
         return b;
       })
     );
+    const motorItems = [...MOTOR_BRANDS.map(([name]) => ({ key: name, label: name })), { key: MOTOR_OTHER, label: MOTOR_OTHER }, { key: MOTOR_UNKNOWN, label: MOTOR_UNKNOWN }];
     const priceInput = (key, ph) => {
       const i = el('input', { class: 'input', type: 'number', inputmode: 'numeric', min: '0', step: '500', placeholder: ph, 'aria-label': `Cena ${ph} (Kč)` });
       i.value = f[key];
@@ -1116,12 +1222,17 @@
       });
       return el('label', { class: 'toggle' }, cb, label);
     };
+    const group = (label, body, hint) => el('div', { class: 'fgroup' }, el('span', { class: 'fgroup__label', text: label }), body, hint ? el('span', { class: 'fgroup__hint', text: hint }) : null);
     return el(
       'div',
       { class: 'filters', id: 'filters' },
-      el('div', { class: 'fgroup' }, el('span', { class: 'fgroup__label', text: 'Zdroj' }), sources),
-      el('div', { class: 'fgroup' }, el('span', { class: 'fgroup__label', text: 'Typ kola' }), groups),
-      el('div', { class: 'fgroup' }, el('span', { class: 'fgroup__label', text: 'Cena (Kč)' }), el('div', { class: 'price-range' }, priceInput('min', 'od'), '–', priceInput('max', 'do'))),
+      group('Zdroj', sources),
+      group('Typ kola', chipSet(CATEGORIES, 'cats', counts.cat)),
+      group('Pohon', chipSet(DRIVES, 'drive', counts.drive)),
+      group('Odpružení', chipSet(SUSPENSIONS, 'susp', counts.susp)),
+      counts.drive.ebike ? group('Motor (elektrokola)', chipSet(motorItems, 'motors', counts.motor), 'Podle textu inzerátu; výběr motoru omezí výsledky na elektrokola.') : null,
+      group('Stáří inzerátu', ageChips, 'Podle data vložení na web; když ho web neuvádí, podle toho, kdy inzerát poprvé našla Kolomapa. Bez výběru se zobrazí vše, co je na webu stále aktivní.'),
+      group('Cena (Kč)', el('div', { class: 'price-range' }, priceInput('min', 'od'), '–', priceInput('max', 'do'))),
       el('div', { class: 'toggles' }, toggle('deals', 'Jen výhodné'), toggle('fresh', `Jen nové (${state.thresholds.newHours} h)`))
     );
   }
@@ -1131,6 +1242,7 @@
     clearTimeout(filterDeb);
     filterDeb = setTimeout(() => {
       applyFilters();
+      saveFilters();
       const n = activeFilterCount();
       const btn = document.querySelector('.toolbar [aria-controls="filters"]');
       if (btn) {
@@ -1149,9 +1261,14 @@
     const q = fold(f.q).split(/\s+/).filter(Boolean);
     const min = num(f.min);
     const max = num(f.max);
+    const now = Date.now();
     state.filtered = state.listings.filter((l) => {
       if (f.sourcesOff.size && f.sourcesOff.has(l.s)) return false;
-      if (f.groups.size && !f.groups.has(typeGroup(l))) return false;
+      if (f.cats.size && !f.cats.has(category(l))) return false;
+      if (f.drive.size && !f.drive.has(drive(l))) return false;
+      if (f.susp.size && !f.susp.has(suspension(l))) return false;
+      if (f.motors.size && !f.motors.has(motorBrand(l))) return false;
+      if (f.age && !withinHours(l, f.age, now)) return false;
       if (min != null && !(l.p >= min)) return false;
       if (max != null && !(l.p <= max)) return false;
       if (f.deals && dealClass(l) !== 'good') return false;
@@ -1325,6 +1442,7 @@
       chip('Kola', l.ws),
       chip('Rám', l.fs),
       chip('Materiál', MATERIAL[l.mat] || l.mat),
+      chip('Odpružení', SUSP_LABEL[l.su] || null),
       chip('Motor', l.mo || (isEbike(l) ? 'elektrokolo' : null)),
       chip('Baterie', l.wh ? `${fmtNum(l.wh)} Wh` : null),
       chip('Sada', l.gs),

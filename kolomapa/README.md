@@ -5,7 +5,12 @@ Jednou denně projde inzeráty kol na **Bazoši** (Sbazar, Cyklobazar a Aukro jd
 Výhodné nabídky (cena pod odhadem) jsou zeleně, u každého kola je i **doporučená maximální výkupní cena** pro obchod.
 
 - Kliknutím na kraj se mapa přiblíží a ukáže piny přesně tam, kde kolo je (podle souřadnic / PSČ / obce z inzerátu).
-- Vpravo seznam s filtry (zdroj, typ kola, cena, jen výhodné, jen nové) a řazením (nejvýhodnější, nejnovější …).
+- Vpravo seznam s filtry a řazením (nejvýhodnější, nejnovější …). Filtry se kombinují a mapa si je pamatuje:
+  zdroj; typ kola (horská, silniční, gravel, trekingová, městská, dětská, BMX, nákladní); pohon (klasická / elektrokola);
+  odpružení (celoodpružená, přední, bez); značka motoru u elektrokol (Bosch, Shimano, Yamaha, Specialized/Brose, Bafang …
+  podle textu inzerátu); stáří inzerátu (24 h až 30 dní podle data vložení na web, bez výběru vše aktivní); cena;
+  jen výhodné; jen nové. Na mapě jsou inzeráty, které web stále uvádí – zmizelé (prodané, smazané) se skryjí při
+  dalším celém průchodu webu.
 - Detail: fotka, cena, odhad s rozpětím a vysvětlením „proč“, značka/model/rok/velikost/motor…, odkaz na inzerát.
 - Odhad ceny se **učí z trhu** (tisíce inzerátů, srovnatelné nabídky) a **kalibruje na vlastní prodeje obchodu**
   (`training/koloshop-prodeje.json`). S klíčem k Claude API umí nacenit i **podle fotky** (stav kola, výbava).

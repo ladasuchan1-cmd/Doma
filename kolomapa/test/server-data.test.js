@@ -126,6 +126,15 @@ test('buildKraj: souřadnice prošlé jitter() jsou deterministické a zaokrouhl
   assert.equal(e.lo, 16.98765);
 });
 
+test('compactListing: odpružení a motor pro filtry v mapě (su, mo, eb)', () => {
+  const { compactListing } = require('../src/server/data');
+  const o = compactListing({ id: 1, source: 'bazos', title: 'Kolo', features: JSON.stringify({ suspension: 'full', motor: 'Bosch Performance CX', isEbike: true }) });
+  assert.equal(o.su, 'full');
+  assert.equal(o.mo, 'Bosch Performance CX');
+  assert.equal(o.eb, true);
+  assert.equal(compactListing({ id: 2, source: 'bazos', title: 'Kolo', features: '{}' }).su, undefined);
+});
+
 test('compactListing: nebezpečné URL zahodí, popis zkrátí, AI a varování přenese', () => {
   const { db, ids } = sampleDb();
   const evil = data.buildKraj(db, 'STC').listings.find((x) => x.id === ids.evil);
