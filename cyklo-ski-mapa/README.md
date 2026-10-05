@@ -23,6 +23,18 @@ plus poznámka a ručně doplněné kontakty (ty mají přednost před automatic
                       index.html + app.js  (Leaflet; funguje i přímo z disku)   ·   server.js (sdílený stav pro tým)
 ```
 
+## Dokumentace
+
+| Pro koho | Kde |
+|---|---|
+| Vedení, rychlý přehled | [docs/SHRNUTI.md](docs/SHRNUTI.md) – co to je, odkud bere data, jak se aktualizuje, provoz a omezení (1 stránka) |
+| Obchodní tým | [docs/MANUAL.md](docs/MANUAL.md) – ovládání krok za krokem, stav oslovení, tabulka a export, časté otázky |
+| Kdo chce rozumět datům | [docs/METODIKA.md](docs/METODIKA.md) – zdroje a dotazy, klasifikace míst, okresy a okolí, obohacení z webů, co čísla znamenají |
+| Správce serveru | [NASAZENI.md](NASAZENI.md) – Hetzner, nasazení z GitHubu, uživatelé, zálohy, návrat zpět |
+
+Při změně chování aplikace se dokumentace aktualizuje spolu s kódem: ovládání → `docs/MANUAL.md`, výpočet nebo
+zdroj dat → `docs/METODIKA.md` (změnu metodiky **datovat**), nasazení → `NASAZENI.md`.
+
 ## Spuštění
 
 Nejjednodušší: otevřít `index.html` v prohlížeči (Chrome, Edge, Firefox). Data jsou ve složce `data/`, knihovny ve
