@@ -1,0 +1,40 @@
+# Samostatný server s veřejnou doménou: aplikace + Caddy (HTTPS z Let's Encrypt automaticky).
+# Použití:  cp ../.env.example .env  (vyplnit)  →  DOMAIN=mapa.example.cz docker compose up -d --build
+# Pro server, kde už Caddy běží (Koloshop), se compose nepoužívá – viz NASAZENI.md a deploy.sh.
+services:
+  app:
+    build:
+      context: ..
+      args:
+        APP_VERSION: ${APP_VERSION:-compose}
+    image: cyklo-ski-mapa:latest
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      CSM_STAV: /data/stav.json
+      CSM_TRUST_PROXY: "1"
+    volumes:
+      - data:/data
+    expose:
+      - "8090"
+
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    environment:
+      DOMAIN: ${DOMAIN:?Nastavte DOMAIN=vase.domena.cz}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - app
+
+volumes:
+  data:
+  caddy_data:
+  caddy_config:

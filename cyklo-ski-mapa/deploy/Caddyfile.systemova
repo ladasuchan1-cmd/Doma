@@ -1,0 +1,18 @@
+# Blok pro SYSTÉMOVOU Caddy (/etc/caddy/Caddyfile) na serveru, kde už Caddy běží – třeba vedle sales.report.
+# Přidej na konec Caddyfile, DOMENU nahraď a pak:  sudo caddy validate --config /etc/caddy/Caddyfile && sudo systemctl reload caddy
+#
+# Veřejná doména (certifikát z Let's Encrypt automaticky):
+#   mapa.example.cz {
+# Interní doména s vlastní CA jako u sales.report (certifikát si Caddy vystaví sám, prohlížeče mu věří po instalaci root CA):
+#   mapa.report {
+#       tls internal
+#
+# deploy.sh publikuje kontejner na 127.0.0.1:8091 (CSM_PORT).
+DOMENA {
+	encode zstd gzip
+	reverse_proxy 127.0.0.1:8091
+	header {
+		Strict-Transport-Security "max-age=31536000"
+		-Server
+	}
+}

@@ -1,0 +1,27 @@
+# Běh bez Dockeru: systemd služba (Node.js 22+ na serveru). Instalace:
+#   sudo cp deploy/cyklo-ski-mapa.service /etc/systemd/system/
+#   sudo systemctl daemon-reload && sudo systemctl enable --now cyklo-ski-mapa
+#   sudo systemctl status cyklo-ski-mapa ; journalctl -u cyklo-ski-mapa -f
+# Cesty a uživatele uprav podle serveru; .env podle .env.example.
+[Unit]
+Description=Cyklo & Ski mapa – web s kontakty v okolí cyklotras a sjezdovek
+After=network.target
+
+[Service]
+Type=simple
+User=suchan
+WorkingDirectory=/home/suchan/apps/Doma/cyklo-ski-mapa
+EnvironmentFile=/home/suchan/cyklo-ski-mapa-data/.env
+Environment=PORT=8091
+Environment=CSM_STAV=/home/suchan/cyklo-ski-mapa-data/stav.json
+Environment=CSM_TRUST_PROXY=1
+ExecStart=/usr/bin/node server.js
+Restart=on-failure
+RestartSec=3
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ReadWritePaths=/home/suchan/cyklo-ski-mapa-data
+
+[Install]
+WantedBy=multi-user.target
