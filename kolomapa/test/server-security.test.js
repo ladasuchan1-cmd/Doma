@@ -9,7 +9,7 @@ const os = require('node:os');
 const path = require('node:path');
 const http = require('node:http');
 const net = require('node:net');
-const { loadConfig } = require('../src/config');
+const { loadConfig, parseUsers } = require('../src/config');
 const { openDb } = require('../src/db');
 const data = require('../src/server/data');
 const { createApp, hostAllowed, acceptsGzip, resolveStaticPath, CSP, SECURITY_HEADERS, MAX_BODY_BYTES, AUTH_MAX_FAILS } = require('../src/server/http');
@@ -47,9 +47,9 @@ function rawTcp(port, text) {
   });
 }
 
-async function startApp({ password = null, allowedHosts, db: givenDb, runFn, now, trustProxy = false } = {}) {
+async function startApp({ password = null, users, usersFile, allowedHosts, db: givenDb, runFn, now, trustProxy = false } = {}) {
   const { db } = givenDb ? { db: givenDb } : sampleDb();
-  const config = { ...loadConfig({}), dbFile: ':memory:', publicDir: PUBLIC_DIR, password, trustProxy, ...(allowedHosts ? { allowedHosts } : {}) };
+  const config = { ...loadConfig({}), dbFile: ':memory:', publicDir: PUBLIC_DIR, password, trustProxy, ...(allowedHosts ? { allowedHosts } : {}), ...(users ? { users } : {}), ...(usersFile ? { usersFile } : {}) };
   const runner = createRunner({ db, config, log, runFn: runFn || (async () => ({ status: 'ok' })) });
   const server = http.createServer(createApp({ db, config, log, runner, ...(now ? { now } : {}) }));
   await new Promise((r) => server.listen(0, '127.0.0.1', r));
@@ -131,6 +131,63 @@ test('POST /api/run: Sec-Fetch-Site z cizího webu → 403, same-origin → 202'
     assert.equal(started, 1);
   } finally {
     await s.close();
+  }
+});
+
+test('uživatelé jméno:heslo (KOLOMAPA_USERS) vedle společného hesla; KOLOMAPA_USERS_FILE se načte znovu po změně i smazání', async () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'kolomapa-uzivatele-'));
+  const file = path.join(dir, 'uzivatele.env');
+  fs.writeFileSync(file, '# opis z Cyklo & Ski mapy\nCSM_USERS=lada:Tajne1;Obchod:Heslo2\nDOMAIN=x\n');
+  const s = await startApp({ password: 'spolecne', users: parseUsers('jana:abc'), usersFile: file });
+  const B = (n, p) => ({ Authorization: 'Basic ' + Buffer.from(`${n}:${p}`).toString('base64') });
+  const get = async (n, p) => (await raw(s.port, 'GET', '/data/summary.json', B(n, p))).status;
+  try {
+    assert.equal(await get('Lada', 'Tajne1'), 200, 'uživatel ze souboru, jméno bez ohledu na velikost písmen');
+    assert.equal(await get('obchod', 'Heslo2'), 200);
+    assert.equal(await get('jana', 'abc'), 200, 'uživatel z KOLOMAPA_USERS');
+    assert.equal(await get('kdokoli', 'spolecne'), 200, 'společné heslo dál platí s libovolným jménem');
+    assert.equal(await get('lada', 'spolecne'), 401, 'známé jméno se musí přihlásit svým heslem');
+    assert.equal(await get('lada', 'Heslo2'), 401, 'cizí heslo');
+    assert.equal(await get('nikdo', 'Tajne1'), 401, 'heslo uživatele neplatí pod jiným jménem');
+    // změna souboru stejně jako na serveru (zápis vedle + mv = nový inode) → bez restartu
+    fs.writeFileSync(file + '.tmp', 'CSM_USERS=lada:NoveHeslo;petr:Petr1\n');
+    fs.renameSync(file + '.tmp', file);
+    assert.equal(await get('lada', 'Tajne1'), 401, 'staré heslo po změně souboru neplatí');
+    assert.equal(await get('lada', 'NoveHeslo'), 200);
+    assert.equal(await get('petr', 'Petr1'), 200, 'nový uživatel bez restartu');
+    // soubor zmizí → zůstávají KOLOMAPA_USERS a společné heslo
+    fs.unlinkSync(file);
+    assert.equal(await get('petr', 'Petr1'), 401);
+    assert.equal(await get('jana', 'abc'), 200);
+    assert.equal(await get('x', 'spolecne'), 200);
+  } finally {
+    await s.close();
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('jen soubor uživatelů bez společného hesla: přihlášení zapnuté, CSM_PASSWORD = uživatel „tým“; chybějící soubor nikoho nepustí', async () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'kolomapa-uzivatele-'));
+  const file = path.join(dir, 'uzivatele.env');
+  fs.writeFileSync(file, 'CSM_PASSWORD=TymoveHeslo\n');
+  const B = (n, p) => ({ Authorization: 'Basic ' + Buffer.from(`${n}:${p}`).toString('base64') });
+  const s = await startApp({ usersFile: file });
+  try {
+    assert.equal((await raw(s.port, 'GET', '/data/summary.json')).status, 401, 'bez přihlášení 401 (ne otevřeno)');
+    assert.equal((await raw(s.port, 'GET', '/data/summary.json', { Host: 'cizi.example.com' })).status, 401, 's přihlášením se cizí Host nehlídá (jako s heslem)');
+    assert.equal((await raw(s.port, 'GET', '/data/summary.json', B('tým', 'TymoveHeslo'))).status, 200);
+    assert.equal((await raw(s.port, 'GET', '/data/summary.json', B('TÝM', 'TymoveHeslo'))).status, 200);
+    assert.equal((await raw(s.port, 'GET', '/data/summary.json', B('x', 'TymoveHeslo'))).status, 401);
+  } finally {
+    await s.close();
+  }
+  const s2 = await startApp({ usersFile: path.join(dir, 'neexistuje.env') });
+  try {
+    assert.equal((await raw(s2.port, 'GET', '/data/summary.json')).status, 401);
+    assert.equal((await raw(s2.port, 'GET', '/data/summary.json', B('x', ''))).status, 401);
+  } finally {
+    await s2.close();
+    fs.rmSync(dir, { recursive: true, force: true });
   }
 });
 

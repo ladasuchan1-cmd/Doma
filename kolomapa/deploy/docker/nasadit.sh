@@ -8,7 +8,12 @@
 #
 # Co se kde drží:
 #   kód        /root/Doma (klon repozitáře, aplikace ve složce kolomapa) – ruční spuštění si stáhne novou verzi
-#   nastavení  /root/kolomapa.env (mimo git; při prvním nasazení vznikne s náhodným heslem a vypíše ho)
+#   nastavení  /root/kolomapa.env (mimo git; při prvním nasazení vznikne – s náhodným heslem, když na serveru není
+#              Cyklo & Ski mapa; jinak se přihlašuje jejími jmény a hesly, viz níže)
+#   přihlášení jména a hesla Cyklo & Ski mapy (CSM_USERS v jejím .env, typicky /opt/Doma/cyklo-ski-mapa/deploy/.env):
+#              skript /usr/local/sbin/kolomapa-uzivatele je opisuje do /root/kolomapa-data/uzivatele.env (hned a pak
+#              cronem každých 5 minut), kontejner ho čte přes KOLOMAPA_USERS_FILE a změnu pozná hned – jeden seznam
+#              uživatelů pro obě aplikace. Navíc platí KOLOMAPA_PASSWORD (libovolné jméno), je-li vyplněné.
 #   data       /root/kolomapa-data → /app/data (databáze; přežije přestavbu obrazu), zálohy v podsložce zalohy/
 #   kontejner  „kolomapa“ z obrazu „kolomapa“, port 8050
 #   vrátnice   Caddy → https://<KOLOMAPA_DOMENA>; výchozí doména kolomapa.<IP-serveru>.sslip.io (bez vlastní DNS,
@@ -41,6 +46,10 @@ CADDY_SITES=/config/sites                      # soubory dalších webů ve svaz
 IMPORT_RADEK="import $CADDY_SITES/*.caddy"
 IMPORT_KOMENTAR="# Další weby na tomto serveru (Kolomapa …): soubory $CADDY_SITES/*.caddy (přidal kolomapa/deploy/docker/nasadit.sh)"
 ZALOHA_CRON="${KOLOMAPA_ZALOHA_CRON:-/etc/cron.daily/kolomapa-zaloha}"
+CSM_ENV="${CSM_ENV:-}"                         # .env Cyklo & Ski mapy (CSM_USERS); prázdné = najít vedle jejího Caddyfile
+UZIVATELE_SKRIPT="${KOLOMAPA_UZIVATELE_SKRIPT:-/usr/local/sbin/kolomapa-uzivatele}"
+UZIVATELE_CRON="${KOLOMAPA_UZIVATELE_CRON:-/etc/cron.d/kolomapa-uzivatele}"
+UZIVATELE_SOUBOR=uzivatele.env                 # v $DATA → /app/data/uzivatele.env v kontejneru (KOLOMAPA_USERS_FILE)
 
 say() { printf '\n\033[1m→ %s\033[0m\n' "$*"; }
 die() { printf '\nCHYBA: %s\n' "$*" >&2; exit 1; }
@@ -122,6 +131,15 @@ if [[ "$REZIM" == none ]]; then
   echo "          Bez Caddy se mapa z internetu neotevře. Jiné jméno kontejneru: CADDY_KONTEJNER=jmeno bash nasadit.sh"
 fi
 
+# --- Uživatelé Cyklo & Ski mapy ---------------------------------------------------------------------------------
+# Běží-li na serveru Cyklo & Ski mapa (její .env s CSM_USERS / CSM_PASSWORD), přihlašuje se do Kolomapy stejnými
+# jmény a hesly. Vlastní KOLOMAPA_USERS / KOLOMAPA_USERS_FILE v /root/kolomapa.env mají přednost (pak se nic neopisuje).
+if [[ -z "$CSM_ENV" ]]; then
+  if [[ -n "$KLON" ]]; then CSM_ENV="$(dirname "$CADDYFILE")/.env"; else CSM_ENV=/opt/Doma/cyklo-ski-mapa/deploy/.env; fi
+fi
+UZIVATELE=""   # csm = z Cyklo & Ski mapy, vlastni = KOLOMAPA_USERS(_FILE) v kolomapa.env, prázdné = jen KOLOMAPA_PASSWORD
+if [[ -f "$CSM_ENV" ]] && grep -qE '^CSM_(USERS|PASSWORD)=.' "$CSM_ENV"; then UZIVATELE=csm; fi
+
 # --- Nastavení (/root/kolomapa.env) -----------------------------------------------------------------------------
 # Výchozí doména: kolomapa.<veřejná IP serveru s pomlčkami>.sslip.io – funguje bez vlastní DNS, Caddy si pro ni
 # vyřídí certifikát sama. Vlastní doménu (kolomapa.ksprehledy.cz) stačí zapsat do KOLOMAPA_DOMENA a přidat záznam A.
@@ -132,8 +150,12 @@ vychozi_domena() {
 }
 NOVE_HESLO=""
 if [[ ! -f "$ENV_SOUBOR" ]]; then
-  say "Zakládám $ENV_SOUBOR s náhodným heslem"
-  NOVE_HESLO="$(head -c 32 /dev/urandom | base64 | tr -dc 'A-Za-z0-9' | cut -c1-20)"
+  if [[ "$UZIVATELE" == csm ]]; then
+    say "Zakládám $ENV_SOUBOR – přihlášení jmény a hesly Cyklo & Ski mapy ($CSM_ENV), bez dalšího hesla"
+  else
+    say "Zakládám $ENV_SOUBOR s náhodným heslem"
+    NOVE_HESLO="$(head -c 32 /dev/urandom | base64 | tr -dc 'A-Za-z0-9' | cut -c1-20)"
+  fi
   cat >"$ENV_SOUBOR" <<EOF
 # Nastavení Kolomapy na serveru (vytvořil kolomapa/deploy/docker/nasadit.sh). Formát docker --env-file:
 # KLÍČ=hodnota bez uvozovek. Po změně znovu spusťte nasadit.sh (kontejner se musí založit znovu, docker restart
@@ -142,8 +164,11 @@ if [[ ! -f "$ENV_SOUBOR" ]]; then
 # Adresa mapy. sslip.io = podle IP serveru, bez vlastní DNS. Vlastní doména: přepsat a přidat záznam A na IP serveru.
 KOLOMAPA_DOMENA=${KOLOMAPA_DOMENA:-$(vychozi_domena)}
 
-# Heslo do mapy (jméno při přihlášení libovolné):
+# Přihlášení: na serveru s Cyklo & Ski mapou platí její jména a hesla (CSM_USERS v jejím .env; nasadit.sh je opisuje do
+# data/uzivatele.env, změna se projeví do 5 minut). Navíc může platit společné heslo s libovolným jménem:
 KOLOMAPA_PASSWORD=$NOVE_HESLO
+# Vlastní seznam místo Cyklo & Ski mapy (pak se nic neopisuje): jana:heslo;petr:heslo2
+#KOLOMAPA_USERS=
 
 # Čas denního stahování (pražský čas):
 #KOLOMAPA_SCHEDULE=05:30
@@ -164,7 +189,9 @@ DOMENA="${KOLOMAPA_DOMENA:-$(hodnota KOLOMAPA_DOMENA)}"
 DOMENA="${DOMENA:-$(vychozi_domena)}"
 PROHLIZEC="${KOLOMAPA_PROHLIZEC:-$(hodnota KOLOMAPA_PROHLIZEC)}"
 [[ "$DOMENA" =~ ^[A-Za-z0-9]([A-Za-z0-9-]*[A-Za-z0-9])?(\.[A-Za-z0-9]([A-Za-z0-9-]*[A-Za-z0-9])?)+$ ]] || die "KOLOMAPA_DOMENA=„$DOMENA“ nevypadá jako doména"
-grep -q '^KOLOMAPA_PASSWORD=.\+' "$ENV_SOUBOR" || die "v $ENV_SOUBOR chybí KOLOMAPA_PASSWORD – mapa na internetu musí mít heslo"
+if grep -qE '^KOLOMAPA_USERS(_FILE)?=.' "$ENV_SOUBOR"; then UZIVATELE=vlastni; fi
+[[ -n "$UZIVATELE" ]] || grep -q '^KOLOMAPA_PASSWORD=.\+' "$ENV_SOUBOR" || die "v $ENV_SOUBOR chybí KOLOMAPA_PASSWORD (a na serveru není Cyklo & Ski mapa s uživateli) – mapa na internetu musí mít heslo"
+HESLO_TAKE="$(hodnota KOLOMAPA_PASSWORD)"
 
 # --- Obraz + testy ---------------------------------------------------------------------------------------------
 say "Stavím obraz $IMAGE (--no-cache${PROHLIZEC:+, s prohlížečem pro Cyklobazar})"
@@ -182,6 +209,34 @@ if [[ "$REZIM" == docker ]]; then docker network connect "$SIT" "$CADDY" >/dev/n
 mkdir -p "$DATA/zalohy"
 chown -R 1000:1000 "$DATA"   # kontejner běží jako uživatel node (UID 1000)
 
+# --- Uživatelé: opis z Cyklo & Ski mapy -------------------------------------------------------------------------
+ENV_NAVIC=()
+if [[ "$UZIVATELE" == csm ]]; then
+  say "Přihlášení: jména a hesla z Cyklo & Ski mapy ($CSM_ENV)"
+  cat >"$UZIVATELE_SKRIPT" <<EOF
+#!/bin/sh
+# Uživatelé Kolomapy = uživatelé Cyklo & Ski mapy: opisuje řádky CSM_USERS / CSM_PASSWORD z jejího .env do
+# $DATA/$UZIVATELE_SOUBOR (čte ho kontejner kolomapa přes KOLOMAPA_USERS_FILE a změnu pozná hned).
+# Spravuje kolomapa/deploy/docker/nasadit.sh; spouští ho nasazení a cron ($UZIVATELE_CRON) každých 5 minut.
+Z='$CSM_ENV'; CIL='$DATA/$UZIVATELE_SOUBOR'
+[ -f "\$Z" ] || exit 0
+{ echo "# Opis uživatelů z Cyklo & Ski mapy (\$Z) – dělá $UZIVATELE_SKRIPT, neupravovat (přepíše se)."; grep -E '^CSM_(USERS|PASSWORD)=' "\$Z"; } >"\$CIL.tmp"
+if cmp -s "\$CIL.tmp" "\$CIL"; then rm -f "\$CIL.tmp"; else chown 1000:1000 "\$CIL.tmp" && chmod 600 "\$CIL.tmp" && mv -f "\$CIL.tmp" "\$CIL"; fi
+EOF
+  chmod 755 "$UZIVATELE_SKRIPT"
+  if [[ -d "$(dirname "$UZIVATELE_CRON")" ]]; then
+    printf '# Uživatelé Kolomapy z Cyklo & Ski mapy (spravuje kolomapa/deploy/docker/nasadit.sh)\n*/5 * * * * root %s\n' "$UZIVATELE_SKRIPT" >"$UZIVATELE_CRON"
+    chmod 644 "$UZIVATELE_CRON"
+  fi
+  "$UZIVATELE_SKRIPT"
+  JMENA="$(sed -n 's/^CSM_USERS=//p' "$CSM_ENV" | head -1 | tr ';,' '\n\n' | sed 's/:.*//; s/^ *//; s/ *$//' | grep . | tr '\n' ' ')"
+  [[ -n "$JMENA" ]] || JMENA="tým (CSM_PASSWORD)"
+  echo "   uživatelé: $JMENA→ $DATA/$UZIVATELE_SOUBOR (obnova cronem každých 5 minut)"
+  ENV_NAVIC=(-e "KOLOMAPA_USERS_FILE=/app/data/$UZIVATELE_SOUBOR")
+else
+  rm -f "$UZIVATELE_CRON" 2>/dev/null || true
+fi
+
 # --- Výměna kontejneru -----------------------------------------------------------------------------------------
 PUBLISH=()
 if [[ "$REZIM" != docker ]]; then PUBLISH=(-p "127.0.0.1:$PORT:$PORT"); fi   # jen pro Caddy mimo Docker, nikdy veřejně
@@ -194,6 +249,7 @@ docker run -d \
   --env-file "$ENV_SOUBOR" \
   -v "$DATA":/app/data \
   "${PUBLISH[@]}" \
+  "${ENV_NAVIC[@]}" \
   "$IMAGE" >/dev/null
 
 # --- Caddy -------------------------------------------------------------------------------------------------------
@@ -338,7 +394,12 @@ for i in $(seq 1 30); do
       esac
     fi
     echo
-    echo "Mapa:       https://$DOMENA   (jméno libovolné; heslo: KOLOMAPA_PASSWORD v $ENV_SOUBOR)"
+    echo "Mapa:       https://$DOMENA"
+    case "$UZIVATELE" in
+      csm)     echo "Přihlášení: jména a hesla z Cyklo & Ski mapy ($CSM_ENV)${HESLO_TAKE:+; navíc KOLOMAPA_PASSWORD z $ENV_SOUBOR s libovolným jménem}" ;;
+      vlastni) echo "Přihlášení: podle KOLOMAPA_USERS / KOLOMAPA_USERS_FILE v $ENV_SOUBOR${HESLO_TAKE:+ (+ KOLOMAPA_PASSWORD, jméno libovolné)}" ;;
+      *)       echo "Přihlášení: jméno libovolné, heslo KOLOMAPA_PASSWORD v $ENV_SOUBOR" ;;
+    esac
     case "$REZIM" in
       docker) if [[ "$ZPUSOB" == sites ]]; then echo "Vrátnice:   Caddy v kontejneru $CADDY → $CIL (blok $CADDY_SITES/$APP.caddy, import v $CADDYFILE)"
               else echo "Vrátnice:   Caddy v kontejneru $CADDY → $CIL (blok v $CADDYFILE)"; fi ;;

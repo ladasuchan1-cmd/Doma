@@ -11,8 +11,10 @@
 //                                  X-Requested-With: kolomapa (ochrana proti CSRF – prohlížeč ji cizímu webu nepošle
 //                                  bez preflightu, který server nepovolí) a odmítá Sec-Fetch-Site ≠ same-origin.
 //
-// Volitelné heslo (config.password, KOLOMAPA_PASSWORD) → HTTP Basic, jméno libovolné, porovnání v konstantním čase,
-// po AUTH_MAX_FAILS špatných pokusech z jedné IP adresy 429 na AUTH_WINDOW_MS (hádání hesla v síti). Za reverzní proxy
+// Volitelné přihlášení → HTTP Basic, porovnání v konstantním čase: společné heslo (config.password, KOLOMAPA_PASSWORD;
+// jméno libovolné) a/nebo uživatelé jméno:heslo (config.users z KOLOMAPA_USERS, config.usersFile z KOLOMAPA_USERS_FILE –
+// soubor se čte znovu, jakmile se změní; na serveru ho plní nasadit.sh ze seznamu uživatelů Cyklo & Ski mapy).
+// Po AUTH_MAX_FAILS špatných pokusech z jedné IP adresy 429 na AUTH_WINDOW_MS (hádání hesla v síti). Za reverzní proxy
 // na stejném serveru (Caddy, nginx) přicházejí všechny požadavky z 127.0.0.1 → s config.trustProxy
 // (KOLOMAPA_TRUST_PROXY=1) se adresa návštěvníka bere z poslední položky X-Forwarded-For, jinak by jeden útočník
 // zablokoval všechny.
@@ -32,6 +34,7 @@ const path = require('node:path');
 const zlib = require('node:zlib');
 const { promisify } = require('node:util');
 const defaultLog = require('../util/log');
+const { parseUsersFile } = require('../config');
 const data = require('./data');
 
 const gzipAsync = promisify(zlib.gzip);
@@ -152,18 +155,72 @@ function safeEqual(a, b) {
   return crypto.timingSafeEqual(ha, hb);
 }
 
-/** Ověří hlavičku Authorization: Basic … proti heslu (jméno se ignoruje). */
-function checkBasicAuth(header, password) {
+/**
+ * Ověří hlavičku Authorization: Basic … proti společnému heslu (jméno se ignoruje) a/nebo uživatelům jméno → heslo
+ * (jméno bez ohledu na velikost písmen). Porovnává vždy (i bez hlavičky, i pro neznámé jméno), ať odpověď trvá stejně.
+ * @param {string|undefined} header
+ * @param {string|null} password společné heslo, null = jen uživatelé
+ * @param {Map<string, string>|null} [users]
+ * @returns {boolean}
+ */
+function checkBasicAuth(header, password, users = null) {
   const m = /^Basic\s+([A-Za-z0-9+/=]+)\s*$/i.exec(String(header || ''));
+  let name = '';
   let pass = '';
   if (m) {
     const decoded = Buffer.from(m[1], 'base64').toString('utf8');
     const i = decoded.indexOf(':');
+    name = i >= 0 ? decoded.slice(0, i) : decoded;
     pass = i >= 0 ? decoded.slice(i + 1) : '';
   }
-  // porovnat vždy (i bez hlavičky), ať odpověď trvá stejně
-  const ok = safeEqual(pass, password);
+  const expected = users && users.size ? users.get(name.trim().toLowerCase()) : undefined;
+  let ok = false;
+  if (expected != null) ok = safeEqual(pass, expected);
+  else ok = safeEqual(pass, password != null ? password : '\0') && password != null;
   return !!m && ok;
+}
+
+/**
+ * Uživatelé pro přihlášení: config.users (KOLOMAPA_USERS) + soubor config.usersFile (KOLOMAPA_USERS_FILE), který se
+ * načte znovu, jakmile se změní (podle mtime, velikosti a inode – stat je levný). Chybějící nebo nečitelný soubor =
+ * bez uživatelů ze souboru (jednou se zaloguje).
+ * @returns {() => Map<string, string>}
+ */
+function createUsersSource(config, log) {
+  const fixed = config.users instanceof Map ? config.users : new Map();
+  const file = config.usersFile || null;
+  if (!file) return () => fixed;
+  let stamp = null;
+  let merged = fixed;
+  let warned = false;
+  return () => {
+    let st = null;
+    try {
+      st = fs.statSync(file);
+    } catch {
+      st = null;
+    }
+    const key = st ? `${st.mtimeMs}:${st.size}:${st.ino}` : 'none';
+    if (key !== stamp) {
+      stamp = key;
+      let fromFile = new Map();
+      if (st) {
+        try {
+          fromFile = parseUsersFile(fs.readFileSync(file, 'utf8'));
+          warned = false;
+          log.info(`Uživatelé ze souboru ${file}: ${fromFile.size}`, { jmena: [...fromFile.keys()] });
+        } catch (e) {
+          if (!warned) log.warn(`Soubor s uživateli ${file} nejde přečíst: ${e.message}`);
+          warned = true;
+        }
+      } else if (!warned) {
+        log.warn(`Soubor s uživateli ${file} neexistuje – platí jen KOLOMAPA_USERS / KOLOMAPA_PASSWORD.`);
+        warned = true;
+      }
+      merged = new Map([...fixed, ...fromFile]);
+    }
+    return merged;
+  };
 }
 
 /**
@@ -258,6 +315,10 @@ function createApp({ db, config, log = defaultLog, runner = null, now: clock = (
       .filter((h) => typeof h === 'string' && h.trim())
       .map((h) => h.trim().toLowerCase())
   );
+  const getUsers = createUsersSource(config, log);
+  // přihlášení je zapnuté, když je společné heslo, uživatelé, nebo aspoň soubor s uživateli (i prázdný/chybějící –
+  // raději nikoho nepustit než pustit všechny)
+  const authOn = !!(config.password || (config.users instanceof Map && config.users.size) || config.usersFile);
   let geojsonEntry = null;
 
   // ------------------------------------------------------------------ cache sestavených dat
@@ -513,14 +574,14 @@ function createApp({ db, config, log = defaultLog, runner = null, now: clock = (
       if (Number(req.headers['content-length']) > MAX_BODY_BYTES) {
         throw new HttpError(413, 'Požadavek je příliš velký.', { Connection: 'close' });
       }
-      if (!config.password && !hostAllowed(req.headers.host, allowedHosts)) {
+      if (!authOn && !hostAllowed(req.headers.host, allowedHosts)) {
         throw new HttpError(
           403,
           'Neznámá adresa serveru (hlavička Host) – ochrana proti DNS rebinding. Otevřete Kolomapu přes IP adresu nebo localhost, ' +
             'nebo nastavte heslo (KOLOMAPA_PASSWORD), případně povolte jméno serveru v KOLOMAPA_ALLOWED_HOSTS.'
         );
       }
-      if (config.password) {
+      if (authOn) {
         const ip = clientIp(req, !!config.trustProxy);
         const now = Date.now();
         const blocked = authBlockedFor(ip, now);
@@ -528,7 +589,7 @@ function createApp({ db, config, log = defaultLog, runner = null, now: clock = (
           const min = Math.ceil(blocked / 60000);
           throw new HttpError(429, `Příliš mnoho neúspěšných pokusů o přihlášení – zkuste to znovu za ${min} min.`, { 'Retry-After': String(Math.ceil(blocked / 1000)) });
         }
-        if (!checkBasicAuth(req.headers.authorization, config.password)) {
+        if (!checkBasicAuth(req.headers.authorization, config.password, getUsers())) {
           if (req.headers.authorization) authFailed(ip, now);
           res.writeHead(401, {
             ...SECURITY_HEADERS,
@@ -536,7 +597,7 @@ function createApp({ db, config, log = defaultLog, runner = null, now: clock = (
             'Content-Type': 'text/plain; charset=utf-8',
             'Cache-Control': 'no-store',
           });
-          res.end(req.method === 'HEAD' ? undefined : 'Přihlaste se heslem Kolomapy.');
+          res.end(req.method === 'HEAD' ? undefined : 'Přihlaste se jménem a heslem Kolomapy.');
           return;
         }
       }
@@ -576,6 +637,7 @@ module.exports = {
   clientIp,
   resolveStaticPath,
   checkBasicAuth,
+  createUsersSource,
   safeEqual,
   hostAllowed,
   acceptsGzip,

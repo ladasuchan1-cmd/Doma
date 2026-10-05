@@ -9,6 +9,8 @@
 # Přístup z jiných počítačů v obchodě (pak nastavte i heslo; Windows se zeptá na povolení ve firewallu):
 #KOLOMAPA_HOST=0.0.0.0
 #KOLOMAPA_PASSWORD=zvolte-heslo
+# Nebo (i navíc) uživatelé se jmény – stejný zápis jako CSM_USERS v Cyklo & Ski mapě:
+#KOLOMAPA_USERS=jana:heslo;petr:heslo2
 
 # Weby: bazos (výchozí). sbazar, cyklobazar a aukro jsou vypnuté kvůli pravidlům webů (robots.txt, Cloudflare) –
 # zapnutí je vaše rozhodnutí, viz README.md (Zdroje, šetrnost a pravidla). all = všechny.

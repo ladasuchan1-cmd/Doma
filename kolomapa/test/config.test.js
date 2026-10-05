@@ -83,6 +83,20 @@ test('relativní cesty (KOLOMAPA_DB …) vůči složce kolomapa – Plánovač 
   assert.equal(loadConfig({ KOLOMAPA_DB: ':memory:' }).dbFile, ':memory:');
 });
 
+test('uživatelé: „jana:heslo;petr:heslo2“ jako CSM_USERS (oddělovače ; , nový řádek, jméno malými, ořez mezer); soubor s CSM_PASSWORD → „tým“', () => {
+  const { parseUsers, parseUsersFile, loadConfig, PROJECT_DIR } = require('../src/config');
+  assert.deepEqual([...parseUsers('Lada:Tajne1; obchod : Heslo2,x:,:y\nTým:abc')], [['lada', 'Tajne1'], ['obchod', 'Heslo2'], ['tým', 'abc']]);
+  assert.equal(parseUsers('').size, 0);
+  assert.equal(parseUsers(undefined).size, 0);
+  const f = parseUsersFile('# opis\nCSM_USERS="lada:a;Obchod:b"\nCSM_PASSWORD=spolecne\nDOMAIN=x\nexport KOLOMAPA_USERS=jana:c\nKOLOMAPA_PASSWORD=ne\n');
+  assert.deepEqual([...f], [['lada', 'a'], ['obchod', 'b'], ['tým', 'spolecne'], ['jana', 'c']]);
+  const c = loadConfig({ KOLOMAPA_USERS: 'a:1;b:2', KOLOMAPA_USERS_FILE: 'data/uzivatele.env' });
+  assert.deepEqual([...c.users], [['a', '1'], ['b', '2']]);
+  assert.equal(c.usersFile, path.join(PROJECT_DIR, 'data', 'uzivatele.env'), 'relativní cesta vůči složce kolomapa');
+  assert.equal(loadConfig({}).usersFile, null);
+  assert.equal(loadConfig({}).users.size, 0);
+});
+
 test('nastaveni.txt: komentáře, „set“, uvozovky, malá písmena, překlepy, nesmysly', () => {
   const { values, warnings } = C.parseSettings(
     [

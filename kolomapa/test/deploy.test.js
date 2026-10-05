@@ -87,7 +87,7 @@ test('docker: nasadit.sh je platný bash, nasazuje jen s heslem a šablona .env 
   if (r.error) return t.skip('bash není k dispozici');
   assert.equal(r.status, 0, r.stderr);
   // bez hesla se mapa na internet nepouští; testy běží v obrazu před výměnou kontejneru; kontejner bez -p
-  assert.match(s, /grep -q '\^KOLOMAPA_PASSWORD=\.\\\+' "\$ENV_SOUBOR" \|\| die/);
+  assert.match(s, /grep -q '\^KOLOMAPA_PASSWORD=\.\\\+' "\$ENV_SOUBOR" \|\| die/, 'bez hesla (a bez uživatelů) se nenasazuje');
   assert.match(s, /docker run --rm "\$IMAGE" npm test/);
   assert.match(s, /docker build --no-cache --build-arg "S_PROHLIZECEM=/);
   // port se publikuje jen pro Caddy mimo Docker a jen na 127.0.0.1 – nikdy veřejně
@@ -110,6 +110,13 @@ test('docker: nasadit.sh je platný bash, nasazuje jen s heslem a šablona .env 
   const sites = s.slice(s.indexOf('elif [[ "$ZPUSOB" == sites ]]; then'), s.indexOf('caddyfile_git_srovnat "$CADDYFILE" "$KLON"'));
   assert.ok(sites.length > 100 && !sites.includes('$CADDYFILE.zaloha'), 'v git klonu žádný soubor .zaloha (hetzner.sh by viděl necommitnutou změnu)');
   assert.match(s, /merge -q --ff-only "origin\/\$vetev"/);
+  // přihlášení jmény a hesly Cyklo & Ski mapy: opis CSM_USERS/CSM_PASSWORD do data/uzivatele.env (vlastník UID 1000,
+  // jen pro čtení vlastníkem), obnova cronem, kontejner čte KOLOMAPA_USERS_FILE; bez hesla jen když uživatelé jsou
+  assert.match(s, /grep -E '\^CSM_\(USERS\|PASSWORD\)=' "\\\$Z"/);
+  assert.match(s, /chown 1000:1000 "\\\$CIL\.tmp" && chmod 600 "\\\$CIL\.tmp" && mv -f/);
+  assert.match(s, /\\n\*\/5 \* \* \* \* root %s\\n/, 'cron každých 5 minut');
+  assert.match(s, /ENV_NAVIC=\(-e "KOLOMAPA_USERS_FILE=\/app\/data\/\$UZIVATELE_SOUBOR"\)/);
+  assert.match(s, /\[\[ -n "\$UZIVATELE" \]\] \|\| grep -q '\^KOLOMAPA_PASSWORD=\.\\\+' "\$ENV_SOUBOR" \|\| die/);
   const { KNOWN_KEYS } = require('../src/config');
   for (const k of s.match(/^#?(KOLOMAPA_[A-Z_]+|ANTHROPIC_API_KEY)=/gm).map((x) => x.replace(/^#|=$/g, ''))) assert.ok(KNOWN_KEYS.has(k), k);
 });

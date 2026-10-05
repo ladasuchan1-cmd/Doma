@@ -19,9 +19,10 @@ curl -fsSL https://raw.githubusercontent.com/ladasuchan1-cmd/Doma/refs/heads/cla
 (Funguje pro uživatele se `sudo` i pro roota. Webová konzole Hetzneru `>_` také funguje, ale nejde do ní vkládat.)
 
 Stáhne kód do `/root/Doma`, postaví obraz, pustí v něm testy, spustí kontejner, přidá blok do konfigurace Caddy
-a načte ji, založí denní zálohu a **na konci vypíše heslo**. Trvá 3–5 minut. Pak otevřete
-https://kolomapa.37-27-203-154.sslip.io (jméno libovolné, heslo z výpisu). První stahování začne samo a trvá 2–3
-hodiny; mapa se plní průběžně. Příkaz lze spustit znovu kdykoli (aktualizuje kód a nasadí znovu).
+a načte ji, založí denní zálohu a na konci vypíše, **jak se přihlásit**: na tomto serveru jmény a hesly Cyklo & Ski
+mapy (viz níže); bez ní vygeneruje heslo a vypíše ho. Trvá 3–5 minut. Pak otevřete
+https://kolomapa.37-27-203-154.sslip.io. První stahování začne samo a trvá 2–3 hodiny; mapa se plní průběžně.
+Příkaz lze spustit znovu kdykoli (aktualizuje kód a nasadí znovu).
 
 Až bude práce sloučená do `main`, bude odkaz bez `refs/heads/claude/…` → `refs/heads/main`. Je-li repozitář
 soukromý, odkaz `raw.githubusercontent.com` nefunguje – pak nasazujte přes runner (níže) nebo podle
@@ -58,7 +59,8 @@ Změny v postupu nasazení patří do `nasadit.sh`, ne do workflow – skript po
 | Co | Kde |
 |---|---|
 | kód | `/root/Doma` (klon repozitáře, aplikace ve složce `kolomapa`) – při nasazení přes runner netřeba |
-| nastavení | `/root/kolomapa.env` (mimo git; při prvním nasazení vznikne s náhodným heslem a skript ho vypíše) |
+| nastavení | `/root/kolomapa.env` (mimo git; při prvním nasazení vznikne – s náhodným heslem jen bez Cyklo & Ski mapy) |
+| přihlášení | jména a hesla Cyklo & Ski mapy: `/usr/local/sbin/kolomapa-uzivatele` → `/root/kolomapa-data/uzivatele.env` (cron každých 5 min) |
 | data | `/root/kolomapa-data` → `/app/data` v kontejneru (databáze; přežije přestavbu), zálohy v `zalohy/` |
 | kontejner | `kolomapa` z obrazu `kolomapa`, port 8050 |
 | vrátnice | Caddy Cyklo & Ski mapy (`deploy-caddy-1`) → `https://kolomapa.37-27-203-154.sslip.io`; blok `/config/sites/kolomapa.caddy` ve svazku `caddy_config` zapíše `nasadit.sh` |
@@ -76,6 +78,22 @@ Caddy jako služba systému (`/etc/caddy/Caddyfile`, Kolomapa publikuje jen `127
 caddy`). Když v Caddyfile je sdílený snippet `(header_sec)`, blok ho použije. Před načtením se konfigurace ověří a
 při chybě se vrátí původní. Na konci skript zkusí `https://<doména>` přes Caddy (čeká 401 = chce heslo).
 
+## Přihlášení – stejná jména a hesla jako Cyklo & Ski mapa
+
+Cyklo & Ski mapa má uživatele v `CSM_USERS=jmeno:heslo;…` v `/opt/Doma/cyklo-ski-mapa/deploy/.env` (plní se z GitHubu,
+secret `HETZNER_USERS`, při každém jejím nasazení). Kolomapa používá tentýž seznam: `nasadit.sh` založí skript
+`/usr/local/sbin/kolomapa-uzivatele`, který řádky `CSM_USERS` / `CSM_PASSWORD` opisuje do
+`/root/kolomapa-data/uzivatele.env` (hned a pak cronem každých 5 minut, `/etc/cron.d/kolomapa-uzivatele`); kontejner
+soubor čte přes `KOLOMAPA_USERS_FILE` a změnu pozná okamžitě. Přidáte-li tedy uživatele v Cyklo & Ski mapě, do
+5 minut se přihlásí i do Kolomapy – bez nasazování. Jméno se zadává bez ohledu na velikost písmen; `CSM_PASSWORD`
+(společné heslo Cyklo & Ski mapy) platí jako uživatel „tým“.
+
+Vedle toho platí `KOLOMAPA_PASSWORD` v `/root/kolomapa.env` s libovolným jménem (když je vyplněné). Nechcete-li ho,
+nechte ho prázdné a spusťte `nasadit.sh`. Vlastní seznam jen pro Kolomapu: `KOLOMAPA_USERS=jana:heslo;petr:heslo2`
+v `/root/kolomapa.env` – pak se z Cyklo & Ski mapy nic neopisuje. Přihlášení je HTTP Basic (okno prohlížeče);
+odhlášení = zavřít prohlížeč. Session Cyklo & Ski mapy (cookie) se nesdílí – jde o stejná jména a hesla, ne o
+společné přihlášení.
+
 ## Vlastní doména místo sslip.io
 
 1. U správce domény přidejte záznam **A**, např. `kolomapa.ksprehledy.cz` → `37.27.203.154`
@@ -91,7 +109,8 @@ Formát `docker --env-file`: `KLÍČ=hodnota` bez uvozovek, `#` komentář. Po z
 
 | Klíč | Význam |
 |---|---|
-| `KOLOMAPA_PASSWORD` | heslo do mapy (jméno libovolné) – povinné, bez něj skript nenasadí |
+| `KOLOMAPA_PASSWORD` | společné heslo do mapy (jméno libovolné); bez Cyklo & Ski mapy povinné, s ní volitelné |
+| `KOLOMAPA_USERS` | vlastní uživatelé `jana:heslo;petr:heslo2` místo seznamu Cyklo & Ski mapy |
 | `KOLOMAPA_DOMENA` | adresa mapy (výchozí `kolomapa.<IP-s-pomlčkami>.sslip.io`) |
 | `KOLOMAPA_SOURCES` | weby (výchozí `bazos`; ostatní viz README – Zdroje, šetrnost a pravidla) |
 | `KOLOMAPA_PROHLIZEC` | `1` = do obrazu se přidá Chromium pro Cyklobazar (~400 MB; jen s `cyklobazar` v `KOLOMAPA_SOURCES`) |
@@ -125,6 +144,7 @@ Ostatní volby (`KOLOMAPA_DELAY_MS`, `KOLOMAPA_MAX_DETAILS`, `KOLOMAPA_AI_MAX_PE
 | „klon /opt/Doma má kvůli řádku import necommitnutou změnu“ | neškodí Kolomapě; jen `hetzner.sh aktualizace` (Cyklo & Ski mapa) zatím nestahuje nový kód – srovná se samo při dalším `nasadit.sh`, až bude větev Kolomapy sloučená do hlavní |
 | „Kolomapa do minuty neodpověděla“ | skript vypíše posledních 40 řádků logu; typicky špatná hodnota v `/root/kolomapa.env` |
 | mapa prázdná | první stahování ještě běží (stav nahoře v mapě, `docker logs kolomapa`) |
+| jméno z Cyklo & Ski mapy se nepřihlásí | `cat /root/kolomapa-data/uzivatele.env` má být opis `CSM_USERS` z `/opt/Doma/cyklo-ski-mapa/deploy/.env`; jinak `/usr/local/sbin/kolomapa-uzivatele` a `docker logs kolomapa \| grep -i uživatel`; v `/root/kolomapa.env` nesmí být vlastní `KOLOMAPA_USERS` |
 
 ## Rollback
 

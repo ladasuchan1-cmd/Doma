@@ -49,6 +49,11 @@
 //   KOLOMAPA_STATIC_INTERNAL    1 = statická verze ponechá max. výkupní ceny a poznámky AI (výchozí 0 – bývá veřejná)
 //   KOLOMAPA_USER_AGENT         identifikace robota v dotazech (výchozí „Mozilla/5.0 (compatible; Kolomapa/1.0; +…)“)
 //   KOLOMAPA_PASSWORD           heslo pro přístup k webu (HTTP Basic, jméno libovolné); prázdné = bez hesla
+//   KOLOMAPA_USERS              uživatelé „jana:heslo;petr:heslo2“ (oddělovač ; , nebo nový řádek; jméno bez ohledu na
+//                               velikost písmen) – stejný formát jako CSM_USERS v Cyklo & Ski mapě; platí vedle hesla
+//   KOLOMAPA_USERS_FILE         soubor s uživateli (řádky KOLOMAPA_USERS=…, CSM_USERS=…, CSM_PASSWORD=… → uživatel
+//                               „tým“); čte se znovu při každé změně souboru – na serveru ho plní nasadit.sh z Cyklo & Ski
+//                               mapy, takže obě aplikace mají stejná jména a hesla
 //   KOLOMAPA_DOMENA, KOLOMAPA_PROHLIZEC   čte jen deploy/docker/nasadit.sh (doména pro Caddy, Chromium do obrazu);
 //                               Kolomapa sama je ignoruje
 //   KOLOMAPA_EVAL_DIR           data pro tools/eval-pricing.js (výchozí data/eval)
@@ -80,6 +85,8 @@ const KNOWN_KEYS = new Set([
   'KOLOMAPA_STATIC_INTERNAL',
   'KOLOMAPA_EXPORT_AFTER_RUN',
   'KOLOMAPA_PASSWORD',
+  'KOLOMAPA_USERS',
+  'KOLOMAPA_USERS_FILE',
   'KOLOMAPA_USER_AGENT',
   'KOLOMAPA_SOURCES',
   'KOLOMAPA_SCHEDULE',
@@ -268,6 +275,44 @@ function matchTime(s) {
   return { hour: Number(m[1]), minute: Number(m[2]) };
 }
 
+/**
+ * Uživatelé „jana:heslo;petr:heslo2“ (oddělovač ; , nebo nový řádek) → Map(jméno malými písmeny → heslo). Stejná
+ * pravidla jako CSM_USERS v Cyklo & Ski mapě (jméno do 60 znaků, obojí bez mezer na krajích), aby jeden seznam platil
+ * pro obě aplikace.
+ * @param {string|null|undefined} src
+ * @returns {Map<string, string>}
+ */
+function parseUsers(src) {
+  const out = new Map();
+  for (const part of String(src || '').split(/[;\n,]+/)) {
+    const i = part.indexOf(':');
+    if (i <= 0) continue;
+    const name = part.slice(0, i).trim();
+    const pass = part.slice(i + 1).trim();
+    if (name && pass) out.set(name.slice(0, 60).toLowerCase(), pass);
+  }
+  return out;
+}
+
+/**
+ * Soubor s uživateli (KOLOMAPA_USERS_FILE): řádky KLÍČ=hodnota, # komentář; bere KOLOMAPA_USERS, CSM_USERS a
+ * CSM_PASSWORD (→ uživatel „tým“, jako v Cyklo & Ski mapě). Jiné řádky ignoruje – soubor bývá opis .env jiné aplikace.
+ * @param {string} text
+ * @returns {Map<string, string>}
+ */
+function parseUsersFile(text) {
+  const out = new Map();
+  for (const raw of String(text || '').split(/\r\n|\r|\n/)) {
+    const line = raw.replace(/^\uFEFF/, '').trim();
+    const m = /^(?:export\s+)?(KOLOMAPA_USERS|CSM_USERS|CSM_PASSWORD)\s*=\s*(.*)$/.exec(line);
+    if (!m) continue;
+    let val = m[2].trim();
+    if (val.length >= 2 && ((val.startsWith('"') && val.endsWith('"')) || (val.startsWith("'") && val.endsWith("'")))) val = val.slice(1, -1);
+    for (const [k, v] of parseUsers(m[1] === 'CSM_PASSWORD' ? (val ? `tým:${val}` : '') : val)) out.set(k, v);
+  }
+  return out;
+}
+
 function parseSchedule(v) {
   const s = envStr(v);
   if (s && OFF_RE.test(s)) return null;
@@ -402,6 +447,8 @@ function loadConfig(env = process.env) {
     staticInternal: bool('KOLOMAPA_STATIC_INTERNAL', false),
     // heslo se neořezává – mezery na začátku/konci jsou jeho součástí (jen prázdné = bez hesla)
     password: env.KOLOMAPA_PASSWORD != null && String(env.KOLOMAPA_PASSWORD) !== '' ? String(env.KOLOMAPA_PASSWORD) : null,
+    users: parseUsers(env.KOLOMAPA_USERS),
+    usersFile: envStr(env.KOLOMAPA_USERS_FILE) ? path.resolve(PROJECT_DIR, envStr(env.KOLOMAPA_USERS_FILE)) : null,
     userAgent: envStr(env.KOLOMAPA_USER_AGENT),
     sources,
     schedule,
@@ -493,6 +540,8 @@ module.exports = {
   envStr,
   parseSchedule,
   parseSources,
+  parseUsers,
+  parseUsersFile,
   parseSettings,
   applySettingsFile,
   decodeText,

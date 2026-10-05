@@ -104,9 +104,11 @@ async function start(options = {}) {
     const addr = server.address();
     const port = typeof addr === 'object' && addr ? addr.port : config.port;
     const url = displayUrl(config.host, port);
-    log.info(`Kolomapa běží na ${url}`, { db: config.dbFile, heslo: !!config.password });
-    if (!config.password && config.host !== '127.0.0.1' && config.host !== 'localhost' && config.host !== '::1') {
-      log.warn('Server naslouchá v síti bez hesla – nastavte KOLOMAPA_PASSWORD.');
+    const users = config.users instanceof Map ? config.users.size : 0;
+    const authOn = !!(config.password || users || config.usersFile);
+    log.info(`Kolomapa běží na ${url}`, { db: config.dbFile, heslo: !!config.password, uzivatele: users, souborUzivatelu: config.usersFile || null });
+    if (!authOn && config.host !== '127.0.0.1' && config.host !== 'localhost' && config.host !== '::1') {
+      log.warn('Server naslouchá v síti bez hesla – nastavte KOLOMAPA_PASSWORD nebo KOLOMAPA_USERS.');
     }
 
     if (schedulerOpts !== false) scheduler = startScheduler({ db, config, log, runner, ...(schedulerOpts || {}) });
