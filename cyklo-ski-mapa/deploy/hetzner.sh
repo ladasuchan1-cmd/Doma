@@ -24,8 +24,8 @@ set -euo pipefail
 
 if [ "$(id -u)" != 0 ]; then
   if [ -f "${BASH_SOURCE[0]:-}" ] && sudo -n true 2>/dev/null; then
-    exec sudo -n env CSM_USERS="${CSM_USERS:-}" CSM_USERS_B64="${CSM_USERS_B64:-}" CSM_REPO_DIR="${CSM_REPO_DIR:-}" \
-      CSM_COMPOSE="${CSM_COMPOSE:-}" CSM_ZALOHY="${CSM_ZALOHY:-}" CSM_VETEV="${CSM_VETEV:-}" CSM_UFW="${CSM_UFW:-}" \
+    exec sudo -n env CSM_USERS="${CSM_USERS:-}" CSM_USERS_B64="${CSM_USERS_B64:-}" CSM_DOMAIN="${CSM_DOMAIN:-}" CSM_REPO_DIR="${CSM_REPO_DIR:-}" \
+      CSM_COMPOSE="${CSM_COMPOSE:-}" CSM_ZALOHY="${CSM_ZALOHY:-}" CSM_VETEV="${CSM_VETEV:-}" CSM_UFW="${CSM_UFW:-}" CSM_CRON="${CSM_CRON:-}" \
       bash "${BASH_SOURCE[0]}" "$@"
   fi
   echo "CHYBA: spusťte jako root nebo přes sudo (sudo bash $0 …)." >&2
@@ -52,11 +52,29 @@ domena() { sed -n 's/^DOMAIN=//p' "$DEPLOY_DIR/.env" 2>/dev/null | head -1; }
 
 verze_z_gitu() { git -C "$APP_DIR" log -1 --format='v%cd-%h' --date=format:%Y-%m-%d 2>/dev/null || date +'v%Y-%m-%d-%H%M'; }
 
+# Uživatelé (CSM_USERS) a doména (CSM_DOMAIN) z prostředí – typicky z nastavení GitHubu při nasazení –
+# se propíší do deploy/.env, aby platilo to, co je v GitHubu, a na server nebylo nutné chodit.
+synchronizuj_env() {
+  local env="$DEPLOY_DIR/.env"
+  [ -f "$env" ] || return 0
+  if [ -n "${CSM_USERS:-}" ] && [ "$(sed -n 's/^CSM_USERS=//p' "$env" | head -1)" != "$CSM_USERS" ]; then
+    { grep -v '^CSM_USERS=' "$env"; printf 'CSM_USERS=%s\n' "$CSM_USERS"; } > "$env.tmp" && mv "$env.tmp" "$env" && chmod 600 "$env"
+    echo "→ Uživatelé aplikace v .env aktualizováni podle nastavení GitHubu."
+  fi
+  if [ -n "${CSM_DOMAIN:-}" ] && [ "$(domena)" != "$CSM_DOMAIN" ]; then
+    { grep -v '^DOMAIN=' "$env"; printf 'DOMAIN=%s\n' "$CSM_DOMAIN"; } > "$env.tmp" && mv "$env.tmp" "$env" && chmod 600 "$env"
+    echo "→ Doména změněna na $CSM_DOMAIN (Caddy si vystaví nový certifikát)."
+  fi
+}
+
 # Čeká, až aplikace v kontejneru odpoví na /api/health (a hlásí zapisovatelnou datovou složku).
 cekej_na_app() {
   local i
   for i in $(seq 1 60); do
-    if compose exec -T app wget -qO- http://127.0.0.1:8090/api/health >/dev/null 2>&1; then return 0; fi
+    if compose exec -T app wget -qO- http://127.0.0.1:8090/api/health >/dev/null 2>&1; then
+      compose logs --tail 20 app 2>/dev/null | grep -o 'Přihlášení zapnuté, uživatelé: .*' | tail -1 || true
+      return 0
+    fi
     sleep 1
   done
   echo "Aplikace do minuty neodpověděla. Log:" >&2
@@ -174,6 +192,7 @@ aktualizace() {
       echo "VAROVÁNÍ: aktualizace z GitHubu nešla rychloposunem – stavím aktuálně vytažený stav."
     fi
   fi
+  synchronizuj_env
   # předchozí verze pro cestu zpět – před buildem, než se přepíše tag latest
   if docker image inspect "$IMAGE:latest" >/dev/null 2>&1; then docker tag "$IMAGE:latest" "$IMAGE:predchozi"; fi
   echo "→ Stavím a spouštím…"
