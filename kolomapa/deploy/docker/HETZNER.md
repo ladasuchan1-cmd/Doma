@@ -1,11 +1,53 @@
-# Kolomapa na serveru s Dockerem a Caddy (Hetzner, ksprehledy.cz)
+# Kolomapa na serveru Hetzner (37.27.203.154) – Docker + Caddy
 
-Stejný vzor jako sales, projekty a import: aplikace běží jako kontejner na Docker síti `web`, ven ji pouští Caddy
-(kontejner `caddy`, konfigurace `/root/Caddyfile`), doména `*.ksprehledy.cz`, HTTPS certifikát si Caddy vyřídí sama.
+Stejný vzor jako ostatní aplikace (Cyklostezky a sjezdovky na `37-27-203-154.sslip.io`, sales/projekty/import na
+ksprehledy.cz): aplikace běží jako kontejner, ven ji pouští Caddy, HTTPS certifikát si Caddy vyřídí sama.
 Nasazení dělá jeden skript (`nasadit.sh`) – ručně v konzoli Hetzneru, nebo automaticky přes GitHub Actions
 (stejně jako Cashflow Radar).
 
-Výsledek: **https://kolomapa.ksprehledy.cz** s heslem; stahování běží každý den v 05:30 přímo na serveru.
+Výsledek: **https://kolomapa.37-27-203-154.sslip.io** s heslem; stahování běží každý den v 05:30 přímo na serveru.
+Adresa je podle IP serveru (sslip.io), takže nepotřebuje žádnou DNS – vlastní doménu lze dát kdykoli (níže).
+
+## První nasazení – jeden příkaz v konzoli Hetzneru (jako root)
+
+```bash
+bash <(curl -fsSL https://raw.githubusercontent.com/ladasuchan1-cmd/Doma/refs/heads/claude/bike-sales-monitoring-app-kufe7w/kolomapa/deploy/docker/pripravit-server.sh)
+```
+
+Stáhne kód do `/root/Doma`, postaví obraz, pustí v něm testy, spustí kontejner, přidá blok do konfigurace Caddy
+a načte ji, založí denní zálohu a **na konci vypíše heslo**. Trvá 3–5 minut. Pak otevřete
+https://kolomapa.37-27-203-154.sslip.io (jméno libovolné, heslo z výpisu). První stahování začne samo a trvá 2–3
+hodiny; mapa se plní průběžně. Příkaz lze spustit znovu kdykoli (aktualizuje kód a nasadí znovu).
+
+Až bude práce sloučená do `main`, bude odkaz bez `refs/heads/claude/…` → `refs/heads/main`. Je-li repozitář
+soukromý, odkaz `raw.githubusercontent.com` nefunguje – pak nasazujte přes runner (níže) nebo podle
+[../NASAZENI.md](../NASAZENI.md), krok 2 (klíč jen pro čtení) a `bash /root/Doma/kolomapa/deploy/docker/nasadit.sh`.
+
+## Automatické nasazení (GitHub Actions + self-hosted runner)
+
+Po každém sloučení do `main` (změny ve složce `kolomapa/`) proběhne workflow **„Kolomapa – nasazení na server“**:
+testy na runneru GitHubu → když projdou, self-hosted runner na serveru pustí `nasadit.sh`. Ručně:
+Actions → „Kolomapa – nasazení na server“ → *Run workflow* (jde i z rozpracované větve).
+
+1. **Repozitář přepněte na soukromý** (Settings → Danger Zone). Self-hosted runner ve veřejném repozitáři GitHub
+   nedoporučuje – kód z cizího pull requestu by se mohl dostat na váš server.
+2. **Registrační token:** GitHub → Doma → *Settings → Actions → Runners → New self-hosted runner → Linux* –
+   na stránce je řádek `./config.sh … --token XXXXXXXX`; token zkopírujte (platí hodinu).
+3. **Na serveru** tentýž příkaz jako při prvním nasazení, jen s tokenem na konci:
+
+   ```bash
+   bash <(curl -fsSL https://raw.githubusercontent.com/ladasuchan1-cmd/Doma/refs/heads/claude/bike-sales-monitoring-app-kufe7w/kolomapa/deploy/docker/pripravit-server.sh) XXXXXXXX
+   ```
+
+   Nainstaluje runner do `/root/actions-runner-kolomapa` se štítkem **`kolomapa`** jako službu (běží jako root,
+   protože nasazení upravuje konfiguraci Caddy a tak na serveru běží vše ostatní). Soukromý repozitář: runner si
+   kód stáhne sám (nepotřebuje klíč) – jen `raw.githubusercontent.com` odkaz nahraďte spuštěním
+   `bash /root/Doma/kolomapa/deploy/docker/pripravit-server.sh XXXXXXXX` z klonu, který už na serveru je.
+4. **Zapnutí:** Settings → Secrets and variables → Actions → *Variables* → `KOLOMAPA_HETZNER` = `true`.
+   Bez proměnné se job `deploy` přeskočí (jinak by bez runneru visel na „Waiting for a runner“).
+5. Actions → „Kolomapa – nasazení na server“ → *Run workflow*. Job `deploy` musí runner sebrat do pár vteřin.
+
+Změny v postupu nasazení patří do `nasadit.sh`, ne do workflow – skript pouští i ruční zásah na serveru.
 
 ## Jak to běží
 
@@ -14,62 +56,25 @@ Výsledek: **https://kolomapa.ksprehledy.cz** s heslem; stahování běží kaž
 | kód | `/root/Doma` (klon repozitáře, aplikace ve složce `kolomapa`) – při nasazení přes runner netřeba |
 | nastavení | `/root/kolomapa.env` (mimo git; při prvním nasazení vznikne s náhodným heslem a skript ho vypíše) |
 | data | `/root/kolomapa-data` → `/app/data` v kontejneru (databáze; přežije přestavbu), zálohy v `zalohy/` |
-| kontejner | `kolomapa` z obrazu `kolomapa`, síť `web`, port 8050 jen uvnitř sítě (bez `-p`) |
-| vrátnice | Caddy → `https://kolomapa.ksprehledy.cz` (blok do `/root/Caddyfile` přidá `nasadit.sh`, s `header_sec`) |
+| kontejner | `kolomapa` z obrazu `kolomapa`, port 8050 |
+| vrátnice | Caddy → `https://kolomapa.37-27-203-154.sslip.io`; blok do Caddyfile přidá `nasadit.sh` |
 | stahování | plánovač uvnitř kontejneru (05:30 pražského času) – žádný cron |
 | záloha | `/etc/cron.daily/kolomapa-zaloha` → `/root/kolomapa-data/zalohy/kolomapa-<den>.db` (7 dní dozadu) |
 | log | `docker logs -f kolomapa` |
 
-Doménu lze změnit v `/root/kolomapa.env` (`KOLOMAPA_DOMENA=…`) před prvním nasazením.
+Caddy skript pozná sám: v kontejneru `caddy` (Kolomapa se připojí na jeho Docker síť, blok `reverse_proxy
+kolomapa:8050`, Caddyfile podle připojeného svazku – typicky `/root/Caddyfile`), nebo jako služba systému
+(`/etc/caddy/Caddyfile`, Kolomapa publikuje jen `127.0.0.1:8050`, `systemctl reload caddy`). Když v Caddyfile je
+sdílený snippet `(header_sec)`, blok ho použije. Nic jiného se v konfiguraci Caddy nemění; před načtením se ověří
+a při chybě se vrátí původní soubor.
 
-## 1. DNS
+## Vlastní doména místo sslip.io
 
-U správce domény ksprehledy.cz přidejte záznam **A**: `kolomapa` → IP Hetzner serveru (stejná jako
-`sales.ksprehledy.cz`). Certifikát si Caddy vyřídí, jakmile se změna projeví (obvykle do hodiny).
-
-## 2. První nasazení – ručně (konzole Hetzneru, dva příkazy)
-
-```bash
-git clone -b claude/bike-sales-monitoring-app-kufe7w https://github.com/ladasuchan1-cmd/Doma.git /root/Doma
-bash /root/Doma/kolomapa/deploy/docker/nasadit.sh
-```
-
-(Až bude práce sloučená do `main`, klonujte bez `-b …`.) Skript postaví obraz, pustí v něm testy, spustí
-kontejner, přidá blok do `/root/Caddyfile` a načte Caddy, založí denní zálohu a **na konci vypíše heslo**.
-Trvá 3–5 minut. Pak otevřete https://kolomapa.ksprehledy.cz (jméno libovolné, heslo z výpisu); první stahování
-začne samo a trvá 2–3 hodiny.
-
-Je-li repozitář **soukromý**, potřebuje server pro `git clone` / `git pull` klíč jen pro čtení – postup
-v [../NASAZENI.md](../NASAZENI.md), krok 2 (nebo nasazujte přes runner níže, ten klíč nepotřebuje).
-
-## 3. Automatické nasazení (GitHub Actions + self-hosted runner)
-
-Po každém sloučení do `main` (změny ve složce `kolomapa/`) proběhne workflow **„Kolomapa – nasazení na server“**:
-testy na runneru GitHubu → když projdou, self-hosted runner na serveru pustí `nasadit.sh`. Ručně:
-Actions → „Kolomapa – nasazení na server“ → *Run workflow* (jde i z jiné větve, např. té rozpracované).
-
-1. **Repozitář přepněte na soukromý** (Settings → Danger Zone). Self-hosted runner ve veřejném repozitáři GitHub
-   nedoporučuje – kód z cizího pull requestu by se mohl dostat na váš server.
-2. **Runner na serveru** (konzole Hetzneru, jako root). Na GitHubu otevřete *Settings → Actions → Runners →
-   New self-hosted runner → Linux / x64* – stránka vypíše aktuální verzi, kontrolní součet a **registrační
-   token** (platí hodinu); použijte příkazy odtud, jen s těmito úpravami:
-
-   ```bash
-   mkdir -p /root/actions-runner-kolomapa && cd /root/actions-runner-kolomapa
-   # curl … a tar … přesně podle stránky GitHubu
-   RUNNER_ALLOW_RUNASROOT=1 ./config.sh --url https://github.com/ladasuchan1-cmd/Doma --token TOKEN_ZE_STRANKY \
-     --labels kolomapa --unattended
-   ./svc.sh install root && ./svc.sh start && ./svc.sh status
-   ```
-
-   Štítek **`kolomapa`** je důležitý – podle něj si workflow runner najde. Vlastní složka
-   `actions-runner-kolomapa`: runner je vázaný na jeden repozitář, případný runner jiné aplikace nezabere.
-   Běží jako root, protože nasazení upravuje `/root/Caddyfile` a na serveru tak běží vše ostatní.
-3. **Zapnutí:** Settings → Secrets and variables → Actions → *Variables* → `KOLOMAPA_HETZNER` = `true`.
-   Bez proměnné se job `deploy` přeskočí (jinak by bez runneru visel na „Waiting for a runner“).
-4. Actions → „Kolomapa – nasazení na server“ → *Run workflow*. Job `deploy` musí runner sebrat do pár vteřin.
-
-Změny v postupu nasazení patří do `nasadit.sh`, ne do workflow – skript pouští i ruční zásah na serveru.
+1. U správce domény přidejte záznam **A**, např. `kolomapa.ksprehledy.cz` → `37.27.203.154`
+   (je-li doména za Cloudflare, záznam dejte „DNS only“ – šedý mráček, ať certifikát vyřídí Caddy).
+2. V `/root/kolomapa.env` přepište `KOLOMAPA_DOMENA=kolomapa.ksprehledy.cz`.
+3. `bash /root/Doma/kolomapa/deploy/docker/nasadit.sh` – přidá nový blok do Caddy. Starý blok pro sslip.io můžete
+   v Caddyfile smazat.
 
 ## Nastavení (`/root/kolomapa.env`)
 
@@ -79,7 +84,7 @@ Formát `docker --env-file`: `KLÍČ=hodnota` bez uvozovek, `#` komentář. Po z
 | Klíč | Význam |
 |---|---|
 | `KOLOMAPA_PASSWORD` | heslo do mapy (jméno libovolné) – povinné, bez něj skript nenasadí |
-| `KOLOMAPA_DOMENA` | doména pro Caddy (výchozí `kolomapa.ksprehledy.cz`) |
+| `KOLOMAPA_DOMENA` | adresa mapy (výchozí `kolomapa.<IP-s-pomlčkami>.sslip.io`) |
 | `KOLOMAPA_SOURCES` | weby (výchozí `bazos`; ostatní viz README – Zdroje, šetrnost a pravidla) |
 | `KOLOMAPA_PROHLIZEC` | `1` = do obrazu se přidá Chromium pro Cyklobazar (~400 MB; jen s `cyklobazar` v `KOLOMAPA_SOURCES`) |
 | `ANTHROPIC_API_KEY` | zapne AI nacenění podle fotek (placené); balíček je v obrazu |
@@ -107,8 +112,8 @@ Ostatní volby (`KOLOMAPA_DELAY_MS`, `KOLOMAPA_MAX_DETAILS`, `KOLOMAPA_AI_MAX_PE
 | job `deploy` visí na „Waiting for a runner“ | runner neběží (`cd /root/actions-runner-kolomapa && ./svc.sh status`) nebo nemá štítek `kolomapa` |
 | job `deploy` se přeskočil | chybí proměnná repozitáře `KOLOMAPA_HETZNER=true` |
 | „testy v obrazu neprošly“ | celý výpis v `/tmp/kolomapa-testy.log` na serveru; starý kontejner běží dál |
-| „nová konfigurace Caddy neprošla kontrolou“ | skript vrátil původní `/root/Caddyfile`; blok přidejte ručně (je vypsaný ve skriptu) a `docker exec caddy caddy reload --config /etc/caddy/Caddyfile` |
-| prohlížeč hlásí chybu certifikátu | DNS ještě neukazuje na server (`getent hosts kolomapa.ksprehledy.cz`), Caddy to zkouší znovu sama |
+| „nová konfigurace Caddy neprošla kontrolou“ | skript vrátil původní Caddyfile; blok přidejte ručně (je vypsaný ve skriptu) a Caddy načtěte znovu |
+| prohlížeč hlásí chybu certifikátu | Caddy certifikát teprve vyřizuje (do minuty); u vlastní domény DNS ještě neukazuje na server |
 | „Kolomapa do minuty neodpověděla“ | skript vypíše posledních 40 řádků logu; typicky špatná hodnota v `/root/kolomapa.env` |
 | mapa prázdná | první stahování ještě běží (stav nahoře v mapě, `docker logs kolomapa`) |
 
@@ -117,7 +122,7 @@ Ostatní volby (`KOLOMAPA_DELAY_MS`, `KOLOMAPA_MAX_DETAILS`, `KOLOMAPA_AI_MAX_PE
 ```bash
 cd /root/Doma && git log --oneline -5        # commit před nasazením
 git checkout <hash> && bash kolomapa/deploy/docker/nasadit.sh   # (hlášku o git pull ignorujte)
-git checkout main                            # až to bude opravené
+git checkout -                               # až to bude opravené
 ```
 
 Databáze i nastavení zůstávají; nic se nemaže.

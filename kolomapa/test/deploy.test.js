@@ -90,7 +90,10 @@ test('docker: nasadit.sh je platný bash, nasazuje jen s heslem a šablona .env 
   assert.match(s, /grep -q '\^KOLOMAPA_PASSWORD=\.\\\+' "\$ENV_SOUBOR" \|\| die/);
   assert.match(s, /docker run --rm "\$IMAGE" npm test/);
   assert.match(s, /docker build --no-cache --build-arg "S_PROHLIZECEM=/);
-  assert.doesNotMatch(s, /docker run -d[^]*?-p /, 'kontejner se nepublikuje na hostiteli – jen přes Caddy');
+  // port se publikuje jen pro Caddy mimo Docker a jen na 127.0.0.1 – nikdy veřejně
+  assert.match(s, /PUBLISH=\(-p "127\.0\.0\.1:\$PORT:\$PORT"\)/);
+  assert.doesNotMatch(s, /-p "\$PORT:|-p 0\.0\.0\.0|-p "\$\{?PORT\}?:/);
+  assert.match(s, /sslip\.io/, 'výchozí adresa bez vlastní DNS');
   assert.match(s, /--network "\$SIT"/);
   assert.match(s, /--env-file "\$ENV_SOUBOR"/);
   assert.match(s, /-v "\$DATA":\/app\/data/);
@@ -110,4 +113,20 @@ test('docker: workflow nasazení – testy jako brána, self-hosted runner jen s
   assert.match(w, /needs: test/);
   assert.match(w, /run: bash kolomapa\/deploy\/docker\/nasadit\.sh/);
   assert.match(w, /contents: read/);
+});
+
+test('docker: pripravit-server.sh – jeden příkaz z raw odkazu (refs/heads/…), runner se štítkem kolomapa', (t) => {
+  const s = read(path.join('docker', 'pripravit-server.sh'));
+  assert.ok(!s.includes('\r'));
+  assert.match(s, /^#!\/usr\/bin\/env bash\n/);
+  assert.match(s, /\nset -euo pipefail\n/);
+  const r = spawnSync('bash', ['-n', path.join(DIR, 'docker', 'pripravit-server.sh')], { encoding: 'utf8' });
+  if (r.error) return t.skip('bash není k dispozici');
+  assert.equal(r.status, 0, r.stderr);
+  assert.match(s, /raw\.githubusercontent\.com\/ladasuchan1-cmd\/Doma\/refs\/heads\//, 'větev s lomítkem jen přes refs/heads/');
+  assert.match(s, /--labels kolomapa --unattended --replace/);
+  assert.match(s, /RUNNER_ALLOW_RUNASROOT=1/);
+  assert.match(s, /bash "\$KOD\/kolomapa\/deploy\/docker\/nasadit\.sh"/);
+  // bez tokenu se runner neinstaluje, jen nasadí
+  assert.match(s, /if \[\[ -z "\$TOKEN" \]\]; then/);
 });

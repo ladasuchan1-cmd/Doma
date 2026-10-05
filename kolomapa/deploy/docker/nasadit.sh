@@ -1,21 +1,27 @@
 #!/usr/bin/env bash
-# Nasazení Kolomapy na server s Dockerem a Caddy (Hetzner, ksprehledy.cz) – stejný vzor jako ostatní aplikace
-# (r01sales, projekty, import-web): kontejner na Docker síti „web“, ven ho pouští Caddy v kontejneru „caddy“
-# s konfigurací /root/Caddyfile. Postup a instalace runneru: deploy/docker/HETZNER.md.
+# Nasazení Kolomapy na server s Dockerem a Caddy (Hetzner) – stejný vzor jako ostatní aplikace (r01sales, projekty,
+# import-web, Cyklostezky a sjezdovky): kontejner, ven ho pouští Caddy. Postup a instalace runneru: HETZNER.md.
 #
-# Skript běží NA SERVERU – pouští ho GitHub Actions přes self-hosted runner (štítek „kolomapa“), nebo ho spustíte
-# ručně v konzoli Hetzneru:   bash /root/Doma/kolomapa/deploy/docker/nasadit.sh
+# Skript běží NA SERVERU – pouští ho GitHub Actions přes self-hosted runner (štítek „kolomapa“), nebo ručně
+# v konzoli Hetzneru:   bash /root/Doma/kolomapa/deploy/docker/nasadit.sh
 # Je schválně jeden pro obě cesty, aby se ruční zásah a automat nerozešly. Lze spouštět opakovaně.
 #
 # Co se kde drží:
 #   kód        /root/Doma (klon repozitáře, aplikace ve složce kolomapa) – ruční spuštění si stáhne novou verzi
 #   nastavení  /root/kolomapa.env (mimo git; při prvním nasazení vznikne s náhodným heslem a vypíše ho)
 #   data       /root/kolomapa-data → /app/data (databáze; přežije přestavbu obrazu), zálohy v podsložce zalohy/
-#   kontejner  „kolomapa“ z obrazu „kolomapa“, síť web, port 8050 jen uvnitř sítě (bez -p)
-#   vrátnice   Caddy → https://<KOLOMAPA_DOMENA> (výchozí kolomapa.ksprehledy.cz); blok do Caddyfile přidá skript
+#   kontejner  „kolomapa“ z obrazu „kolomapa“, port 8050
+#   vrátnice   Caddy → https://<KOLOMAPA_DOMENA>; výchozí doména kolomapa.<IP-serveru>.sslip.io (bez vlastní DNS,
+#              např. kolomapa.37-27-203-154.sslip.io), nebo vlastní (kolomapa.ksprehledy.cz + záznam A)
 #   stahování  plánovač uvnitř kontejneru (05:30 pražského času) – žádný cron není potřeba
 #   záloha     /etc/cron.daily/kolomapa-zaloha → /root/kolomapa-data/zalohy/kolomapa-<den>.db (7 dní dozadu)
 #
+# Caddy skript pozná sám:
+#   a) v kontejneru „caddy“ (ksprehledy.cz): Kolomapa na stejné Docker síti, blok „reverse_proxy kolomapa:8050“,
+#      Caddyfile na hostiteli podle připojeného svazku (typicky /root/Caddyfile), reload přes docker exec;
+#   b) jako služba systému (/etc/caddy/Caddyfile): Kolomapa publikuje 127.0.0.1:8050, blok
+#      „reverse_proxy 127.0.0.1:8050“, systemctl reload caddy;
+#   c) jinak blok jen vypíše (přidáte ručně).
 # Když cokoli selže (stavba, testy v obrazu, Caddy), starý kontejner běží dál.
 set -euo pipefail
 
@@ -24,17 +30,15 @@ IMAGE=kolomapa
 KOD="${KOLOMAPA_KOD:-/root/Doma}"
 ENV_SOUBOR="${KOLOMAPA_ENV:-/root/kolomapa.env}"
 DATA="${KOLOMAPA_DATA:-/root/kolomapa-data}"
-SIT="${KOLOMAPA_SIT:-web}"
 PORT=8050
-CADDYFILE="${CADDYFILE:-/root/Caddyfile}"      # na hostiteli (bind mount do kontejneru caddy)
 CADDY="${CADDY_KONTEJNER:-caddy}"
-CADDY_CONFIG="${CADDY_CONFIG:-/etc/caddy/Caddyfile}"   # tatáž cesta uvnitř kontejneru caddy
+CADDY_CONFIG="${CADDY_CONFIG:-/etc/caddy/Caddyfile}"   # cesta uvnitř kontejneru caddy
 ZALOHA_CRON="${KOLOMAPA_ZALOHA_CRON:-/etc/cron.daily/kolomapa-zaloha}"
 
 say() { printf '\n\033[1m→ %s\033[0m\n' "$*"; }
 die() { printf '\nCHYBA: %s\n' "$*" >&2; exit 1; }
 
-command -v docker >/dev/null || die "docker není nainstalovaný (na Hetzneru je – spouštíte to na správném serveru?)"
+command -v docker >/dev/null || die "docker není nainstalovaný (spouštíte to na správném serveru?)"
 docker info >/dev/null 2>&1 || die "uživatel $(whoami) nedosáhne na docker (chybí práva, nebo docker neběží)"
 
 # --- Odkud se staví --------------------------------------------------------------------------------------------
@@ -52,18 +56,52 @@ else
 fi
 echo "   verze: $(git -C "$ZDROJ" rev-parse --short HEAD 2>/dev/null || echo '?')"
 
+# --- Caddy: kde a jak --------------------------------------------------------------------------------------------
+REZIM=none
+SIT="${KOLOMAPA_SIT:-}"
+if docker ps --format '{{.Names}}' | grep -qx "$CADDY"; then
+  REZIM=docker
+  if [[ -z "${CADDYFILE:-}" ]]; then
+    # Caddyfile na hostiteli = zdroj svazku připojeného do kontejneru jako /etc/caddy/Caddyfile
+    CADDYFILE="$(docker inspect "$CADDY" --format '{{range .Mounts}}{{if eq .Destination "'"$CADDY_CONFIG"'"}}{{.Source}}{{end}}{{end}}' 2>/dev/null || true)"
+    CADDYFILE="${CADDYFILE:-/root/Caddyfile}"
+  fi
+  if [[ -z "$SIT" ]]; then
+    # první uživatelská Docker síť kontejneru caddy (na ní se Kolomapa najde jménem); bez ní síť „web“ + připojit caddy
+    SIT="$(docker inspect "$CADDY" --format '{{range $k, $v := .NetworkSettings.Networks}}{{$k}} {{end}}' 2>/dev/null | tr ' ' '\n' | grep -vx -e bridge -e host -e none -e '' | head -1 || true)"
+    SIT="${SIT:-web}"
+  fi
+  CIL="$APP:$PORT"
+elif command -v caddy >/dev/null && [[ -f "${CADDYFILE:-/etc/caddy/Caddyfile}" ]]; then
+  REZIM=system
+  CADDYFILE="${CADDYFILE:-/etc/caddy/Caddyfile}"
+  CIL="127.0.0.1:$PORT"
+else
+  CADDYFILE="${CADDYFILE:-/root/Caddyfile}"
+  CIL="127.0.0.1:$PORT"
+fi
+SIT="${SIT:-web}"
+echo "   Caddy: $REZIM${CADDYFILE:+ ($CADDYFILE)}, Docker síť: $SIT"
+
 # --- Nastavení (/root/kolomapa.env) -----------------------------------------------------------------------------
+# Výchozí doména: kolomapa.<veřejná IP serveru s pomlčkami>.sslip.io – funguje bez vlastní DNS, Caddy si pro ni
+# vyřídí certifikát sama. Vlastní doménu (kolomapa.ksprehledy.cz) stačí zapsat do KOLOMAPA_DOMENA a přidat záznam A.
+vychozi_domena() {
+  local ip
+  ip="$(hostname -I 2>/dev/null | tr ' ' '\n' | grep -E '^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$' | grep -vE '^(10\.|127\.|172\.(1[6-9]|2[0-9]|3[01])\.|192\.168\.)' | head -1 || true)"
+  if [[ -n "$ip" ]]; then echo "kolomapa.${ip//./-}.sslip.io"; else echo "kolomapa.ksprehledy.cz"; fi
+}
 NOVE_HESLO=""
 if [[ ! -f "$ENV_SOUBOR" ]]; then
   say "Zakládám $ENV_SOUBOR s náhodným heslem"
   NOVE_HESLO="$(head -c 32 /dev/urandom | base64 | tr -dc 'A-Za-z0-9' | cut -c1-20)"
   cat >"$ENV_SOUBOR" <<EOF
 # Nastavení Kolomapy na serveru (vytvořil kolomapa/deploy/docker/nasadit.sh). Formát docker --env-file:
-# KLÍČ=hodnota bez uvozovek. Po změně znovu spusťte nasadit.sh (nebo: docker restart nic nepomůže – kontejner
-# se musí založit znovu, to dělá nasadit.sh). Všechny volby: kolomapa/README.md a src/config.js.
+# KLÍČ=hodnota bez uvozovek. Po změně znovu spusťte nasadit.sh (kontejner se musí založit znovu, docker restart
+# nové hodnoty nenačte). Všechny volby: kolomapa/README.md a src/config.js.
 
-# Doména, na které Caddy mapu pouští (blok do Caddyfile přidá nasadit.sh):
-KOLOMAPA_DOMENA=kolomapa.ksprehledy.cz
+# Adresa mapy. sslip.io = podle IP serveru, bez vlastní DNS. Vlastní doména: přepsat a přidat záznam A na IP serveru.
+KOLOMAPA_DOMENA=${KOLOMAPA_DOMENA:-$(vychozi_domena)}
 
 # Heslo do mapy (jméno při přihlášení libovolné):
 KOLOMAPA_PASSWORD=$NOVE_HESLO
@@ -84,7 +122,7 @@ EOF
 fi
 hodnota() { sed -n "s/^$1=//p" "$ENV_SOUBOR" | tail -1 | tr -d '\r'; }
 DOMENA="${KOLOMAPA_DOMENA:-$(hodnota KOLOMAPA_DOMENA)}"
-DOMENA="${DOMENA:-kolomapa.ksprehledy.cz}"
+DOMENA="${DOMENA:-$(vychozi_domena)}"
 PROHLIZEC="${KOLOMAPA_PROHLIZEC:-$(hodnota KOLOMAPA_PROHLIZEC)}"
 [[ "$DOMENA" =~ ^[A-Za-z0-9]([A-Za-z0-9-]*[A-Za-z0-9])?(\.[A-Za-z0-9]([A-Za-z0-9-]*[A-Za-z0-9])?)+$ ]] || die "KOLOMAPA_DOMENA=„$DOMENA“ nevypadá jako doména"
 grep -q '^KOLOMAPA_PASSWORD=.\+' "$ENV_SOUBOR" || die "v $ENV_SOUBOR chybí KOLOMAPA_PASSWORD – mapa na internetu musí mít heslo"
@@ -101,10 +139,13 @@ echo "   $(grep -E '^# (pass|fail)' /tmp/kolomapa-testy.log | tr '\n' ' ')"
 
 # --- Síť, data -------------------------------------------------------------------------------------------------
 docker network inspect "$SIT" >/dev/null 2>&1 || { say "Zakládám Docker síť $SIT"; docker network create "$SIT" >/dev/null; }
+if [[ "$REZIM" == docker ]]; then docker network connect "$SIT" "$CADDY" >/dev/null 2>&1 || true; fi   # už připojená = nic
 mkdir -p "$DATA/zalohy"
 chown -R 1000:1000 "$DATA"   # kontejner běží jako uživatel node (UID 1000)
 
 # --- Výměna kontejneru -----------------------------------------------------------------------------------------
+PUBLISH=()
+if [[ "$REZIM" != docker ]]; then PUBLISH=(-p "127.0.0.1:$PORT:$PORT"); fi   # jen pro Caddy mimo Docker, nikdy veřejně
 say "Spouštím kontejner $APP"
 docker rm -f "$APP" >/dev/null 2>&1 || true
 docker run -d \
@@ -113,12 +154,13 @@ docker run -d \
   --network "$SIT" \
   --env-file "$ENV_SOUBOR" \
   -v "$DATA":/app/data \
+  "${PUBLISH[@]}" \
   "$IMAGE" >/dev/null
 
 # --- Caddy -------------------------------------------------------------------------------------------------------
 BLOK="# Kolomapa – mapa inzerátů kol (blok přidal kolomapa/deploy/docker/nasadit.sh)
 $DOMENA {
-    reverse_proxy $APP:$PORT
+    reverse_proxy $CIL
     header X-Robots-Tag \"noindex, nofollow\"
 }"
 if [[ ! -f "$CADDYFILE" ]]; then
@@ -134,18 +176,29 @@ else
   cp "$CADDYFILE" "$CADDYFILE.zaloha"
   # >> drží stejný soubor (inode) – kontejner caddy ho má připojený, nový soubor by neviděl
   printf '\n%s\n' "$BLOK" >>"$CADDYFILE"
-  if docker ps --format '{{.Names}}' | grep -qx "$CADDY"; then
-    if docker exec "$CADDY" caddy validate --config "$CADDY_CONFIG" >/dev/null 2>&1; then
-      docker exec "$CADDY" caddy reload --config "$CADDY_CONFIG" 2>&1 | grep -v -i 'formatt' || true
-      echo "   Caddy načetla novou konfiguraci (záloha předchozí: $CADDYFILE.zaloha)"
-    else
-      cp "$CADDYFILE.zaloha" "$CADDYFILE"
-      docker exec "$CADDY" caddy validate --config "$CADDY_CONFIG" 2>&1 | tail -5 || true
-      die "nová konfigurace Caddy neprošla kontrolou – vrácena původní; blok přidejte ručně (viz výše ve skriptu)"
-    fi
-  else
-    echo "VAROVÁNÍ: kontejner $CADDY neběží – blok je v $CADDYFILE, Caddy ho načte při příštím startu/reloadu."
-  fi
+  case "$REZIM" in
+    docker)
+      if docker exec "$CADDY" caddy validate --config "$CADDY_CONFIG" >/dev/null 2>&1; then
+        docker exec "$CADDY" caddy reload --config "$CADDY_CONFIG" >/dev/null 2>&1 || true
+        echo "   Caddy načetla novou konfiguraci (záloha předchozí: $CADDYFILE.zaloha)"
+      else
+        cp "$CADDYFILE.zaloha" "$CADDYFILE"
+        docker exec "$CADDY" caddy validate --config "$CADDY_CONFIG" 2>&1 | tail -5 || true
+        die "nová konfigurace Caddy neprošla kontrolou – vrácena původní; blok přidejte ručně (je ve skriptu)"
+      fi
+      ;;
+    system)
+      if caddy validate --config "$CADDYFILE" >/dev/null 2>&1; then
+        systemctl reload caddy 2>/dev/null || caddy reload --config "$CADDYFILE" >/dev/null 2>&1 || true
+        echo "   Caddy načetla novou konfiguraci (záloha předchozí: $CADDYFILE.zaloha)"
+      else
+        cp "$CADDYFILE.zaloha" "$CADDYFILE"
+        caddy validate --config "$CADDYFILE" 2>&1 | tail -5 || true
+        die "nová konfigurace Caddy neprošla kontrolou – vrácena původní; blok přidejte ručně (je ve skriptu)"
+      fi
+      ;;
+    *) echo "VAROVÁNÍ: Caddy neběží – blok je v $CADDYFILE, Caddy ho načte při příštím startu." ;;
+  esac
 fi
 
 # --- Denní záloha databáze ----------------------------------------------------------------------------------
