@@ -89,6 +89,9 @@ test('docker: nasadit.sh je platný bash, nasazuje jen s heslem a šablona .env 
   // bez hesla se mapa na internet nepouští; testy běží v obrazu před výměnou kontejneru; kontejner bez -p
   assert.match(s, /grep -q '\^KOLOMAPA_PASSWORD=\.\\\+' "\$ENV_SOUBOR" \|\| die/, 'bez hesla (a bez uživatelů) se nenasazuje');
   assert.match(s, /docker run --rm "\$IMAGE" npm test/);
+  // pull přinese nový nasadit.sh → bash by dočetl starý soubor nad novým kódem; nová verze se proto spustí znovu (jednou)
+  assert.match(s, /KOLOMAPA_NASADIT_ZNOVU=1 exec bash "\$SKRIPT" "\$@"/);
+  assert.match(s, /-z "\$\{KOLOMAPA_NASADIT_ZNOVU:-\}"/);
   assert.match(s, /docker build --no-cache --build-arg "S_PROHLIZECEM=/);
   // port se publikuje jen pro Caddy mimo Docker a jen na 127.0.0.1 – nikdy veřejně
   assert.match(s, /PUBLISH=\(-p "127\.0\.0\.1:\$PORT:\$PORT"\)/);

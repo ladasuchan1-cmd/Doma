@@ -61,10 +61,19 @@ docker info >/dev/null 2>&1 || die "uživatel $(whoami) nedosáhne na docker (ch
 # Z runneru je to jeho workspace s už vytaženým commitem (git na serveru netřeba). Ruční spuštění z /root/Doma si
 # napřed stáhne nejnovější verzi větve, kterou má klon vybranou.
 ZDROJ="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+SKRIPT="$ZDROJ/deploy/docker/nasadit.sh"
 [[ -f "$ZDROJ/Dockerfile" && -f "$ZDROJ/server.js" ]] || die "skript musí ležet v kolomapa/deploy/docker (nenašel jsem $ZDROJ/Dockerfile)"
 if [[ "$ZDROJ" == "$KOD/kolomapa" ]] && git -C "$KOD" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
   say "Ruční spuštění v $KOD – stahuji nejnovější verzi ($(git -C "$KOD" rev-parse --abbrev-ref HEAD))"
-  if git -C "$KOD" pull --ff-only; then :; else
+  OTISK_PRED="$(sha256sum "$SKRIPT" | cut -d' ' -f1)"
+  if git -C "$KOD" pull --ff-only; then
+    # Bash čte běžící skript ze starého souboru – když pull přinesl nový nasadit.sh, pokračoval by starý postup
+    # nad novým kódem. Proto se nová verze spustí znovu (jen jednou; druhý běh už nic nestáhne).
+    if [[ "$(sha256sum "$SKRIPT" | cut -d' ' -f1)" != "$OTISK_PRED" && -z "${KOLOMAPA_NASADIT_ZNOVU:-}" ]]; then
+      echo "   nasadit.sh se aktualizoval – spouštím znovu jeho novou verzi"
+      KOLOMAPA_NASADIT_ZNOVU=1 exec bash "$SKRIPT" "$@"
+    fi
+  else
     echo "VAROVÁNÍ: klon se nedostal na GitHub (soukromý repozitář bez klíče? bez sítě?) – stavím to, co na serveru je."
   fi
 else
