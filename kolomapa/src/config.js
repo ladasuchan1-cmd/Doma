@@ -10,8 +10,8 @@
 //   PORT / KOLOMAPA_PORT        port HTTP serveru (výchozí 8090)
 //   KOLOMAPA_HOST               adresa pro naslouchání (výchozí 127.0.0.1 – jen tento počítač; 0.0.0.0 = celá síť)
 //   KOLOMAPA_ALLOWED_HOSTS      další jména serveru povolená bez hesla (čte server.js; ochrana proti DNS rebinding)
-//   KOLOMAPA_TRUST_PROXY        1 = Kolomapa běží za reverzní proxy na stejném serveru (Caddy, nginx): adresa
-//                               návštěvníka pro ochranu proti hádání hesla se bere z X-Forwarded-For (výchozí 0)
+//   KOLOMAPA_TRUST_PROXY        1 = Kolomapa běží za reverzní proxy na stejném serveru nebo v téže Docker síti (Caddy,
+//                               nginx): adresa návštěvníka pro ochranu proti hádání hesla z X-Forwarded-For (výchozí 0)
 //   KOLOMAPA_DB                 soubor databáze (výchozí <projekt>/data/kolomapa.db; ':memory:' pro testy)
 //   KOLOMAPA_PUBLIC_DIR         adresář s UI (výchozí <projekt>/public)
 //   KOLOMAPA_SOURCES            zapnuté zdroje, čárkou (výchozí jen bazos – jediný web, jehož robots.txt potřebné stránky
@@ -49,6 +49,8 @@
 //   KOLOMAPA_STATIC_INTERNAL    1 = statická verze ponechá max. výkupní ceny a poznámky AI (výchozí 0 – bývá veřejná)
 //   KOLOMAPA_USER_AGENT         identifikace robota v dotazech (výchozí „Mozilla/5.0 (compatible; Kolomapa/1.0; +…)“)
 //   KOLOMAPA_PASSWORD           heslo pro přístup k webu (HTTP Basic, jméno libovolné); prázdné = bez hesla
+//   KOLOMAPA_DOMENA, KOLOMAPA_PROHLIZEC   čte jen deploy/docker/nasadit.sh (doména pro Caddy, Chromium do obrazu);
+//                               Kolomapa sama je ignoruje
 //   KOLOMAPA_EVAL_DIR           data pro tools/eval-pricing.js (výchozí data/eval)
 //   LOG_LEVEL                   debug | info | warn | error | silent
 //
@@ -70,6 +72,8 @@ const KNOWN_KEYS = new Set([
   'KOLOMAPA_HOST',
   'KOLOMAPA_ALLOWED_HOSTS',
   'KOLOMAPA_TRUST_PROXY',
+  'KOLOMAPA_DOMENA',
+  'KOLOMAPA_PROHLIZEC',
   'KOLOMAPA_DB',
   'KOLOMAPA_PUBLIC_DIR',
   'KOLOMAPA_STATIC_DIR',

@@ -17,6 +17,9 @@ kolomapa/
   tools/export-static.js    statická verze mapy do dist/ (GitHub Pages apod.)
   deploy/                   nasazení na vlastní Linux server: instalace.sh (služba systemd + Caddy/HTTPS + zálohy),
                             aktualizovat.sh, šablony služby a proxy, návod NASAZENI.md
+  deploy/docker/            server s Dockerem a Caddy (Hetzner): nasadit.sh (obraz, testy v obrazu, kontejner na síti
+                            web, blok do Caddyfile, záloha), návod HETZNER.md; obraz: Dockerfile + .dockerignore;
+                            workflow .github/workflows/kolomapa-nasazeni.yml (self-hosted runner, štítek kolomapa)
   tools/import-sales.js     import vlastních prodejů z POHODY (xlsx) → training/ + DB
   tools/build-geo.js        přegeneruje src/geo/data (GeoNames, ČÚZK)
   src/config.js             proměnné prostředí + nastaveni.txt; neplatné hodnoty → výchozí + české varování

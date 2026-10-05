@@ -55,3 +55,59 @@ test('deploy: služba běží pod vlastním uživatelem, kód jen pro čtení, p
   // nginx varianta: X-Forwarded-For jen s adresou návštěvníka (nepodvrhnutelné)
   assert.match(read('nginx-kolomapa.conf'), /proxy_set_header X-Forwarded-For \$remote_addr;/);
 });
+
+// ---------------------------------------------------------------- server s Dockerem a Caddy (deploy/docker)
+
+const ROOT = path.join(__dirname, '..');
+const readRoot = (f) => fs.readFileSync(path.join(ROOT, f), 'utf8');
+
+test('docker: obraz běží pod uživatelem node v pražském čase, jen port 8050, bez dat a hesel v obrazu', () => {
+  const d = readRoot('Dockerfile');
+  assert.match(d, /^FROM node:22-/m);
+  assert.match(d, /^USER node$/m);
+  assert.match(d, /TZ=Europe\/Prague/);
+  assert.match(d, /^EXPOSE 8050$/m);
+  assert.match(d, /KOLOMAPA_PORT=8050/);
+  assert.match(d, /KOLOMAPA_HOST=0\.0\.0\.0/);
+  assert.match(d, /KOLOMAPA_TRUST_PROXY=1/);
+  assert.match(d, /^HEALTHCHECK /m);
+  assert.match(d, /PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1/, 'Chromium jen na vyžádání (build-arg)');
+  assert.match(d, /^CMD \["node", "--disable-warning=ExperimentalWarning", "server\.js"\]$/m);
+  const ignore = readRoot('.dockerignore').split('\n');
+  for (const f of ['data', 'dist', 'node_modules', '.env', 'nastaveni.txt', '*.xlsx', '.git']) assert.ok(ignore.includes(f), `.dockerignore: chybí ${f}`);
+  assert.ok(readRoot('.gitignore').split('\n').includes('/.env'), '.env (heslo) se necommituje');
+});
+
+test('docker: nasadit.sh je platný bash, nasazuje jen s heslem a šablona .env má jen známé klíče', (t) => {
+  const s = read(path.join('docker', 'nasadit.sh'));
+  assert.ok(!s.includes('\r'));
+  assert.match(s, /^#!\/usr\/bin\/env bash\n/);
+  assert.match(s, /\nset -euo pipefail\n/);
+  const r = spawnSync('bash', ['-n', path.join(DIR, 'docker', 'nasadit.sh')], { encoding: 'utf8' });
+  if (r.error) return t.skip('bash není k dispozici');
+  assert.equal(r.status, 0, r.stderr);
+  // bez hesla se mapa na internet nepouští; testy běží v obrazu před výměnou kontejneru; kontejner bez -p
+  assert.match(s, /grep -q '\^KOLOMAPA_PASSWORD=\.\\\+' "\$ENV_SOUBOR" \|\| die/);
+  assert.match(s, /docker run --rm "\$IMAGE" npm test/);
+  assert.match(s, /docker build --no-cache --build-arg "S_PROHLIZECEM=/);
+  assert.doesNotMatch(s, /docker run -d[^]*?-p /, 'kontejner se nepublikuje na hostiteli – jen přes Caddy');
+  assert.match(s, /--network "\$SIT"/);
+  assert.match(s, /--env-file "\$ENV_SOUBOR"/);
+  assert.match(s, /-v "\$DATA":\/app\/data/);
+  assert.match(s, /caddy validate --config/, 'Caddyfile se před reloadem ověří');
+  assert.match(s, /chmod 600 "\$ENV_SOUBOR"/);
+  const { KNOWN_KEYS } = require('../src/config');
+  for (const k of s.match(/^#?(KOLOMAPA_[A-Z_]+|ANTHROPIC_API_KEY)=/gm).map((x) => x.replace(/^#|=$/g, ''))) assert.ok(KNOWN_KEYS.has(k), k);
+});
+
+test('docker: workflow nasazení – testy jako brána, self-hosted runner jen se zapnutou proměnnou, bez pull_request', (t) => {
+  const wf = path.join(ROOT, '..', '.github', 'workflows', 'kolomapa-nasazeni.yml');
+  if (!fs.existsSync(wf)) return t.skip('workflow leží v repozitáři nad složkou kolomapa (v obrazu Dockeru / ZIPu chybí)');
+  const w = fs.readFileSync(wf, 'utf8');
+  assert.doesNotMatch(w, /pull_request/, 'self-hosted runner nesmí spouštět kód z cizích pull requestů');
+  assert.match(w, /^\s+if: vars\.KOLOMAPA_HETZNER == 'true'$/m);
+  assert.match(w, /runs-on: \[self-hosted, kolomapa\]/);
+  assert.match(w, /needs: test/);
+  assert.match(w, /run: bash kolomapa\/deploy\/docker\/nasadit\.sh/);
+  assert.match(w, /contents: read/);
+});

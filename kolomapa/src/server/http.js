@@ -166,21 +166,31 @@ function checkBasicAuth(header, password) {
   return !!m && ok;
 }
 
-/** Adresa z tohoto počítače (127.0.0.0/8, ::1, IPv4 mapovaná do IPv6)? */
-function isLoopback(ip) {
-  const s = String(ip || '');
-  return s === '::1' || s.startsWith('127.') || s.startsWith('::ffff:127.');
+/**
+ * Adresa z tohoto počítače nebo z neveřejné sítě (reverzní proxy na stejném serveru, Caddy v Docker síti „web“):
+ * 127.0.0.0/8, ::1, 10/8, 172.16/12, 192.168/16, fc00::/7, fe80::/10 – i IPv4 mapovaná do IPv6 (::ffff:…).
+ */
+function isPrivatePeer(ip) {
+  let s = String(ip || '').toLowerCase();
+  if (s.startsWith('::ffff:')) s = s.slice(7);
+  if (s === '::1' || s.startsWith('fc') || s.startsWith('fd') || s.startsWith('fe80:')) return true;
+  const m = /^(\d{1,3})\.(\d{1,3})\.\d{1,3}\.\d{1,3}$/.exec(s);
+  if (!m) return false;
+  const a = Number(m[1]);
+  const b = Number(m[2]);
+  return a === 127 || a === 10 || (a === 172 && b >= 16 && b <= 31) || (a === 192 && b === 168);
 }
 
 /**
- * IP adresa návštěvníka. S trustProxy a požadavkem z tohoto počítače (reverzní proxy na stejném serveru) poslední
- * položka X-Forwarded-For – tu přidává proxy, předchozí si klient může vymyslet. Jinak adresa spojení.
+ * IP adresa návštěvníka. S trustProxy a požadavkem z tohoto počítače či neveřejné sítě (reverzní proxy na stejném
+ * serveru nebo v téže Docker síti) poslední položka X-Forwarded-For – tu přidává proxy, předchozí si klient může
+ * vymyslet. Jinak adresa spojení. Přímé spojení z internetu hlavičku nikdy nepoužije.
  * @param {import('node:http').IncomingMessage} req
  * @param {boolean} trustProxy
  */
 function clientIp(req, trustProxy) {
   const peer = req.socket.remoteAddress || '';
-  if (!trustProxy || !isLoopback(peer)) return peer;
+  if (!trustProxy || !isPrivatePeer(peer)) return peer;
   const list = String(req.headers['x-forwarded-for'] || '')
     .split(',')
     .map((x) => x.trim())

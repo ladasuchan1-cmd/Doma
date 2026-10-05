@@ -1,0 +1,52 @@
+# Kolomapa – nasazení na server s Dockerem a Caddy (Hetzner, ksprehledy.cz). Postup a instalace runneru:
+# kolomapa/deploy/docker/HETZNER.md. Stejný vzor jako Cashflow Radar: testy na runneru GitHubu, nasazení na
+# self-hosted runneru přímo na serveru (štítek „kolomapa“), který pustí kolomapa/deploy/docker/nasadit.sh.
+#
+# ZAPNUTÍ: proměnná repozitáře KOLOMAPA_HETZNER = true (Settings → Secrets and variables → Actions → Variables).
+# Bez ní se job deploy přeskočí – jinak by bez nainstalovaného runneru visel na „Waiting for a runner“.
+# Ručně: Actions → „Kolomapa – nasazení na server“ → Run workflow (jde i z jiné větve než main).
+name: Kolomapa – nasazení na server
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "kolomapa/**"
+      - ".github/workflows/kolomapa-nasazeni.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# Nikdy neběží dvě nasazení naráz; nové počká na rozběhnuté.
+concurrency:
+  group: kolomapa-nasazeni
+  cancel-in-progress: false
+
+jobs:
+  # Brána: testy musí projít, jinak se nenasazuje. Běží na runneru GitHubu, na server nesahá.
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: kolomapa
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Testy
+        run: npm test
+
+  # Nasazuje SELF-HOSTED runner na serveru (checkout do jeho workspace → vždy nejnovější verze skriptu;
+  # na serveru pak není potřeba žádný přístup ke gitu ani klíč k soukromému repozitáři).
+  deploy:
+    needs: test
+    if: vars.KOLOMAPA_HETZNER == 'true'
+    runs-on: [self-hosted, kolomapa]
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+      - name: Nasazení (build --no-cache + testy v obrazu + výměna kontejneru + Caddy)
+        run: bash kolomapa/deploy/docker/nasadit.sh

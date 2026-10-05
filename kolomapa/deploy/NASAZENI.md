@@ -1,5 +1,9 @@
 # Kolomapa na vlastním serveru s doménou
 
+> Server, kde už běží ostatní aplikace v Dockeru za Caddy (Hetzner, ksprehledy.cz)? Pak použijte
+> [docker/HETZNER.md](docker/HETZNER.md) – Kolomapa tam poběží jako další kontejner. Tenhle návod je pro
+> samostatný Linux server bez Dockeru.
+
 Výsledek: mapa na `https://mapa.vasedomena.cz` s heslem a HTTPS certifikátem (Let's Encrypt, obnovuje se sám).
 Stahování běží každý den přímo na serveru, počítač v obchodě nemusí být zapnutý.
 

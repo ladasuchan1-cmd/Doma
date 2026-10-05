@@ -1,0 +1,11 @@
+# Do obrazu nepatří data, výstupy ani soubory s hesly (nastavení jde do kontejneru přes --env-file).
+data
+dist
+node_modules
+nastaveni.txt
+nastaveni.txt.txt
+.env
+*.xlsx
+*.xls
+*.csv
+.git

@@ -32,6 +32,10 @@ Na Linuxovém serveru (Ubuntu/Debian) poběží Kolomapa jako služba se stahov�
 s heslem a automatickým HTTPS certifikátem – jedním příkazem `sudo bash deploy/instalace.sh mapa.vasedomena.cz`.
 Celý postup (DNS, stažení kódu ze soukromého repozitáře, zálohy, aktualizace): [deploy/NASAZENI.md](deploy/NASAZENI.md).
 
+Na serveru, kde už běží ostatní aplikace v Dockeru za Caddy (Hetzner, ksprehledy.cz), se Kolomapa nasazuje jako další
+kontejner – ručně jedním skriptem, nebo automaticky po sloučení do `main` (GitHub Actions + runner na serveru):
+[deploy/docker/HETZNER.md](deploy/docker/HETZNER.md).
+
 ## Windows – krok za krokem
 
 1. **Node.js:** na https://nodejs.org stáhněte verzi **LTS** (Windows Installer) a nainstalujte ji s výchozími volbami.

@@ -183,7 +183,10 @@ test('clientIp: X-Forwarded-For jen od proxy na stejném počítači, jen platn�
   assert.equal(clientIp(req('127.0.0.1', '1.2.3.4'), true), '1.2.3.4');
   assert.equal(clientIp(req('::ffff:127.0.0.1', '9.9.9.9, 1.2.3.4'), true), '1.2.3.4');
   assert.equal(clientIp(req('::1', '2001:db8::1'), true), '2001:db8::1');
+  assert.equal(clientIp(req('172.18.0.3', '1.2.3.4'), true), '1.2.3.4', 'Caddy v Docker síti web');
+  assert.equal(clientIp(req('::ffff:10.0.0.5', '9.9.9.9, 1.2.3.4'), true), '1.2.3.4', 'proxy v neveřejné síti');
   assert.equal(clientIp(req('192.0.2.5', '1.2.3.4'), true), '192.0.2.5', 'přímé spojení z internetu: hlavičce nevěřit');
+  assert.equal(clientIp(req('172.32.0.1', '1.2.3.4'), true), '172.32.0.1', '172.32/12 už je veřejný rozsah');
   assert.equal(clientIp(req('127.0.0.1', 'nesmysl'), true), '127.0.0.1');
   assert.equal(clientIp(req('127.0.0.1'), true), '127.0.0.1');
   assert.equal(clientIp(req('127.0.0.1', '1.2.3.4'), false), '127.0.0.1');
