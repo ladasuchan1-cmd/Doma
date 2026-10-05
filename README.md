@@ -86,6 +86,9 @@ se všemi cyklotrasami, cyklostezkami a sjezdovkami a s ubytováním, půjčovna
 e-mail → voláno → osobní návštěva, poznámka). Stačí otevřít `cyklo-ski-mapa/index.html`; pro sdílení stavu v týmu
 `cd cyklo-ski-mapa && npm start`.
 
+Dokumentace: [shrnutí na 1 stránku](cyklo-ski-mapa/docs/SHRNUTI.md) · [manuál pro obchodní tým](cyklo-ski-mapa/docs/MANUAL.md)
+· [metodika dat](cyklo-ski-mapa/docs/METODIKA.md) · [nasazení a provoz](cyklo-ski-mapa/NASAZENI.md).
+
 ## Licence
 
 MIT
