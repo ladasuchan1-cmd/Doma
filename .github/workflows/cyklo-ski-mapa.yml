@@ -68,14 +68,24 @@ jobs:
           test -n "$HOST" || { echo "Chybí secret HETZNER_HOST"; exit 1; }
           test -n "$KEY" || { echo "Chybí secret HETZNER_SSH_KEY"; exit 1; }
           mkdir -p ~/.ssh
-          # klíč vložený ze schránky (Windows) mívá konce řádků CRLF nebo BOM – OpenSSH ho pak odmítne („error in libcrypto“)
-          printf '%s\n' "$KEY" | sed '1s/^\xEF\xBB\xBF//' | tr -d '\r' > ~/.ssh/id_deploy
-          chmod 600 ~/.ssh/id_deploy
-          if ! ssh-keygen -y -P "" -f ~/.ssh/id_deploy >/dev/null 2>&1; then
-            echo "Secret HETZNER_SSH_KEY není platný soukromý klíč bez hesla. Vložte celý obsah souboru csm-deploy (ne .pub),"
-            echo "od řádku -----BEGIN OPENSSH PRIVATE KEY----- po -----END OPENSSH PRIVATE KEY-----, vygenerovaný bez passphrase."
+          # Klíč vložený ze schránky (Windows) mívá CRLF, BOM, mezery na koncích řádků nebo je slepený do jednoho
+          # řádku – OpenSSH ho pak odmítne („error in libcrypto“). Vezme se jen tělo mezi BEGIN a END a znovu zalomí.
+          raw="$(printf '%s\n' "$KEY" | sed '1s/^\xEF\xBB\xBF//' | tr -d '\r')"
+          typ="$(printf '%s\n' "$raw" | grep -o -m1 'BEGIN [A-Z0-9 ]*PRIVATE KEY' | sed 's/^BEGIN //')"
+          if [ -z "$typ" ]; then
+            echo "Secret HETZNER_SSH_KEY neobsahuje soukromý klíč (chybí řádek -----BEGIN … PRIVATE KEY-----)."
+            echo "Vložte celý obsah souboru csm-deploy (bez přípony .pub), od řádku BEGIN po řádek END."
             exit 1
           fi
+          body="$(printf '%s\n' "$raw" | sed -e 's/-----BEGIN [A-Z0-9 ]*PRIVATE KEY-----//' -e 's/-----END [A-Z0-9 ]*PRIVATE KEY-----//' | tr -d '[:space:]')"
+          { echo "-----BEGIN $typ-----"; printf '%s\n' "$body" | fold -w 70; echo "-----END $typ-----"; } > ~/.ssh/id_deploy
+          chmod 600 ~/.ssh/id_deploy
+          if ! chyba="$(ssh-keygen -y -P "" -f ~/.ssh/id_deploy 2>&1 >/dev/null)"; then
+            echo "Secret HETZNER_SSH_KEY není použitelný klíč: $chyba"
+            echo "Zmiňuje-li hláška passphrase, je klíč chráněný heslem: vygenerujte nový bez passphrase (postup v NASAZENI.md) a nahrajte veřejný na server i soukromý do secretu znovu."
+            exit 1
+          fi
+          echo "Klíč v pořádku, otisk: $(ssh-keygen -lf ~/.ssh/id_deploy | awk '{print $2}')"
           ssh-keyscan -p "${PORT:-22}" -H "$HOST" >> ~/.ssh/known_hosts 2>/dev/null
           APP="${DIR:-/opt/Doma/cyklo-ski-mapa}"
           REPO_DIR="$(dirname "$APP")"
