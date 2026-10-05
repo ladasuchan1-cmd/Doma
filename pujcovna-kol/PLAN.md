@@ -9,7 +9,7 @@ Nic z toho zatím není naprogramováno – tento dokument říká **co, proč, 
 ## 0. Jak bych postupoval – v deseti bodech
 
 1. **Nestavět na cizím hotovém systému, ale na vlastním jádru.** Nejbližší open-source vzory (Louez, Shelf.nu, QloApps, AdamRMS) jsou AGPL/GPL nebo PHP monolity – bereme z nich *vzory* (stavový automat rezervace, záloha jako částečná platba, white-label přes konfiguraci), ne kód. Vlastní jádro v Node bez závislostí je přesně to, co už umíme z Cenotvorby, a má nejmenší útočnou plochu – což je u priority „bezpečnost dat“ rozhodující.
-2. **Jedna aplikace, jedna databáze na půjčovnu.** Každá půjčovna = samostatný SQLite soubor, vlastní tajemství, vlastní doména. Odpovídá to právní realitě (každá půjčovna je správce osobních údajů, my jsme zpracovatel), výmaz při odchodu klienta je smazání souboru, a chyba v jednom dotazu nikdy nevynese data jiné půjčovny.
+2. **Jedna aplikace, jedna databáze na půjčovnu.** Každá půjčovna = samostatný SQLite soubor, vlastní tajemství, vlastní subdoména musteru odvozená z názvu jejího webu (např. `utridubu.rezervacekol.cz`). Odpovídá to právní realitě (každá půjčovna je správce osobních údajů, my jsme zpracovatel), výmaz při odchodu klienta je smazání souboru, a chyba v jednom dotazu nikdy nevynese data jiné půjčovny.
 3. **Karty nikdy nesahají na náš server.** Platba kartou jde přes hostovanou stránku brány (redirect), takže jsme v nejnižším režimu PCI DSS (SAQ A). Převod a QR Platba (standard SPAYD) generujeme sami a párujeme přes bankovní API (Fio zdarma) nebo ručně.
 4. **Rezervační poplatek je fixní částka za každé kolo a účtuje se jako částečná platba objednávky**, ne zvláštní entita: při finálním vyúčtování se odečte (`doplatek = cena − zaplaceno`). Storno pravidla jsou tabulka „hodin před vyzvednutím → kolik z poplatku propadá“, nastavitelná per půjčovna. Kauce je něco jiného (vratná jistota), blokuje se až při převzetí a půjčovna nabízí obě formy: hotově či terminálem na místě, nebo preautorizací karty přes bránu.
 5. **Rezervujeme typ kola, konkrétní kus přiřazujeme při výdeji.** Dostupnost = počet kol daného typu a velikosti − překrývající se rezervace (s bufferem na čištění). Kontrola i zápis běží v jedné transakci, takže dvojí rezervace nevznikne.
@@ -47,7 +47,8 @@ Nic z toho zatím není naprogramováno – tento dokument říká **co, proč, 
 | Admin | **vlastní jednoduchý admin** (vzor Cenotvorba: vanilla JS views nad `/api/v1`) | nejmenší útočná plocha; Strapi měl v roce 2026 kritické CVE, Directus není OSS | AdminJS, react-admin, Payload, Directus, Strapi |
 | Theming | **CSS tokeny ve 3 vrstvách + `data-theme` + layoutové varianty v manifestu půjčovny**, fonty self-hostované | 3 skutečně odlišné designy nad jedním HTML; žádné Google CDN (GDPR, CSP) | Tailwind presety (build krok), 3 oddělené šablony (trojí údržba) |
 | Mapa | **Leaflet (vendor) + Mapy.cz outdoor + CyclOSM**, data z Cyklo & Ski mapy, POI z OSM/Wikidata/Wikipedie | 0 Kč měsíčně v limitech, licenčně čisté, znovupoužití hotové pipeline | MapLibre (vektorové, pomalejší na GeoJSON), Google Maps/Places (drahé, zákaz ukládání) |
-| Hosting | **jeden Hetzner VPS (EU) + Docker Compose + Caddy s on-demand TLS**, Litestream + restic zálohy | známý postup (`hetzner.sh`), desítky půjčoven na CX22, data v EU | kontejner per půjčovna (jen pro VIP), PaaS mimo EU |
+| Hosting | **jeden Hetzner VPS (EU) + Docker Compose + Caddy s wildcard certifikátem (DNS-01) pro subdomény půjčoven**, on-demand TLS jen pro případné vlastní domény, Litestream + restic zálohy | známý postup (`hetzner.sh`), desítky půjčoven na CX22, data v EU; wildcard = založení půjčovny bez čekání na certifikát, názvy klientů nejsou v CT lozích, limity Let's Encrypt nehrají roli | kontejner per půjčovna (jen pro VIP), PaaS mimo EU, čistě on-demand TLS (max ~45 nových půjčoven týdně, veřejný seznam klientů v CT) |
+| Hlavní doména | **`pujcovna.cz` je obsazená** (registr CZ.NIC: držena od 1998, aktivní, transfer lock) → doporučení **`rezervacekol.cz`** (volná k 5. 10. 2026), registrovat ihned na 3+ roky; zálohy `kolapujcovna.cz`, `rezervujkolo.cz` jako přesměrování | krátká, popisuje funkci, čte se dobře jako `utridubu.rezervacekol.cz`; detaily a 10 volných alternativ v [rešerši 07](docs/vyzkum/07-domeny-a-tls.md) | odkup `pujcovna.cz` (nereálné), vlastní doména každé půjčovny jako výchozí (zadavatel chce subdomény) |
 | Doklady totožnosti | **nikdy kopie ani sken**, jen typ + číslo v šifrovaném poli, automatický výmaz po vypořádání | stanovisko ÚOOÚ 2021, § 39 zákona č. 269/2021 Sb. | upload fotky dokladu (časté v praxi, ale protiprávní bez svobodného souhlasu) |
 
 ---
@@ -55,7 +56,7 @@ Nic z toho zatím není naprogramováno – tento dokument říká **co, proč, 
 ## 3. Architektura
 
 ```
- zákazník ──HTTPS──▶ Caddy (TLS on-demand podle platform.db) ──▶ app (Node, 1 proces)
+ zákazník ──HTTPS──▶ Caddy (wildcard *.rezervacekol.cz; on-demand TLS jen pro vlastní domény) ──▶ app (Node, 1 proces)
                                                                   │
                            hostname → tenant (slug) ──────────────┤
                                                                   ├─ SSR stránky (téma podle tenant.json)
@@ -275,7 +276,8 @@ Technicky vzor Cenotvorby: vanilla JS views nad `/api/v1`, znovupoužité `publi
 
 ## 12. Provoz a nasazení
 
-- **Docker Compose:** `app` (Node, `USER node`, read-only FS, `/data` volume) + `caddy` (on-demand TLS s `ask` na `/api/tls-ask` ověřujícím doménu v `platform.db`; HSTS, `encode zstd gzip`, bez `Server` hlavičky, access log s rotací) + `litestream` (průběžná replikace všech `*.db` do Hetzner Object Storage) + volitelně `uptime-kuma`.
+- **Docker Compose:** `app` (Node, `USER node`, read-only FS, `/data` volume) + `caddy` (vlastní image s DNS pluginem; HSTS, `encode zstd gzip`, bez `Server` hlavičky, access log s rotací) + `litestream` (průběžná replikace všech `*.db` do Hetzner Object Storage) + volitelně `uptime-kuma`.
+- **Domény a TLS** (detail v [rešerši 07](docs/vyzkum/07-domeny-a-tls.md)): hlavní doména musteru (doporučení `rezervacekol.cz`), půjčovna = `<slug>.rezervacekol.cz`, slug z domény jejího stávajícího webu (`utridubu.cz` → `utridubu`), `[a-z0-9-]`, 3–40 znaků, jediná úroveň; rezervované slugy `www`, `platform`, `stage`, `mail`, `bounce`, `demo-*`. **Wildcard certifikát `*.rezervacekol.cz` + apex přes DNS-01** (Caddy ≥ 2.10 s pluginem `caddy-dns/cloudflare` při DNS-only u Cloudflare s tokenem omezeným na zónu, nebo `caddy-dns/hetzner`; nejlépe delegace `_acme-challenge` do oddělené zóny) → nová půjčovna bez čekání na certifikát, názvy klientů nejsou v CT lozích. **On-demand TLS** s `ask` na `/api/tls-ask` jen pro případné vlastní domény půjčoven po pilotu. Cookies výhradně `__Host-` (bez `Domain`), `/platform` na vlastním hostu, HSTS `max-age` postupně až na rok s `includeSubDomains`, preload a Public Suffix List až po pilotu a vědomě. DNS: `A/AAAA` apex + wildcard, CAA `letsencrypt.org`, DNSSEC. E-mail z `<slug>@mail.rezervacekol.cz` s `Reply-To` půjčovny, DKIM na hlavní doméně, SPF na každém odesílacím hostu, DMARC `p=reject; sp=reject`.
 - **`hetzner.sh`:** převzít (instalace, aktualizace s rollbackem, zaloha, stav, log) a rozšířit o `tenant pridat <slug> <domena>` (založí DB, zavolá `build-okoli`, přidá doménu), `tenant odebrat` (export + smazání po potvrzení), `obnova-test`.
 - **Zálohy:** Litestream (point-in-time) + restic denně `/data` (DB, fotky, doklady) na Hetzner Storage Box, šifrováno, retence 7 dní / 4 týdny / 12 měsíců; `sqlite.backup()` pro konzistentní snapshot; **test obnovy měsíčně** s záznamem.
 - **E-maily:** transakční přes HTTPS API poskytovatele (bez SDK), preferovat EU hosting a smlouvu o zpracování (kandidáti: Mailgun EU, Brevo, Postmark/Resend po ověření podmínek – rozhodnutí v kap. 15); SPF, DKIM, DMARC; odesílání z domény musteru s `Reply-To` půjčovny, nebo ověřená doména půjčovny; bounce webhook → admin.
@@ -300,7 +302,7 @@ Odhad pro 1–2 vývojáře, který se zpřesní po rozhodnutích z kap. 15. Ka�
 
 | Fáze | Obsah | Výstup | Odhad |
 |---|---|---|---|
-| **0 Příprava** | rozhodnutí z kap. 15; zadání textů advokátovi; účty: brána (sandbox), Mapy.cz API klíč, Fio testovací účet, e-mail; kostra `pujcovna-kol/`, CI, Dockerfile; SPEC.md z tohoto plánu | repozitář s testy a CI, rozhodnutí zapsaná | 1 týden |
+| **0 Příprava** | zbývající rozhodnutí z kap. 15; **registrace hlavní domény** (doporučení `rezervacekol.cz`, 3+ roky) a DNS u poskytovatele s API pro DNS-01; předání návrhů z `legal/` advokátovi zadavatele; účty: brána (sandbox), Mapy.cz API klíč, Fio testovací účet, e-mail; kostra `pujcovna-kol/`, CI, Dockerfile; SPEC.md z tohoto plánu | repozitář s testy a CI, rozhodnutí zapsaná, doména registrovaná | 1 týden |
 | **1 Jádro + prezentace** | platform/tenant DB a migrace; auth (scrypt, session, 2FA), šifrování polí, audit; SSR layout a téma Outdoor; stránky Domů, Kola, Detail kola, Kontakt, OP, Zásady; admin: kola, ceník, nastavení, uživatelé; `new-tenant.js` | živý web demo půjčovny bez rezervací | 2–3 týdny |
 | **2 Rezervace** | dostupnost, kalendář, cena, rezervační tok (bez plateb → „platba na místě“), e-maily, expirace, správa rezervace tokenem; admin: timeline, rezervace, výdej/vrácení, protokol, doklady HTML | kompletní rezervace bez online platby | 2–3 týdny |
 | **3 Platby** | `PaymentProvider`, převod + QR (SPAYD), Fio párování + import + ruční; karta přes 1. bránu (sandbox → prod); storno engine, vratky, ledger, kauce preautorizací, doklady k platbě, Pohoda export | rezervační poplatek online všemi třemi způsoby, vyúčtování | 2–3 týdny |
@@ -323,7 +325,7 @@ Po pilotu: PDF doklady, druhá brána (Stripe), okruhy BRouter, více poboček, 
 | **Rezervační poplatek** | fixní částka za každé kolo | per typ kola, výchozí návrh 300 Kč kolo / 500 Kč e-kolo, vratný s odstupňovaným stornem (kap. 6) |
 | **Kauce** | obě varianty | hotově/terminál na místě i preautorizace karty přes bránu při převzetí (kap. 6) |
 | **Banka pro párování** | Fio | adaptér `FioMatcher` první; import výpisu a ruční potvrzení pro ostatní banky |
-| **Domény** | subdomény musteru podle názvu stávajícího webu půjčovny, např. Hotel U Tří dubů s webem utridubu.cz → `utridubu.pujcovna.cz` | jedna hlavní doména, slug odvozený z domény webu půjčovny; TLS, limity a bezpečnost cookies viz kap. 12 a rešerše domén; dostupnost domény `pujcovna.cz` nutno ověřit (viz rešerše) |
+| **Domény** | subdomény musteru podle názvu stávajícího webu půjčovny, např. Hotel U Tří dubů s webem utridubu.cz → `utridubu.<domena-musteru>` | **`pujcovna.cz` je obsazená** (ověřeno v registru CZ.NIC 5. 10. 2026, držena od 1998, aktivní) → doporučení registrovat **`rezervacekol.cz`** (volná) a zálohy `kolapujcovna.cz`, `rezervujkolo.cz`; wildcard TLS, `__Host-` cookies, limity a e-mail viz kap. 12 a [rešerše 07](docs/vyzkum/07-domeny-a-tls.md). **Konečný výběr názvu domény je na zadavateli.** |
 | **Právní kontrola** | zajišťuje zadavatel | my dodáváme návrhy v `legal/` s oponenturou a seznamem bodů k ověření (kap. 8) |
 
 ### Zbývá rozhodnout
@@ -350,6 +352,8 @@ Po pilotu: PDF doklady, druhá brána (Stripe), okruhy BRouter, více poboček, 
 | Doručitelnost e-mailů | zákazník nedostane potvrzení | ověřená doména, SPF/DKIM/DMARC, bounce webhook, potvrzení i na stránce „Správa rezervace“ |
 | Malý tým, široký rozsah | nestihnutý pilot | MVP s jedním designem a jednou bránou; ostatní po pilotu |
 | Server kompromitován | únik dat více půjčoven | šifrovaná pole s klíčem mimo DB, oddělené DB, minimální práva kontejneru, rychlá rotace klíčů, incident plán |
+| Volné alternativy k obsazené `pujcovna.cz` někdo zaregistruje dřív | ztráta zvoleného názvu musteru | registrovat vybranou doménu (`rezervacekol.cz`) hned ve fázi 0, na 3+ roky |
+| DNS API klíč pro wildcard certifikát na serveru | útočník s přístupem k serveru mění DNS | token omezený na jednu zónu, nebo delegace `_acme-challenge` do oddělené zóny; DNS-only režim bez proxy |
 
 ---
 
@@ -370,3 +374,7 @@ Po pilotu: PDF doklady, druhá brána (Stripe), okruhy BRouter, více poboček, 
 3. [Bezpečnost, GDPR, obchodní podmínky](docs/vyzkum/03-bezpecnost-gdpr-podminky.md) – ÚOOÚ k dokladům, retence, OWASP parametry, multi-tenant izolace, praxe 10 půjčoven, checklist 28 bodů, osnovy OP a Zásad.
 4. [Mapa cyklostezek a zajímavosti](docs/vyzkum/04-mapa-cyklostezek-a-zajimavosti.md) – knihovny, podklady a ceny, data tras, POI zdroje a licence, znovupoužití Cyklo & Ski mapy.
 5. [Stack, theming, tři designy](docs/vyzkum/05-stack-theming-designy.md) – zvyklosti v repozitáři, porovnání backendů/DB/renderování, tokeny, tři koncepty s paletami a fonty, admin, provoz.
+6. [Výběr platební brány](docs/vyzkum/06-vyber-platebni-brany.md) – ověřené ceníky a API Comgate, GoPay, ThePay a Stripe, náklady pro malou a střední půjčovnu, hodnocení cena+údržba a bezpečnost+riziko, doporučení první a záložní brány.
+7. [Subdomény, hlavní doména a TLS](docs/vyzkum/07-domeny-a-tls.md) – `pujcovna.cz` obsazená, volné alternativy, wildcard DNS-01 vs. on-demand, limity Let's Encrypt, cookies `__Host-`, HSTS, PSL, SEO, e-mail.
+
+Návrhy právních textů k advokátní kontrole: složka [legal/](legal/README.md).
