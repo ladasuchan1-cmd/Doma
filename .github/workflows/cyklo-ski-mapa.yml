@@ -92,9 +92,11 @@ jobs:
           SUDO=""; [ "${USER:-root}" != "root" ] && SUDO="sudo -n"
           ssh_cmd() { ssh -i ~/.ssh/id_deploy -p "${PORT:-22}" -o StrictHostKeyChecking=yes "${USER:-root}@$HOST" "$@"; }
           USERS_B64="$(printf %s "$USERS" | base64 -w0)"
+          # Skript se posílá přes stdin z právě nasazovaného commitu: kdyby se spouštěl ten na serveru, běžela by
+          # jeho předchozí verze (soubor se aktualizuje až uvnitř běhu) a změny ve skriptu by platily o nasazení později.
           if ssh_cmd "$SUDO test -f '$APP/deploy/.env'"; then
             echo "→ Aplikace je nainstalovaná – aktualizuji (uživatelé a doména podle nastavení GitHubu, jsou-li vyplněné)."
-            ssh_cmd "$SUDO env CSM_USERS_B64='$USERS_B64' CSM_DOMAIN='$DOMAIN' bash '$APP/deploy/hetzner.sh' aktualizace"
+            ssh_cmd "$SUDO env CSM_USERS_B64='$USERS_B64' CSM_DOMAIN='$DOMAIN' CSM_REPO_DIR='$REPO_DIR' bash -s -- aktualizace" < cyklo-ski-mapa/deploy/hetzner.sh
           else
             echo "→ Aplikace na serveru není – první instalace."
             test -n "$DOMAIN" || { echo "První instalace potřebuje variable CSM_HETZNER_DOMAIN (doména webu)."; exit 1; }
