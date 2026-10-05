@@ -61,7 +61,7 @@ if [[ "$ZDROJ" == "$KOD/kolomapa" ]] && git -C "$KOD" rev-parse --is-inside-work
 else
   say "Stavím z $ZDROJ (kód dodal runner / aktuální složka)"
 fi
-echo "   verze: $(git -C "$ZDROJ" rev-parse --short HEAD 2>/dev/null || echo '?')"
+echo "   verze: $(git -C "$ZDROJ" log -1 --format='%h (%cd) %s' --date=format:'%Y-%m-%d %H:%M' 2>/dev/null || echo '?')"
 
 # --- Caddy: kde a jak --------------------------------------------------------------------------------------------
 # Kontejner Caddy: jméno z CADDY_KONTEJNER, jinak „caddy“, jinak jediný běžící kontejner z obrazu caddy nebo se
@@ -116,6 +116,11 @@ else
 fi
 SIT="${SIT:-web}"
 echo "   Caddy: $REZIM${CADDY:+ (kontejner $CADDY)}${CADDYFILE:+, $CADDYFILE}${KLON:+ – v git klonu $KLON}, Docker síť: $SIT"
+if [[ "$REZIM" == none ]]; then
+  echo "VAROVÁNÍ: Caddy jsem nenašel – žádný běžící kontejner z obrazu caddy (ani se „caddy“ ve jméně) a caddy není ani služba."
+  echo "          Běžící kontejnery: $(docker ps --format '{{.Names}} ({{.Image}})' | tr '\n' ' ')"
+  echo "          Bez Caddy se mapa z internetu neotevře. Jiné jméno kontejneru: CADDY_KONTEJNER=jmeno bash nasadit.sh"
+fi
 
 # --- Nastavení (/root/kolomapa.env) -----------------------------------------------------------------------------
 # Výchozí doména: kolomapa.<veřejná IP serveru s pomlčkami>.sslip.io – funguje bez vlastní DNS, Caddy si pro ni
@@ -321,7 +326,8 @@ for i in $(seq 1 30); do
       LOG_CADDY="${CADDY:+docker logs $CADDY}"; LOG_CADDY="${LOG_CADDY:-journalctl -u caddy -n 50}"
       KOD_HTTP=000
       for _ in $(seq 1 12); do
-        KOD_HTTP="$(curl -sk -o /dev/null -m 5 -w '%{http_code}' --resolve "$DOMENA:443:127.0.0.1" "https://$DOMENA/" 2>/dev/null || echo 000)"
+        KOD_HTTP="$(curl -sk -o /dev/null -m 5 -w '%{http_code}' --resolve "$DOMENA:443:127.0.0.1" "https://$DOMENA/" 2>/dev/null || true)"
+        KOD_HTTP="${KOD_HTTP:-000}"
         [[ "$KOD_HTTP" == 000 ]] || break
         sleep 5
       done
@@ -333,6 +339,12 @@ for i in $(seq 1 30); do
     fi
     echo
     echo "Mapa:       https://$DOMENA   (jméno libovolné; heslo: KOLOMAPA_PASSWORD v $ENV_SOUBOR)"
+    case "$REZIM" in
+      docker) if [[ "$ZPUSOB" == sites ]]; then echo "Vrátnice:   Caddy v kontejneru $CADDY → $CIL (blok $CADDY_SITES/$APP.caddy, import v $CADDYFILE)"
+              else echo "Vrátnice:   Caddy v kontejneru $CADDY → $CIL (blok v $CADDYFILE)"; fi ;;
+      system) echo "Vrátnice:   Caddy jako služba ($CADDYFILE) → $CIL" ;;
+      *)      echo "Vrátnice:   ŽÁDNÁ – Caddy nenalezena, https://$DOMENA se neotevře (viz VAROVÁNÍ výše)" ;;
+    esac
     [[ -n "$NOVE_HESLO" ]] && echo "Nové heslo: $NOVE_HESLO"
     echo "Log:        docker logs -f $APP        Stav: docker ps --filter name=$APP"
     echo "Nastavení:  $ENV_SOUBOR  (po změně znovu spustit nasadit.sh)"
