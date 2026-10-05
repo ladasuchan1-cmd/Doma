@@ -334,6 +334,9 @@
     shown: 0,
     filters: loadFilters(),
     filtersOpen: storage.get('filtersOpen', false),
+    onlyVisible: storage.get('onlyVisible', true), // seznam jen z inzerátů v zobrazené části mapy (piny zůstávají všechny)
+    listed: [], // state.filtered omezené na výřez mapy (když onlyVisible)
+    keepListUntil: 0, // po kliknutí na kartu mapa přijíždí k pinu – seznam se při tom nepřepočítává
     sort: storage.get('sort', 'deal'),
     tab: storage.get('tab', 'deals'),
     selectedId: null,
@@ -501,6 +504,7 @@
     map.fitBounds(CR_BOUNDS, { padding: [8, 8] });
     map.createPane('krajePane').style.zIndex = 390;
     map.on('zoomend', updateZoomClass);
+    map.on('moveend', onMapMoved);
     updateZoomClass();
 
     cluster = L.markerClusterGroup({
@@ -760,6 +764,7 @@
     await pinsReady;
     await whenMapIdle();
     if (state.selectedId !== l.id) return;
+    state.keepListUntil = Date.now() + 2500; // cesta mapy k pinu není změna výřezu od uživatele
     const m = markers.get(l.id);
     if (m && cluster.hasLayer(m) && m.__parent) {
       cluster.zoomToShowLayer(m, () => {
@@ -1112,14 +1117,26 @@
       'Filtry',
       n ? el('span', { class: 'fbadge', text: String(n) }) : null
     );
+    const filters = buildFilters();
+    filters.hidden = !state.filtersOpen;
+    const active = el('div', { class: 'chips chips--active', id: 'active-filters', 'aria-label': 'Zapnuté filtry' });
+    const syncOpen = () => {
+      $('filters').hidden = !state.filtersOpen;
+      toggle.setAttribute('aria-expanded', String(state.filtersOpen));
+      renderActiveFilters();
+    };
     toggle.addEventListener('click', () => {
       state.filtersOpen = !state.filtersOpen;
       storage.set('filtersOpen', state.filtersOpen);
-      $('filters').hidden = !state.filtersOpen;
-      toggle.setAttribute('aria-expanded', String(state.filtersOpen));
+      syncOpen();
     });
-    const filters = buildFilters();
-    filters.hidden = !state.filtersOpen;
+    const hide = el('button', { type: 'button', class: 'btn btn--sm', id: 'hide-filters' }, 'Skrýt filtry');
+    hide.addEventListener('click', () => {
+      state.filtersOpen = false;
+      storage.set('filtersOpen', false);
+      syncOpen();
+    });
+    filters.append(el('div', { class: 'filters__foot' }, hide));
     const reset = el('button', { type: 'button', class: 'linkbtn', id: 'reset', hidden: !n }, 'Zrušit filtry');
     reset.addEventListener('click', () => {
       Object.assign(state.filters, EMPTY_FILTERS());
@@ -1127,13 +1144,64 @@
       renderKrajPanel(false);
       applyFilters();
     });
+    // Seznam jen z výřezu mapy: přiblížíte město a vlevo dole vidíte, co je tam k mání; piny zůstávají všude.
+    const vis = el('input', { type: 'checkbox', id: 'only-visible' });
+    vis.checked = !!state.onlyVisible;
+    vis.addEventListener('change', () => {
+      state.onlyVisible = vis.checked;
+      storage.set('onlyVisible', state.onlyVisible);
+      applyFilters();
+    });
     return el(
       'div',
       { class: 'toolbar' },
       el('div', { class: 'toolbar__row' }, el('label', { class: 'search' }, icon('search'), search)),
       el('div', { class: 'toolbar__row' }, toggle, sort),
+      active,
       filters,
-      el('div', { class: 'resultbar' }, el('span', { id: 'result-count', 'aria-live': 'polite' }), reset)
+      el('div', { class: 'resultbar' }, el('span', { id: 'result-count', 'aria-live': 'polite' }), reset),
+      el('label', { class: 'toggle toggle--sm' }, vis, 'Jen kola v zobrazené části mapy')
+    );
+  }
+
+  /** Zapnuté filtry jako čipy s křížkem – vidět i při skrytém panelu filtrů; křížek filtr zruší. */
+  function activeFilterItems() {
+    const f = state.filters;
+    const items = [];
+    const setItems = (setKey, defs) => {
+      for (const key of f[setKey]) {
+        const d = defs.find((x) => x.key === key);
+        items.push({ label: d ? d.label : key, remove: () => f[setKey].delete(key) });
+      }
+    };
+    for (const k of f.sourcesOff) items.push({ label: `bez: ${sourceLabel(k)}`, remove: () => f.sourcesOff.delete(k) });
+    setItems('cats', CATEGORIES);
+    setItems('drive', DRIVES);
+    setItems('susp', SUSPENSIONS);
+    for (const k of f.motors) items.push({ label: `motor ${k}`, remove: () => f.motors.delete(k) });
+    if (f.age) items.push({ label: `do ${(AGES.find((a) => a.key === f.age) || { label: `${f.age} h` }).label}`, remove: () => (f.age = '') });
+    if (f.min !== '') items.push({ label: `od ${fmtNum(f.min)} Kč`, remove: () => (f.min = '') });
+    if (f.max !== '') items.push({ label: `do ${fmtNum(f.max)} Kč`, remove: () => (f.max = '') });
+    if (f.deals) items.push({ label: 'jen výhodné', remove: () => (f.deals = false) });
+    if (f.fresh) items.push({ label: 'jen nové', remove: () => (f.fresh = false) });
+    return items;
+  }
+  function renderActiveFilters() {
+    const box = $('active-filters');
+    if (!box) return;
+    const items = state.filtersOpen ? [] : activeFilterItems();
+    box.hidden = !items.length;
+    box.replaceChildren(
+      ...items.map((it) => {
+        const b = el('button', { type: 'button', class: 'chip chip--active', title: 'Zrušit tento filtr', 'aria-label': `Zrušit filtr ${it.label}` }, it.label, el('span', { class: 'x', 'aria-hidden': 'true', text: '×' }));
+        b.addEventListener('click', () => {
+          it.remove();
+          saveFilters();
+          renderKrajPanel(false);
+          applyFilters();
+        });
+        return b;
+      })
     );
   }
 
@@ -1243,6 +1311,7 @@
     filterDeb = setTimeout(() => {
       applyFilters();
       saveFilters();
+      renderActiveFilters();
       const n = activeFilterCount();
       const btn = document.querySelector('.toolbar [aria-controls="filters"]');
       if (btn) {
@@ -1280,18 +1349,55 @@
       return true;
     });
     sortListings(state.filtered);
+    renderPins();
+    renderList();
+    const reset = $('reset');
+    if (reset) reset.hidden = !activeFilterCount() && !f.q;
+    renderActiveFilters();
+  }
+
+  /**
+   * Inzeráty z state.filtered v zobrazené části mapy. Inzeráty bez polohy nejde umístit – ukážou se, jen dokud je
+   * vidět celý kraj (jinak by počet „v zobrazené části“ nikdy nedosáhl počtu v kraji).
+   */
+  function inViewport(list) {
+    if (!map || !state.kraj) return list;
+    const b = map.getBounds();
+    const layer = krajLayers.get(state.kraj);
+    const wholeKraj = !!layer && b.contains(layer.getBounds());
+    return list.filter((l) => (l.la != null && l.lo != null ? b.contains([l.la, l.lo]) : wholeKraj));
+  }
+
+  /** Seznam vlevo (karty) a počet – ze state.filtered, při „jen v zobrazené části mapy“ jen z výřezu. */
+  function renderList() {
+    state.listed = state.onlyVisible ? inViewport(state.filtered) : state.filtered;
     state.shown = 0;
     const ul = $('cards');
     if (ul) ul.replaceChildren();
     renderMore();
-    renderPins();
     const rc = $('result-count');
     if (rc) {
       const n = state.filtered.length;
-      rc.textContent = n === state.listings.length ? `${fmtNum(n)} ${plural(n, 'inzerát', 'inzeráty', 'inzerátů')}` : `${fmtNum(n)} z ${fmtNum(state.listings.length)}`;
+      const all = n === state.listings.length;
+      const base = all ? `${fmtNum(n)} ${plural(n, 'inzerát', 'inzeráty', 'inzerátů')}` : `${fmtNum(n)} z ${fmtNum(state.listings.length)}`;
+      rc.textContent = state.listed.length === n ? base : `${fmtNum(state.listed.length)} v zobrazené části mapy · ${base}${all ? ' v kraji' : ''}`;
     }
-    const reset = $('reset');
-    if (reset) reset.hidden = !activeFilterCount() && !f.q;
+  }
+
+  let mapMoveDeb = null;
+  function onMapMoved() {
+    if (!state.kraj || !state.onlyVisible) return;
+    if (Date.now() < state.keepListUntil) {
+      state.keepListUntil = Date.now() + 500; // animace (zoom k pinu) jede ve víc krocích – počkat na její konec
+      return;
+    }
+    clearTimeout(mapMoveDeb);
+    mapMoveDeb = setTimeout(() => {
+      if (!state.kraj || !state.onlyVisible) return;
+      const next = inViewport(state.filtered);
+      if (next.length === state.listed.length && next.every((l, i) => l === state.listed[i])) return;
+      renderList();
+    }, 150);
   }
 
   function sortListings(arr) {
@@ -1325,23 +1431,25 @@
     const ul = $('cards');
     const more = $('more');
     if (!ul || !more) return;
-    const next = state.filtered.slice(state.shown, state.shown + PAGE);
+    const list = state.listed;
+    const next = list.slice(state.shown, state.shown + PAGE);
     ul.append(...next.map((l) => card(l)));
     state.shown += next.length;
     more.replaceChildren();
-    if (!state.filtered.length) {
+    if (!list.length) {
+      const viewportOnly = state.filtered.length > 0; // filtry něco pustily, jen to není v zobrazené části mapy
       more.append(
         el(
           'div',
           { class: 'empty' },
-          el('b', { text: state.listings.length ? 'Nic neodpovídá filtrům' : 'V kraji teď nejsou žádné inzeráty kol' }),
-          state.listings.length ? el('div', { text: 'Zkuste filtry uvolnit nebo zrušit.' }) : null
+          el('b', { text: viewportOnly ? 'V zobrazené části mapy nic není' : state.listings.length ? 'Nic neodpovídá filtrům' : 'V kraji teď nejsou žádné inzeráty kol' }),
+          viewportOnly ? el('div', { text: 'Oddalte mapu, posuňte ji k pinům, nebo vypněte „Jen kola v zobrazené části mapy“.' }) : state.listings.length ? el('div', { text: 'Zkuste filtry uvolnit nebo zrušit.' }) : null
         )
       );
       return;
     }
-    if (state.shown < state.filtered.length) {
-      const b = el('button', { type: 'button', class: 'btn' }, `Zobrazit další (${fmtNum(state.filtered.length - state.shown)})`);
+    if (state.shown < list.length) {
+      const b = el('button', { type: 'button', class: 'btn' }, `Zobrazit další (${fmtNum(list.length - state.shown)})`);
       b.addEventListener('click', renderMore);
       more.append(b);
       // automatické dočtení při doscrollování

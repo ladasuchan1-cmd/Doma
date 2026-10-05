@@ -9,8 +9,10 @@ Výhodné nabídky (cena pod odhadem) jsou zeleně, u každého kola je i **dopo
   zdroj; typ kola (horská, silniční, gravel, trekingová, městská, dětská, BMX, nákladní); pohon (klasická / elektrokola);
   odpružení (celoodpružená, přední, bez); značka motoru u elektrokol (Bosch, Shimano, Yamaha, Specialized/Brose, Bafang …
   podle textu inzerátu); stáří inzerátu (24 h až 30 dní podle data vložení na web, bez výběru vše aktivní); cena;
-  jen výhodné; jen nové. Na mapě jsou inzeráty, které web stále uvádí – zmizelé (prodané, smazané) se skryjí při
-  dalším celém průchodu webu.
+  jen výhodné; jen nové. Panel filtrů jde skrýt (tlačítko Filtry / Skrýt filtry); zapnuté filtry zůstávají vidět
+  jako čipy s křížkem. Seznam vlevo ukazuje jen kola v zobrazené části mapy (přiblížíte město a vidíte, co je tam
+  k mání; piny zůstávají všude) – vypíná se zaškrtávátkem pod počtem. Na mapě jsou inzeráty, které web stále
+  uvádí – zmizelé (prodané, smazané) se skryjí při dalším celém průchodu webu.
 - Detail: fotka, cena, odhad s rozpětím a vysvětlením „proč“, značka/model/rok/velikost/motor…, odkaz na inzerát.
 - Odhad ceny se **učí z trhu** (tisíce inzerátů, srovnatelné nabídky) a **kalibruje na vlastní prodeje obchodu**
   (`training/koloshop-prodeje.json`). S klíčem k Claude API umí nacenit i **podle fotky** (stav kola, výbava).
