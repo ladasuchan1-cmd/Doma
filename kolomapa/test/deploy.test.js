@@ -98,6 +98,9 @@ test('docker: nasadit.sh je platný bash, nasazuje jen s heslem a šablona .env 
   assert.doesNotMatch(s, /-p "\$PORT:|-p 0\.0\.0\.0|-p "\$\{?PORT\}?:/);
   assert.match(s, /sslip\.io/, 'výchozí adresa bez vlastní DNS');
   assert.match(s, /--network "\$SIT"/);
+  // stálé jméno hostitele + smazání zámku běhu po zabitém kontejneru (jinak by nový server čekal na „jiný proces“)
+  assert.match(s, /--hostname "\$APP"/);
+  assert.match(s, /^rm -f "\$DATA\/kolomapa\.db\.run-lock"$/m);
   assert.match(s, /--env-file "\$ENV_SOUBOR"/);
   assert.match(s, /-v "\$DATA":\/app\/data/);
   assert.match(s, /caddy validate --config/, 'Caddyfile se před reloadem ověří');

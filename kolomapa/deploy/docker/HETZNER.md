@@ -144,6 +144,8 @@ Ostatní volby (`KOLOMAPA_DELAY_MS`, `KOLOMAPA_MAX_DETAILS`, `KOLOMAPA_AI_MAX_PE
 | „klon /opt/Doma má kvůli řádku import necommitnutou změnu“ | neškodí Kolomapě; jen `hetzner.sh aktualizace` (Cyklo & Ski mapa) zatím nestahuje nový kód – srovná se samo při dalším `nasadit.sh`, až bude větev Kolomapy sloučená do hlavní |
 | „Kolomapa do minuty neodpověděla“ | skript vypíše posledních 40 řádků logu; typicky špatná hodnota v `/root/kolomapa.env` |
 | mapa prázdná | první stahování ještě běží (stav nahoře v mapě, `docker logs kolomapa`) |
+| mapa prázdná, ale inzeráty v databázi jsou (kraje 0) | běh byl přerušen před závěrečným zpracováním (např. nasazením uprostřed stahování): `docker exec kolomapa node tools/run.js --process-only` doplní polohu a nacenění bez stahování (pár minut). Kraj se jinak doplňuje průběžně po každém tisíci inzerátů. |
+| stav v mapě hlásí „Stahuje jiný proces“, ale nic neběží | zámek po zabitém procesu: `rm -f /root/kolomapa-data/kolomapa.db.run-lock` (nasazení ho maže samo, server ho při startu pozná a smaže) |
 | jméno z Cyklo & Ski mapy se nepřihlásí | `cat /root/kolomapa-data/uzivatele.env` má být opis `CSM_USERS` z `/opt/Doma/cyklo-ski-mapa/deploy/.env`; jinak `/usr/local/sbin/kolomapa-uzivatele` a `docker logs kolomapa \| grep -i uživatel`; v `/root/kolomapa.env` nesmí být vlastní `KOLOMAPA_USERS` |
 
 ## Rollback

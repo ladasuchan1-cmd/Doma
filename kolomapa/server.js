@@ -12,7 +12,7 @@ const { loadConfig } = require('./src/config');
 const { openDb } = require('./src/db');
 const defaultLog = require('./src/util/log');
 const { createApp, publicDirStatus } = require('./src/server/http');
-const { createRunner, startScheduler, lockHolder } = require('./src/server/scheduler');
+const { createRunner, startScheduler, lockHolder, releaseStaleLock } = require('./src/server/scheduler');
 
 /** „kolomapa.firma.cz, dilna:8090“ → ['kolomapa.firma.cz', 'dilna'] (malými písmeny, bez portu). */
 function parseHostList(v) {
@@ -73,6 +73,7 @@ async function start(options = {}) {
   let scheduler = null;
   const runner = createRunner({ db, config, log, ...(runFn ? { runFn } : {}) });
   try {
+    if (releaseStaleLock(config.dbFile)) log.warn('Smazán zámek běhu po předchozím procesu (pád nebo výměna kontejneru).');
     const fixed = recoverInterrupted(db, config);
     if (fixed) log.warn('Po restartu označeny přerušené běhy', { count: fixed });
     if (!publicDirStatus(config.publicDir)) log.warn(`Uživatelské rozhraní nenalezeno (${config.publicDir}/index.html) – běží jen data a API.`);

@@ -251,8 +251,12 @@ PUBLISH=()
 if [[ "$REZIM" != docker ]]; then PUBLISH=(-p "127.0.0.1:$PORT:$PORT"); fi   # jen pro Caddy mimo Docker, nikdy veřejně
 say "Spouštím kontejner $APP"
 docker rm -f "$APP" >/dev/null 2>&1 || true
+# Zámek běhu po právě zabitém kontejneru (stahování uprostřed nasazení) – jinak by nový kontejner čekal, že stahuje
+# „jiný proces“, a vlastní běh nespustil. --hostname: stálé jméno hostitele, zámek tak nevypadá jako z cizího počítače.
+rm -f "$DATA/kolomapa.db.run-lock"
 docker run -d \
   --name "$APP" \
+  --hostname "$APP" \
   --restart unless-stopped \
   --network "$SIT" \
   --env-file "$ENV_SOUBOR" \

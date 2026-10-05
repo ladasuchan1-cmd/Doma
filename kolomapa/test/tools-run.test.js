@@ -117,6 +117,39 @@ test('main: databázi nejde otevřít → česká hláška a kód 1, žádný st
   assert.doesNotMatch(out, /\n\s+at /);
 });
 
+test('main --process-only: bez stahování doplní klasifikaci, polohu a nacenění; při drženém zámku kód 1', async () => {
+  const { openDb } = require('../src/db');
+  const { upsertItem } = require('../src/pipeline');
+  const sch = require('../src/server/scheduler');
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'kolomapa-run-'));
+  const dbFile = path.join(dir, 'kolomapa.db');
+  const logs = [];
+  const errors = [];
+  const origLog = console.log;
+  const origError = console.error;
+  console.log = (...a) => logs.push(a.join(' '));
+  console.error = (...a) => errors.push(a.join(' '));
+  try {
+    const db = openDb(dbFile);
+    for (let i = 1; i <= 5; i++) upsertItem(db, 'bazos', { sourceId: String(i), url: `https://x.cz/${i}`, title: `Horské kolo Trek ${i}`, priceCzk: 8000 + i * 500, locationText: 'Brno' }, new Date().toISOString());
+    db.close();
+    const lock = sch.acquireRunLock(dbFile);
+    assert.equal(await main([`--db=${dbFile}`, '--process-only']), 1, 'zámek drží jiný proces');
+    lock.release();
+    assert.equal(await main([`--db=${dbFile}`, '--process-only']), 0);
+    const db2 = openDb(dbFile);
+    assert.equal(db2.prepare("SELECT count(*) AS n FROM listings WHERE kraj = 'JHM' AND is_bike = 1").get().n, 5);
+    db2.close();
+    assert.equal(fs.existsSync(`${dbFile}.run-lock`), false, 'zámek uvolněn');
+  } finally {
+    console.log = origLog;
+    console.error = origError;
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+  assert.match(errors.join('\n'), /už běží jiné stahování/);
+  assert.match(logs.join('\n'), /zpracování bez stahování: klasifikováno 5, poloha 5, naceněno/);
+});
+
 test('main: neznámý zdroj / argument → kód 1 a nápověda', async () => {
   const errors = [];
   const origError = console.error;

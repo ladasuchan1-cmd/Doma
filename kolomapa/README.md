@@ -115,7 +115,9 @@ node tools/run.js --help
 ```
 
 Návratový kód `tools/run.js`: 0 = v pořádku / částečně, 1 = chyba, žádný web se nepodařilo stáhnout nebo už běží
-jiné stahování (server a `tools/run.js` sdílejí zámek `data/kolomapa.db.run-lock`).
+jiné stahování (server a `tools/run.js` sdílejí zámek `data/kolomapa.db.run-lock`). `--process-only` nic nestahuje,
+jen doplní klasifikaci, polohu a nacenění uložených inzerátů – po běhu přerušeném před závěrečným zpracováním
+(kraj a klasifikace se jinak doplňují průběžně po každém tisíci inzerátů, nacenění až na konci běhu).
 
 **GitHub Actions:** workflow `.github/workflows/kolomapa-denne.yml` umí totéž každý den na serverech GitHubu a mapu
 zveřejnit na GitHub Pages. **Je vypnuté** – zapíná se proměnnou repozitáře `KOLOMAPA_PAGES=true` (Settings → Secrets

@@ -104,6 +104,26 @@ function lockHolder(dbFile) {
 }
 
 /**
+ * Při startu procesu: zámek s PID tohoto procesu nemůže být jeho (nový proces žádný běh nedrží) – zůstal po pádu nebo
+ * po výměně kontejneru (v Dockeru je server vždy PID 1 a kontejner má stále stejné jméno hostitele, takže by jinak
+ * lockHolder hlásil „živý“ cizí běh a vlastní stahování by se nespustilo). Smaže ho.
+ * @param {string} dbFile
+ * @returns {boolean} true = smazán
+ */
+function releaseStaleLock(dbFile) {
+  const file = lockPath(dbFile);
+  if (!file) return false;
+  try {
+    const info = parseJson(fs.readFileSync(file, 'utf8'), null);
+    if (!info || info.pid !== process.pid) return false;
+    fs.unlinkSync(file);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/**
  * Získá zámek běhu. Vrací {release()} nebo {busy: info} když běží jiný proces.
  * @param {string} dbFile
  */
@@ -390,6 +410,7 @@ module.exports = {
   lastGoodRunStart,
   acquireRunLock,
   lockHolder,
+  releaseStaleLock,
   recordFailedRun,
   runOnce,
   createRunner,

@@ -347,6 +347,25 @@ test('migrace v4: okres/kraj Sbazaru → src_okres/src_kraj, text místo kódu k
   assert.equal(after[1].lat, null, 'zahraniční okres zůstane bez polohy');
 });
 
+test('runPipeline: přerušený běh (abort uprostřed výpisu) nechá už stažené inzeráty s krajem – klasifikace a poloha běží průběžně', async () => {
+  const db = openDb(':memory:');
+  const controller = new AbortController();
+  const src = {
+    key: 'fake',
+    label: 'Fake',
+    async scan(ctx) {
+      for (let i = 1; i <= 1000; i++) await ctx.emit(item(String(i), { locationText: 'Brno' }));
+      controller.abort(new Error('Výměna kontejneru'));
+      throw controller.signal.reason;
+    },
+  };
+  const res = await runPipeline({ db, config, sources: [src], signal: controller.signal });
+  assert.equal(res.status, 'error');
+  assert.equal(db.prepare("SELECT count(*) AS n FROM listings WHERE kraj = 'JHM'").get().n, 1000, 'poloha doplněná po každém tisíci inzerátů, ne až na konci');
+  assert.equal(db.prepare('SELECT count(*) AS n FROM listings WHERE is_bike IS NULL').get().n, 0, 'klasifikace také průběžně');
+  assert.ok(res.stats.geocoded >= 1000 && res.stats.classified >= 1000, JSON.stringify(res.stats));
+});
+
 test('runPipeline: běh nedokončený po pádu procesu („running“) se při dalším běhu uzavře jako chyba', async () => {
   const db = openDb(':memory:');
   db.prepare("INSERT INTO runs (started_at, status, trigger) VALUES ('2026-10-01T05:30:00.000Z', 'running', 'schedule')").run();

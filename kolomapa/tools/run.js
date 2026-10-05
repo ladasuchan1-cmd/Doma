@@ -9,6 +9,8 @@
 //   --max-pages     max. stránek výpisu na kategorii (výchozí KOLOMAPA_MAX_PAGES)
 //   --full          projít výpisy celé (odhalí prodané/smazané inzeráty) bez ohledu na KOLOMAPA_FULL_SCAN_DAYS
 //   --export        po běhu zapsat statickou verzi mapy (jako npm run export)
+//   --process-only  bez stahování: jen klasifikace, poloha a nacenění už uložených inzerátů – např. po běhu
+//                   přerušeném před závěrečným zpracováním (mapa prázdná, přestože inzeráty v databázi jsou)
 //   --db            jiný soubor databáze (výchozí KOLOMAPA_DB / data/kolomapa.db)
 // Návratový kód: 0 = ok / částečně, 1 = chyba, žádný web se nepodařilo stáhnout, nebo už běží jiné stahování
 // (Plánovač úloh Windows pak u úlohy ukáže „Výsledek posledního spuštění: 0x1“).
@@ -151,6 +153,41 @@ function exitCodeFor(res) {
   return nothingDownloaded(res) ? 1 : 0;
 }
 
+/**
+ * --process-only: klasifikace, poloha a nacenění uložených inzerátů bez stahování (pod zámkem běhu, aby se nepotkalo
+ * se stahováním). Vrací návratový kód.
+ */
+function processOnly(db, config, log) {
+  const { acquireRunLock } = require('../src/server/scheduler');
+  const { classifyPending, geocodePending } = require('../src/pipeline');
+  const pricing = require('../src/pricing');
+  const lock = acquireRunLock(config.dbFile);
+  if (lock.busy) {
+    console.error('Kolomapa – zpracování: už běží jiné stahování (zámek běhu) – zkuste to, až skončí.');
+    db.close();
+    return 1;
+  }
+  const t0 = Date.now();
+  try {
+    const classified = classifyPending(db);
+    const geocoded = geocodePending(db);
+    const model = pricing.trainModel(db, { config, log });
+    const priced = pricing.priceAll(db, model, { config });
+    console.log(`Kolomapa – zpracování bez stahování: klasifikováno ${n(classified)}, poloha ${n(geocoded)}, naceněno ${n(priced)} (${Math.round((Date.now() - t0) / 1000)} s)`);
+    return 0;
+  } catch (e) {
+    console.error(`Kolomapa – zpracování: CHYBA – ${e.message}`);
+    return 1;
+  } finally {
+    lock.release();
+    try {
+      db.close();
+    } catch {
+      /* nic */
+    }
+  }
+}
+
 async function main(argv) {
   let args;
   try {
@@ -161,7 +198,7 @@ async function main(argv) {
   }
   if (args.help || args.h) {
     console.log(
-      'Použití: node tools/run.js [--sources=bazos,sbazar,aukro,cyklobazar] [--max-details=N] [--max-pages=N] [--full] [--export] [--db=SOUBOR]'
+      'Použití: node tools/run.js [--sources=bazos,sbazar,aukro,cyklobazar] [--max-details=N] [--max-pages=N] [--full] [--export] [--process-only] [--db=SOUBOR]'
     );
     return 0;
   }
@@ -199,6 +236,7 @@ async function main(argv) {
     console.error('');
     return 1;
   }
+  if (args['process-only']) return processOnly(db, config, log);
   const controller = new AbortController();
   const onSignal = (sig) => {
     if (controller.signal.aborted) process.exit(1);

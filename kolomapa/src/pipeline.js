@@ -362,6 +362,13 @@ async function runPipeline(o) {
     log?.info?.(msg, meta);
     o.onProgress?.(msg, meta);
   };
+  // Klasifikace a poloha průběžně, ne až na konci: přerušený běh (výměna kontejneru při nasazení, restart serveru)
+  // by jinak nechal tisíce stažených inzerátů bez kraje – mapa prázdná, přestože data jsou. Obě funkce zpracují jen
+  // nové / změněné řádky, takže jsou levné.
+  const prubezne = () => {
+    stats.classified += classifyPending(db);
+    stats.geocoded += geocodePending(db);
+  };
   let status = 'ok';
   let error = null;
   try {
@@ -411,6 +418,7 @@ async function runPipeline(o) {
           if (r.isNew) s.new++;
           else if (r.changed) s.changed++;
           if (s.scanned % 500 === 0) progress(`${src.label}: ${s.scanned} inzerátů`, { new: s.new });
+          if (s.scanned % 1000 === 0) prubezne();
           return r;
         },
       };
@@ -445,6 +453,7 @@ async function runPipeline(o) {
             } else if (d) {
               upsertItem(db, src.key, { ...d, sourceId: row.source_id, url: d.url || row.url, title: d.title || row.title }, nowIso(), { fromDetail: true });
               s.details++;
+              if (s.details % 250 === 0) prubezne();
             }
           } catch (e) {
             if (o.signal?.aborted) break;
@@ -474,7 +483,7 @@ async function runPipeline(o) {
     progress('Klasifikuji inzeráty…');
     stats.classified += classifyPending(db);
     progress('Určuji polohu…');
-    stats.geocoded = geocodePending(db);
+    stats.geocoded += geocodePending(db);
     progress('Naceňuji…');
     const model = pricing.trainModel(db, { config, log });
     stats.model = model.summary;

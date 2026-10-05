@@ -174,6 +174,25 @@ test('zámek běhu mezi procesy', () => {
   }
 });
 
+test('releaseStaleLock: zámek s vlastním PID při startu je po pádu / výměně kontejneru → smazat; cizí PID nechat', () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'kolomapa-lock-'));
+  const dbFile = path.join(dir, 'k.db');
+  try {
+    assert.equal(sch.releaseStaleLock(dbFile), false, 'bez zámku nic');
+    assert.equal(sch.releaseStaleLock(':memory:'), false);
+    fs.writeFileSync(`${dbFile}.run-lock`, JSON.stringify({ pid: process.pid, host: 'kolomapa', startedAt: new Date().toISOString() }));
+    assert.equal(sch.releaseStaleLock(dbFile), true, 'PID 1 v novém kontejneru = zámek po starém kontejneru');
+    assert.equal(fs.existsSync(`${dbFile}.run-lock`), false);
+    fs.writeFileSync(`${dbFile}.run-lock`, JSON.stringify({ pid: process.pid + 1, host: os.hostname(), startedAt: new Date().toISOString() }));
+    assert.equal(sch.releaseStaleLock(dbFile), false, 'cizí PID (tools/run.js) se nechává');
+    assert.equal(fs.existsSync(`${dbFile}.run-lock`), true);
+    fs.writeFileSync(`${dbFile}.run-lock`, 'rozbité');
+    assert.equal(sch.releaseStaleLock(dbFile), false);
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
 test('startScheduler: plánovaný běh v čase, jen jednou; běh po startu jen když dnes neproběhl', async () => {
   const db = openDb(':memory:');
   let now = local(2026, 10, 2, 5, 0);
