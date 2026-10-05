@@ -14,6 +14,10 @@ první priorita.
   3. [bezpečnost, GDPR, obchodní podmínky](docs/vyzkum/03-bezpecnost-gdpr-podminky.md)
   4. [mapa cyklostezek a zajímavosti](docs/vyzkum/04-mapa-cyklostezek-a-zajimavosti.md)
   5. [stack, theming, tři designy](docs/vyzkum/05-stack-theming-designy.md)
+  6. [výběr platební brány podle ceny, údržby a bezpečnosti](docs/vyzkum/06-vyber-platebni-brany.md)
+  7. [subdomény `<slug>.pujcovna.cz`, TLS a limity](docs/vyzkum/07-domeny-a-tls.md)
+- **[legal/](legal/README.md)** – návrhy právních textů k advokátní kontrole: obchodní podmínky, zásady ochrany
+  osobních údajů, zpracovatelská smlouva, záznamy o činnostech zpracování, smlouva o nájmu s předávacím protokolem.
 
 Navazuje na ostatní projekty v repozitáři: datová pipeline a Leaflet z [Cyklo & Ski mapy](../cyklo-ski-mapa/),
 backend bez závislostí, `node:sqlite`, admin a nasazení z [Cenotvorby](../repricing/).

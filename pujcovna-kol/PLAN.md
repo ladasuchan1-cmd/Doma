@@ -11,7 +11,7 @@ Nic z toho zatím není naprogramováno – tento dokument říká **co, proč, 
 1. **Nestavět na cizím hotovém systému, ale na vlastním jádru.** Nejbližší open-source vzory (Louez, Shelf.nu, QloApps, AdamRMS) jsou AGPL/GPL nebo PHP monolity – bereme z nich *vzory* (stavový automat rezervace, záloha jako částečná platba, white-label přes konfiguraci), ne kód. Vlastní jádro v Node bez závislostí je přesně to, co už umíme z Cenotvorby, a má nejmenší útočnou plochu – což je u priority „bezpečnost dat“ rozhodující.
 2. **Jedna aplikace, jedna databáze na půjčovnu.** Každá půjčovna = samostatný SQLite soubor, vlastní tajemství, vlastní doména. Odpovídá to právní realitě (každá půjčovna je správce osobních údajů, my jsme zpracovatel), výmaz při odchodu klienta je smazání souboru, a chyba v jednom dotazu nikdy nevynese data jiné půjčovny.
 3. **Karty nikdy nesahají na náš server.** Platba kartou jde přes hostovanou stránku brány (redirect), takže jsme v nejnižším režimu PCI DSS (SAQ A). Převod a QR Platba (standard SPAYD) generujeme sami a párujeme přes bankovní API (Fio zdarma) nebo ručně.
-4. **Rezervační poplatek je částečná platba objednávky**, ne zvláštní entita: poplatek za každé kolo se při finálním vyúčtování odečte (`doplatek = cena − zaplaceno`). Storno pravidla jsou tabulka „hodin před vyzvednutím → kolik z poplatku propadá“, nastavitelná per půjčovna. Kauce je něco jiného (vratná jistota) a blokuje se až při převzetí.
+4. **Rezervační poplatek je fixní částka za každé kolo a účtuje se jako částečná platba objednávky**, ne zvláštní entita: při finálním vyúčtování se odečte (`doplatek = cena − zaplaceno`). Storno pravidla jsou tabulka „hodin před vyzvednutím → kolik z poplatku propadá“, nastavitelná per půjčovna. Kauce je něco jiného (vratná jistota), blokuje se až při převzetí a půjčovna nabízí obě formy: hotově či terminálem na místě, nebo preautorizací karty přes bránu.
 5. **Rezervujeme typ kola, konkrétní kus přiřazujeme při výdeji.** Dostupnost = počet kol daného typu a velikosti − překrývající se rezervace (s bufferem na čištění). Kontrola i zápis běží v jedné transakci, takže dvojí rezervace nevznikne.
 6. **Mapa cyklostezek a zajímavosti z dat, která už máme.** Cyklo & Ski mapa obsahuje všech 4 280 tras a 12 932 míst ČR z OpenStreetMap. Pro každou půjčovnu při nasazení vyřízneme okolí (25–30 km od adresy), doplníme převýšení (Mapy.cz Elevation), zajímavosti (OSM × Wikidata × Wikipedie, obrázky jen pod volnou licencí) a GPX ke stažení. Podklad: Mapy.cz „outdoor“ (zdarma do 250 000 dlaždic měsíčně, komerčně povoleno), záložně CyclOSM.
 7. **Tři designy = tři sady tokenů a layoutových variant nad jedním HTML**, ne tři weby: „Outdoor“ (zemitý, fotografický), „Sport“ (tmavý, kontrastní), „Family“ (světlý, zaoblený). Půjčovna si vybere, doplní logo, barvy, fotky a texty.
@@ -175,9 +175,9 @@ Stavy platby: `created → pending → paid | authorized → captured | partiall
 ## 6. Platby
 
 ### Rezervační poplatek, doplatek, kauce
-- **Poplatek** = `fee_minor` za každé kolo (per typ; půjčovna volí fixní částku, např. 200–500 Kč, nebo % z ceny). Zaplacením přechází rezervace do `confirmed`; poplatek je **částečná platba ceny**.
+- **Poplatek** = **fixní částka za každé kolo** (rozhodnuto 5. 10. 2026), `fee_minor` per typ kola, výchozí návrh 300 Kč kolo / 500 Kč e-kolo, nastavitelné v adminu. Zaplacením přechází rezervace do `confirmed`; poplatek je **částečná platba ceny**.
 - **Doplatek** = `total − paid` (± kredit z přeplatku). Online (karta/QR před vyzvednutím) nebo na místě (terminál/hotově – zapíše se jako externí platba).
-- **Kauce** = vratná jistota, **ne příjem**: samostatná platba `deposit_hold` s ručním zachycením. Zakládá se **při převzetí** (preautorizace karty platí u bran jen 4–7 dní), při vrácení se uvolní nebo částečně strhne na škodu. U převodu/QR kauci nepoužíváme (vracení je pracné) – hotově/terminál.
+- **Kauce** = vratná jistota, **ne příjem**: samostatná platba `deposit_hold`. Půjčovna nabízí **obě varianty** (rozhodnuto): (a) **hotově nebo platebním terminálem na místě** – obsluha zapíše částku a formu do předávacího protokolu, systém eviduje vrácení; (b) **preautorizace karty přes bránu při převzetí** – obsluha vygeneruje odkaz/QR na platební stránku brány, zákazník kartu autorizuje na svém telefonu nebo na pultu, blokace platí u bran 4–7 dní, při vrácení se uvolní (`cancelHold`) nebo částečně strhne na škodu (`capture`). U výpůjček delších než platnost blokace systém upozorní a nabídne variantu (a). U převodu/QR kauci nepoužíváme (vracení je pracné).
 - **Storno engine:** tabulka per půjčovna, např. `≥ 72 h → 100 % poplatku zpět · 24–72 h → 50 % · < 24 h / no-show → 0 %`. Vratka jde původní metodou (karta → refund brány; převod → odchozí platba na protiúčet z `bank_transactions`, ručně potvrzená). Propadlý poplatek je smluvní pokuta/odstupné – není předmětem DPH, k původně zdaněné záloze se vystaví opravný doklad.
 
 ### Metody
@@ -186,7 +186,7 @@ Stavy platby: `created → pending → paid | authorized → captured | partiall
 | **Karta** | adaptér brány: založit platbu (částka ze serveru, nikdy z klienta) → redirect → návrat → **stav vždy ověřit dotazem na API**, notifikaci brát jen jako podnět; idempotentní zpracování (`webhook_events`) | PCI SAQ A (hostovaná stránka), 3-D Secure řeší brána, u Stripe HMAC podpis webhooku, u CZ bran IP whitelist + ověření stavu |
 | **Převod** | zobrazit IBAN, částku, VS = číslo rezervace, zprávu; expirace 48–72 h | párování podle VS (primárně), zprávy (regex), částky + protiúčtu (fallback); přeplatek → kredit/vratka, nedoplatek → `partially_paid` + e-mail s QR na zbytek, tolerance ±5 Kč |
 | **QR Platba** | SPAYD řetězec (`SPD*1.0*ACC:…*AM:…*CC:CZK*X-VS:…*MSG:…`) → QR jako SVG na serveru | payload výhradně ze serveru; vendorovaný generátor QR (MIT), SPAYD + převod čísla účtu na IBAN napíšeme sami (pár desítek řádků) |
-| **Párování banky** | adaptér `FioMatcher` (REST, token read-only, interval ≥ 30 s, zarážka `set-last-id`, rotace tokenu před 180. dnem), `ImportMatcher` (CSV/GPC výpis), `ManualMatcher` (potvrzení v adminu) | token šifrovaný per půjčovna; nespárované platby do fronty v adminu |
+| **Párování banky** | **Fio (rozhodnuto)**: adaptér `FioMatcher` (REST, token read-only, interval ≥ 30 s, zarážka `set-last-id`, rotace tokenu před 180. dnem); pro půjčovny s jinou bankou `ImportMatcher` (CSV/GPC výpis) a `ManualMatcher` (potvrzení v adminu) | token šifrovaný per půjčovna; nespárované platby do fronty v adminu |
 | **Na místě** | hotově/terminál – evidence v adminu | – |
 
 ### Doklady
@@ -232,7 +232,7 @@ Plán: kontakty, kdo rozhoduje, šablona ohlášení ÚOOÚ do 72 h, komunikace 
   3. Zpracovatelská smlouva my ↔ půjčovna.
   4. Záznam o činnostech zpracování (čl. 30) předvyplněný per půjčovna.
   5. Předávací protokol / smlouva o nájmu k podpisu na místě.
-- **Advokát:** všechny texty před prvním nasazením zkontroluje advokát (náklad jednorázový, pak jen aktualizace). Rešerše obsahuje osnovy a praxi 10+ českých půjčoven.
+- **Advokát:** kontrolu zajišťuje zadavatel (rozhodnuto). My dodáváme návrhy všech pěti dokumentů ve složce `legal/` jako parametrizované šablony s placeholdery `{{…}}`, po oponentuře ze dvou pohledů (právo ČR; GDPR a praktičnost) a s sekcí „K ověření advokátem“ na konci každého dokumentu, aby kontrola byla rychlá a cílená.
 
 ---
 
@@ -313,20 +313,27 @@ Po pilotu: PDF doklady, druhá brána (Stripe), okruhy BRouter, více poboček, 
 
 ---
 
-## 15. Co je třeba rozhodnout (otázky na vás)
+## 15. Rozhodnutí a otevřené otázky
 
-1. **Karetní brána jako první:** Comgate (doporučuji – nejlevnější pro malé obraty, preautorizace, bankovní tlačítka), Stripe (mezinárodní, nejlepší API) nebo GoPay (oficiální Node SDK)? Každá půjčovna si uzavírá vlastní smlouvu – souhlasíte?
-2. **Rezervační poplatek:** fixní částka za kolo (jaká výchozí, např. 300 Kč kolo / 500 Kč e-kolo) nebo % z ceny? Vratný s odstupňovaným stornem (doporučuji) nebo nevratný?
-3. **Kauce:** nabízet preautorizaci kartou online při převzetí (přes bránu), nebo jen hotově/terminál na místě?
-4. **DPH:** budou půjčovny typicky plátci DPH? (Ovlivňuje daňové doklady k přijaté platbě.) Jaké účetnictví mají – stačí CSV + Pohoda XML?
-5. **Banka pro automatické párování:** Fio (zdarma, hotové API) jako první; mají půjčovny jiné banky, kde chceme placené API (KB, ČSOB), nebo postačí import výpisu / ruční potvrzení?
-6. **Domény:** vlastní doména každé půjčovny (doporučuji, on-demand TLS) nebo subdomény musteru?
-7. **Jazyky:** jen čeština v MVP, nebo i angličtina a němčina (příhraniční půjčovny)?
-8. **Obchodní model musteru:** jednorázová cena za nasazení + měsíční provoz, nebo předplatné? Ovlivňuje, co má umět `/platform` (fakturace, pozastavení).
-9. **E-mailový poskytovatel:** EU hosting (Mailgun EU, Brevo) vs. Postmark/Resend – rozhodnout po ověření smluv o zpracování.
-10. **Právník:** kdo zkontroluje OP, Zásady a zpracovatelskou smlouvu? Termín ovlivňuje pilot.
-11. **Fotografie:** budou mít půjčovny vlastní fotky, nebo potřebujeme licencovanou fotobanku pro demo a výchozí stav?
-12. **Pilotní půjčovna:** máme konkrétního prvního klienta (adresa → okolí, typ designu)?
+### Rozhodnuto zadavatelem (5. 10. 2026)
+
+| Téma | Rozhodnutí | Důsledek pro plán |
+|---|---|---|
+| **Karetní brána** | kritéria: nejlevnější pro malé obraty, nejjednodušší na údržbu, kvalitní bezpečnostní zajištění | ověřený výběr podle těchto kritérií je v [docs/vyzkum/06-vyber-platebni-brany.md](docs/vyzkum/06-vyber-platebni-brany.md); první adaptér podle něj, druhá brána jako záloha; každá půjčovna má vlastní smlouvu s bránou |
+| **Rezervační poplatek** | fixní částka za každé kolo | per typ kola, výchozí návrh 300 Kč kolo / 500 Kč e-kolo, vratný s odstupňovaným stornem (kap. 6) |
+| **Kauce** | obě varianty | hotově/terminál na místě i preautorizace karty přes bránu při převzetí (kap. 6) |
+| **Banka pro párování** | Fio | adaptér `FioMatcher` první; import výpisu a ruční potvrzení pro ostatní banky |
+| **Domény** | subdomény musteru podle názvu stávajícího webu půjčovny, např. Hotel U Tří dubů s webem utridubu.cz → `utridubu.pujcovna.cz` | jedna hlavní doména, slug odvozený z domény webu půjčovny; TLS, limity a bezpečnost cookies viz kap. 12 a rešerše domén; dostupnost domény `pujcovna.cz` nutno ověřit (viz rešerše) |
+| **Právní kontrola** | zajišťuje zadavatel | my dodáváme návrhy v `legal/` s oponenturou a seznamem bodů k ověření (kap. 8) |
+
+### Zbývá rozhodnout
+
+1. **DPH:** budou půjčovny typicky plátci DPH? Ovlivňuje daňové doklady k přijaté platbě. Stačí export CSV + Pohoda XML?
+2. **Jazyky:** jen čeština v MVP, nebo i angličtina a němčina pro příhraniční půjčovny?
+3. **Obchodní model musteru:** jednorázová cena za nasazení + měsíční provoz, nebo předplatné? Ovlivňuje, co má umět `/platform` (fakturace, pozastavení).
+4. **E-mailový poskytovatel:** EU hosting (Mailgun EU, Brevo) vs. Postmark/Resend – rozhodnout po ověření smluv o zpracování.
+5. **Fotografie:** budou mít půjčovny vlastní fotky, nebo potřebujeme licencovanou fotobanku pro demo a výchozí stav?
+6. **Pilotní půjčovna:** máme konkrétního prvního klienta (adresa → okolí, typ designu, web → slug subdomény)?
 
 ---
 
