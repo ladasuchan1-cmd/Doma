@@ -60,9 +60,13 @@ obnova = `docker compose cp zaloha.json app:/data/stav.json && docker compose re
 **5. Automatické nasazení z GitHubu** (volitelné, doporučené): po každém pushi do hlavní větve, který se
 dotkne složky `cyklo-ski-mapa/`, proběhnou testy a pak se přes SSH na serveru spustí `hetzner.sh aktualizace`.
 
-1. Na svém počítači vytvořte klíč jen pro nasazení: `ssh-keygen -t ed25519 -f ~/.ssh/csm-deploy -N ""`
-   a veřejnou část přidejte na server: `ssh-copy-id -i ~/.ssh/csm-deploy.pub agent@IP_SERVERU` (účet, pod kterým
-   se workflow přihlásí; jiný než root potřebuje `sudo` bez hesla).
+1. Na svém počítači vytvořte klíč jen pro nasazení, **bez passphrase**: `ssh-keygen -t ed25519 -f ~/.ssh/csm-deploy -N ""`
+   (ve Windows PowerShellu 5.1 je prázdná passphrase `-N '""'`, v PowerShellu 7 `-N ""`; když se ssh-keygen ptá
+   na passphrase, jen dvakrát potvrďte Enter). Veřejnou část přidejte na server: `ssh-copy-id -i ~/.ssh/csm-deploy.pub agent@IP_SERVERU`
+   (účet, pod kterým se workflow přihlásí; jiný než root potřebuje `sudo` bez hesla: `echo 'agent ALL=(ALL) NOPASSWD:ALL' | sudo tee /etc/sudoers.d/agent`).
+   Ve Windows bez `ssh-copy-id`: `type $HOME\.ssh\csm-deploy.pub | ssh agent@IP_SERVERU "mkdir -p ~/.ssh && cat >> ~/.ssh/authorized_keys"`.
+   Soukromý klíč do schránky: `Get-Content $HOME\.ssh\csm-deploy | Set-Clipboard` (nekopírujte výběrem textu z okna konzole,
+   přidává mezery; workflow si klíč sice očistí, ale otisk v logu jobu musí odpovídat tomu, který vypsal ssh-keygen).
 2. GitHub → repo **Doma** → Settings → Secrets and variables → Actions:
    - **Secrets**: `HETZNER_HOST` = IP nebo doména serveru, `HETZNER_SSH_KEY` = obsah souboru `~/.ssh/csm-deploy`
      (soukromý klíč, celý včetně hlaviček), `HETZNER_USER` (např. `agent`; výchozí `root`), `HETZNER_USERS` =
