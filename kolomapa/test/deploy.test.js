@@ -99,6 +99,17 @@ test('docker: nasadit.sh je platný bash, nasazuje jen s heslem a šablona .env 
   assert.match(s, /-v "\$DATA":\/app\/data/);
   assert.match(s, /caddy validate --config/, 'Caddyfile se před reloadem ověří');
   assert.match(s, /chmod 600 "\$ENV_SOUBOR"/);
+  // Caddy ze stacku Cyklo & Ski mapy (deploy-caddy-1): kontejner podle obrazu, ne jen podle jména „caddy“; její
+  // Caddyfile je v git klonu, proto blok do svazku caddy_config (/config/sites/kolomapa.caddy) + řádek import,
+  // a klon se po sloučení srovná z gitu (hetzner.sh aktualizace jinak kód nestahuje)
+  assert.match(s, /\(\^\|\\\/\)caddy\(:\|@\|\$\)/, 'kontejner Caddy podle obrazu');
+  assert.match(s, /^CADDY_SITES=\/config\/sites\s/m);
+  assert.match(s, /^IMPORT_RADEK="import \$CADDY_SITES\/\*\.caddy"$/m);
+  assert.match(s, /mkdir -p '\$CADDY_SITES' && cat >'\$SOUBOR'/);
+  assert.match(s, /caddyfile_git_srovnat "\$CADDYFILE" "\$KLON"/);
+  const sites = s.slice(s.indexOf('elif [[ "$ZPUSOB" == sites ]]; then'), s.indexOf('caddyfile_git_srovnat "$CADDYFILE" "$KLON"'));
+  assert.ok(sites.length > 100 && !sites.includes('$CADDYFILE.zaloha'), 'v git klonu žádný soubor .zaloha (hetzner.sh by viděl necommitnutou změnu)');
+  assert.match(s, /merge -q --ff-only "origin\/\$vetev"/);
   const { KNOWN_KEYS } = require('../src/config');
   for (const k of s.match(/^#?(KOLOMAPA_[A-Z_]+|ANTHROPIC_API_KEY)=/gm).map((x) => x.replace(/^#|=$/g, ''))) assert.ok(KNOWN_KEYS.has(k), k);
 });
@@ -113,6 +124,14 @@ test('docker: workflow nasazení – testy jako brána, self-hosted runner jen s
   assert.match(w, /needs: test/);
   assert.match(w, /run: bash kolomapa\/deploy\/docker\/nasadit\.sh/);
   assert.match(w, /contents: read/);
+});
+
+test('docker: Caddyfile Cyklo & Ski mapy načítá /config/sites/*.caddy (blok Kolomapy ve svazku caddy_config)', (t) => {
+  const dir = path.join(ROOT, '..', 'cyklo-ski-mapa', 'deploy');
+  if (!fs.existsSync(dir)) return t.skip('cyklo-ski-mapa leží v repozitáři nad složkou kolomapa (v obrazu Dockeru / ZIPu chybí)');
+  assert.match(fs.readFileSync(path.join(dir, 'Caddyfile'), 'utf8'), /^import \/config\/sites\/\*\.caddy$/m);
+  // /config musí být svazek, jinak by soubor Kolomapy nepřežil obnovu kontejneru caddy
+  assert.match(fs.readFileSync(path.join(dir, 'docker-compose.yml'), 'utf8'), /^\s+- caddy_config:\/config$/m);
 });
 
 test('docker: pripravit-server.sh – jeden příkaz z raw odkazu (refs/heads/…), runner se štítkem kolomapa', (t) => {

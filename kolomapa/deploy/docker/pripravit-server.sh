@@ -4,7 +4,7 @@
 #   curl -fsSL https://raw.githubusercontent.com/ladasuchan1-cmd/Doma/refs/heads/VETEV/kolomapa/deploy/docker/pripravit-server.sh -o /tmp/pripravit-server.sh && sudo bash /tmp/pripravit-server.sh [REGISTRACNI_TOKEN]
 #
 # 1. stáhne (nebo aktualizuje) kód do /root/Doma a nasadí Kolomapu (deploy/docker/nasadit.sh: obraz, testy,
-#    kontejner na síti web, blok do /root/Caddyfile, záloha) – na konci vypíše heslo do mapy,
+#    kontejner na Docker síti Caddy, blok pro Caddy, záloha) – na konci vypíše heslo do mapy,
 # 2. s REGISTRAČNÍM TOKENEM z GitHubu (Doma → Settings → Actions → Runners → New self-hosted runner → Linux;
 #    token ze stránky platí hodinu) nainstaluje self-hosted runner se štítkem „kolomapa“ jako službu – od té
 #    chvíle nasazuje workflow „Kolomapa – nasazení na server“ samo (zapíná proměnná repozitáře
@@ -65,7 +65,7 @@ fi
 if [[ -f .runner ]]; then
   echo "   runner už je zaregistrovaný – nechávám."
 else
-  # Runner běží jako root: nasazení upravuje /root/Caddyfile a tak na tomto serveru běží vše ostatní.
+  # Runner běží jako root: nasazení upravuje konfiguraci Caddy a tak na tomto serveru běží vše ostatní.
   RUNNER_ALLOW_RUNASROOT=1 ./config.sh --url "https://github.com/$REPO" --token "$TOKEN" \
     --name "hetzner-kolomapa" --labels kolomapa --unattended --replace
   grep -q '^RUNNER_ALLOW_RUNASROOT=' .env 2>/dev/null || echo 'RUNNER_ALLOW_RUNASROOT=1' >>.env

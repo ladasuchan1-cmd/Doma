@@ -61,24 +61,28 @@ Změny v postupu nasazení patří do `nasadit.sh`, ne do workflow – skript po
 | nastavení | `/root/kolomapa.env` (mimo git; při prvním nasazení vznikne s náhodným heslem a skript ho vypíše) |
 | data | `/root/kolomapa-data` → `/app/data` v kontejneru (databáze; přežije přestavbu), zálohy v `zalohy/` |
 | kontejner | `kolomapa` z obrazu `kolomapa`, port 8050 |
-| vrátnice | Caddy → `https://kolomapa.37-27-203-154.sslip.io`; blok do Caddyfile přidá `nasadit.sh` |
+| vrátnice | Caddy Cyklo & Ski mapy (`deploy-caddy-1`) → `https://kolomapa.37-27-203-154.sslip.io`; blok `/config/sites/kolomapa.caddy` ve svazku `caddy_config` zapíše `nasadit.sh` |
 | stahování | plánovač uvnitř kontejneru (05:30 pražského času) – žádný cron |
 | záloha | `/etc/cron.daily/kolomapa-zaloha` → `/root/kolomapa-data/zalohy/kolomapa-<den>.db` (7 dní dozadu) |
 | log | `docker logs -f kolomapa` |
 
-Caddy skript pozná sám: v kontejneru `caddy` (Kolomapa se připojí na jeho Docker síť, blok `reverse_proxy
-kolomapa:8050`, Caddyfile podle připojeného svazku – typicky `/root/Caddyfile`), nebo jako služba systému
-(`/etc/caddy/Caddyfile`, Kolomapa publikuje jen `127.0.0.1:8050`, `systemctl reload caddy`). Když v Caddyfile je
-sdílený snippet `(header_sec)`, blok ho použije. Nic jiného se v konfiguraci Caddy nemění; před načtením se ověří
-a při chybě se vrátí původní soubor.
+Caddy skript pozná sám – na 37.27.203.154 je to Caddy ze stacku Cyklo & Ski mapy (kontejner `deploy-caddy-1`,
+Docker síť `deploy_default`, Caddyfile `/opt/Doma/cyklo-ski-mapa/deploy/Caddyfile`). Ten Caddyfile je v git klonu,
+proto do něj blok nejde: Kolomapa má vlastní soubor `/config/sites/kolomapa.caddy` ve svazku `caddy_config`
+(`reverse_proxy kolomapa:8050`) a Caddyfile ho načítá řádkem `import /config/sites/*.caddy` (v repozitáři je; starší
+klon ho od skriptu dostane a jakmile je i na GitHubu, skript klon srovná, aby `hetzner.sh aktualizace` dál stahoval
+kód). Jinde: kontejner `caddy` (blok přímo do Caddyfile podle připojeného svazku, typicky `/root/Caddyfile`), nebo
+Caddy jako služba systému (`/etc/caddy/Caddyfile`, Kolomapa publikuje jen `127.0.0.1:8050`, `systemctl reload
+caddy`). Když v Caddyfile je sdílený snippet `(header_sec)`, blok ho použije. Před načtením se konfigurace ověří a
+při chybě se vrátí původní. Na konci skript zkusí `https://<doména>` přes Caddy (čeká 401 = chce heslo).
 
 ## Vlastní doména místo sslip.io
 
 1. U správce domény přidejte záznam **A**, např. `kolomapa.ksprehledy.cz` → `37.27.203.154`
    (je-li doména za Cloudflare, záznam dejte „DNS only“ – šedý mráček, ať certifikát vyřídí Caddy).
 2. V `/root/kolomapa.env` přepište `KOLOMAPA_DOMENA=kolomapa.ksprehledy.cz`.
-3. `bash /root/Doma/kolomapa/deploy/docker/nasadit.sh` – přidá nový blok do Caddy. Starý blok pro sslip.io můžete
-   v Caddyfile smazat.
+3. `bash /root/Doma/kolomapa/deploy/docker/nasadit.sh` – přepíše blok v Caddy na novou doménu (u Caddy s blokem přímo
+   v Caddyfile přidá nový; starý pro sslip.io můžete smazat).
 
 ## Nastavení (`/root/kolomapa.env`)
 
@@ -116,8 +120,9 @@ Ostatní volby (`KOLOMAPA_DELAY_MS`, `KOLOMAPA_MAX_DETAILS`, `KOLOMAPA_AI_MAX_PE
 | job `deploy` visí na „Waiting for a runner“ | runner neběží (`cd /root/actions-runner-kolomapa && ./svc.sh status`) nebo nemá štítek `kolomapa` |
 | job `deploy` se přeskočil | chybí proměnná repozitáře `KOLOMAPA_HETZNER=true` |
 | „testy v obrazu neprošly“ | celý výpis v `/tmp/kolomapa-testy.log` na serveru; starý kontejner běží dál |
-| „nová konfigurace Caddy neprošla kontrolou“ | skript vrátil původní Caddyfile; blok přidejte ručně (je vypsaný ve skriptu) a Caddy načtěte znovu |
-| prohlížeč hlásí chybu certifikátu | Caddy certifikát teprve vyřizuje (do minuty); u vlastní domény DNS ještě neukazuje na server |
+| „nová konfigurace Caddy neprošla kontrolou“ | skript vrátil původní konfiguraci; blok přidejte ručně (je vypsaný ve skriptu) a Caddy načtěte znovu |
+| prohlížeč hlásí chybu certifikátu / „internal error“ | Caddy certifikát teprve vyřizuje (do minuty), nebo o Kolomapě neví: `docker exec deploy-caddy-1 cat /config/sites/kolomapa.caddy` a `grep import /opt/Doma/cyklo-ski-mapa/deploy/Caddyfile` – chybí-li, znovu `nasadit.sh`; u vlastní domény DNS ještě neukazuje na server |
+| „klon /opt/Doma má kvůli řádku import necommitnutou změnu“ | neškodí Kolomapě; jen `hetzner.sh aktualizace` (Cyklo & Ski mapa) zatím nestahuje nový kód – srovná se samo při dalším `nasadit.sh`, až bude větev Kolomapy sloučená do hlavní |
 | „Kolomapa do minuty neodpověděla“ | skript vypíše posledních 40 řádků logu; typicky špatná hodnota v `/root/kolomapa.env` |
 | mapa prázdná | první stahování ještě běží (stav nahoře v mapě, `docker logs kolomapa`) |
 

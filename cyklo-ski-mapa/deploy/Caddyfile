@@ -15,3 +15,8 @@
 		}
 	}
 }
+
+# Další weby na tomto serveru (Kolomapa …): každý má vlastní soubor ve svazku caddy_config, /config/sites/*.caddy.
+# Zapisuje ho skript nasazení té aplikace (kolomapa/deploy/docker/nasadit.sh) – Caddyfile zůstává beze změny
+# a klon repozitáře čistý (hetzner.sh aktualizace jinak kód nestahuje). Bez souborů řádek nic nedělá.
+import /config/sites/*.caddy

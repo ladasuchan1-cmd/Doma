@@ -17,8 +17,12 @@
 #   záloha     /etc/cron.daily/kolomapa-zaloha → /root/kolomapa-data/zalohy/kolomapa-<den>.db (7 dní dozadu)
 #
 # Caddy skript pozná sám:
-#   a) v kontejneru „caddy“ (ksprehledy.cz): Kolomapa na stejné Docker síti, blok „reverse_proxy kolomapa:8050“,
-#      Caddyfile na hostiteli podle připojeného svazku (typicky /root/Caddyfile), reload přes docker exec;
+#   a) v kontejneru – jménem „caddy“ (ksprehledy.cz), nebo z obrazu caddy (docker compose Cyklo & Ski mapy:
+#      deploy-caddy-1): Kolomapa na stejné Docker síti, „reverse_proxy kolomapa:8050“, reload přes docker exec.
+#      Blok jde do Caddyfile na hostiteli (podle připojeného svazku, typicky /root/Caddyfile). Když je Caddyfile
+#      v git klonu (cyklo-ski-mapa/deploy/Caddyfile v /opt/Doma) a Caddy má svazek /config, blok jde do souboru
+#      /config/sites/kolomapa.caddy a v Caddyfile je jen řádek „import /config/sites/*.caddy“ (v repozitáři
+#      commitnutý) – Caddyfile zůstává beze změny a klon čistý (hetzner.sh aktualizace jinak kód nestahuje);
 #   b) jako služba systému (/etc/caddy/Caddyfile): Kolomapa publikuje 127.0.0.1:8050, blok
 #      „reverse_proxy 127.0.0.1:8050“, systemctl reload caddy;
 #   c) jinak blok jen vypíše (přidáte ručně).
@@ -31,8 +35,11 @@ KOD="${KOLOMAPA_KOD:-/root/Doma}"
 ENV_SOUBOR="${KOLOMAPA_ENV:-/root/kolomapa.env}"
 DATA="${KOLOMAPA_DATA:-/root/kolomapa-data}"
 PORT=8050
-CADDY="${CADDY_KONTEJNER:-caddy}"
+CADDY="${CADDY_KONTEJNER:-}"                   # jméno kontejneru Caddy; prázdné = najít sám (caddy, deploy-caddy-1 …)
 CADDY_CONFIG="${CADDY_CONFIG:-/etc/caddy/Caddyfile}"   # cesta uvnitř kontejneru caddy
+CADDY_SITES=/config/sites                      # soubory dalších webů ve svazku caddy_config (řádek import v Caddyfile)
+IMPORT_RADEK="import $CADDY_SITES/*.caddy"
+IMPORT_KOMENTAR="# Další weby na tomto serveru (Kolomapa …): soubory $CADDY_SITES/*.caddy (přidal kolomapa/deploy/docker/nasadit.sh)"
 ZALOHA_CRON="${KOLOMAPA_ZALOHA_CRON:-/etc/cron.daily/kolomapa-zaloha}"
 
 say() { printf '\n\033[1m→ %s\033[0m\n' "$*"; }
@@ -57,13 +64,38 @@ fi
 echo "   verze: $(git -C "$ZDROJ" rev-parse --short HEAD 2>/dev/null || echo '?')"
 
 # --- Caddy: kde a jak --------------------------------------------------------------------------------------------
-REZIM=none
+# Kontejner Caddy: jméno z CADDY_KONTEJNER, jinak „caddy“, jinak jediný běžící kontejner z obrazu caddy nebo se
+# „caddy“ ve jméně (docker compose je pojmenovává <projekt>-caddy-1 – u Cyklo & Ski mapy deploy-caddy-1).
+najdi_caddy() {
+  local kandidati
+  if [[ -n "$CADDY" ]]; then
+    docker ps --format '{{.Names}}' | grep -qx "$CADDY" || die "kontejner Caddy „$CADDY“ (CADDY_KONTEJNER) neběží"
+    return 0
+  fi
+  if docker ps --format '{{.Names}}' | grep -qx caddy; then CADDY=caddy; return 0; fi
+  kandidati="$(docker ps --format '{{.Names}} {{.Image}}' | awk '$2 ~ /(^|\/)caddy(:|@|$)/ || $1 ~ /caddy/ {print $1}')"
+  case "$(grep -c . <<<"$kandidati")" in
+    0) return 1 ;;
+    1) CADDY="$kandidati" ;;
+    *) die "běží víc kontejnerů Caddy ($(tr '\n' ' ' <<<"$kandidati")) – vyberte: CADDY_KONTEJNER=jmeno bash nasadit.sh" ;;
+  esac
+}
+mount_zdroj() { docker inspect "$1" --format '{{range .Mounts}}{{if eq .Destination "'"$2"'"}}{{.Source}}{{end}}{{end}}' 2>/dev/null || true; }
+mount_typ()   { docker inspect "$1" --format '{{range .Mounts}}{{if eq .Destination "'"$2"'"}}{{.Type}}{{end}}{{end}}' 2>/dev/null || true; }
+git_klon() {   # Caddyfile sledovaný gitem (cyklo-ski-mapa/deploy/Caddyfile v /opt/Doma) → cesta klonu; jinak nic
+  local d; d="$(dirname "$1")"
+  if git -C "$d" ls-files --error-unmatch "$(basename "$1")" >/dev/null 2>&1; then git -C "$d" rev-parse --show-toplevel 2>/dev/null || true; fi
+}
+
+REZIM=none     # docker | system | none
+ZPUSOB=blok    # blok = blok rovnou do Caddyfile; sites = soubor /config/sites/kolomapa.caddy (Caddyfile v git klonu)
+KLON=""
 SIT="${KOLOMAPA_SIT:-}"
-if docker ps --format '{{.Names}}' | grep -qx "$CADDY"; then
+if najdi_caddy; then
   REZIM=docker
   if [[ -z "${CADDYFILE:-}" ]]; then
     # Caddyfile na hostiteli = zdroj svazku připojeného do kontejneru jako /etc/caddy/Caddyfile
-    CADDYFILE="$(docker inspect "$CADDY" --format '{{range .Mounts}}{{if eq .Destination "'"$CADDY_CONFIG"'"}}{{.Source}}{{end}}{{end}}' 2>/dev/null || true)"
+    CADDYFILE="$(mount_zdroj "$CADDY" "$CADDY_CONFIG")"
     CADDYFILE="${CADDYFILE:-/root/Caddyfile}"
   fi
   if [[ -z "$SIT" ]]; then
@@ -72,6 +104,8 @@ if docker ps --format '{{.Names}}' | grep -qx "$CADDY"; then
     SIT="${SIT:-web}"
   fi
   CIL="$APP:$PORT"
+  KLON="$(git_klon "$CADDYFILE")"
+  if [[ -n "$KLON" && -n "$(mount_typ "$CADDY" "$(dirname "$CADDY_SITES")")" ]]; then ZPUSOB=sites; fi
 elif command -v caddy >/dev/null && [[ -f "${CADDYFILE:-/etc/caddy/Caddyfile}" ]]; then
   REZIM=system
   CADDYFILE="${CADDYFILE:-/etc/caddy/Caddyfile}"
@@ -81,7 +115,7 @@ else
   CIL="127.0.0.1:$PORT"
 fi
 SIT="${SIT:-web}"
-echo "   Caddy: $REZIM${CADDYFILE:+ ($CADDYFILE)}, Docker síť: $SIT"
+echo "   Caddy: $REZIM${CADDY:+ (kontejner $CADDY)}${CADDYFILE:+, $CADDYFILE}${KLON:+ – v git klonu $KLON}, Docker síť: $SIT"
 
 # --- Nastavení (/root/kolomapa.env) -----------------------------------------------------------------------------
 # Výchozí doména: kolomapa.<veřejná IP serveru s pomlčkami>.sslip.io – funguje bez vlastní DNS, Caddy si pro ni
@@ -163,28 +197,86 @@ $DOMENA {
     reverse_proxy $CIL
     header X-Robots-Tag \"noindex, nofollow\"
 }"
+# bezpečnostní hlavičky sdílené s ostatními aplikacemi (snippet header_sec), když v Caddyfile jsou
+if [[ -f "$CADDYFILE" ]] && grep -q '^(header_sec)' "$CADDYFILE"; then BLOK="${BLOK/reverse_proxy/import header_sec
+    reverse_proxy}"; fi
+
+caddy_docker_nacti() {   # ověřit a načíst konfiguraci běžícího kontejneru Caddy; 1 = kontrola neprošla
+  docker exec "$CADDY" caddy validate --config "$CADDY_CONFIG" >/dev/null 2>&1 || return 1
+  docker exec "$CADDY" caddy reload --config "$CADDY_CONFIG" >/dev/null 2>&1 || true
+}
+caddy_docker_chyba() {
+  docker exec "$CADDY" caddy validate --config "$CADDY_CONFIG" 2>&1 | tail -5 || true
+  die "nová konfigurace Caddy neprošla kontrolou – vrácena původní; blok přidejte ručně (je ve skriptu)"
+}
+# Caddyfile v git klonu: řádek import je v repozitáři commitnutý (cyklo-ski-mapa/deploy/Caddyfile). Dokud ho klon na
+# serveru nemá, doplnil se do pracovní kopie – a hetzner.sh aktualizace (Cyklo & Ski mapa) pak hlásí „necommitnuté
+# změny – kód nestahuji“. Jakmile řádek má i origin, srovná se pracovní kopie z gitu (checkout + rychloposun), aby
+# klon zůstal čistý. Jiných necommitnutých změn se nedotýká.
+caddyfile_git_srovnat() {   # $1 Caddyfile, $2 klon
+  local rel vetev r
+  rel="$(git -C "$(dirname "$1")" ls-files --full-name "$(basename "$1")" 2>/dev/null)"
+  [[ -n "$rel" ]] || return 0
+  git -C "$2" diff --quiet -- "$rel" 2>/dev/null && return 0      # pracovní kopie = HEAD, není co srovnávat
+  while IFS= read -r r; do   # smí se lišit jen o prázdný řádek, náš komentář a řádek import
+    case "$r" in "+"|"+$IMPORT_KOMENTAR"|"+$IMPORT_RADEK") ;; *)
+      echo "   POZOR: $rel v klonu $2 má i jiné necommitnuté změny – nechávám (hetzner.sh aktualizace kvůli nim kód nestahuje)."
+      return 0 ;;
+    esac
+  done < <(git -C "$2" diff -- "$rel" | grep -E '^[-+]' | grep -vE '^(\+\+\+|---) ')
+  vetev="$(git -C "$2" branch --show-current 2>/dev/null || true)"
+  if [[ -n "$vetev" ]] && git -C "$2" fetch -q origin "$vetev" 2>/dev/null \
+     && git -C "$2" show "origin/$vetev:$rel" 2>/dev/null | grep -qxF "$IMPORT_RADEK"; then
+    if git -C "$2" checkout -q -- "$rel" && git -C "$2" merge -q --ff-only "origin/$vetev" 2>/dev/null && grep -qxF "$IMPORT_RADEK" "$1"; then
+      echo "   klon $2: řádek „$IMPORT_RADEK“ už je v origin/$vetev – $rel srovnán z gitu, klon je čistý"
+      return 0
+    fi
+    grep -qxF "$IMPORT_RADEK" "$1" || printf '\n%s\n' "$IMPORT_RADEK" >>"$1"   # rychloposun nešel – řádek zpět
+  fi
+  echo "   POZOR: klon $2 má kvůli řádku „$IMPORT_RADEK“ necommitnutou změnu v $rel; hetzner.sh aktualizace (Cyklo & Ski"
+  echo "          mapa) kvůli ní nestahuje nový kód. Srovná se samo při příštím nasazení Kolomapy, až bude řádek i na"
+  echo "          GitHubu ve větvi $vetev (sloučení větve Kolomapy)."
+}
+
 if [[ ! -f "$CADDYFILE" ]]; then
   echo "VAROVÁNÍ: $CADDYFILE neexistuje – do své konfigurace Caddy přidejte ručně:"
   printf '%s\n' "$BLOK"
 elif grep -qE "^[[:space:]]*$DOMENA([[:space:],{]|$)" "$CADDYFILE"; then
   say "Caddy: blok pro $DOMENA už v $CADDYFILE je"
+elif [[ "$ZPUSOB" == sites ]]; then
+  # Caddyfile je v git klonu (Cyklo & Ski mapa) – blok nejde dovnitř, ale do svazku caddy_config: /config/sites/kolomapa.caddy.
+  # V Caddyfile musí být řádek „import /config/sites/*.caddy“ (v repozitáři je; starší klon ho dostane tady).
+  SOUBOR="$CADDY_SITES/$APP.caddy"
+  say "Caddy: zapisuji blok pro $DOMENA do $SOUBOR v kontejneru $CADDY"
+  PUVODNI="$(docker exec "$CADDY" cat "$SOUBOR" 2>/dev/null || true)"
+  PUVODNI_CADDYFILE=""   # záloha jen v paměti – soubor .zaloha by v git klonu vadil (hetzner.sh: necommitnuté změny)
+  if ! grep -qxF "$IMPORT_RADEK" "$CADDYFILE"; then
+    echo "   $CADDYFILE: doplňuji řádek „$IMPORT_RADEK“"
+    PUVODNI_CADDYFILE="$(cat "$CADDYFILE")"
+    # >> drží stejný soubor (inode) – kontejner caddy ho má připojený, nový soubor by neviděl
+    printf '\n%s\n%s\n' "$IMPORT_KOMENTAR" "$IMPORT_RADEK" >>"$CADDYFILE"
+  fi
+  printf '%s\n' "$BLOK" | docker exec -i "$CADDY" sh -c "mkdir -p '$CADDY_SITES' && cat >'$SOUBOR'"
+  if caddy_docker_nacti; then
+    echo "   Caddy načetla novou konfiguraci"
+  else
+    if [[ -n "$PUVODNI" ]]; then printf '%s\n' "$PUVODNI" | docker exec -i "$CADDY" sh -c "cat >'$SOUBOR'"; else docker exec "$CADDY" rm -f "$SOUBOR"; fi
+    [[ -n "$PUVODNI_CADDYFILE" ]] && printf '%s\n' "$PUVODNI_CADDYFILE" >"$CADDYFILE"   # > drží inode
+    caddy_docker_chyba
+  fi
+  caddyfile_git_srovnat "$CADDYFILE" "$KLON"
 else
   say "Caddy: přidávám blok pro $DOMENA do $CADDYFILE"
-  # bezpečnostní hlavičky sdílené s ostatními aplikacemi (snippet header_sec), když v Caddyfile jsou
-  if grep -q '^(header_sec)' "$CADDYFILE"; then BLOK="${BLOK/reverse_proxy/import header_sec
-    reverse_proxy}"; fi
   cp "$CADDYFILE" "$CADDYFILE.zaloha"
   # >> drží stejný soubor (inode) – kontejner caddy ho má připojený, nový soubor by neviděl
   printf '\n%s\n' "$BLOK" >>"$CADDYFILE"
   case "$REZIM" in
     docker)
-      if docker exec "$CADDY" caddy validate --config "$CADDY_CONFIG" >/dev/null 2>&1; then
-        docker exec "$CADDY" caddy reload --config "$CADDY_CONFIG" >/dev/null 2>&1 || true
+      if caddy_docker_nacti; then
         echo "   Caddy načetla novou konfiguraci (záloha předchozí: $CADDYFILE.zaloha)"
       else
         cp "$CADDYFILE.zaloha" "$CADDYFILE"
-        docker exec "$CADDY" caddy validate --config "$CADDY_CONFIG" 2>&1 | tail -5 || true
-        die "nová konfigurace Caddy neprošla kontrolou – vrácena původní; blok přidejte ručně (je ve skriptu)"
+        caddy_docker_chyba
       fi
       ;;
     system)
@@ -223,6 +315,21 @@ for i in $(seq 1 30); do
       echo
       echo "POZOR: doména $DOMENA se zatím nepřekládá – u správce domény přidejte záznam A na IP tohoto serveru."
       echo "       Certifikát HTTPS si Caddy vyřídí sama, jakmile se DNS projeví."
+    elif [[ "$REZIM" != none ]] && command -v curl >/dev/null; then
+      # Přes Caddy z tohoto serveru (bez ohledu na DNS): 401 = Caddy směruje na Kolomapu a chce heslo. Certifikát
+      # Caddy vyřizuje na pozadí, chvíli to může trvat – proto víc pokusů, a jen jako informace.
+      LOG_CADDY="${CADDY:+docker logs $CADDY}"; LOG_CADDY="${LOG_CADDY:-journalctl -u caddy -n 50}"
+      KOD_HTTP=000
+      for _ in $(seq 1 12); do
+        KOD_HTTP="$(curl -sk -o /dev/null -m 5 -w '%{http_code}' --resolve "$DOMENA:443:127.0.0.1" "https://$DOMENA/" 2>/dev/null || echo 000)"
+        [[ "$KOD_HTTP" == 000 ]] || break
+        sleep 5
+      done
+      case "$KOD_HTTP" in
+        401) echo "   přes Caddy: https://$DOMENA odpovídá (401 – chce heslo), certifikát vystaven" ;;
+        000) echo "   přes Caddy: https://$DOMENA zatím neodpovídá – Caddy nejspíš ještě vyřizuje certifikát; zkuste za minutu, jinak: $LOG_CADDY" ;;
+        *)   echo "   přes Caddy: https://$DOMENA vrací $KOD_HTTP (čekal jsem 401) – podívejte se do: $LOG_CADDY" ;;
+      esac
     fi
     echo
     echo "Mapa:       https://$DOMENA   (jméno libovolné; heslo: KOLOMAPA_PASSWORD v $ENV_SOUBOR)"
