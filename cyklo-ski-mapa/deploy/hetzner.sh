@@ -156,8 +156,9 @@ instalace() {
   cekej_na_app
   cekej_na_web || true
   mkdir -p "$ZALOHY"
+  zajisti_cron
   echo
-  echo "Hotovo. Další kroky: hetzner.sh zaloha --cron (denní záloha stavu), v GitHubu nastavit automatické nasazení (NASAZENI.md)."
+  echo "Hotovo. Další krok: v GitHubu nastavit automatické nasazení (NASAZENI.md)."
 }
 
 aktualizace() {
@@ -183,6 +184,7 @@ aktualizace() {
     exit 1
   fi
   docker image prune -f >/dev/null 2>&1 || true
+  zajisti_cron
   cekej_na_web || true
 }
 
@@ -194,15 +196,25 @@ zpet() {
   cekej_na_app && echo "Běží předchozí verze: $(compose exec -T app wget -qO- http://127.0.0.1:8090/api/health)"
 }
 
+# Denní záloha stavu přes cron – nastavuje se automaticky po instalaci i aktualizaci (CSM_CRON=0 vypne).
+zajisti_cron() {
+  [ "${CSM_CRON:-1}" = "1" ] || return 0
+  [ -d /etc/cron.d ] || return 0
+  local soubor=/etc/cron.d/cyklo-ski-mapa-zaloha
+  local obsah="# Denní záloha stavu oslovení Cyklo & Ski mapy (hetzner.sh zaloha)
+30 2 * * * root bash $DEPLOY_DIR/hetzner.sh zaloha >> /var/log/cyklo-ski-mapa-zaloha.log 2>&1"
+  if [ ! -f "$soubor" ] || [ "$(cat "$soubor")" != "$obsah" ]; then
+    printf '%s\n' "$obsah" > "$soubor"
+    chmod 644 "$soubor"
+    echo "→ Denní záloha stavu ve 2:30 nastavena ($soubor, kopie v $ZALOHY)."
+  fi
+}
+
 zaloha() {
   mkdir -p "$ZALOHY"
   if [ "${1:-}" = "--cron" ]; then
-    cat > /etc/cron.d/cyklo-ski-mapa-zaloha <<EOF
-# Denní záloha stavu oslovení Cyklo & Ski mapy (hetzner.sh zaloha)
-30 2 * * * root bash $DEPLOY_DIR/hetzner.sh zaloha >> /var/log/cyklo-ski-mapa-zaloha.log 2>&1
-EOF
-    chmod 644 /etc/cron.d/cyklo-ski-mapa-zaloha
-    echo "→ Denní záloha ve 2:30 nastavena (/etc/cron.d/cyklo-ski-mapa-zaloha)."
+    rm -f /etc/cron.d/cyklo-ski-mapa-zaloha
+    zajisti_cron
   fi
   local cil="$ZALOHY/stav-$(date +%F-%H%M).json"
   if compose cp app:/data/stav.json "$cil" >/dev/null 2>&1; then

@@ -46,7 +46,7 @@ Bez dotazu: `sudo env CSM_USERS='lada:heslo;obchod:heslo2' bash …/hetzner.sh i
 **4. Zálohy a provoz.**
 
 ```bash
-bash /opt/Doma/cyklo-ski-mapa/deploy/hetzner.sh zaloha --cron   # denní kopie stav.json do /opt/zalohy-cyklo-ski-mapa (60 posledních)
+bash /opt/Doma/cyklo-ski-mapa/deploy/hetzner.sh zaloha          # ruční záloha stav.json do /opt/zalohy-cyklo-ski-mapa (denní ve 2:30 se nastaví sama, 60 posledních)
 bash /opt/Doma/cyklo-ski-mapa/deploy/hetzner.sh stav            # kontejnery, health, disk
 bash /opt/Doma/cyklo-ski-mapa/deploy/hetzner.sh log             # živý log
 bash /opt/Doma/cyklo-ski-mapa/deploy/hetzner.sh aktualizace     # nový kód z GitHubu → build → výměna (při chybě vrátí předchozí)
