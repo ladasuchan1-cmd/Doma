@@ -22,17 +22,22 @@ nastaví firewall a stáhne repozitář. (Bez cloud‑initu to udělá krok 3.)
 a **AAAA záznam** → IPv6 serveru (Hetzner ji dává zdarma; když AAAA nedáte, nic se neděje). Ověřte
 `ping mapa.vase-domena.cz`. Než se DNS rozšíří, Caddy certifikát nedostane – proto DNS dřív než krok 3.
 
-**3. Instalace.**
+**3. Instalace** – jeden příkaz na serveru (jako root, nebo účet se `sudo`):
 
 ```bash
-ssh root@IP_SERVERU
-apt-get install -y git && git clone https://github.com/ladasuchan1-cmd/Doma.git /opt/Doma   # (přeskočit, když klonoval cloud-init)
-bash /opt/Doma/cyklo-ski-mapa/deploy/hetzner.sh instalace mapa.vase-domena.cz
+ssh root@IP_SERVERU            # nebo ssh agent@IP_SERVERU – skript se přes sudo povýší sám
+sudo apt-get install -y git && sudo git clone https://github.com/ladasuchan1-cmd/Doma.git /opt/Doma   # (přeskočit, když klonoval cloud-init)
+sudo bash /opt/Doma/cyklo-ski-mapa/deploy/hetzner.sh instalace mapa.vase-domena.cz
 ```
 
 Skript doinstaluje Docker, zeptá se na **uživatele a hesla** (`jmeno:heslo;jmeno2:heslo2`; Enter =
 jedno náhodné heslo pro uživatele „tým“), zapíše `deploy/.env`, postaví a spustí aplikaci i Caddy a počká,
 až `https://mapa.vase-domena.cz/api/health` odpoví. Pak otevřete adresu v prohlížeči a přihlaste se.
+Bez dotazu: `sudo env CSM_USERS='lada:heslo;obchod:heslo2' bash …/hetzner.sh instalace mapa.vase-domena.cz`.
+
+> Nemáte zatím doménu? Dočasně poslouží `IP-S-POMLCKAMI.sslip.io` (např. `37-27-203-154.sslip.io`) – veřejná DNS
+> služba, která jméno překládá na tu IP, takže Caddy dostane platný certifikát. Vlastní doménu pak nastavíte
+> změnou `DOMAIN=` v `deploy/.env` a `hetzner.sh aktualizace`.
 
 > Pokud aplikace zatím není v hlavní větvi repa, klonujte větev, kde je:
 > `git clone -b NAZEV_VETVE https://github.com/ladasuchan1-cmd/Doma.git /opt/Doma`.
@@ -56,13 +61,17 @@ obnova = `docker compose cp zaloha.json app:/data/stav.json && docker compose re
 dotkne složky `cyklo-ski-mapa/`, proběhnou testy a pak se přes SSH na serveru spustí `hetzner.sh aktualizace`.
 
 1. Na svém počítači vytvořte klíč jen pro nasazení: `ssh-keygen -t ed25519 -f ~/.ssh/csm-deploy -N ""`
-   a veřejnou část přidejte na server: `ssh-copy-id -i ~/.ssh/csm-deploy.pub root@IP_SERVERU`.
+   a veřejnou část přidejte na server: `ssh-copy-id -i ~/.ssh/csm-deploy.pub agent@IP_SERVERU` (účet, pod kterým
+   se workflow přihlásí; jiný než root potřebuje `sudo` bez hesla).
 2. GitHub → repo **Doma** → Settings → Secrets and variables → Actions:
    - **Secrets**: `HETZNER_HOST` = IP nebo doména serveru, `HETZNER_SSH_KEY` = obsah souboru `~/.ssh/csm-deploy`
-     (soukromý klíč, celý včetně hlaviček), volitelně `HETZNER_USER` (výchozí `root`) a `HETZNER_PORT` (22).
-   - **Variables**: `CSM_HETZNER` = `1` (zapíná job), volitelně `CSM_HETZNER_DIR` (výchozí `/opt/Doma/cyklo-ski-mapa`).
-3. Ruční spuštění: Actions → „Cyklo & Ski mapa“ → Run workflow (hlavní větev). Výsledek je vidět v logu jobu
-   `deploy-hetzner` včetně výstupu `/api/health` s verzí.
+     (soukromý klíč, celý včetně hlaviček), `HETZNER_USER` (např. `agent`; výchozí `root`), `HETZNER_USERS` =
+     `jmeno:heslo;jmeno2:heslo2` (přihlášení do aplikace – použije se jen při první instalaci), volitelně `HETZNER_PORT`.
+   - **Variables**: `CSM_HETZNER` = `1` (zapíná job), `CSM_HETZNER_DOMAIN` = doména webu (nutná pro první instalaci),
+     volitelně `CSM_HETZNER_DIR` (výchozí `/opt/Doma/cyklo-ski-mapa`).
+3. Job `deploy-hetzner` pozná, zda aplikace na serveru je: když ne, provede **první instalaci** (pošle skript přes
+   SSH a ten doinstaluje Docker, naklonuje repo, nastaví uživatele i doménu), jinak **aktualizaci**. Ruční spuštění:
+   Actions → „Cyklo & Ski mapa“ → Run workflow (hlavní větev); v logu jobu je i výstup `/api/health` s verzí.
 
 **Když Caddy nedostane certifikát** (`hetzner.sh log` hlásí ACME chyby): DNS ještě nemíří na server, nebo
 nejsou otevřené porty 80/443 (Hetzner Firewall i `ufw status`). Po opravě Caddy zkouší dál sama.

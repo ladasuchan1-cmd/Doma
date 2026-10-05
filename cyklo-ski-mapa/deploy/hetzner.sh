@@ -14,8 +14,27 @@
 #
 # Proměnné: CSM_REPO_DIR (/opt/Doma), CSM_COMPOSE (docker-compose.yml, pro Caddy v jiném kontejneru
 # docker-compose.caddy-externi.yml), CSM_ZALOHY (/opt/zalohy-cyklo-ski-mapa), CSM_USERS (uživatelé pro
-# instalaci bez dotazu), CSM_UFW=0 (nenastavovat firewall).
+# instalaci bez dotazu; nebo CSM_USERS_B64 = totéž v base64, bez starostí s uvozovkami), CSM_VETEV (větev
+# repa pro první klon), CSM_UFW=0 (nenastavovat firewall).
+#
+# Běží i bez repa na disku – skript lze poslat přes SSH ze stdin (první instalace z GitHub Actions):
+#   ssh agent@server 'sudo -n env CSM_USERS_B64=… bash -s -- instalace mapa.domena.cz' < deploy/hetzner.sh
+# Když neběží jako root a sudo je bez hesla, spustí se přes sudo sám.
 set -euo pipefail
+
+if [ "$(id -u)" != 0 ]; then
+  if [ -f "${BASH_SOURCE[0]:-}" ] && sudo -n true 2>/dev/null; then
+    exec sudo -n env CSM_USERS="${CSM_USERS:-}" CSM_USERS_B64="${CSM_USERS_B64:-}" CSM_REPO_DIR="${CSM_REPO_DIR:-}" \
+      CSM_COMPOSE="${CSM_COMPOSE:-}" CSM_ZALOHY="${CSM_ZALOHY:-}" CSM_VETEV="${CSM_VETEV:-}" CSM_UFW="${CSM_UFW:-}" \
+      bash "${BASH_SOURCE[0]}" "$@"
+  fi
+  echo "CHYBA: spusťte jako root nebo přes sudo (sudo bash $0 …)." >&2
+  exit 1
+fi
+if [ -z "${CSM_USERS:-}" ] && [ -n "${CSM_USERS_B64:-}" ]; then
+  CSM_USERS="$(printf %s "$CSM_USERS_B64" | base64 -d)"
+  export CSM_USERS
+fi
 
 REPO_URL="${CSM_REPO:-https://github.com/ladasuchan1-cmd/Doma.git}"
 REPO_DIR="${CSM_REPO_DIR:-/opt/Doma}"
@@ -118,7 +137,6 @@ EOF
 
 instalace() {
   local d="${1:-}"
-  [ "$(id -u)" = 0 ] || chyba "spusťte jako root (ssh root@server)."
   [ -n "$d" ] || [ -n "$(domena)" ] || chyba "zadejte doménu: hetzner.sh instalace mapa.vase-domena.cz"
   export DEBIAN_FRONTEND=noninteractive
   if command -v apt-get >/dev/null 2>&1; then
@@ -216,7 +234,7 @@ case "${1:-}" in
   stav) stav ;;
   log) compose logs --tail 100 -f ;;
   *)
-    sed -n '2,15p' "$0" | sed 's/^# \{0,1\}//'
+    echo "Použití: hetzner.sh instalace DOMENA | aktualizace | zaloha [--cron] | zpet | stav | log" >&2
     exit 1
     ;;
 esac

@@ -3,9 +3,12 @@
 # Testy běží na každém pushi a PR, který se složky dotkne. Nasazení běží jen po pushi do hlavní
 # větve repa (default branch – dnes `claude/terms-reader-app-dl4h8h`, po případném přejmenování `main`)
 # a jen když je zapnuté proměnnou repa (Settings → Secrets and variables → Actions → Variables):
-#   CSM_HETZNER = 1  → job `deploy-hetzner`: přes SSH spustí na serveru deploy/hetzner.sh aktualizace
-#                      (secrets HETZNER_HOST, HETZNER_SSH_KEY, volitelně HETZNER_USER, HETZNER_PORT;
-#                       variable CSM_HETZNER_DIR, výchozí /opt/Doma/cyklo-ski-mapa)
+#   CSM_HETZNER = 1  → job `deploy-hetzner`: přes SSH spustí na serveru deploy/hetzner.sh aktualizace;
+#                      když tam aplikace ještě není, provede první instalaci (skript pošle přes stdin).
+#                      Secrets: HETZNER_HOST, HETZNER_SSH_KEY, HETZNER_USERS (jmeno:heslo;… – jen pro první
+#                      instalaci), volitelně HETZNER_USER (výchozí root; jiný účet potřebuje sudo bez hesla),
+#                      HETZNER_PORT. Variables: CSM_HETZNER_DOMAIN (doména webu, nutná pro první instalaci),
+#                      CSM_HETZNER_DIR (výchozí /opt/Doma/cyklo-ski-mapa).
 #   CSM_DEPLOY = 1   → job `deploy`: self-hosted runner na serveru s labelem `cyklo-ski-mapa` spustí deploy.sh
 #                      (server bez veřejné adresy, jako u R01 Sales)
 # Bez proměnných by joby čekaly na neexistující runner / padaly na chybějících secrets. Postup: cyklo-ski-mapa/NASAZENI.md.
@@ -50,13 +53,17 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
-      - name: Nasazení přes SSH (hetzner.sh aktualizace)
+      - uses: actions/checkout@v4
+      - name: Nasazení přes SSH (hetzner.sh aktualizace, poprvé instalace)
         env:
           HOST: ${{ secrets.HETZNER_HOST }}
           USER: ${{ secrets.HETZNER_USER }}
           PORT: ${{ secrets.HETZNER_PORT }}
           KEY: ${{ secrets.HETZNER_SSH_KEY }}
+          USERS: ${{ secrets.HETZNER_USERS }}
+          DOMAIN: ${{ vars.CSM_HETZNER_DOMAIN }}
           DIR: ${{ vars.CSM_HETZNER_DIR }}
+          BRANCH: ${{ github.ref_name }}
         run: |
           test -n "$HOST" || { echo "Chybí secret HETZNER_HOST"; exit 1; }
           test -n "$KEY" || { echo "Chybí secret HETZNER_SSH_KEY"; exit 1; }
@@ -64,8 +71,20 @@ jobs:
           printf '%s\n' "$KEY" > ~/.ssh/id_deploy
           chmod 600 ~/.ssh/id_deploy
           ssh-keyscan -p "${PORT:-22}" -H "$HOST" >> ~/.ssh/known_hosts 2>/dev/null
-          ssh -i ~/.ssh/id_deploy -p "${PORT:-22}" -o StrictHostKeyChecking=yes "${USER:-root}@$HOST" \
-            "bash '${DIR:-/opt/Doma/cyklo-ski-mapa}/deploy/hetzner.sh' aktualizace"
+          APP="${DIR:-/opt/Doma/cyklo-ski-mapa}"
+          REPO_DIR="$(dirname "$APP")"
+          SUDO=""; [ "${USER:-root}" != "root" ] && SUDO="sudo -n"
+          ssh_cmd() { ssh -i ~/.ssh/id_deploy -p "${PORT:-22}" -o StrictHostKeyChecking=yes "${USER:-root}@$HOST" "$@"; }
+          if ssh_cmd "$SUDO test -f '$APP/deploy/.env'"; then
+            echo "→ Aplikace je nainstalovaná – aktualizuji."
+            ssh_cmd "$SUDO bash '$APP/deploy/hetzner.sh' aktualizace"
+          else
+            echo "→ Aplikace na serveru není – první instalace."
+            test -n "$DOMAIN" || { echo "První instalace potřebuje variable CSM_HETZNER_DOMAIN (doména webu)."; exit 1; }
+            test -n "$USERS" || { echo "První instalace potřebuje secret HETZNER_USERS (jmeno:heslo;jmeno2:heslo2)."; exit 1; }
+            USERS_B64="$(printf %s "$USERS" | base64 -w0)"
+            ssh_cmd "$SUDO env CSM_USERS_B64='$USERS_B64' CSM_REPO_DIR='$REPO_DIR' CSM_VETEV='$BRANCH' bash -s -- instalace '$DOMAIN'" < cyklo-ski-mapa/deploy/hetzner.sh
+          fi
 
   # Interní server bez veřejné adresy (self-hosted runner), jako u R01 Sales.
   deploy:
