@@ -70,9 +70,12 @@ dotkne složky `cyklo-ski-mapa/`, proběhnou testy a pak se přes SSH na serveru
 2. GitHub → repo **Doma** → Settings → Secrets and variables → Actions:
    - **Secrets**: `HETZNER_HOST` = IP nebo doména serveru, `HETZNER_SSH_KEY` = obsah souboru `~/.ssh/csm-deploy`
      (soukromý klíč, celý včetně hlaviček), `HETZNER_USER` (např. `agent`; výchozí `root`), `HETZNER_USERS` =
-     `jmeno:heslo;jmeno2:heslo2` (přihlášení do aplikace – použije se jen při první instalaci), volitelně `HETZNER_PORT`.
-   - **Variables**: `CSM_HETZNER` = `1` (zapíná job), `CSM_HETZNER_DOMAIN` = doména webu (nutná pro první instalaci),
+     `jmeno:heslo;jmeno2:heslo2` (přihlášení do aplikace; jména nerozlišují velikost písmen), volitelně `HETZNER_PORT`.
+   - **Variables**: `CSM_HETZNER` = `1` (zapíná job), `CSM_HETZNER_DOMAIN` = doména webu,
      volitelně `CSM_HETZNER_DIR` (výchozí `/opt/Doma/cyklo-ski-mapa`).
+   - **Uživatelé i doména se při každém nasazení propíší na server** (do `deploy/.env`). Změna hesla nebo nový
+     kolega = upravit secret `HETZNER_USERS` a spustit workflow (Actions → „Cyklo & Ski mapa“ → Run workflow);
+     nová doména = změnit variable `CSM_HETZNER_DOMAIN` (po nastavení DNS) a spustit workflow.
 3. Job `deploy-hetzner` pozná, zda aplikace na serveru je: když ne, provede **první instalaci** (pošle skript přes
    SSH a ten doinstaluje Docker, naklonuje repo, nastaví uživatele i doménu), jinak **aktualizaci**. Ruční spuštění:
    Actions → „Cyklo & Ski mapa“ → Run workflow (hlavní větev); v logu jobu je i výstup `/api/health` s verzí.

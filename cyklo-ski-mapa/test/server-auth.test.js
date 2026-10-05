@@ -31,7 +31,7 @@ async function login(jmeno, heslo) {
 }
 
 test('parseUsers a safeNext', () => {
-  const u = parseUsers('jana:a;petr:b,karel:c\nbez_hesla:\n:bez_jmena');
+  const u = parseUsers('Jana:a;petr:b,KAREL:c\nbez_hesla:\n:bez_jmena');
   assert.deepStrictEqual([...u.entries()], [['jana', 'a'], ['petr', 'b'], ['karel', 'c']]);
   assert.strictEqual(parseUsers('').size, 0);
   assert.strictEqual(safeNext('/x?y=1'), '/x?y=1');
@@ -59,7 +59,7 @@ test('špatné heslo 401, správné nastaví HttpOnly cookie a přesměruje', as
   assert.strictEqual(bad.res.status, 401);
   assert.match(await bad.res.text(), /Nesprávné jméno nebo heslo/);
   assert.strictEqual(bad.cookie, '');
-  const ok = await login('jana', 'TajneHeslo1');
+  const ok = await login('Jana', 'TajneHeslo1'); // velikost písmen ve jméně nerozhoduje
   assert.strictEqual(ok.res.status, 302);
   assert.strictEqual(ok.res.headers.get('location'), '/');
   const sc = ok.res.headers.get('set-cookie');

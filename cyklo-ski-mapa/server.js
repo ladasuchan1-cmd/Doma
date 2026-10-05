@@ -59,7 +59,7 @@ function parseUsers(src) {
     if (i <= 0) continue;
     const name = part.slice(0, i).trim();
     const pass = part.slice(i + 1).trim();
-    if (name && pass) out.set(name.slice(0, 60), pass);
+    if (name && pass) out.set(name.slice(0, 60).toLowerCase(), pass); // jméno bez ohledu na velikost písmen
   }
   return out;
 }
@@ -81,7 +81,7 @@ function safeEqual(a, b) {
 }
 
 function checkLogin(name, pass) {
-  const expected = USERS.get(String(name || '').trim());
+  const expected = USERS.get(String(name || '').trim().toLowerCase());
   if (expected == null) {
     safeEqual('x', String(pass || '')); // stejný čas i pro neznámé jméno
     return false;
@@ -303,7 +303,7 @@ async function handleLogin(req, res, url) {
     return send(res, 401, loginPage({ next, jmeno: form.get('jmeno'), chyba: 'Nesprávné jméno nebo heslo.' }), 'text/html; charset=utf-8');
   }
   failures.delete(ip);
-  const user = String(form.get('jmeno')).trim();
+  const user = String(form.get('jmeno')).trim().toLowerCase();
   return redirect(res, next, { 'Set-Cookie': cookieHeader(makeSession(user), req, SESSION_DAYS * 86400) });
 }
 
