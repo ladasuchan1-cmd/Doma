@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
-# Příprava serveru (Hetzner 37.27.203.154, ksprehledy.cz) pro Kolomapu – JEDEN příkaz v konzoli Hetzneru jako root:
+# Příprava serveru (Hetzner 37.27.203.154) pro Kolomapu – JEDEN příkaz přes SSH (uživatel se sudo, nebo root):
 #
-#   bash <(curl -fsSL https://raw.githubusercontent.com/ladasuchan1-cmd/Doma/refs/heads/VETEV/kolomapa/deploy/docker/pripravit-server.sh) [REGISTRACNI_TOKEN]
+#   curl -fsSL https://raw.githubusercontent.com/ladasuchan1-cmd/Doma/refs/heads/VETEV/kolomapa/deploy/docker/pripravit-server.sh -o /tmp/pripravit-server.sh && sudo bash /tmp/pripravit-server.sh [REGISTRACNI_TOKEN]
 #
 # 1. stáhne (nebo aktualizuje) kód do /root/Doma a nasadí Kolomapu (deploy/docker/nasadit.sh: obraz, testy,
 #    kontejner na síti web, blok do /root/Caddyfile, záloha) – na konci vypíše heslo do mapy,
@@ -21,7 +21,10 @@ TOKEN="${1:-}"
 say() { printf '\n\033[1m== %s\033[0m\n' "$*"; }
 die() { printf '\nCHYBA: %s\n' "$*" >&2; exit 1; }
 
-[[ $EUID -eq 0 ]] || die "spusťte jako root (konzole Hetzneru)"
+if [[ $EUID -ne 0 ]]; then
+  die "potřebuje práva root. Spusťte přes sudo:
+  curl -fsSL https://raw.githubusercontent.com/ladasuchan1-cmd/Doma/refs/heads/$VETEV/kolomapa/deploy/docker/pripravit-server.sh -o /tmp/pripravit-server.sh && sudo bash /tmp/pripravit-server.sh${TOKEN:+ $TOKEN}"
+fi
 command -v docker >/dev/null || die "docker tu není – je to server, kde běží ostatní aplikace (sales, projekty)?"
 if ! command -v git >/dev/null; then
   say "Instaluji git"

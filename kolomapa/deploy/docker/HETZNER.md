@@ -8,11 +8,15 @@ Nasazení dělá jeden skript (`nasadit.sh`) – ručně v konzoli Hetzneru, neb
 Výsledek: **https://kolomapa.37-27-203-154.sslip.io** s heslem; stahování běží každý den v 05:30 přímo na serveru.
 Adresa je podle IP serveru (sslip.io), takže nepotřebuje žádnou DNS – vlastní doménu lze dát kdykoli (níže).
 
-## První nasazení – jeden příkaz v konzoli Hetzneru (jako root)
+## První nasazení – jeden příkaz přes SSH
+
+Přihlaste se na server (`ssh agent@37.27.203.154` z PowerShellu, nebo Termius z telefonu) a vložte:
 
 ```bash
-bash <(curl -fsSL https://raw.githubusercontent.com/ladasuchan1-cmd/Doma/refs/heads/claude/bike-sales-monitoring-app-kufe7w/kolomapa/deploy/docker/pripravit-server.sh)
+curl -fsSL https://raw.githubusercontent.com/ladasuchan1-cmd/Doma/refs/heads/claude/bike-sales-monitoring-app-kufe7w/kolomapa/deploy/docker/pripravit-server.sh -o /tmp/pripravit-server.sh && sudo bash /tmp/pripravit-server.sh
 ```
+
+(Funguje pro uživatele se `sudo` i pro roota. Webová konzole Hetzneru `>_` také funguje, ale nejde do ní vkládat.)
 
 Stáhne kód do `/root/Doma`, postaví obraz, pustí v něm testy, spustí kontejner, přidá blok do konfigurace Caddy
 a načte ji, založí denní zálohu a **na konci vypíše heslo**. Trvá 3–5 minut. Pak otevřete
@@ -36,13 +40,13 @@ Actions → „Kolomapa – nasazení na server“ → *Run workflow* (jde i z r
 3. **Na serveru** tentýž příkaz jako při prvním nasazení, jen s tokenem na konci:
 
    ```bash
-   bash <(curl -fsSL https://raw.githubusercontent.com/ladasuchan1-cmd/Doma/refs/heads/claude/bike-sales-monitoring-app-kufe7w/kolomapa/deploy/docker/pripravit-server.sh) XXXXXXXX
+   curl -fsSL https://raw.githubusercontent.com/ladasuchan1-cmd/Doma/refs/heads/claude/bike-sales-monitoring-app-kufe7w/kolomapa/deploy/docker/pripravit-server.sh -o /tmp/pripravit-server.sh && sudo bash /tmp/pripravit-server.sh XXXXXXXX
    ```
 
    Nainstaluje runner do `/root/actions-runner-kolomapa` se štítkem **`kolomapa`** jako službu (běží jako root,
    protože nasazení upravuje konfiguraci Caddy a tak na serveru běží vše ostatní). Soukromý repozitář: runner si
    kód stáhne sám (nepotřebuje klíč) – jen `raw.githubusercontent.com` odkaz nahraďte spuštěním
-   `bash /root/Doma/kolomapa/deploy/docker/pripravit-server.sh XXXXXXXX` z klonu, který už na serveru je.
+   `sudo bash /root/Doma/kolomapa/deploy/docker/pripravit-server.sh XXXXXXXX` z klonu, který už na serveru je.
 4. **Zapnutí:** Settings → Secrets and variables → Actions → *Variables* → `KOLOMAPA_HETZNER` = `true`.
    Bez proměnné se job `deploy` přeskočí (jinak by bez runneru visel na „Waiting for a runner“).
 5. Actions → „Kolomapa – nasazení na server“ → *Run workflow*. Job `deploy` musí runner sebrat do pár vteřin.
