@@ -78,6 +78,17 @@ pro dynamickou cenotvorbu podle vlastních dat o konkurenci: import cen konkuren
 segmentace podle vlastních metrik, cenové strategie s limity marže, schvalování návrhů a export nových cen do adminu
 (feed, webhook, API) nebo přímo do POHODY (XML). Spuštění: `cd repricing && npm run demo && npm start`.
 
+## Další projekt v repozitáři: Cyklo & Ski mapa
+
+Složka [`cyklo-ski-mapa/`](cyklo-ski-mapa/README.md) obsahuje **Cyklo & Ski mapu** – interaktivní mapu ČR (kraje → okresy)
+se všemi cyklotrasami, cyklostezkami a sjezdovkami a s ubytováním, půjčovnami, cykloprodejnami a infocentry v jejich okolí
+(název, provozovatel, telefon, e-mail, web, zda provozují půjčovnu) a evidencí oslovení (chceme kontaktovat → nabídkový
+e-mail → voláno → osobní návštěva, poznámka). Stačí otevřít `cyklo-ski-mapa/index.html`; pro sdílení stavu v týmu
+`cd cyklo-ski-mapa && npm start`.
+
+Dokumentace: [shrnutí na 1 stránku](cyklo-ski-mapa/docs/SHRNUTI.md) · [manuál pro obchodní tým](cyklo-ski-mapa/docs/MANUAL.md)
+· [metodika dat](cyklo-ski-mapa/docs/METODIKA.md) · [nasazení a provoz](cyklo-ski-mapa/NASAZENI.md).
+
 ## Licence
 
 MIT

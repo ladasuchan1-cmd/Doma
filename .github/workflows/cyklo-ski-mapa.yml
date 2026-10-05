@@ -1,0 +1,117 @@
+# Testy a nasazení aplikace Cyklo & Ski mapa (složka cyklo-ski-mapa/).
+#
+# Testy běží na každém pushi a PR, který se složky dotkne. Nasazení běží jen po pushi do hlavní
+# větve repa (default branch – dnes `claude/terms-reader-app-dl4h8h`, po případném přejmenování `main`)
+# a jen když je zapnuté proměnnou repa (Settings → Secrets and variables → Actions → Variables):
+#   CSM_HETZNER = 1  → job `deploy-hetzner`: přes SSH spustí na serveru deploy/hetzner.sh aktualizace;
+#                      když tam aplikace ještě není, provede první instalaci (skript pošle přes stdin).
+#                      Secrets: HETZNER_HOST, HETZNER_SSH_KEY, HETZNER_USERS (jmeno:heslo;… – přihlášení do
+#                      aplikace; při každém nasazení se propíše na server), volitelně HETZNER_USER (výchozí root;
+#                      jiný účet potřebuje sudo bez hesla), HETZNER_PORT. Variables: CSM_HETZNER_DOMAIN (doména
+#                      webu, propisuje se na server), CSM_HETZNER_DIR (výchozí /opt/Doma/cyklo-ski-mapa).
+#   CSM_DEPLOY = 1   → job `deploy`: self-hosted runner na serveru s labelem `cyklo-ski-mapa` spustí deploy.sh
+#                      (server bez veřejné adresy, jako u R01 Sales)
+# Bez proměnných by joby čekaly na neexistující runner / padaly na chybějících secrets. Postup: cyklo-ski-mapa/NASAZENI.md.
+name: Cyklo & Ski mapa
+
+on:
+  push:
+    branches: ["**"]
+    paths:
+      - "cyklo-ski-mapa/**"
+      - ".github/workflows/cyklo-ski-mapa.yml"
+  pull_request:
+    paths:
+      - "cyklo-ski-mapa/**"
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.event_name == 'pull_request' && format('csm-pr-{0}', github.ref) || (github.ref_name == github.event.repository.default_branch && 'csm-deploy' || format('csm-{0}', github.ref)) }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: cyklo-ski-mapa
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Jednotkové testy, server a konzistence dat
+        run: npm test
+
+  # Hetzner / jakýkoli VPS s veřejnou adresou: nasazení přes SSH z runneru GitHubu.
+  deploy-hetzner:
+    needs: test
+    if: github.event_name != 'pull_request' && github.ref_name == github.event.repository.default_branch && vars.CSM_HETZNER == '1'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v5
+      - name: Nasazení přes SSH (hetzner.sh aktualizace, poprvé instalace)
+        env:
+          HOST: ${{ secrets.HETZNER_HOST }}
+          USER: ${{ secrets.HETZNER_USER }}
+          PORT: ${{ secrets.HETZNER_PORT }}
+          KEY: ${{ secrets.HETZNER_SSH_KEY }}
+          USERS: ${{ secrets.HETZNER_USERS }}
+          DOMAIN: ${{ vars.CSM_HETZNER_DOMAIN }}
+          DIR: ${{ vars.CSM_HETZNER_DIR }}
+          BRANCH: ${{ github.ref_name }}
+        run: |
+          test -n "$HOST" || { echo "Chybí secret HETZNER_HOST"; exit 1; }
+          test -n "$KEY" || { echo "Chybí secret HETZNER_SSH_KEY"; exit 1; }
+          mkdir -p ~/.ssh
+          # Klíč vložený ze schránky (Windows) mívá CRLF, BOM, mezery na koncích řádků nebo je slepený do jednoho
+          # řádku – OpenSSH ho pak odmítne („error in libcrypto“). Vezme se jen tělo mezi BEGIN a END a znovu zalomí.
+          raw="$(printf '%s\n' "$KEY" | sed '1s/^\xEF\xBB\xBF//' | tr -d '\r')"
+          typ="$(printf '%s\n' "$raw" | grep -o -m1 'BEGIN [A-Z0-9 ]*PRIVATE KEY' | sed 's/^BEGIN //')"
+          if [ -z "$typ" ]; then
+            echo "Secret HETZNER_SSH_KEY neobsahuje soukromý klíč (chybí řádek -----BEGIN … PRIVATE KEY-----)."
+            echo "Vložte celý obsah souboru csm-deploy (bez přípony .pub), od řádku BEGIN po řádek END."
+            exit 1
+          fi
+          body="$(printf '%s\n' "$raw" | sed -e 's/-----BEGIN [A-Z0-9 ]*PRIVATE KEY-----//' -e 's/-----END [A-Z0-9 ]*PRIVATE KEY-----//' | tr -d '[:space:]')"
+          { echo "-----BEGIN $typ-----"; printf '%s\n' "$body" | fold -w 70; echo "-----END $typ-----"; } > ~/.ssh/id_deploy
+          chmod 600 ~/.ssh/id_deploy
+          if ! chyba="$(ssh-keygen -y -P "" -f ~/.ssh/id_deploy 2>&1 >/dev/null)"; then
+            echo "Secret HETZNER_SSH_KEY není použitelný klíč: $chyba"
+            echo "Zmiňuje-li hláška passphrase, je klíč chráněný heslem: vygenerujte nový bez passphrase (postup v NASAZENI.md) a nahrajte veřejný na server i soukromý do secretu znovu."
+            exit 1
+          fi
+          echo "Klíč v pořádku, otisk: $(ssh-keygen -lf ~/.ssh/id_deploy | awk '{print $2}')"
+          ssh-keyscan -p "${PORT:-22}" -H "$HOST" >> ~/.ssh/known_hosts 2>/dev/null
+          APP="${DIR:-/opt/Doma/cyklo-ski-mapa}"
+          REPO_DIR="$(dirname "$APP")"
+          SUDO=""; [ "${USER:-root}" != "root" ] && SUDO="sudo -n"
+          ssh_cmd() { ssh -i ~/.ssh/id_deploy -p "${PORT:-22}" -o StrictHostKeyChecking=yes "${USER:-root}@$HOST" "$@"; }
+          USERS_B64="$(printf %s "$USERS" | base64 -w0)"
+          # Skript se posílá přes stdin z právě nasazovaného commitu: kdyby se spouštěl ten na serveru, běžela by
+          # jeho předchozí verze (soubor se aktualizuje až uvnitř běhu) a změny ve skriptu by platily o nasazení později.
+          if ssh_cmd "$SUDO test -f '$APP/deploy/.env'"; then
+            echo "→ Aplikace je nainstalovaná – aktualizuji (uživatelé a doména podle nastavení GitHubu, jsou-li vyplněné)."
+            ssh_cmd "$SUDO env CSM_USERS_B64='$USERS_B64' CSM_DOMAIN='$DOMAIN' CSM_REPO_DIR='$REPO_DIR' bash -s -- aktualizace" < cyklo-ski-mapa/deploy/hetzner.sh
+          else
+            echo "→ Aplikace na serveru není – první instalace."
+            test -n "$DOMAIN" || { echo "První instalace potřebuje variable CSM_HETZNER_DOMAIN (doména webu)."; exit 1; }
+            test -n "$USERS" || { echo "První instalace potřebuje secret HETZNER_USERS (jmeno:heslo;jmeno2:heslo2)."; exit 1; }
+            ssh_cmd "$SUDO env CSM_USERS_B64='$USERS_B64' CSM_REPO_DIR='$REPO_DIR' CSM_VETEV='$BRANCH' bash -s -- instalace '$DOMAIN'" < cyklo-ski-mapa/deploy/hetzner.sh
+          fi
+
+  # Interní server bez veřejné adresy (self-hosted runner), jako u R01 Sales.
+  deploy:
+    needs: test
+    if: github.event_name != 'pull_request' && github.ref_name == github.event.repository.default_branch && vars.CSM_DEPLOY == '1'
+    runs-on: [self-hosted, cyklo-ski-mapa]
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v5
+      - name: Nasazení (build --no-cache, zkouška, výměna kontejneru)
+        working-directory: cyklo-ski-mapa
+        run: bash deploy.sh

@@ -1,0 +1,78 @@
+# Měsíční obnova dat Cyklo & Ski mapy: stáhne nové trasy, sjezdovky a místa z OpenStreetMap,
+# OpenSkiMap a ČÚZK, znovu projde weby míst a výsledek commitne do hlavní větve repa. Po commitu spustí
+# workflow „Cyklo & Ski mapa“ (testy + nasazení), protože pushe z Actions ho samy nespouštějí.
+# Lze pustit i ručně tlačítkem „Run workflow“ (volitelně bez průchodu webů).
+name: Cyklo & Ski mapa – obnova dat
+
+on:
+  schedule:
+    - cron: "17 3 1 * *"   # 1. den v měsíci 3:17 UTC
+  workflow_dispatch:
+    inputs:
+      enrich:
+        description: "Projít i weby míst (≈30 min)"
+        type: boolean
+        default: true
+
+permissions:
+  contents: write
+  actions: write
+
+concurrency:
+  group: csm-data
+  cancel-in-progress: false
+
+jobs:
+  obnova:
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+    steps:
+      - name: Hlavní větev repa
+        id: vetev
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: echo "nazev=$(gh repo view ${{ github.repository }} --json defaultBranchRef -q .defaultBranchRef.name)" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ steps.vetev.outputs.nazev }}
+
+      - name: Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Sestavení dat (nové stažení zdrojů)
+        working-directory: cyklo-ski-mapa
+        run: node tools/build-data.js --fetch
+
+      - name: Průchod webů míst
+        if: ${{ github.event_name == 'schedule' || inputs.enrich }}
+        working-directory: cyklo-ski-mapa
+        run: node tools/enrich-web.js --force --concurrency 10
+
+      - name: Testy nad novými daty
+        working-directory: cyklo-ski-mapa
+        run: npm test
+
+      - name: Commit a push
+        id: commit
+        working-directory: cyklo-ski-mapa
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add data/*.js
+          if git diff --cached --quiet; then
+            echo "Žádná změna dat."
+            echo "changed=0" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          git commit -m "Cyklo & Ski mapa: měsíční obnova dat ($(date +%Y-%m-%d))"
+          git push origin "HEAD:${{ steps.vetev.outputs.nazev }}"
+          echo "changed=1" >> "$GITHUB_OUTPUT"
+
+      - name: Spustit testy a nasazení nad novými daty
+        if: steps.commit.outputs.changed == '1'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh workflow run cyklo-ski-mapa.yml --ref "${{ steps.vetev.outputs.nazev }}"
