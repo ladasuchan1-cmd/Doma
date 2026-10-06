@@ -191,6 +191,34 @@ Ostrá verze proto přejde na **wildcard `*.<domena>` + apex přes DNS-01**:
    pilotu; HSTS `max-age` zvyšovat postupně (300 → týden → měsíc → rok s `includeSubDomains`) v `src/http/headers.js`;
    PSL a preload až vědomě po pilotu.
 
+## 7b. Vedle Cyklo & Ski mapy na jednom serveru (37.27.203.154)
+
+Na serveru, kde už běží Cyklo & Ski mapa (její kontejner Caddy drží porty 80 a 443), se půjčovna spouští jen jako
+aplikace v téže Docker síti a Caddy mapy dostane blok pro doménu půjčovny (`import /etc/caddy/extra/*.caddy`
+v `cyklo-ski-mapa/deploy/Caddyfile`, adresář `/opt/caddy-extra` připojený v jejím `docker-compose.yml`). Vše dělá
+`deploy/vedle-mapy.sh`:
+
+```bash
+ssh root@37.27.203.154
+bash /opt/Doma/pujcovna-kol/deploy/vedle-mapy.sh instalace ksprehledy.cz
+```
+
+Skript: přepne repo `/opt/Doma` na větev s půjčovnou (`PK_VETEV`, výchozí `claude/quirky-ramanujan-cjewtf`; po
+sloučení do hlavní větve nastavte `PK_VETEV=main`), ověří Docker síť Caddy mapy (`deploy_default`; jinak
+`PK_CADDY_SIT=…`), znovu vytvoří Caddy mapy s připojeným `/opt/caddy-extra` (výpadek mapy jen na sekundy), zapíše
+blok `/opt/caddy-extra/pujcovna-kol.caddy`, Caddy znovu načte a spustí `hetzner.sh instalace` s
+`PK_COMPOSE=docker-compose.vedle-mapy.yml` (aplikace bez vlastní Caddy, zálohy a cron jako obvykle). Firewall
+se neřeší (`PK_UFW=0`) – mapa ho už nastavila.
+
+**DNS u Cloudflare** (doména `ksprehledy.cz` je dnes za Cloudflare proxy s Cloudflare Access): pro `ksprehledy.cz`,
+`www`, `outdoor`, `sport` a `family` nastavte záznamy **A → 37.27.203.154** v režimu **DNS only (šedý mrak)**, aby
+Let's Encrypt na serveru mohl vystavit certifikáty, a pro tyto hosty vypněte aplikaci Cloudflare Access (jinak
+návštěvníky zastaví přihlašovací stránka Cloudflare). Chcete-li demo chránit přihlášením, je lepší to řešit až po
+nasazení (Access lze zapnout zpět při oranžovém mraku a režimu SSL „Full (strict)“).
+
+Aktualizace a provoz: `vedle-mapy.sh aktualizace | stav | log | zaloha | zpet`. Logy Caddy pro půjčovnu jsou
+v kontejneru Caddy mapy (`/data/access-pujcovna-kol.log`).
+
 ## 8. Když něco nejde
 
 - **Caddy nedostane certifikát** (`hetzner.sh log` hlásí ACME chyby): DNS záznam daného hostu nemíří na server,

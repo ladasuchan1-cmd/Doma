@@ -1,0 +1,46 @@
+# Půjčovna kol VEDLE Cyklo & Ski mapy na jednom serveru: spustí jen aplikaci a připojí ji do Docker sítě,
+# ve které běží Caddy mapy (projekt cyklo-ski-mapa/deploy → síť `deploy_default`). Nic nepublikuje – Caddy mapy
+# se na aplikaci odkazuje jménem kontejneru `pujcovna-kol` (blok deploy/Caddyfile.vedle-mapy-blok). Spouští
+# deploy/vedle-mapy.sh; přímo: PK_CADDY_SIT=deploy_default docker compose -f docker-compose.vedle-mapy.yml up -d --build
+name: pujcovna-kol
+
+services:
+  app:
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile
+      args:
+        APP_VERSION: ${APP_VERSION:-compose}
+    image: pujcovna-kol:latest
+    container_name: pujcovna-kol
+    restart: unless-stopped
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      PK_DATA: /data
+      PK_TENANTS: /app/tenants
+      PK_TRUST_PROXY: "1"
+      PORT: "8092"
+    volumes:
+      - data:/data
+    read_only: true
+    tmpfs:
+      - /tmp
+    security_opt:
+      - no-new-privileges:true
+    logging:
+      driver: json-file
+      options:
+        max-size: "20m"
+        max-file: "5"
+    networks:
+      - web
+
+volumes:
+  data:
+
+networks:
+  web:
+    external: true
+    name: ${PK_CADDY_SIT:-deploy_default}

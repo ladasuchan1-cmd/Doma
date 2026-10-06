@@ -1,0 +1,23 @@
+# Blok pro Caddy Cyklo & Ski mapy (import /etc/caddy/extra/*.caddy). deploy/vedle-mapy.sh ho s dosazenou doménou
+# zapíše do /opt/caddy-extra/pujcovna-kol.caddy a Caddy znovu načte. Certifikáty pro všech 5 hostů vystaví Caddy
+# sám (Let's Encrypt, HTTP-01/TLS-ALPN-01) – DNS A záznamy musí mířit na server bez proxy (u Cloudflare „DNS only“).
+# HSTS posílá aplikace (src/http/headers.js), Caddy ji nepřidává.
+DOMENA, www.DOMENA, outdoor.DOMENA, sport.DOMENA, family.DOMENA {
+	encode zstd gzip
+	header {
+		-Server
+	}
+	log {
+		output file /data/access-pujcovna-kol.log {
+			roll_size 20mb
+			roll_keep 5
+			roll_keep_for 336h
+		}
+	}
+	reverse_proxy pujcovna-kol:8092 {
+		transport http {
+			dial_timeout 5s
+			response_header_timeout 65s
+		}
+	}
+}
