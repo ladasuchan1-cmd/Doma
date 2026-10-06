@@ -1,0 +1,838 @@
+/* =====================================================================================================
+   admin.css – styly administrace (SPEC kap. 13). Jen přes tokeny z base.css, funguje ve všech 3 tématech.
+   Admin shell: boční navigace + obsah, karty, statistiky, tabulky, kalendář (timeline), QR štítky (tisk),
+   2FA, náhled e-mailu, dialog a toasty progresivního JS (public/admin/). Žádný inline CSS v HTML.
+   ===================================================================================================== */
+
+body.admin {
+  background: var(--surface);
+}
+body.admin .site-footer,
+body.admin .hero {
+  display: none;
+}
+body.admin .site-main {
+  padding: 0;
+}
+/* hlavička webu v adminu: vždy běžný pruh (žádné průhledné / absolutní varianty témat) */
+:root[data-theme] body.admin .site-header {
+  position: relative;
+  top: auto;
+  background: var(--bg-elevated);
+  color: var(--text);
+  border-bottom: 1px solid var(--border);
+  text-shadow: none;
+  animation: none;
+}
+
+.admin-shell {
+  display: grid;
+  grid-template-columns: 1fr;
+  min-height: 70vh;
+  max-width: 1600px;
+  margin: 0 auto;
+  width: 100%;
+}
+@media (min-width: 960px) {
+  .admin-shell {
+    grid-template-columns: 220px minmax(0, 1fr);
+  }
+}
+.admin__side {
+  background: var(--bg-elevated);
+  border-right: 1px solid var(--border);
+  padding: var(--space-4);
+}
+.admin__brand {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: var(--step-1);
+  margin: 0 0 var(--space-3);
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+.admin__brand a {
+  color: var(--text);
+  text-decoration: none;
+}
+.admin__nav-toggle {
+  position: absolute;
+  opacity: 0;
+  width: 1px;
+  height: 1px;
+}
+.admin__nav-label {
+  display: inline-flex;
+}
+.admin__nav {
+  display: none;
+  flex-direction: column;
+  gap: var(--space-4);
+  margin-top: var(--space-3);
+}
+.admin__nav-toggle:checked ~ .admin__nav {
+  display: flex;
+}
+@media (min-width: 960px) {
+  .admin__nav-label {
+    display: none;
+  }
+  .admin__nav {
+    display: flex;
+    position: sticky;
+    top: var(--space-4);
+  }
+}
+.admin__nav-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.admin__nav-link {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  min-height: 44px;
+  border-radius: var(--radius-sm);
+  color: var(--text);
+  text-decoration: none;
+  font-weight: 500;
+}
+.admin__nav-link .icon {
+  width: 20px;
+  height: 20px;
+  color: var(--text-muted);
+}
+.admin__nav-link:hover {
+  background: var(--surface);
+}
+.admin__nav-link.is-active {
+  background: var(--primary);
+  color: var(--on-primary);
+}
+.admin__nav-link.is-active .icon {
+  color: inherit;
+}
+.admin__nav-count {
+  margin-left: auto;
+  font-size: var(--step--1);
+  background: var(--surface-2);
+  color: var(--text);
+  border-radius: var(--radius-pill);
+  padding: 0 var(--space-2);
+}
+.admin__user {
+  border-top: 1px solid var(--border);
+  padding-top: var(--space-3);
+  font-size: var(--step--1);
+}
+.admin__user-name {
+  margin: 0 0 var(--space-2);
+}
+.admin__logout {
+  display: inline;
+}
+.admin__back {
+  margin: 0;
+  font-size: var(--step--1);
+}
+
+.admin__main {
+  padding: var(--space-5) var(--space-4) var(--space-9);
+  min-width: 0;
+}
+@media (min-width: 960px) {
+  .admin__main {
+    padding: var(--space-6) var(--space-7) var(--space-10);
+  }
+}
+.admin__head {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: var(--space-3);
+  margin-bottom: var(--space-5);
+}
+.admin__title {
+  font-size: var(--step-3);
+  margin: 0;
+}
+.admin__lead {
+  margin: var(--space-1) 0 0;
+  color: var(--text-muted);
+}
+.admin__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+.admin-flash {
+  margin-bottom: var(--space-4);
+}
+.admin-section-title {
+  font-size: var(--step-1);
+  margin: var(--space-6) 0 var(--space-3);
+}
+
+/* Karty a mřížky */
+.admin-card {
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: var(--card-radius);
+  margin-bottom: var(--space-4);
+  min-width: 0;
+}
+.admin-card--primary {
+  border-color: var(--primary);
+}
+.admin-card--danger {
+  border-color: var(--danger);
+}
+.admin-card--warning {
+  border-color: var(--warning);
+}
+.admin-card--info {
+  border-color: var(--info);
+}
+.admin-card__head {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-3) var(--space-4);
+  border-bottom: 1px solid var(--border);
+}
+.admin-card__title {
+  font-size: var(--step-0);
+  margin: 0;
+}
+.admin-card__subtitle {
+  font-size: var(--step-0);
+  margin: var(--space-4) 0 var(--space-2);
+}
+.admin-card__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  align-items: center;
+}
+.admin-card__body {
+  padding: var(--space-4);
+}
+.admin-card--compact .admin-card__body {
+  padding: var(--space-3) var(--space-4);
+}
+.admin-card .table-scroll {
+  margin: 0 calc(-1 * var(--space-4));
+}
+.admin-card .table-wrap {
+  padding: 0 var(--space-4);
+}
+.admin-grid {
+  display: grid;
+  gap: var(--space-4);
+  grid-template-columns: 1fr;
+  align-items: start;
+}
+@media (min-width: 900px) {
+  .admin-grid--2 {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .admin-grid--3 {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+  .admin-grid--head {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  }
+}
+.admin-grid > .admin-card {
+  margin-bottom: 0;
+}
+.admin-actions .admin-card__body .form {
+  gap: var(--space-3);
+}
+
+/* Statistiky */
+.admin-stats {
+  display: grid;
+  gap: var(--space-3);
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  margin-bottom: var(--space-4);
+}
+.admin-stat {
+  display: flex;
+  flex-direction: column;
+  padding: var(--space-3) var(--space-4);
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: var(--card-radius);
+  text-decoration: none;
+  color: var(--text);
+}
+.admin-stat__value {
+  font-family: var(--font-display);
+  font-size: var(--step-3);
+  font-weight: 700;
+  line-height: 1.1;
+}
+.admin-stat__label {
+  color: var(--text-muted);
+  font-size: var(--step--1);
+}
+.admin-stat--primary {
+  border-color: var(--primary);
+}
+.admin-stat--primary .admin-stat__value {
+  color: var(--primary);
+}
+.admin-stat--warning .admin-stat__value {
+  color: var(--warning);
+}
+.admin-stat--danger .admin-stat__value {
+  color: var(--danger);
+}
+.admin-stat--info .admin-stat__value {
+  color: var(--info);
+}
+
+/* Tabulky: vodorovný posun uvnitř karty (.table-scroll > .table-wrap, viz pages/admin/shared.js tableWrap()).
+   .table-wrap je pozicovaný, aby absolutně pozicované .visually-hidden popisky polí v buňkách (ceník, uživatelé,
+   otevírací doba) zůstaly uvnitř posuvného kontejneru a nezvětšovaly scrollWidth stránky. Progresivní JS přidává
+   .is-scrollable a .is-scroll-left/-right – vyblednuté okraje naznačují, že je část tabulky mimo zobrazení. */
+.admin .table-scroll {
+  position: relative;
+}
+.admin .table-wrap {
+  position: relative;
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+}
+.admin .table-wrap:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: -2px;
+}
+.admin .table-scroll::before,
+.admin .table-scroll::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 32px;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity var(--motion) var(--ease);
+  z-index: 1;
+}
+.admin .table-scroll::before {
+  left: 0;
+  background: linear-gradient(to right, var(--bg-elevated), transparent);
+}
+.admin .table-scroll::after {
+  right: 0;
+  background: linear-gradient(to left, var(--bg-elevated), transparent);
+}
+.admin .table-scroll.is-scroll-left::before,
+.admin .table-scroll.is-scroll-right::after {
+  opacity: 1;
+}
+.table-scroll__hint {
+  margin: var(--space-1) var(--space-4) 0;
+  font-size: var(--step--1);
+  color: var(--text-muted);
+}
+.admin .table {
+  font-size: var(--step--1);
+}
+.admin .table .btn {
+  white-space: nowrap;
+}
+.admin .table td,
+.admin .table th {
+  vertical-align: middle;
+}
+.admin .table .num,
+.admin .num {
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.admin .mono {
+  font-family: var(--font-mono);
+  font-size: 0.95em;
+}
+.admin .muted {
+  color: var(--text-muted);
+}
+.admin .small {
+  font-size: var(--step--1);
+}
+.admin .pre {
+  white-space: pre-line;
+}
+.admin-empty {
+  color: var(--text-muted);
+  margin: 0;
+  padding: var(--space-2) 0;
+}
+.admin-filter {
+  margin: 0 0 var(--space-3);
+  max-width: 320px;
+}
+.table[data-sortable] th[data-sort]:not([data-sort='none']) {
+  cursor: pointer;
+  user-select: none;
+}
+.table[data-sortable] th[data-sort]:not([data-sort='none'])::after {
+  content: ' ↕';
+  opacity: 0.4;
+}
+.table[data-sortable] th[aria-sort='ascending']::after {
+  content: ' ↑';
+  opacity: 1;
+}
+.table[data-sortable] th[aria-sort='descending']::after {
+  content: ' ↓';
+  opacity: 1;
+}
+.table tr[hidden] {
+  display: none;
+}
+.admin-pager {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-3);
+  margin-top: var(--space-4);
+}
+.admin-pager__info {
+  color: var(--text-muted);
+  font-size: var(--step--1);
+}
+
+/* Formuláře v adminu */
+.form--inline {
+  display: inline-flex;
+  flex-direction: row;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: var(--space-2);
+}
+.form--inline .field {
+  gap: 2px;
+}
+.form--inline .field__label {
+  font-size: var(--step--1);
+}
+.form--filters {
+  flex-direction: row;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: var(--space-3);
+}
+.form--filters .field {
+  flex: 1 1 160px;
+}
+.form__actions--inline {
+  margin: 0;
+  align-items: center;
+}
+.field__input--sm {
+  min-height: 36px;
+  padding: var(--space-1) var(--space-2);
+  font-size: var(--step--1);
+  width: auto;
+  min-width: 6em;
+}
+.table--prices .field__input--sm {
+  width: 6.5em;
+}
+.field__check--plain {
+  display: inline-flex;
+  min-height: 36px;
+  align-items: center;
+}
+.admin .form .field--checkbox .field__check {
+  min-height: 36px;
+}
+.admin-details summary {
+  cursor: pointer;
+  color: var(--link);
+  font-size: var(--step--1);
+}
+.admin-pre {
+  white-space: pre-wrap;
+  word-break: break-word;
+  font-family: var(--font-mono);
+  font-size: var(--step--1);
+  background: var(--surface);
+  padding: var(--space-3);
+  border-radius: var(--radius-sm);
+  max-height: 480px;
+  overflow: auto;
+}
+.admin-details--inline .admin-pre {
+  max-width: 420px;
+  max-height: 200px;
+}
+.admin-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-3) var(--space-5);
+}
+.admin-toolbar__group {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  margin: 0;
+}
+
+/* Fotky typu */
+.admin-photos {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: var(--space-3);
+}
+.admin-photos__grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: var(--space-3);
+}
+.admin-photos__item {
+  display: grid;
+  gap: var(--space-1);
+  cursor: pointer;
+}
+.admin-photos__item img {
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  object-fit: cover;
+  border-radius: var(--radius-sm);
+  border: 2px solid transparent;
+}
+.admin-photos__item:has(input:checked) img {
+  border-color: var(--primary);
+}
+
+/* Zajímavosti */
+.admin-pois {
+  display: grid;
+  gap: var(--space-3);
+}
+.admin-poi {
+  display: grid;
+  grid-template-columns: 120px minmax(0, 1fr);
+  gap: var(--space-3);
+  padding: var(--space-3);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--bg);
+}
+.admin-poi.is-hidden {
+  opacity: 0.6;
+}
+.admin-poi__img {
+  width: 120px;
+  height: 90px;
+  object-fit: cover;
+  border-radius: var(--radius-sm);
+  background: var(--surface-2);
+}
+.admin-poi__title {
+  font-size: var(--step-0);
+  margin: 0 0 var(--space-1);
+}
+.admin-poi__summary {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.admin-poi__fields {
+  gap: var(--space-2);
+}
+@media (max-width: 600px) {
+  .admin-poi {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Kalendář */
+.timeline--admin {
+  --_label: 14rem;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: var(--card-radius);
+  overflow-x: auto;
+}
+.timeline--admin .timeline__row--type .timeline__label {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  overflow: visible;
+}
+.timeline--admin .timeline__row--type .timeline__label > a {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.timeline--admin .timeline__row--type .timeline__label > small {
+  flex: none;
+}
+.timeline--admin .timeline__row--bike .timeline__label {
+  padding-left: var(--space-6);
+  font-size: var(--step--1);
+  color: var(--text-muted);
+}
+.timeline--admin .timeline__row--bike.is-unavailable .timeline__label {
+  text-decoration: line-through;
+}
+.timeline--admin .timeline__row--unassigned .timeline__label {
+  color: var(--warning);
+}
+.timeline--admin .timeline__row.is-collapsed {
+  display: none;
+}
+.timeline--admin .timeline__day.is-today {
+  background: var(--tint-primary);
+  font-weight: 700;
+}
+.timeline--admin .timeline__bar {
+  text-decoration: none;
+}
+.timeline--admin .timeline__bar.is-cut-start {
+  border-top-left-radius: 0;
+  border-bottom-left-radius: 0;
+}
+.timeline--admin .timeline__bar.is-cut-end {
+  border-top-right-radius: 0;
+  border-bottom-right-radius: 0;
+}
+.timeline__toggle {
+  flex: none;
+  margin-left: auto;
+  padding: 0 var(--space-2);
+  min-height: 28px;
+  min-width: 28px;
+  font-size: var(--step--1);
+}
+.timeline-legend {
+  font-size: var(--step--1);
+}
+.timeline-legend__item {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+}
+.timeline-legend .timeline__bar {
+  position: static;
+  display: inline-block;
+  width: 18px;
+  height: 12px;
+  min-height: 0;
+  padding: 0;
+}
+
+/* QR štítky */
+.qr-labels {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: var(--space-3);
+}
+.qr-label {
+  display: grid;
+  grid-template-columns: 110px 1fr;
+  gap: var(--space-3);
+  align-items: center;
+  padding: var(--space-3);
+  border: 1px dashed var(--border);
+  border-radius: var(--radius-sm);
+  background: #fff;
+  color: #000;
+  break-inside: avoid;
+}
+.qr-label__qr svg {
+  width: 110px;
+  height: 110px;
+}
+.qr-label__text {
+  display: grid;
+  gap: 2px;
+  font-size: var(--step--1);
+}
+.qr-label__code {
+  font-size: var(--step-1);
+}
+.qr-label__owner {
+  color: var(--gray-600);
+}
+
+/* 2FA */
+.admin-2fa {
+  display: grid;
+  grid-template-columns: 200px minmax(0, 1fr);
+  gap: var(--space-4);
+  align-items: start;
+}
+.admin-2fa__qr svg {
+  width: 200px;
+  height: 200px;
+  background: #fff;
+  border: 1px solid var(--border);
+}
+.admin-2fa__secret {
+  letter-spacing: 0.06em;
+  word-break: break-all;
+}
+@media (max-width: 600px) {
+  .admin-2fa {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* E-mail náhled */
+.admin-mail-frame {
+  width: 100%;
+  min-height: 520px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: #fff;
+}
+
+/* Přihlášení */
+.admin-login__box {
+  max-width: 480px;
+}
+.admin-login__form {
+  margin-top: var(--space-4);
+}
+.admin-login__alt {
+  margin-top: var(--space-4);
+  font-size: var(--step--1);
+}
+
+/* Progresivní JS: dialog a toasty */
+.admin-dialog {
+  border: 1px solid var(--border);
+  border-radius: var(--card-radius);
+  padding: 0;
+  max-width: min(480px, calc(100vw - 32px));
+  background: var(--bg-elevated);
+  color: var(--text);
+  box-shadow: var(--shadow-3);
+}
+.admin-dialog::backdrop {
+  background: rgba(0, 0, 0, 0.45);
+}
+.admin-dialog__body {
+  padding: var(--space-5);
+}
+.admin-dialog__title {
+  font-size: var(--step-1);
+  margin: 0 0 var(--space-3);
+}
+.admin-dialog__actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--space-2);
+  padding: var(--space-3) var(--space-5);
+  border-top: 1px solid var(--border);
+  background: var(--surface);
+}
+.toasts {
+  position: fixed;
+  right: var(--space-4);
+  bottom: var(--space-4);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  z-index: 1000;
+  max-width: min(420px, calc(100vw - 32px));
+}
+.toast {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--radius-md);
+  background: var(--gray-900);
+  color: #fff;
+  box-shadow: var(--shadow-3);
+  border-left: 4px solid var(--info);
+  animation: toast-in var(--motion) var(--ease);
+}
+.toast--success {
+  border-left-color: var(--success);
+}
+.toast--danger {
+  border-left-color: var(--danger);
+}
+.toast--warning {
+  border-left-color: var(--warning);
+}
+.toast.is-leaving {
+  opacity: 0;
+  transition: opacity 180ms;
+}
+.toast__body {
+  flex: 1;
+}
+.toast__body a {
+  color: #fff;
+}
+.toast__close {
+  background: none;
+  border: 0;
+  color: inherit;
+  font-size: 1.2em;
+  cursor: pointer;
+  line-height: 1;
+  min-width: 32px;
+  min-height: 32px;
+}
+@keyframes toast-in {
+  from {
+    transform: translateY(8px);
+    opacity: 0;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .toast {
+    animation: none;
+  }
+}
+.js .admin-flash[data-toast] {
+  display: none;
+}
+
+/* Tisk: štítky a doklady */
+@media print {
+  body.admin .admin__side,
+  body.admin .admin__head,
+  body.admin .admin-flash,
+  body.admin .notice,
+  body.admin .admin__actions {
+    display: none !important;
+  }
+  .admin-shell {
+    grid-template-columns: 1fr;
+  }
+  .admin__main {
+    padding: 0;
+  }
+  .qr-labels {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 6mm;
+  }
+  .qr-label {
+    border: 1px dashed #999;
+  }
+}

@@ -7,7 +7,17 @@
 //   legalParams(tenant, settings)  → slovník hodnot pro VŠECHNY placeholdery všech pěti šablon
 //                                    (dvojice PLATEBNI_BRANA/PLATEBNI_BRANA_NAZEV, BANKA/BANKA_NAZEV,
 //                                    POJISTENI/POJISTOVNA_NAZEV dostávají stejnou hodnotu; údaje rezervace a
-//                                    protokolu mají výchozí prázdné hodnoty – admin je přepíše)
+//                                    protokolu mají výchozí prázdné hodnoty – admin je přepíše).
+//                                    Podmíněné bloky {{#X}}…{{/X}} šablon řídí booleovské parametry „ano“/„ne“:
+//                                    PLATCE_DPH, EVIDENCE_UCETNICTVI (REZIM_EVIDENCE = ucetnictvi), DOKLAD_ZJEDNODUSENY
+//                                    (REZIM_DOKLADU = zjednoduseny), ANALYTIKA (je nastaven analytický nástroj),
+//                                    ZAPISOVAT_NAROZENI_ADRESU, DRUHY_DOKLAD, GPS_LOKATORY, PREDAVANI_MIMO_EU,
+//                                    PODPIS_OBRAZOVKA (PODPIS_ZPUSOB = obrazovka), DOKLAD_CISLO_PLNE (DOKLAD_CISLO_TISK
+//                                    = plne), POJISTOVNA_UVEDENA, POPLATEK_NABITI_UCTUJEME, PLATBA_NA_MISTE_POVOLENA,
+//                                    DOPLATEK_PREDEM_POVINNY, DRIVEJSI_VRACENI_REFUND; u smlouvy navíc SMLOUVA_NA_MISTE
+//                                    (SMLOUVA_REZIM = na-miste), KOLO_JE_EKOLO, KAUCE_HOTOVE, VRACENI_BEZ_NAJEMCE a KOLA
+//                                    (pole záznamů { KOLO_PORADI, KOLO_TYP, … } – cyklus přes kola; výchozí „ano“ =
+//                                    jeden průchod s hodnotami sloučenými do jedné buňky).
 //   renderLegal(docName, params, { only, omitHeadings, legalDir }) → { html, title, headings, missing }
 //   LEGAL_DOCS – názvy šablon (bez .md)
 // Vstup: tenant (tenant.json), settings (tabulka settings + výchozí z tenant.json). Výstup: stránky v layoutu.
@@ -114,6 +124,12 @@ function legalParams(tenant, settings = {}) {
   const effective = l.effectiveFrom ? format.date(l.effectiveFrom) : BLANK;
   const version = l.version || '1.0';
   const transferHours = Number(s.transferExpiryHours) || 48;
+  const yesNo = (v) => (v ? 'ano' : 'ne');
+  const accountingMode = s.accountingMode || (isCompany ? 'ucetnictvi' : 'danova-evidence');
+  const docMode = 'zjednoduseny';
+  const signatureMode = s.signatureMode || 'obrazovka';
+  const idDocPrint = s.idDocPrint || 'maskovane';
+  const contractMode = s.contractMode || 'online';
 
   const out = {
     // --- půjčovna (správce) ---
@@ -160,9 +176,11 @@ function legalParams(tenant, settings = {}) {
     MAPOVE_PODKLADY: l.mapProviders || 'Seznam.cz, a.s. (Mapy.cz) a CyclOSM (OpenStreetMap France)',
 
     // --- DPH a doklady ---
-    PLATCE_DPH: vat ? 'ano' : 'ne',
-    REZIM_DOKLADU: 'zjednoduseny',
-    REZIM_EVIDENCE: s.accountingMode || (isCompany ? 'ucetnictvi' : 'danova-evidence'),
+    PLATCE_DPH: yesNo(vat),
+    REZIM_DOKLADU: docMode,
+    DOKLAD_ZJEDNODUSENY: yesNo(docMode === 'zjednoduseny'),
+    REZIM_EVIDENCE: accountingMode,
+    EVIDENCE_UCETNICTVI: yesNo(accountingMode === 'ucetnictvi'),
     STORNO_DPH_REZIM: s.stornoVatMode || 'zdanitelne-plneni',
     DOBA_DOKLADY: vat ? '10 let od konce zdaňovacího období, ve kterém se plnění uskutečnilo (§ 35 odst. 2 ZDPH)' : '5 let od konce účetního období',
 
@@ -177,14 +195,15 @@ function legalParams(tenant, settings = {}) {
     UCETNI_ROLE: s.accountantRole || 'zpracovatel',
     POJISTENI: insurance,
     POJISTOVNA_NAZEV: insurance,
+    POJISTOVNA_UVEDENA: yesNo(s.insurance || l.insurance), // půjčovna uvedla pojišťovnu → bloky o pojišťovně
     POPLATEK_KOLO: money(fee.default, 30000),
     POPLATEK_EKOLO: money(fee.ebike ?? fee.default, 50000),
     KAUCE_KOLO: money(dep.default, 300000),
     KAUCE_EKOLO: money(dep.ebike, 1000000),
     PREAUTH_MAX_DNU: String(s.preauthMaxDays ?? 7),
     LHUTA_PLATBY_POPLATKU: `${hoursText(transferHours)} od odeslání rezervace; začíná-li nájem dříve než za ${hoursText(transferHours)}, do 20:00 dne předcházejícího začátku nájmu`,
-    PLATBA_NA_MISTE_POVOLENA: s.allowPayOnSite ? 'ano' : 'ne',
-    DOPLATEK_PREDEM_POVINNY: s.balanceBeforePickup ? 'ano' : 'ne',
+    PLATBA_NA_MISTE_POVOLENA: yesNo(s.allowPayOnSite),
+    DOPLATEK_PREDEM_POVINNY: yesNo(s.balanceBeforePickup),
     TOLERANCE_PLATBY: money(s.paymentToleranceMinor, 500),
 
     // --- storno ---
@@ -199,10 +218,12 @@ function legalParams(tenant, settings = {}) {
     DOKLAD_REZIM: 'A',
     DOKLADY_AKCEPTOVANE: s.acceptedIdDocs || 'občanský průkaz, cestovní pas nebo řidičský průkaz',
     DOBA_CISLO_DOKLADU: daysText(s.idDocRetentionDays ?? 30),
-    DRUHY_DOKLAD: s.secondIdDoc ? 'ano' : 'ne',
-    ZAPISOVAT_NAROZENI_ADRESU: s.recordBirthAddress ? 'ano' : 'ne',
-    DOKLAD_CISLO_TISK: s.idDocPrint || 'maskovane',
-    PODPIS_ZPUSOB: s.signatureMode || 'obrazovka',
+    DRUHY_DOKLAD: yesNo(s.secondIdDoc),
+    ZAPISOVAT_NAROZENI_ADRESU: yesNo(s.recordBirthAddress),
+    DOKLAD_CISLO_TISK: idDocPrint,
+    DOKLAD_CISLO_PLNE: yesNo(idDocPrint === 'plne'),
+    PODPIS_ZPUSOB: signatureMode,
+    PODPIS_OBRAZOVKA: yesNo(signatureMode === 'obrazovka'),
     OBSLUHA_JMENO_FORMAT: s.staffNameFormat || 'jmeno_a_iniciala',
 
     // --- užívání, vrácení, škody ---
@@ -216,7 +237,8 @@ function legalParams(tenant, settings = {}) {
     POPLATEK_POZDNI_PAUSAL: money(s.lateReturnFlatMinor, 30000),
     POPLATEK_CISTENI: money(s.cleaningFlatMinor, 30000),
     POPLATEK_NABITI: money(s.chargingFlatMinor, 0),
-    DRIVEJSI_VRACENI_REFUND: s.earlyReturnRefund ? 'ano' : 'ne',
+    POPLATEK_NABITI_UCTUJEME: yesNo(Number(s.chargingFlatMinor) > 0),
+    DRIVEJSI_VRACENI_REFUND: yesNo(s.earlyReturnRefund),
     LHUTA_VYUCTOVANI_SKODY: '14 dnů od vrácení',
     LHUTA_UHRADY_SKODY: '14 dnů od doručení vyúčtování',
     LHUTA_VRATKY_KAUCE_PREVODEM: '5 pracovních dnů',
@@ -233,12 +255,13 @@ function legalParams(tenant, settings = {}) {
     DOBA_FRONTY: '90 dní',
 
     // --- analytika, předávání mimo EU, GPS ---
+    ANALYTIKA: yesNo(s.analyticsTool), // zapnutý analytický nástroj s cookies → bloky o cookie liště
     ANALYTIKA_NASTROJ: s.analyticsTool || '',
     ANALYTIKA_POSKYTOVATEL: s.analyticsProvider || '',
     ANALYTIKA_COOKIES_TABULKA: s.analyticsCookiesTable || '',
-    PREDAVANI_MIMO_EU: s.transferOutsideEu ? 'ano' : 'ne',
+    PREDAVANI_MIMO_EU: yesNo(s.transferOutsideEu),
     PREDAVANI_MIMO_EU_POPIS: s.transferOutsideEuText || '',
-    GPS_LOKATORY: s.gpsTrackers ? 'ano' : 'ne',
+    GPS_LOKATORY: yesNo(s.gpsTrackers),
 
     // --- lhůty zpracovatelské smlouvy ---
     LHUTA_OHLASENI_INCIDENTU: '24 hodin',
@@ -267,6 +290,11 @@ function legalParams(tenant, settings = {}) {
     SEZNAM_SPRAVCU: '(řádky generuje platforma)',
 
     // --- rezervace a protokol (doplní admin při tisku smlouvy / protokolu) ---
+    SMLOUVA_REZIM: contractMode, // 'online' (rezervace přes web) | 'na-miste' (založila obsluha na výdejním místě)
+    SMLOUVA_NA_MISTE: yesNo(contractMode === 'na-miste'),
+    KOLA: 'ano', // pole záznamů { KOLO_PORADI, KOLO_TYP, KOLO_JE_EKOLO, … } → řádky pro každé kolo; „ano“ = jeden průchod
+    KAUCE_HOTOVE: 'ne', // kauce složená hotově → věty o účtu pro vratku
+    VRACENI_BEZ_NAJEMCE: 'ne', // vrácení bez společné kontroly nebo mimo otevírací dobu → protokol podepisuje jen obsluha
     SMLOUVA_CISLO: BLANK,
     PROTOKOL_VRACENI_CISLO: BLANK,
     KONECNY_DOKLAD_CISLO: BLANK,

@@ -32,7 +32,7 @@ const STATUS_TEXT = {
 };
 
 const DESCRIPTIONS = {
-  404: 'Stránka, kterou hledáte, neexistuje nebo byla přesunuta. Zkontrolujte adresu, nebo pokračujte na domovskou stránku.',
+  404: 'Zkontrolujte adresu, nebo začněte na domovské stránce.',
   403: 'Požadavek nebylo možné provést.',
   405: 'Tuto akci nelze provést touto metodou.',
   413: 'Odeslaná data jsou příliš velká (limit 256 KB).',
@@ -40,17 +40,40 @@ const DESCRIPTIONS = {
   500: 'Omlouváme se, při zpracování požadavku nastala neočekávaná chyba. Zkuste to prosím za chvíli znovu.',
 };
 
-/** Tělo chybové stránky (bez layoutu) – komponenty se načítají líně, aby nevznikl cyklus. */
+/** Odkazy pod chybovou hláškou. 404 nabízí Domů / Kola / Kontakt, ostatní stavy Domů / Kontakt. */
+const ERROR_LINKS = {
+  404: [
+    { label: 'Domů', href: '/', variant: 'primary' },
+    { label: 'Kola', href: '/kola', variant: 'secondary' },
+    { label: 'Kontakt', href: '/kontakt', variant: 'ghost' },
+  ],
+  default: [
+    { label: 'Na domovskou stránku', href: '/', variant: 'primary' },
+    { label: 'Kontakt', href: '/kontakt', variant: 'ghost' },
+  ],
+};
+
+/**
+ * Tělo chybové stránky (bez layoutu) – komponenty se načítají líně, aby nevznikl cyklus. Nadpis je <h1>.
+ * Podtitul (section__lead) nese vysvětlující text, ne opakování nadpisu; u 404 s vlastní hláškou (ctx.notFound('Kolo
+ * nenalezeno')) se vysvětlení „Zkontrolujte adresu…“ přidá pod ni. 500 vždy zobrazí identifikátor požadavku.
+ */
 function errorBody({ status, message, requestId }) {
   const { section, button } = require('../render/components');
   const title = STATUS_TEXT[status] || 'Chyba';
+  const fallback = DESCRIPTIONS[status] || '';
+  const lead = message && message !== title ? message : fallback;
+  const hint = status === 404 && lead !== fallback ? fallback : '';
+  const links = ERROR_LINKS[status] || ERROR_LINKS.default;
   return section({
     title: `${status} · ${title}`,
-    lead: message || DESCRIPTIONS[status] || '',
+    titleTag: 'h1', // chybová stránka má jediný nadpis první úrovně (přístupnost, SEO)
+    lead,
     variant: 'error',
     children: html`
-      ${status >= 500 && requestId ? html`<p class="error-page__id">Identifikátor požadavku: <code>${requestId}</code></p>` : ''}
-      <p class="error-page__actions">${button({ label: 'Na domovskou stránku', href: '/', variant: 'primary' })} ${button({ label: 'Kontakt', href: '/kontakt', variant: 'ghost' })}</p>
+      ${hint ? html`<p class="error-page__hint">${hint}</p>` : ''}
+      ${status >= 500 ? html`<p class="error-page__id">Identifikátor požadavku: <code>${requestId || '–'}</code>. Uveďte ho prosím, pokud nás budete kontaktovat.</p>` : ''}
+      <p class="error-page__actions">${links.map((l, i) => html`${i ? ' ' : ''}${button({ label: l.label, href: l.href, variant: l.variant })}`)}</p>
     `,
   });
 }
@@ -95,4 +118,4 @@ function serverError(ctx, err) {
   return sendErrorPage(ctx, 500, { requestId: ctx.requestId });
 }
 
-module.exports = { HttpError, STATUS_TEXT, DESCRIPTIONS, sendErrorPage, notFound, serverError, errorBody };
+module.exports = { HttpError, STATUS_TEXT, DESCRIPTIONS, ERROR_LINKS, sendErrorPage, notFound, serverError, errorBody };

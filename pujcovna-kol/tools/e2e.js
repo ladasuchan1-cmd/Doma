@@ -10,7 +10,15 @@
 //   … --url=http://host:port    netestovat vlastní server, ale běžící (demo data musí mít)
 //   … --out=dist/screenshots    kam ukládat screenshoty
 //   … --bez-rezervace           přeskočit rezervační tok
+//   … --platba=karta            varianta platby poplatku v rezervačním toku (výchozí karta):
+//                                 karta  = „Zaplatit kartou“ → /simulace-brany/:id → „Zaplatit“ → /rezervace/hotovo (potvrzeno)
+//                                 prevod = „Zaplatit převodem“ → IBAN/VS/QR → „Simulovat příchozí platbu (demo)“ → /simulace-banky → potvrzeno
+//                                 demo   = tlačítko „Simulovat zaplacení poplatku (demo)“ (obchází bránu)
+//                                 vse    = všechny tři varianty za sebou (každá založí vlastní rezervaci)
 //   … --mapa                    kliknout i na „Načíst mapu“ (externí dlaždice – vyžaduje síť)
+// Rezervační tok klade důraz na skutečnou interakci uživatele: termín se vybírá klikáním v JS kalendáři
+// (button.calendar__day), ověří se nadpis měsíce i hodnoty skrytých inputů; přímé vyplnění <input type=date> je jen
+// záložní cesta, když kalendář není rozšířený JS (např. chyba skriptu – ta se zároveň hlásí jako chyba).
 // Prostředí: PLAYWRIGHT_BROWSERS_PATH (adresář s chromium-*), PK_E2E_CHROME (přímá cesta k binárce), PK_E2E_TIMEOUT (ms).
 // Výstup: souhrn do konzole; exit 0 bez chyb, 1 při chybách, 2 když Playwright nebo prohlížeč chybí.
 
@@ -37,21 +45,33 @@ const PAGES = [
   { path: '/reklamace', name: 'reklamace' },
   { path: '/mapa', name: 'mapa' },
   { path: '/okoli', name: 'okoli' },
+  { path: '/simulace-banky', name: 'simulace-banky' }, // jen PK_DEMO=1 (mimo demo 404 = přeskočeno)
 ];
+
+// Varianty platby poplatku v kroku 4 (--platba=).
+const PAYMENT_VARIANTS = ['karta', 'prevod', 'demo'];
 
 // ---------------------------------------------------------------------------------------------------------
 // Argumenty a pomocníci
 
 function parseArgs(argv) {
-  const args = { design: null, url: null, out: DEFAULT_OUT, reservation: true, mapa: false };
+  const args = { design: null, url: null, out: DEFAULT_OUT, reservation: true, mapa: false, payments: ['karta'] };
   for (const a of argv) {
     if (a.startsWith('--design=')) args.design = a.slice(9);
     else if (a.startsWith('--url=')) args.url = a.slice(6).replace(/\/$/, '');
     else if (a.startsWith('--out=')) args.out = path.resolve(ROOT, a.slice(6));
     else if (a === '--bez-rezervace') args.reservation = false;
     else if (a === '--mapa') args.mapa = true;
-    else if (a === '--help' || a === '-h') {
-      console.log('Použití: node tools/e2e.js [--design=outdoor|sport|family] [--url=http://host:port] [--out=dist/screenshots] [--bez-rezervace] [--mapa]');
+    else if (a.startsWith('--platba=')) {
+      const v = a.slice(9);
+      if (v === 'vse') args.payments = [...PAYMENT_VARIANTS];
+      else if (PAYMENT_VARIANTS.includes(v)) args.payments = [v];
+      else {
+        console.error(`Neznámá varianta platby „${v}“. Dostupné: ${PAYMENT_VARIANTS.join(', ')}, vse`);
+        process.exit(2);
+      }
+    } else if (a === '--help' || a === '-h') {
+      console.log('Použití: node tools/e2e.js [--design=outdoor|sport|family] [--url=http://host:port] [--out=dist/screenshots] [--bez-rezervace] [--platba=karta|prevod|demo|vse] [--mapa]');
       process.exit(0);
     } else {
       console.error(`Neznámý argument: ${a}`);
@@ -316,9 +336,192 @@ async function loadMap(page, sink) {
   await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
 }
 
-/** Rezervační tok: termín → kola → údaje → poplatek (demo simulace) → hotovo → správa → storno. */
-async function reservationFlow(page, { baseUrl, theme, out, sink }) {
-  const shoot = (name) => page.screenshot({ path: path.join(out, `${theme}-${name}.png`), fullPage: true });
+/** Text těla stránky (pro kontroly hlášek). */
+async function bodyText(page) {
+  return page.locator('body').innerText().catch(() => '');
+}
+
+/**
+ * Krok 1 – výběr termínu klikáním v JS kalendáři (.calendar.is-enhanced): přelistuje na měsíc dne, klikne na den
+ * vyzvednutí a vrácení, ověří nadpis měsíce (.calendar__month bez „undefined“/„NaN“), zvýraznění .is-start/.is-end,
+ * hodnoty skrytých inputů od/do a text .calendar__selection. Vrací true při úspěchu; chyby hlásí do sink a vyhazuje.
+ */
+async function pickDatesInCalendar(page, { theme, sink, dates }) {
+  const label = `${theme} /rezervace kalendář`;
+  const monthEl = page.locator('.calendar__month');
+  const monthOk = async (ctxLabel) => {
+    const text = ((await monthEl.first().textContent().catch(() => '')) || '').trim();
+    if (!text || /undefined|NaN|null/i.test(text)) {
+      sink.error(`${label}: nadpis měsíce „${text}“ (${ctxLabel})`);
+      return false;
+    }
+    return true;
+  };
+  if (!(await monthEl.count())) {
+    sink.error(`${label}: kalendář je rozšířený JS, ale chybí .calendar__month`);
+    return false;
+  }
+  await monthOk('po načtení');
+
+  const clickDay = async (iso) => {
+    for (let i = 0; i < 4; i++) {
+      const btn = page.locator(`button.calendar__day[data-date="${iso}"]`);
+      if (await btn.count()) {
+        if (await btn.isDisabled()) throw new Error(`krok 1: den ${iso} je v kalendáři zakázaný (zavřeno?) – upravte pickDates()`);
+        await btn.click({ timeout: TIMEOUT });
+        return;
+      }
+      // den není v zobrazeném měsíci → další měsíc (a ověřit, že se nadpis přepsal smysluplně)
+      const before = ((await monthEl.first().textContent()) || '').trim();
+      await page.locator('.calendar__nav[data-nav="1"]').first().click({ timeout: TIMEOUT });
+      if (!(await monthOk('po přelistování'))) throw new Error('krok 1: po přelistování kalendáře je nadpis měsíce rozbitý');
+      const after = ((await monthEl.first().textContent()) || '').trim();
+      if (before === after) throw new Error(`krok 1: přelistování kalendáře nezměnilo měsíc („${after}“)`);
+    }
+    throw new Error(`krok 1: den ${iso} v kalendáři nenalezen ani po 4 přelistováních`);
+  };
+  await clickDay(dates.od);
+  await clickDay(dates.do);
+  if (!(await monthOk('po výběru'))) throw new Error('krok 1: po výběru dnů je nadpis měsíce rozbitý');
+
+  const state = await page.evaluate(() => {
+    const val = (n) => {
+      const el = document.querySelector(`input[name="${n}"]`);
+      return el ? el.value : null;
+    };
+    const sel = document.querySelector('.calendar__selection');
+    return {
+      od: val('od'),
+      do: val('do'),
+      start: document.querySelectorAll('.calendar__day.is-start').length,
+      end: document.querySelectorAll('.calendar__day.is-end').length,
+      selection: sel ? sel.textContent.trim() : '',
+    };
+  });
+  if (state.od !== dates.od || state.do !== dates.do) throw new Error(`krok 1: kalendář nezapsal termín do inputů (od=${state.od}, do=${state.do}; čekáno ${dates.od}–${dates.do})`);
+  if (state.start !== 1 || state.end !== 1) sink.error(`${label}: zvýraznění výběru (.is-start=${state.start}, .is-end=${state.end}; očekáváno 1 a 1)`);
+  if (!/vyzvednut/i.test(state.selection) || !/vr[áa]cen/i.test(state.selection)) sink.warn(`${label}: text výběru „${state.selection}“ neuvádí vyzvednutí a vrácení`);
+  // dostupnost přes /api/v1/dostupnost – stav se má objevit do pár sekund (jen varování, API může být vypnuté)
+  const status = page.locator('[data-availability-status]');
+  if (await status.count()) {
+    await page.waitForFunction(() => {
+      const el = document.querySelector('[data-availability-status]');
+      return el && el.textContent.trim() && !/zjišťuji/i.test(el.textContent);
+    }, null, { timeout: 8000 }).catch(() => sink.warn(`${label}: stav dostupnosti se po výběru termínu nezobrazil`));
+  }
+  return true;
+}
+
+/** Záložní vyplnění termínu bez JS kalendáře (fallback <input type=date>). */
+async function fillDatesDirectly(page, dates) {
+  await page.evaluate((d) => {
+    const set = (name, value) => {
+      const el = document.querySelector(`input[type="date"][name="${name}"]`);
+      el.value = value;
+      el.dispatchEvent(new Event('input', { bubbles: true }));
+      el.dispatchEvent(new Event('change', { bubbles: true }));
+    };
+    set('od', d.od);
+    set('do', d.do);
+  }, dates);
+}
+
+/**
+ * Krok 4 – varianta „karta“: formulář metoda=karta → simulační brána (/simulace-brany/:id?sig=…, banner SIMULACE)
+ * → „Zaplatit …“ → návrat na /rezervace/hotovo/:token. Vrací 'ok' | 'fallback' (tlačítko karty je zakázané).
+ */
+async function payByCard(page, { theme, sink, shoot, expectPath }) {
+  const form = page.locator('form').filter({ has: page.locator('input[name="metoda"][value="karta"]') });
+  if (!(await form.count())) throw new Error('krok 4: formulář „Zaplatit kartou“ chybí');
+  const submit = form.locator('button[type="submit"]').first();
+  if (await submit.isDisabled()) {
+    sink.warn(`${theme} /rezervace/poplatek: „Zaplatit kartou“ je zakázané (platební modul chybí) – varianta karta přeskočena`);
+    return 'fallback';
+  }
+  await submit.click({ timeout: TIMEOUT });
+  await expectPath(/\/simulace-brany\/\d+/, 'brána');
+  await settle(page);
+  sink.setScope('/simulace-brany/:id');
+  const url = new URL(page.url());
+  if (!url.searchParams.get('sig')) sink.error(`${theme} brána: adresa ${url.pathname} nenese podpis ?sig=`);
+  const text = await bodyText(page);
+  if (!/SIMULACE PLATEBNÍ BRÁNY/i.test(text)) sink.error(`${theme} brána: chybí označení „SIMULACE PLATEBNÍ BRÁNY“`);
+  const gwTheme = await page.evaluate(() => document.documentElement.getAttribute('data-theme'));
+  if (gwTheme !== 'gateway') sink.warn(`${theme} brána: <html data-theme="${gwTheme}"> (očekáváno „gateway“ – samostatná stránka bez tématu webu)`);
+  if (/\{\{[^{}]{1,60}\}\}/.test(await page.content())) sink.error(`${theme} brána: nerozvinuté šablony`);
+  await shoot('rezervace-brana');
+  const pay = page.locator('form').filter({ has: page.locator('input[name="akce"][value="zaplatit"]') }).locator('button[type="submit"]').first();
+  if (!(await pay.count())) throw new Error('brána: tlačítko „Zaplatit“ chybí');
+  if (!/^(Zaplatit|Blokovat)\b/.test(((await pay.textContent()) || '').trim())) sink.warn(`${theme} brána: tlačítko platby má text „${((await pay.textContent()) || '').trim()}“`);
+  await pay.click({ timeout: TIMEOUT });
+  await expectPath(/\/rezervace\/hotovo\//, 'krok 5 (návrat z brány)');
+  return 'ok';
+}
+
+/**
+ * Krok 4 – varianta „převod“: formulář metoda=prevod → stránka „Platba převodem“ (IBAN, VS, QR) → odkaz „Simulovat
+ * příchozí platbu (demo)“ → /simulace-banky?vs=&castka= (předvyplněno) → odeslat → „spárována“ → /rezervace/hotovo/:token.
+ */
+async function payByTransfer(page, { theme, sink, shoot, expectPath }) {
+  const form = page.locator('form').filter({ has: page.locator('input[name="metoda"][value="prevod"]') });
+  if (!(await form.count())) throw new Error('krok 4: formulář „Zaplatit převodem“ chybí');
+  await form.locator('button[type="submit"]').first().click({ timeout: TIMEOUT });
+  await page.waitForLoadState('domcontentloaded', { timeout: TIMEOUT }).catch(() => {});
+  await settle(page);
+  sink.setScope('/rezervace/poplatek (převod)');
+  await checkDocument(page, theme, sink, `${theme} platba převodem`);
+  const text = await bodyText(page);
+  if (!/IBAN/i.test(text) || !/variabiln[íi] symbol/i.test(text)) sink.error(`${theme} platba převodem: chybí IBAN nebo variabilní symbol`);
+  if (!(await page.locator('.bank-box__qr-img svg, .bank-box__qr svg').count())) sink.warn(`${theme} platba převodem: QR kód (SVG) se nezobrazil`);
+  await shoot('rezervace-prevod');
+  const doneHref = await page.locator('a[href^="/rezervace/hotovo/"]').first().getAttribute('href').catch(() => null);
+  if (!doneHref) throw new Error('převod: chybí odkaz „Pokračovat na potvrzení“');
+  const simLink = page.locator('a[href^="/simulace-banky"]').first();
+  if (!(await simLink.count())) {
+    sink.warn(`${theme} platba převodem: odkaz „Simulovat příchozí platbu (demo)“ chybí – rezervace zůstane čekající`);
+    await page.goto(new URL(doneHref, page.url()).href, { waitUntil: 'domcontentloaded', timeout: TIMEOUT });
+    return 'awaiting';
+  }
+  const simHref = await simLink.getAttribute('href');
+  await simLink.click({ timeout: TIMEOUT });
+  await expectPath(/\/simulace-banky/, 'simulace banky');
+  await settle(page);
+  sink.setScope('/simulace-banky');
+  await checkDocument(page, theme, sink, `${theme} /simulace-banky`);
+  const prefill = await page.evaluate(() => ({ vs: (document.querySelector('input[name="vs"]') || {}).value || '', castka: (document.querySelector('input[name="castka"]') || {}).value || '' }));
+  const wanted = new URL(simHref, page.url()).searchParams;
+  if (prefill.vs !== (wanted.get('vs') || '') || prefill.castka !== (wanted.get('castka') || '')) sink.error(`${theme} /simulace-banky: formulář není předvyplněný z odkazu (vs=${prefill.vs}, castka=${prefill.castka})`);
+  if (!/^\d{1,10}$/.test(prefill.vs)) sink.error(`${theme} /simulace-banky: VS „${prefill.vs}“ není číslo rezervace`);
+  await shoot('simulace-banky-formular');
+  await page.locator('form').filter({ has: page.locator('input[name="vs"]') }).locator('button[type="submit"]').first().click({ timeout: TIMEOUT });
+  await page.waitForLoadState('domcontentloaded', { timeout: TIMEOUT }).catch(() => {});
+  await settle(page);
+  const after = await bodyText(page);
+  if (!/spárována/i.test(after) || /nebyla spárována/i.test(after)) sink.error(`${theme} /simulace-banky: příchozí platba nebyla spárována s rezervací`);
+  await shoot('simulace-banky-vysledek');
+  await page.goto(new URL(doneHref, page.url()).href, { waitUntil: 'domcontentloaded', timeout: TIMEOUT });
+  await expectPath(/\/rezervace\/hotovo\//, 'krok 5 (po převodu)');
+  return 'ok';
+}
+
+/** Krok 4 – varianta „demo“: tlačítko „Simulovat zaplacení poplatku (demo)“ (jen PK_DEMO=1). */
+async function payByDemo(page, { theme, sink, expectPath }) {
+  const form = page.locator('form').filter({ has: page.locator('input[name="metoda"][value="demo"]') });
+  if (!(await form.count())) {
+    sink.warn(`${theme} /rezervace/poplatek: tlačítko „Simulovat zaplacení poplatku (demo)“ chybí (není demo režim?)`);
+    return 'fallback';
+  }
+  await form.locator('button[type="submit"]').first().click({ timeout: TIMEOUT });
+  await expectPath(/\/rezervace\/hotovo\//, 'krok 5 (demo)');
+  return 'ok';
+}
+
+/**
+ * Rezervační tok: termín (klikání v kalendáři) → kola → údaje → poplatek (varianta `payment`: karta / prevod / demo)
+ * → hotovo („Rezervace potvrzena“) → správa → storno. Screenshoty nesou příponu varianty, pokud běží více variant.
+ */
+async function reservationFlow(page, { baseUrl, theme, out, sink, payment = 'karta', tag = '' }) {
+  const shoot = (name) => page.screenshot({ path: path.join(out, `${theme}-${name}${tag}.png`), fullPage: true });
   const expectPath = async (re, step) => {
     await page.waitForURL(re, { timeout: TIMEOUT });
     const status = await page.evaluate(() => document.readyState);
@@ -336,25 +539,24 @@ async function reservationFlow(page, { baseUrl, theme, out, sink }) {
   }
   await settle(page);
   await checkDocument(page, theme, sink, `${theme} /rezervace`);
-  await shoot('rezervace-termin');
 
-  // krok 1 – termín: fallback <input type=date> schovává kalendář, hodnoty nastavíme přímo (formulář je bere)
+  // krok 1 – termín: skutečná interakce = klikání v JS kalendáři; přímé vyplnění <input type=date> jen bez JS
   const dates = pickDates();
   const hasDateInputs = (await page.locator('input[type="date"][name="od"]').count()) > 0 && (await page.locator('input[type="date"][name="do"]').count()) > 0;
   if (!hasDateInputs) {
     sink.warn(`${theme} /rezervace: formulář termínu nemá pole od/do – rezervační tok přeskočen`);
     return 'chybí';
   }
-  await page.evaluate((d) => {
-    const set = (name, value) => {
-      const el = document.querySelector(`input[type="date"][name="${name}"]`);
-      el.value = value;
-      el.dispatchEvent(new Event('input', { bubbles: true }));
-      el.dispatchEvent(new Event('change', { bubbles: true }));
-    };
-    set('od', d.od);
-    set('do', d.do);
-  }, dates);
+  const hasCalendar = (await page.locator('.calendar[data-calendar]').count()) > 0;
+  const enhanced = hasCalendar && (await page.locator('.calendar.is-enhanced').count()) > 0;
+  if (hasCalendar && !enhanced) sink.error(`${theme} /rezervace: kalendář se nerozšířil JS (.calendar bez .is-enhanced) – /js/rezervace.js nejspíš spadl`);
+  if (enhanced) {
+    await pickDatesInCalendar(page, { theme, sink, dates });
+  } else {
+    sink.warn(`${theme} /rezervace: termín vyplněn přímo do <input type=date> (bez kalendáře)`);
+    await fillDatesDirectly(page, dates);
+  }
+  await shoot('rezervace-termin');
   for (const [name, value] of [
     ['od_cas', '09:00'],
     ['do_cas', '17:00'],
@@ -393,27 +595,24 @@ async function reservationFlow(page, { baseUrl, theme, out, sink }) {
   await checkDocument(page, theme, sink, `${theme} /rezervace/poplatek`);
   await shoot('rezervace-poplatek');
 
-  // krok 4 – v demu simulace zaplacení, jinak převod (zobrazí údaje k platbě)
-  const demoForm = page.locator('form').filter({ has: page.locator('input[name="metoda"][value="demo"]') });
-  const prevodForm = page.locator('form').filter({ has: page.locator('input[name="metoda"][value="prevod"]') });
-  if (await demoForm.count()) {
-    await demoForm.locator('button[type="submit"]').first().click({ timeout: TIMEOUT });
-    await expectPath(/\/rezervace\/hotovo\//, 'krok 5');
-  } else if (await prevodForm.count()) {
-    sink.warn(`${theme} /rezervace/poplatek: simulace platby není k dispozici – volím převod`);
-    await prevodForm.locator('button[type="submit"]').first().click({ timeout: TIMEOUT });
-    await settle(page);
-    await shoot('rezervace-prevod');
-    const link = page.locator('a[href^="/rezervace/hotovo/"]').first();
-    if (!(await link.count())) throw new Error('krok 4: po převodu chybí odkaz na potvrzení');
-    await link.click({ timeout: TIMEOUT });
-    await expectPath(/\/rezervace\/hotovo\//, 'krok 5');
+  // krok 4 – zvolená varianta platby; karta → simulační brána, převod → QR + simulace banky, demo → zkratka
+  const payCtx = { theme, sink, shoot, expectPath };
+  let paid;
+  if (payment === 'karta') {
+    paid = await payByCard(page, payCtx);
+    if (paid === 'fallback') paid = await payByDemo(page, payCtx);
+  } else if (payment === 'prevod') {
+    paid = await payByTransfer(page, payCtx);
   } else {
-    throw new Error('krok 4: žádná dostupná metoda platby (demo/prevod)');
+    paid = await payByDemo(page, payCtx);
   }
+  if (paid === 'fallback') throw new Error('krok 4: žádná použitelná metoda platby (karta zakázaná, demo chybí)');
   await settle(page);
   sink.setScope('/rezervace/hotovo');
   await checkDocument(page, theme, sink, `${theme} /rezervace/hotovo`);
+  const doneText = await bodyText(page);
+  if (paid === 'ok' && !/Rezervace potvrzena/i.test(doneText)) sink.error(`${theme} /rezervace/hotovo (${payment}): chybí stav „Rezervace potvrzena“ (platba poplatku se nepropsala)`);
+  if (paid === 'awaiting' && !/čeká na poplatek/i.test(doneText)) sink.warn(`${theme} /rezervace/hotovo (${payment}): očekáván stav „čeká na poplatek“`);
   await shoot('rezervace-hotovo');
 
   // správa rezervace: odkaz s textem „správa/správu rezervace“, jinak href tvaru /rezervace/<token> (ne kroky, ne ICS)
@@ -482,14 +681,19 @@ async function runTheme(browser, pw, theme, { baseUrl, out, args }) {
     } else sink.warn(`${theme} /kola: žádný odkaz na detail kola`);
   }
 
-  // rezervační tok
+  // rezervační tok – jedna nebo více variant platby (každá založí vlastní rezervaci v nové session)
   if (args.reservation) {
-    try {
-      results.push({ path: '/rezervace (tok)', result: await reservationFlow(page, { baseUrl, theme, out, sink }) });
-    } catch (e) {
-      sink.error(`${theme} rezervační tok neprošel: ${e.message}`);
-      await page.screenshot({ path: path.join(out, `${theme}-rezervace-chyba.png`), fullPage: true }).catch(() => {});
-      results.push({ path: '/rezervace (tok)', result: 'chyba' });
+    const many = args.payments.length > 1;
+    for (const payment of args.payments) {
+      const tag = many ? `-${payment}` : '';
+      const label = `/rezervace (tok, ${payment})`;
+      try {
+        results.push({ path: label, result: await reservationFlow(page, { baseUrl, theme, out, sink, payment, tag }) });
+      } catch (e) {
+        sink.error(`${theme} rezervační tok (${payment}) neprošel: ${e.message}`);
+        await page.screenshot({ path: path.join(out, `${theme}-rezervace-chyba${tag}.png`), fullPage: true }).catch(() => {});
+        results.push({ path: label, result: 'chyba' });
+      }
     }
   }
   await context.close();
@@ -540,7 +744,7 @@ async function main() {
     server = await startServer();
     baseUrl = server.url;
   }
-  console.log(`E2E: server ${baseUrl}, témata ${themes.join(', ')}, Chromium ${executablePath}, screenshoty → ${path.relative(ROOT, args.out) || '.'}`);
+  console.log(`E2E: server ${baseUrl}, témata ${themes.join(', ')}, platba ${args.reservation ? args.payments.join('+') : '(bez rezervace)'}, Chromium ${executablePath}, screenshoty → ${path.relative(ROOT, args.out) || '.'}`);
 
   const browser = await pw.chromium.launch({ executablePath, headless: true });
   const summary = [];
@@ -582,4 +786,4 @@ if (require.main === module) {
   });
 }
 
-module.exports = { PAGES, loadPlaywright, findChromium, pickDates, parseArgs, slug };
+module.exports = { PAGES, PAYMENT_VARIANTS, loadPlaywright, findChromium, pickDates, parseArgs, slug, startServer, createSink, attachCollectors, installCspProbe, reservationFlow, visit };

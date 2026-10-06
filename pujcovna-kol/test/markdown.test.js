@@ -113,6 +113,47 @@ test('šablonování: {{#X}} a {{^X}} podle pravdivosti (ano/ne, prázdno, boole
   assert.match(t, /<td>c<\/td>/);
 });
 
+test('bloky se značkami na samostatných řádcích: žádný prázdný řádek navíc, tabulka zůstane celistvá, skrytý blok zmizí i s řádky', () => {
+  const src = 'A\n\n{{#X}}\n> b\n{{/X}}\n{{^X}}\n> c\n{{/X}}\n\nD';
+  assert.equal(html(src, { X: 'ano' }), '<p>A</p>\n<blockquote><p>b</p></blockquote>\n<p>D</p>');
+  assert.equal(html(src, { X: 'ne' }), '<p>A</p>\n<blockquote><p>c</p></blockquote>\n<p>D</p>');
+  // blok obalující víc řádků tabulky
+  const table = '| a |\n|---|\n{{#X}}\n| 1 |\n| 2 |\n{{/X}}\n| 3 |';
+  assert.equal(html(table, { X: 1 }), '<div class="table-wrap"><table class="table"><thead><tr><th scope="col">a</th></tr></thead><tbody><tr><td>1</td></tr><tr><td>2</td></tr><tr><td>3</td></tr></tbody></table></div>');
+  assert.equal(html(table, { X: 0 }), '<div class="table-wrap"><table class="table"><thead><tr><th scope="col">a</th></tr></thead><tbody><tr><td>3</td></tr></tbody></table></div>');
+  // odstavec obalený blokem; za ním nadpis
+  assert.equal(html('{{#P}}\n3.6 **Platba na místě.** text\n{{/P}}\n\n## 4. Cena', { P: 'ne' }), '<h2 id="4-cena">4. Cena</h2>');
+  assert.equal(html('{{#P}}\n3.6 **Platba na místě.** text\n{{/P}}\n\n## 4. Cena', { P: 'ano' }), '<p>3.6 <strong>Platba na místě.</strong> text</p>\n<h2 id="4-cena">4. Cena</h2>');
+  // podmíněný nadpis s podsekcí
+  assert.equal(html('### A\n\n{{#X}}\n### B\n\nb\n\n{{/X}}\n\n### C', { X: '' }), '<h3 id="a">A</h3>\n<h3 id="c">C</h3>');
+});
+
+test('cyklus {{#X}} nad polem záznamů: řádky tabulky pro každý záznam, hodnoty escapované, vnořené podmínky per záznam', () => {
+  const rows = [
+    { X: '1', E: 'ano', T: 'Trek <FX>' },
+    { X: '2|x', E: 'ne', T: '**ne tučné**' },
+  ];
+  const t = html('| # | typ | e |\n|---|---|---|\n{{#R}}| {{X}} | {{T}} | {{#E}}e-kolo{{/E}}{{^E}}–{{/E}} |{{/R}}\n| z | z | z |', { R: rows });
+  assert.match(t, /<tr><td>1<\/td><td>Trek &lt;FX&gt;<\/td><td>e-kolo<\/td><\/tr><tr><td>2\|x<\/td><td>\*\*ne tučné\*\*<\/td><td>–<\/td><\/tr><tr><td>z<\/td>/);
+  // cyklus přes celou tabulku (blok na samostatných řádcích) → tabulka pro každý záznam
+  const tables = html('{{#K}}\n| h {{V}} |\n|---|\n| {{V}} |\n\n{{/K}}\n\n## N', { K: [{ V: '1' }, { V: '2' }] });
+  assert.equal((tables.match(/<table/g) || []).length, 2);
+  assert.match(tables, /<th scope="col">h 2<\/th>/);
+  assert.match(tables, /<h2 id="n">N<\/h2>$/);
+  // cyklus uvnitř věty, globální parametr dostupný uvnitř, hodnota záznamu má přednost
+  assert.equal(html('Kola: {{#K}}{{V}} ({{G}}); {{/K}}konec', { K: [{ V: 'A' }, { V: 'B', G: 'vlastní' }], G: 'glob' }), '<p>Kola: A (glob); B (vlastní); konec</p>');
+  // prázdné pole = nepravda; „ano“ bez pole = jeden průchod s globálními hodnotami
+  assert.equal(html('a{{#K}}x{{/K}}{{^K}}nic{{/K}}', { K: [] }), '<p>anic</p>');
+  assert.equal(html('{{#K}}| {{V}} |{{/K}}', { K: 'ano', V: 'glob' }), '<p>| glob |</p>');
+  assert.equal(md.isTruthy([]), false);
+  assert.equal(md.isTruthy([{}]), true);
+  // {{K}} jako prostý placeholder nad polem skalárů → seznam
+  assert.equal(html('{{K}}', { K: ['a', 'b'] }), '<p>a, b</p>');
+  // Html fragment v záznamu se vloží beze změny
+  assert.equal(html('{{#K}}{{H}}{{/K}}', { K: [{ H: raw('<em>x</em>') }] }), '<p><em>x</em></p>');
+  assert.deepEqual(md.render('{{#K}}{{V}}{{/K}}', { K: [{ V: 1 }] }).missing, []);
+});
+
 test('INTERNI bloky a HTML komentáře se vyhodí, interní sekce a rámeček se nerenderují', () => {
   const src = [
     '# Zásady',
@@ -151,6 +192,10 @@ test('INTERNI bloky a HTML komentáře se vyhodí, interní sekce a rámeček se
   // oddělovač --- za vyhozenou sekcí Parametry patří k ní a zmizí také
   assert.equal(p.html, '<h1 id="titul">Titul</h1>\n<h1 id="dokument">Dokument</h1>\n<h2 id="1-kdo-jsme">1. Kdo jsme</h2>\n<p>text</p>');
   assert.deepEqual(p.missing, []);
+  // zmínka značky uvnitř textu (v kódu) blok INTERNI neukončí – tabulka Parametry nesmí prosáknout na web
+  const leak = '# T\n\n<!-- INTERNI: nerenderovat -->\n\n## Parametry\n\nOddíly mezi `<!-- INTERNI: nerenderovat -->` a `<!-- /INTERNI -->` jsou interní.\n\n| Parametr | Význam |\n|---|---|\n| `{{A}}` | firma |\n\n<!-- /INTERNI -->\n\n## Stručně\n\nveřejné {{A}}';
+  const l = md.render(leak, { A: 'ok' });
+  assert.equal(l.html, '<h1 id="t">T</h1>\n<h2 id="strucne">Stručně</h2>\n<p>veřejné ok</p>');
   // omitHeadings – volitelné vyřazení dalších sekcí (např. ČÁST D protokolu)
   const o = md.render('# ČÁST C – Vrácení\n\nc\n\n# ČÁST D – Co se ukládá\n\nd', {}, { omitHeadings: [/^ČÁST D/] });
   assert.equal(o.html, '<h1 id="cast-c-vraceni">ČÁST C – Vrácení</h1>\n<p>c</p>');

@@ -46,3 +46,36 @@
   gap: var(--space-3);
   align-items: flex-start;
 }
+
+/* Stránka /fotografie – autoři a licence fotografií (CC BY attribution) */
+.section--credits .credits__group + .credits__group {
+  margin-top: var(--space-8);
+}
+.credits__thumb-link {
+  display: inline-block;
+  line-height: 0;
+}
+.credits__thumb {
+  width: 120px;
+  height: 80px;
+  object-fit: cover;
+  border-radius: var(--radius-sm);
+  background: var(--surface-2);
+}
+.credits__original,
+.credits__note {
+  color: var(--text-muted);
+  font-size: var(--step--1);
+}
+.credits__footnote {
+  margin-top: var(--space-6);
+  color: var(--text-muted);
+  font-size: var(--step--1);
+  max-width: 72ch;
+}
+@media (max-width: 640px) {
+  .credits__thumb {
+    width: 80px;
+    height: 56px;
+  }
+}

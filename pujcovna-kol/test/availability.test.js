@@ -103,6 +103,44 @@ test('zavírací dny a otevírací doba: closures (plná data i MM-DD), dny bez 
   assert.equal(all[all.length - 1], '19:00');
 });
 
+test('otevírací doba z adminu (settings.openingHours) přepisuje tenant.json: null = zavřeno, chybějící den = výchozí', () => {
+  const db = fixture();
+  const s = { ...settings, openingHours: { mon: null, sat: ['10:00', '16:00'] } };
+  const eff = av.effectiveOpeningHours(tenant, s);
+  assert.equal(eff.mon, null, 'pondělí zavřeno');
+  assert.deepEqual(eff.sat, ['10:00', '16:00'], 'sobota přepsaná');
+  assert.deepEqual(eff.tue, ['09:00', '18:00'], 'úterý z tenant.json');
+  assert.deepEqual(Object.keys(eff), ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun']);
+  // bez settings beze změny (zpětná kompatibilita)
+  assert.deepEqual(av.effectiveOpeningHours(tenant), tenant.openingHours);
+  assert.deepEqual(av.effectiveOpeningHours(tenant, { openingHours: null }), tenant.openingHours);
+  // 2026-07-13 je pondělí
+  assert.deepEqual(av.openingHoursFor(tenant, '2026-07-13'), ['09:00', '18:00']);
+  assert.equal(av.openingHoursFor(tenant, '2026-07-13', s), null);
+  assert.equal(av.isClosedDay(db, tenant, '2026-07-13', s), true);
+  assert.deepEqual(av.closedInfo(db, tenant, '2026-07-13', s), { closed: true, reason: 'Zavírací den' });
+  assert.equal(av.isClosedDay(db, tenant, '2026-07-13'), false);
+  // blockedDates: každé pondělí v rozsahu
+  const blocked = av.blockedDates({ db, tenant, settings: s, from: '2026-07-06', to: '2026-07-19' });
+  assert.deepEqual(blocked, ['2026-07-06', '2026-07-13']);
+  assert.deepEqual(av.blockedDates({ db, tenant, from: '2026-07-06', to: '2026-07-19' }), []);
+  // sloty: sobota 10–16 + všední 9–18 + neděle 8–19 → stále 08:00…19:00; při zkrácení všech dní se zúží
+  const narrow = { openingHours: { mon: ['10:00', '15:00'], tue: ['10:00', '15:00'], wed: ['10:00', '15:00'], thu: ['10:00', '15:00'], fri: ['10:00', '15:00'], sat: null, sun: null } };
+  const slots = av.allTimeSlots(tenant, { settings: narrow });
+  assert.equal(slots[0], '10:00');
+  assert.equal(slots[slots.length - 1], '15:00');
+  assert.equal(av.allTimeSlots(tenant, 60).length, 12, 'číselný druhý parametr = krok (zpětně kompatibilní)');
+  // validateRange a termFromDates respektují settings
+  const now = new Date('2026-07-01T10:00:00Z');
+  const v = av.validateRange({ db, tenant, settings: s, fromAt: av.localToUtc('2026-07-13', '09:00'), toAt: av.localToUtc('2026-07-14', '17:00'), now });
+  assert.match(v.errors.od, /zavřeno \(Zavírací den\)/);
+  assert.equal(av.validateRange({ db, tenant, settings, fromAt: av.localToUtc('2026-07-13', '09:00'), toAt: av.localToUtc('2026-07-14', '17:00'), now }).ok, true);
+  const sat = av.validateRange({ db, tenant, settings: s, fromAt: av.localToUtc('2026-07-11', '09:00'), toAt: av.localToUtc('2026-07-11', '15:00'), now });
+  assert.match(sat.errors.od, /10:00–16:00/);
+  assert.equal(av.termFromDates({ tenant, settings: s, od: '2026-07-11', do: '2026-07-11' }).odCas, '10:00');
+  assert.equal(av.termFromDates({ tenant, od: '2026-07-11', do: '2026-07-11' }).odCas, '08:00');
+});
+
 test('převod času Praha ↔ UTC včetně letního času', () => {
   assert.equal(av.localToUtc('2026-07-12', '09:00').toISOString(), '2026-07-12T07:00:00.000Z');
   assert.equal(av.localToUtc('2026-01-12', '09:00').toISOString(), '2026-01-12T08:00:00.000Z');

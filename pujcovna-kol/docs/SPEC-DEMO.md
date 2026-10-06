@@ -140,7 +140,7 @@ module.exports = {
 
 **Bezpečnostní hlavičky** (`src/http/headers.js`), vždy:
 ```
-Content-Security-Policy: default-src 'self'; script-src 'self'; style-src 'self'; font-src 'self'; img-src 'self' data: https://*.tile.openstreetmap.fr https://tile.openstreetmap.org https://*.tile.opentopomap.org https://api.mapy.cz; connect-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self' https://payments.comgate.cz; object-src 'none'
+Content-Security-Policy: default-src 'self'; script-src 'self'; style-src 'self'; font-src 'self'; img-src 'self' data: https://*.tile.openstreetmap.fr https://*.tile-cyclosm.openstreetmap.fr https://tile.openstreetmap.org https://*.tile.opentopomap.org https://api.mapy.cz https://api.mapy.com; connect-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self' https://payments.comgate.cz; object-src 'none'
 Referrer-Policy: strict-origin-when-cross-origin
 X-Content-Type-Options: nosniff
 Permissions-Policy: geolocation=(self), camera=(), microphone=()

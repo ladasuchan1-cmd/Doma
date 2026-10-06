@@ -1,7 +1,8 @@
 'use strict';
 // Půjčovna kol – vstupní bod serveru (SPEC kap. 3).
 //   node --disable-warning=ExperimentalWarning server.js
-// Start: loadConfig → tajemství → tenanty → DB + migrace + settings → admin z env → features (src/features/*.js)
+// Start: loadConfig → tajemství → tenanty → DB + migrace + settings → admin z env → (demo: prázdná tabulka bike_types
+//        → automaticky seed z tools/demo-data.js, bez resetu; vypne PK_DEMO_AUTOSEED=0) → features (src/features/*.js)
 //        → jobs → listen. Health: GET /api/health → { ok, version, tenant, theme }.
 // Export start(options) pro testy (test/helpers.js): vrací { server, port, url, app, stop }.
 
@@ -98,6 +99,32 @@ function ensureAdmin(db, config) {
     nowIso()
   );
   return { created: true, generatedPassword: config.adminPassword ? null : password };
+}
+
+/**
+ * Demo režim: je-li tabulka bike_types prázdná (první start, nový svazek), naplní demo data z tools/demo-data.js
+ * (idempotentně, bez resetu). Chyba seedu server nezastaví – jen se zaloguje.
+ * @returns {Promise<boolean>} true, pokud se seedovalo
+ */
+async function autoSeedDemo({ db, tenant, config, fieldCrypto, log }) {
+  if (!config.demo || !config.demoAutoSeed) return false;
+  let empty;
+  try {
+    empty = db.prepare('SELECT COUNT(*) AS n FROM bike_types').get().n === 0;
+  } catch {
+    return false;
+  }
+  if (!empty) return false;
+  try {
+    const demoData = require('./tools/demo-data');
+    const startedAt = Date.now();
+    await demoData.seed({ db, tenant, config, fieldCrypto, reset: false, log });
+    log.info('Demo data automaticky naplněna (tabulka bike_types byla prázdná)', { tenant: tenant.slug, ms: Date.now() - startedAt });
+    return true;
+  } catch (e) {
+    log.error('Automatické naplnění demo dat selhalo – server startuje bez nich (spusťte npm run demo-data)', { tenant: tenant.slug, error: e.message });
+    return false;
+  }
 }
 
 function printPasswordBanner(email, password) {
@@ -222,7 +249,7 @@ function createApp(deps) {
 
 /**
  * Spustí server.
- * @param {{env?: object, quiet?: boolean, log?: object, port?: number, host?: string}} [options]
+ * @param {{env?: object, quiet?: boolean, log?: object, port?: number, host?: string, startJobs?: boolean, autoSeed?: boolean, featuresDir?: string}} [options]
  */
 async function start(options = {}) {
   const config = { ...loadConfig(options.env || process.env) };
@@ -244,6 +271,7 @@ async function start(options = {}) {
       log.info('Vytvořen výchozí účet správce', { tenant: tenant.slug });
       if (admin.generatedPassword && !options.quiet) printPasswordBanner(config.adminUser, admin.generatedPassword);
     }
+    if (options.autoSeed !== false) await autoSeedDemo({ db, tenant, config, fieldCrypto, log });
     dbs.set(tenant.slug, db);
   }
 
@@ -376,4 +404,4 @@ async function main() {
 
 if (require.main === module) main();
 
-module.exports = { start, createApp, loadFeatures, ensureAdmin, resolveTheme, DESIGN_COOKIE };
+module.exports = { start, createApp, loadFeatures, ensureAdmin, autoSeedDemo, resolveTheme, DESIGN_COOKIE };

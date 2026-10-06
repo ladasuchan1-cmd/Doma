@@ -9,7 +9,7 @@ const { CSP } = require('../src/http/headers');
 const { createLogger } = require('../src/log');
 
 const EXPECTED_CSP =
-  "default-src 'self'; script-src 'self'; style-src 'self'; font-src 'self'; img-src 'self' data: https://*.tile.openstreetmap.fr https://tile.openstreetmap.org https://*.tile.opentopomap.org https://api.mapy.cz; connect-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self' https://payments.comgate.cz; object-src 'none'";
+  "default-src 'self'; script-src 'self'; style-src 'self'; font-src 'self'; img-src 'self' data: https://*.tile.openstreetmap.fr https://*.tile-cyclosm.openstreetmap.fr https://tile.openstreetmap.org https://*.tile.opentopomap.org https://api.mapy.cz https://api.mapy.com; connect-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self' https://payments.comgate.cz; object-src 'none'";
 
 let srv;
 const logLines = [];
@@ -126,12 +126,18 @@ test('domovská stránka zobrazí karty kol z bike_types s cenou od', async () =
   }
 });
 
-test('404 stránka v layoutu, 405 s Allow', async () => {
+test('404 stránka v layoutu s vysvětlením a odkazy Domů / Kola / Kontakt, 405 s Allow', async () => {
   const res = await srv.fetch('/neexistuje');
   assert.equal(res.status, 404);
   const html = await res.text();
   assert.match(html, /<footer class="site-footer">/);
-  assert.match(html, /404 · Stránka nenalezena/);
+  assert.match(html, /<h1 class="section__title">404 · Stránka nenalezena<\/h1>/, 'chybová stránka má h1');
+  assert.ok(!/<h2 class="section__title">/.test(html), 'nadpis chyby není h2');
+  assert.match(html, /<p class="section__lead">Zkontrolujte adresu, nebo začněte na domovské stránce.<\/p>/);
+  assert.match(html, /<a class="btn btn--primary" href="\/"><span class="btn__label">Domů<\/span><\/a>/);
+  assert.match(html, /<a class="btn btn--secondary" href="\/kola"><span class="btn__label">Kola<\/span><\/a>/);
+  assert.match(html, /<a class="btn btn--ghost" href="\/kontakt"><span class="btn__label">Kontakt<\/span><\/a>/);
+  assert.ok(!/error-page__id/.test(html), '404 bez request id');
   assert.match(html, /<meta name="robots" content="noindex">/);
   const api = await srv.fetch('/api/neexistuje');
   assert.equal(api.status, 404);
@@ -139,6 +145,182 @@ test('404 stránka v layoutu, 405 s Allow', async () => {
   const m = await srv.fetch('/', { method: 'DELETE' });
   assert.equal(m.status, 405);
   assert.equal(m.headers.get('allow'), 'GET, HEAD');
+});
+
+test('500 stránka nese identifikátor požadavku, chyba se zaloguje bez stack trace v HTML', async () => {
+  const { errorBody } = require('../src/http/errors');
+  const html = errorBody({ status: 500, requestId: 'rid-abc123' }).toString();
+  assert.match(html, /<h1 class="section__title">500 · Chyba serveru<\/h1>/);
+  assert.match(html, /Identifikátor požadavku: <code>rid-abc123<\/code>/);
+  assert.match(html, /neočekávaná chyba/);
+  // vlastní hláška u 404 → vysvětlení zůstane jako nápověda pod ní
+  const custom = errorBody({ status: 404, message: 'Kolo nenalezeno.' }).toString();
+  assert.match(custom, /<p class="section__lead">Kolo nenalezeno.<\/p>/);
+  assert.match(custom, /<p class="error-page__hint">Zkontrolujte adresu, nebo začněte na domovské stránce.<\/p>/);
+});
+
+test('dynamické odpovědi: gzip/brotli podle Accept-Encoding, Vary, malé a binární odpovědi beze změny', async () => {
+  const plain = await srv.fetch('/');
+  assert.equal(plain.headers.get('content-encoding'), null);
+  assert.equal(plain.headers.get('vary'), 'Accept-Encoding');
+  const gz = await srv.fetch('/', { headers: { 'accept-encoding': 'gzip, deflate' } });
+  assert.equal(gz.status, 200);
+  assert.equal(gz.headers.get('content-encoding'), 'gzip');
+  assert.equal(gz.headers.get('vary'), 'Accept-Encoding');
+  const body = await gz.text();
+  assert.ok(body.startsWith('<!doctype html>'), 'helper tělo rozbalí');
+  assert.ok(Number(gz.headers.get('content-length')) < body.length, 'Content-Length je komprimovaná velikost');
+  const br = await srv.fetch('/', { headers: { 'accept-encoding': 'br, gzip' } });
+  assert.equal(br.headers.get('content-encoding'), 'br');
+  assert.match(await br.text(), /<footer class="site-footer">/);
+  // HEAD: hlavičky jako GET, bez těla
+  const head = await srv.fetch('/', { method: 'HEAD', headers: { 'accept-encoding': 'gzip' } });
+  assert.equal(head.headers.get('content-encoding'), 'gzip');
+  assert.equal((await head.arrayBuffer()).length, 0);
+  // malý JSON (< 1 KB) se nekomprimuje, ale nese Vary
+  const health = await srv.fetch('/api/health', { headers: { 'accept-encoding': 'gzip' } });
+  assert.equal(health.headers.get('content-encoding'), null);
+  assert.equal(health.headers.get('vary'), 'Accept-Encoding');
+  assert.equal((await health.json()).ok, true);
+  // přesměrování bez těla – bez Vary i komprese
+  const redirect = await srv.fetch('/design/nastavit?design=outdoor&zpet=/', { headers: { 'accept-encoding': 'gzip' } });
+  assert.equal(redirect.status, 302);
+  assert.equal(redirect.headers.get('content-encoding'), null);
+  srv.jar.clear();
+  const { compressBody } = require('../src/http/context');
+  const big = Buffer.from('a'.repeat(5000));
+  assert.equal(compressBody(big, { acceptEncoding: 'gzip', contentType: 'image/png' }).encoding, null, 'binární typ se nekomprimuje');
+  assert.equal(compressBody(Buffer.from('x'), { acceptEncoding: 'gzip', contentType: 'text/html' }).encoding, null, 'malé tělo');
+  assert.equal(compressBody(big, { acceptEncoding: 'identity', contentType: 'text/html' }).encoding, null);
+  assert.equal(compressBody(big, { acceptEncoding: 'gzip', contentType: 'text/html; charset=utf-8' }).encoding, 'gzip');
+});
+
+test('logo tenanta je inline SVG (obarvitelné přes CSS color) v hlavičce i patičce, favicon a /tenant/logo.svg zůstávají', async () => {
+  const html = await (await srv.fetch('/')).text();
+  const logos = html.match(/<svg class="site-logo__img" aria-hidden="true" focusable="false" width="160" height="40"[^>]*viewBox="0 0 320 80"[^>]*>/g) || [];
+  assert.equal(logos.length, 2, 'hlavička + patička');
+  assert.ok(!/<svg class="site-logo__img"[^>]*(role=|aria-label=)/.test(html), 'root svg bez role/aria-label (nese ho odkaz)');
+  assert.match(html, /<a class="site-logo" href="\/" aria-label="Půjčovna kol U Tří dubů – domů"><svg class="site-logo__img"/);
+  assert.match(html, /<a class="site-logo site-logo--footer" href="\/" aria-label="Půjčovna kol U Tří dubů – domů"><svg class="site-logo__img"/);
+  assert.match(html, /fill="currentColor"/);
+  assert.ok(!/<img class="site-logo__img"/.test(html), 'žádný <img> logo');
+  assert.ok(!/<!--/.test(html.slice(html.indexOf('<svg class="site-logo__img"'), html.indexOf('</svg>'))), 'bez komentářů z SVG');
+  assert.match(html, /<link rel="icon" href="\/tenant\/logo.svg" type="image\/svg\+xml">/);
+  // fallback na <img>, když logo.svg chybí nebo není použitelné
+  const { tenantLogoSvg, logoMarkup } = require('../src/render/layout');
+  assert.equal(tenantLogoSvg({ dir: '/neexistuje/tenant' }), null);
+  assert.match(logoMarkup({ dir: '/neexistuje/tenant' }, '/tenant/logo.svg').toString(), /^<img class="site-logo__img" src="\/tenant\/logo.svg" alt="" width="160" height="40">$/);
+  const os = require('node:os');
+  const fs = require('node:fs');
+  const path = require('node:path');
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'pk-logo-'));
+  try {
+    fs.writeFileSync(path.join(dir, 'logo.svg'), '<?xml version="1.0"?><!-- k --><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 10 10" role="img" aria-label="x" width="10" height="10"><script>alert(1)</script></svg>');
+    assert.equal(tenantLogoSvg({ dir }), null, 'SVG se skriptem se nevkládá');
+    const dir2 = fs.mkdtempSync(path.join(os.tmpdir(), 'pk-logo-'));
+    fs.writeFileSync(path.join(dir2, 'logo.svg'), '<?xml version="1.0"?>\n<!-- k -->\n<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 10 10" role="img" aria-label="x" width="10" height="10" id="l"><g fill="currentColor"><rect width="5" height="5"/></g></svg>\n');
+    assert.equal(tenantLogoSvg({ dir: dir2 }), '<svg class="site-logo__img" aria-hidden="true" focusable="false" width="160" height="40" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 10 10"><g fill="currentColor"><rect width="5" height="5"/></g></svg>');
+    fs.rmSync(dir2, { recursive: true, force: true });
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('hero fotka a alt text podle tématu (THEMES.<tema>.heroAlt)', async () => {
+  const { THEMES } = require('../src/themes');
+  for (const [name, t] of Object.entries(THEMES)) {
+    assert.ok(t.heroAlt && t.heroAlt.length > 10, `${name}: heroAlt`);
+    const html = await (await srv.fetch(`/?design=${name}`)).text();
+    assert.match(html, new RegExp(`<img src="/img/demo/${name}/hero\\.[a-z]+" alt="${t.heroAlt}"`), `${name}: hero fotka tématu s alt textem`);
+  }
+  assert.ok(!/Cyklisté na hrázi/.test(await (await srv.fetch('/?design=sport')).text()));
+});
+
+test('texty z adminu (settings.texts) přepisují tenant.texts na domovské stránce, v kontaktu i v patičce; prázdné = výchozí', async () => {
+  const { setSetting, getSetting } = require('../src/db');
+  const { getTexts } = require('../src/tenants');
+  assert.deepEqual(getTexts(srv.tenant, { texts: { heroTitle: ' ', about: 'A' } }).about, 'A');
+  assert.equal(getTexts(srv.tenant, { texts: { heroTitle: ' ' } }).heroTitle, srv.tenant.texts.heroTitle, 'prázdný řetězec = výchozí');
+  assert.equal(getTexts(srv.tenant, null).heroText, srv.tenant.texts.heroText);
+  setSetting(srv.db, 'texts', { heroTitle: 'QA TITULEK ZMĚNĚN', heroText: 'Nový text úvodu', about: 'O nás z adminu', contactNote: 'Parkování zdarma za rohem.' });
+  try {
+    const home = await (await srv.fetch('/')).text();
+    assert.match(home, /<h1 class="hero__title">QA TITULEK ZMĚNĚN<\/h1>/);
+    assert.match(home, /<p class="hero__text">Nový text úvodu<\/p>/);
+    assert.match(home, /<meta name="description" content="Nový text úvodu">/);
+    assert.match(home, /<p class="site-footer__about-text">O nás z adminu<\/p>/);
+    assert.ok(!/Půjčte si kolo a objevte Třeboňsko/.test(home), 'výchozí titulek zmizel');
+    const kontakt = await (await srv.fetch('/kontakt')).text();
+    assert.match(kontakt, /<p class="contact-note-text">Parkování zdarma za rohem.<\/p>/);
+    assert.match(kontakt, /<p class="site-footer__about-text">O nás z adminu<\/p>/, 'patička i na jiných stránkách');
+    assert.ok(!/<meta name="description" content="Nový text úvodu">/.test(kontakt), 'kontakt má vlastní description');
+  } finally {
+    srv.db.prepare("DELETE FROM settings WHERE key = 'texts'").run();
+  }
+  assert.equal(getSetting(srv.db, 'texts'), null);
+  const back = await (await srv.fetch('/')).text();
+  assert.match(back, /<h1 class="hero__title">Půjčte si kolo a objevte Třeboňsko<\/h1>/);
+  assert.ok(!/contact-note-text/.test(await (await srv.fetch('/kontakt')).text()));
+});
+
+test('/fotografie: autoři a licence CC BY z public/img/demo/*/ATTRIBUTION.md, odkaz v patičce každé stránky', async () => {
+  const { parseAttributionMd, loadPhotoCredits } = require('../src/features/home');
+  const rows = parseAttributionMd(
+    '# Attribution\n\nText.\n\n| Soubor | Původní soubor | Název / popis | Autor | Licence | Zdroj |\n|---|---|---|---|---|---|\n' +
+      '| `hero.jpg` | Orig (1).JPG | Rybník | Autor X | [CC BY 3.0](https://creativecommons.org/licenses/by/3.0) | https://commons.wikimedia.org/wiki/File:Orig_(1).JPG |\n' +
+      '| `a.jpg` | B.jpg | Popis | Někdo | [CC BY 2.0](https://creativecommons.org/licenses/by/2.0/) (na Commons PD) | https://commons.wikimedia.org/wiki/File:B.jpg (Flickr: https://www.flickr.com/x) |\n' +
+      '| bez souboru | | | | | |\n'
+  );
+  assert.equal(rows.length, 2);
+  assert.deepEqual(rows[0], { file: 'hero.jpg', original: 'Orig (1).JPG', title: 'Rybník', author: 'Autor X', license: { name: 'CC BY 3.0', url: 'https://creativecommons.org/licenses/by/3.0', note: null }, source: 'https://commons.wikimedia.org/wiki/File:Orig_(1).JPG' });
+  assert.equal(rows[1].license.note, 'na Commons PD');
+  assert.equal(rows[1].source, 'https://commons.wikimedia.org/wiki/File:B.jpg');
+  const groups = loadPhotoCredits(srv.instance.config.publicDir);
+  const dirs = groups.map((g) => g.dir);
+  for (const d of ['outdoor', 'sport', 'family', 'kola']) assert.ok(dirs.includes(d), `skupina ${d}`);
+  assert.ok(groups.every((g) => g.items.every((it) => it.author && it.license && it.license.name && it.file)), 'každá položka má autora, licenci a soubor');
+  assert.ok(groups.find((g) => g.dir === 'outdoor').items.some((it) => it.file === 'hero.jpg'), 'hero tématu je v seznamu');
+  for (const name of ['outdoor', 'sport', 'family']) {
+    const res = await srv.fetch(`/fotografie?design=${name}`);
+    assert.equal(res.status, 200, name);
+    const html = await res.text();
+    assert.match(html, /<h1 class="section__title">Fotografie: autoři a licence<\/h1>/);
+    assert.match(html, /<title>Fotografie: autoři a licence · Půjčovna kol U Tří dubů<\/title>/);
+    assert.match(html, /<caption class="table__caption">Design Outdoor<\/caption>/);
+    assert.match(html, /<caption class="table__caption">Fotografie kol \(katalog\)<\/caption>/);
+    assert.match(html, /Chmee2/);
+    assert.match(html, /Taiyo FUJII/);
+    assert.match(html, /<a href="https:\/\/creativecommons\.org\/licenses\/by\/2\.0\/?" rel="license noopener">CC BY 2\.0<\/a>/);
+    assert.match(html, /<img class="credits__thumb" src="\/img\/demo\/outdoor\/hero\.jpg" alt="" loading="lazy"/);
+    assert.match(html, /<link rel="stylesheet" href="\/css\/home\.css\?v=test">/);
+    assert.ok(!/ style="/.test(html) && !/<script>/.test(html), 'bez inline stylů a skriptů');
+  }
+  for (const p of ['/', '/kontakt', '/neexistuje']) {
+    const html = await (await srv.fetch(p)).text();
+    assert.match(html, /<a class="site-footer__credits" href="\/fotografie">Fotografie: autoři a licence<\/a>/, `${p}: odkaz v patičce`);
+  }
+});
+
+test('demo režim: při prázdné tabulce bike_types server sám naplní demo data (PK_DEMO_AUTOSEED), v testech vypnuto', async () => {
+  assert.equal(srv.db.prepare('SELECT COUNT(*) AS n FROM bike_types').get().n, 0, 'výchozí test env má autoseed vypnutý');
+  const seeded = await startServer({ env: { PK_DEMO_AUTOSEED: '1' } });
+  try {
+    assert.equal(seeded.db.prepare('SELECT COUNT(*) AS n FROM bike_types').get().n, 6);
+    assert.ok(seeded.db.prepare('SELECT COUNT(*) AS n FROM reservations').get().n >= 1);
+    assert.equal(seeded.db.prepare('SELECT COUNT(*) AS n FROM users').get().n, 1, 'admin z ensureAdmin se neduplikuje');
+    const home = await (await seeded.fetch('/')).text();
+    assert.match(home, /<article class="card card--bike">/);
+    assert.ok(!/Nabídka kol se připravuje/.test(home));
+    // druhý start se stejnými daty už neseeduje (tabulka není prázdná) – ověříme přes autoSeedDemo
+    const { autoSeedDemo } = require('../server');
+    const calls = [];
+    const log = { info: (m) => calls.push(m), warn() {}, error: (m) => calls.push('E:' + m), debug() {} };
+    assert.equal(await autoSeedDemo({ db: seeded.db, tenant: seeded.tenant, config: seeded.instance.config, fieldCrypto: seeded.app.fieldCrypto, log }), false);
+    assert.deepEqual(calls, []);
+    assert.equal(await autoSeedDemo({ db: seeded.db, tenant: seeded.tenant, config: { ...seeded.instance.config, demo: false }, fieldCrypto: seeded.app.fieldCrypto, log }), false);
+  } finally {
+    await seeded.stop();
+  }
 });
 
 test('statické soubory: MIME, cache, komprese, ETag/304, zákaz .. a skrytých souborů', async () => {

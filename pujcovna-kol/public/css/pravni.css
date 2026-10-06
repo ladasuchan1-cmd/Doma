@@ -5,7 +5,7 @@
   align-items: start;
 }
 @media (min-width: 960px) {
-  .legal-layout {
+  .legal-layout--toc {
     grid-template-columns: 16rem minmax(0, 1fr);
   }
   .legal-toc {
@@ -135,17 +135,41 @@
   border-top: 1px solid var(--border);
   margin: var(--space-8) 0;
 }
+/* Tabulky: na úzkém displeji se posouvají vodorovně uvnitř .table-wrap (slova se nelámou po písmenech),
+   dlouhé adresy se zalomí jen tam, kde se jinak nevejdou */
 .legal .table-wrap {
   margin: 0 0 var(--space-5);
+  max-width: 100%;
   overflow-x: auto;
+  overscroll-behavior-x: contain;
+  scrollbar-width: thin;
 }
 .legal .table {
   font-size: var(--step--1);
   line-height: 1.45;
+  overflow-wrap: break-word;
+  hyphens: manual;
 }
 .legal .table th,
 .legal .table td {
   vertical-align: top;
+  min-width: 7rem;
+}
+.legal .table th {
+  white-space: normal;
+}
+@media (max-width: 720px) {
+  .legal .table {
+    min-width: 40rem;
+  }
+  .legal .table-wrap {
+    /* nápověda, že tabulka pokračuje vpravo */
+    background:
+      linear-gradient(to right, var(--bg) 30%, transparent) left / 2.5rem 100% no-repeat local,
+      linear-gradient(to left, var(--bg) 30%, transparent) right / 2.5rem 100% no-repeat local,
+      linear-gradient(to right, rgb(0 0 0 / 0.14), transparent) left / 0.75rem 100% no-repeat scroll,
+      linear-gradient(to left, rgb(0 0 0 / 0.14), transparent) right / 0.75rem 100% no-repeat scroll;
+  }
 }
 .legal a {
   color: var(--link);
@@ -172,8 +196,36 @@
   font-size: var(--step--1);
 }
 
-/* Tisk: jen text dokumentu, černě, bez navigace a přepínače; URL odkazů za textem */
+/* Tisk: jen text dokumentu, černě na bílé (i v tmavém tématu), bez navigace a přepínače; URL odkazů za textem */
 @media print {
+  html,
+  body,
+  .section--page-head,
+  .section--legal,
+  .legal-layout,
+  .legal-main,
+  .legal-contact,
+  .legal blockquote,
+  .legal code,
+  .legal pre {
+    background: #fff !important;
+    color: #000 !important;
+    box-shadow: none !important;
+  }
+  .section--page-head::before,
+  .section--page-head::after,
+  .section--page-head .section__title::after {
+    display: none !important;
+  }
+  .section--page-head .section__title,
+  .legal h1,
+  .legal h2,
+  .legal h3,
+  .legal h4,
+  .legal strong,
+  .legal-contact * {
+    color: #000 !important;
+  }
   .site-header,
   .site-footer,
   .design-switch,
@@ -220,5 +272,21 @@
   .legal .table th,
   .legal .table td {
     border-color: #000;
+    min-width: 0;
+  }
+  .legal .table {
+    min-width: 0;
+    font-size: 9.5pt;
+  }
+  .legal .table-wrap {
+    overflow: visible;
+    background: none;
+  }
+  .legal-meta {
+    color: #000;
+  }
+  .legal blockquote {
+    background: none;
+    border-left-color: #000;
   }
 }

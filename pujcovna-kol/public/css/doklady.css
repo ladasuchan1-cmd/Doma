@@ -1,0 +1,281 @@
+/* Doklady (SPEC kap. 9): zjednodušený / běžný daňový doklad, konečný doklad, opravný doklad, smlouva a protokoly.
+   Používá se v layoutu webu (uvnitř .doc-frame) i jako samostatná tisková stránka (/doklady/:number.html, body.doc-print).
+   Barvy jsou pevné (doklad je tiskovina, nezávislá na tématu); @media print skrývá vše kromě dokladu. */
+
+.doc-print {
+  margin: 0;
+  padding: 24px;
+  background: #e9e9e9;
+  font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  color: #1a1a1a;
+}
+.doc-print .doc {
+  max-width: 800px;
+  margin: 0 auto;
+  background: #fff;
+  padding: 40px 44px;
+  box-shadow: 0 2px 16px rgba(0, 0, 0, 0.12);
+}
+
+.doc {
+  /* doklad je tiskovina – uvnitř přepisujeme tokeny tématu na neutrální světlé hodnoty */
+  --text: #1a1a1a;
+  --text-muted: #555555;
+  --border: #d6d6d6;
+  --surface: #f4f4f4;
+  --surface-2: #e9e9e9;
+  --bg: #ffffff;
+  --bg-elevated: #ffffff;
+  --link: #1a1a1a;
+  font-size: 0.95rem;
+  line-height: 1.45;
+  color: #1a1a1a;
+  background: #fff;
+}
+.doc h1,
+.doc h2,
+.doc h3,
+.doc h4,
+.doc p,
+.doc li,
+.doc td,
+.doc th,
+.doc dt,
+.doc dd {
+  color: #1a1a1a;
+}
+.doc p {
+  margin: 0 0 0.5em;
+}
+.doc__head {
+  display: grid;
+  gap: 20px;
+  border-bottom: 2px solid #1a1a1a;
+  padding-bottom: 16px;
+  margin-bottom: 20px;
+}
+.doc__title-block {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+}
+.doc__kind {
+  margin: 0;
+  font-size: 0.8rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: #555;
+}
+.doc__title {
+  margin: 0;
+  font-size: 1.6rem;
+  font-weight: 700;
+}
+.doc__subtitle {
+  margin: 0;
+  color: #555;
+}
+.doc__parties {
+  display: grid;
+  gap: 16px;
+}
+@media (min-width: 640px) {
+  .doc__parties {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+.doc__party {
+  padding: 12px 14px;
+  border: 1px solid #d6d6d6;
+  border-radius: 6px;
+}
+.doc__party p {
+  margin: 0;
+}
+.doc__party-label {
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: #555;
+  margin-bottom: 4px !important;
+}
+.doc__vat-status,
+.doc__contact {
+  color: #555;
+  font-size: 0.85rem;
+  margin-top: 6px !important;
+}
+.doc__meta {
+  margin: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  gap: 6px 24px;
+}
+.doc__meta div {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  border-bottom: 1px dotted #d6d6d6;
+  padding: 2px 0;
+}
+.doc__meta dt {
+  color: #555;
+}
+.doc__meta dd {
+  margin: 0;
+  text-align: right;
+  font-weight: 600;
+}
+.doc__body {
+  display: grid;
+  gap: 18px;
+}
+.doc table.table,
+.doc .doc__items,
+.doc .doc__vat {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.9rem;
+}
+.doc th,
+.doc td {
+  padding: 6px 8px;
+  border-bottom: 1px solid #d6d6d6;
+  text-align: left;
+  vertical-align: top;
+}
+.doc thead th {
+  border-bottom: 2px solid #1a1a1a;
+  font-size: 0.78rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: #555;
+}
+.doc .is-right {
+  text-align: right;
+  white-space: nowrap;
+}
+.doc__item--negative td {
+  color: #7a1f1f;
+}
+.doc__item-note {
+  color: #555;
+}
+.doc__vat-note,
+.doc__novat,
+.doc__note {
+  font-size: 0.82rem;
+  color: #555;
+}
+.doc__total {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 16px;
+  margin: 0;
+  padding: 10px 12px;
+  background: #f4f4f4;
+  border-radius: 6px;
+  font-size: 1.1rem;
+}
+.doc__total strong {
+  font-size: 1.4rem;
+}
+.doc__settlement {
+  margin: 0;
+  display: grid;
+  gap: 4px;
+}
+.doc__settlement div {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 4px 0;
+  border-bottom: 1px dotted #d6d6d6;
+}
+.doc__settlement dd {
+  margin: 0;
+  font-variant-numeric: tabular-nums;
+}
+.doc__settlement-total {
+  font-weight: 700;
+  font-size: 1.1rem;
+  border-bottom: 2px solid #1a1a1a !important;
+}
+.doc__foot {
+  margin-top: 24px;
+  padding-top: 12px;
+  border-top: 1px solid #d6d6d6;
+  font-size: 0.78rem;
+  color: #555;
+}
+.doc__foot p {
+  margin: 0;
+}
+
+/* smlouva a protokoly (výstup markdown rendereru) */
+.doc__legal h1 {
+  font-size: 1.3rem;
+  margin: 1.4em 0 0.5em;
+  page-break-after: avoid;
+}
+.doc__legal h2 {
+  font-size: 1.05rem;
+  margin: 1.2em 0 0.4em;
+  page-break-after: avoid;
+}
+.doc__legal table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 0.6em 0;
+  font-size: 0.85rem;
+}
+.doc__legal th,
+.doc__legal td {
+  border: 1px solid #c8c8c8;
+  padding: 4px 6px;
+}
+.doc__legal ul,
+.doc__legal ol {
+  padding-left: 1.4em;
+}
+.doc__legal hr {
+  border: 0;
+  border-top: 1px solid #c8c8c8;
+  margin: 1.5em 0;
+}
+.doc__legal a {
+  color: inherit;
+}
+
+@media print {
+  .doc-print {
+    padding: 0;
+    background: #fff;
+  }
+  .doc-print .doc {
+    box-shadow: none;
+    padding: 0;
+    max-width: none;
+  }
+  .doc {
+    font-size: 11pt;
+  }
+  .doc__head {
+    break-inside: avoid;
+  }
+  .doc tr {
+    break-inside: avoid;
+  }
+  .doc__legal h1 {
+    break-before: page;
+  }
+  .doc__legal h1:first-child {
+    break-before: auto;
+  }
+  a[href]::after {
+    content: '';
+  }
+}

@@ -8,7 +8,9 @@ const CSP = [
   "script-src 'self'",
   "style-src 'self'",
   "font-src 'self'",
-  "img-src 'self' data: https://*.tile.openstreetmap.fr https://tile.openstreetmap.org https://*.tile.opentopomap.org https://api.mapy.cz",
+  // dlaždice: CyclOSM běží na {s}.tile-cyclosm.openstreetmap.fr (vzor *.tile.openstreetmap.fr ho nepokrývá),
+  // Mapy.cz má REST API na api.mapy.com (nová doména) i api.mapy.cz (dlaždice, logo)
+  "img-src 'self' data: https://*.tile.openstreetmap.fr https://*.tile-cyclosm.openstreetmap.fr https://tile.openstreetmap.org https://*.tile.opentopomap.org https://api.mapy.cz https://api.mapy.com",
   "connect-src 'self'",
   "frame-ancestors 'none'",
   "base-uri 'self'",

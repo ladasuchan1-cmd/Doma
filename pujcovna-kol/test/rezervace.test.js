@@ -227,7 +227,21 @@ test('celý tok 1→5: termín → kola → údaje (odmítnutí bez souhlasů) �
   assert.match(html, /Zrušení rezervace/);
   assert.match(html, /vracíme celý rezervační poplatek 600 Kč/);
   assert.match(html, /Odeslané e-maily/);
+  assert.match(html, /Přidat do kalendáře \(ICS\)/);
+  assert.match(html, /Vezměte s sebou platný doklad totožnosti/);
   assert.ok(!/karel.testovaci@example.com/.test(html), 'e-mail se na stránce nezobrazuje');
+  // doklady: po vystavení (documents.syncReservation – v provozu to dělá job plateb) nese odkaz token správy + tisková verze
+  const documents = require('../src/domain/documents');
+  const issued = documents.syncReservation(srv.db, row.id, { tenant: srv.tenant, settings: require('../src/tenants').getSettings(srv.db, srv.tenant), fieldCrypto: srv.app.fieldCrypto });
+  assert.ok(issued.length >= 1, 'doklad o přijaté platbě vystaven');
+  html = await (await srv.fetch(`/rezervace/${mgmtToken}`)).text().then(nb);
+  const tokRe = mgmtToken.replace(/[-_]/g, '.');
+  assert.match(html, new RegExp(`href="/doklady/ZDD-\\d{4}-\\d{6}\\?t=${tokRe}"`), 'odkaz na doklad s tokenem správy');
+  assert.match(html, new RegExp(`href="/doklady/ZDD-\\d{4}-\\d{6}\\.html\\?t=${tokRe}"`), 'tisková verze s tokenem');
+  assert.ok(!/href="\/doklady\/[A-Z]+-\d{4}-\d{6}"/.test(html), 'žádný odkaz na doklad bez tokenu');
+  const docNumber = /href="\/doklady\/(ZDD-\d{4}-\d{6})\?t=/.exec(html)[1];
+  assert.equal((await srv.fetch(`/doklady/${docNumber}?t=${mgmtToken}`)).status, 200, 'odkaz ze správy funguje');
+  assert.equal((await srv.fetch(`/doklady/${docNumber}`)).status, 404, 'bez tokenu 404');
   // ICS
   const ics = await srv.fetch(`/rezervace/${mgmtToken}/kalendar.ics`);
   assert.equal(ics.status, 200);
@@ -262,6 +276,14 @@ test('celý tok 1→5: termín → kola → údaje (odmítnutí bez souhlasů) �
   assert.match(html, /badge badge--danger">Zrušená zákazníkem/);
   assert.match(html, /Vratka<\/td>/);
   assert.ok(!/Zrušení rezervace<\/h2>/.test(html), 'formulář storna už není');
+  // zrušená rezervace: boční panel jen stav a vratka – bez ICS, doplatku a pokynů k vyzvednutí (QA nález)
+  assert.ok(!/Přidat do kalendáře \(ICS\)/.test(html), 'ICS se u zrušené nenabízí');
+  assert.ok(!/Zbývá doplatit/.test(html), 'doplatek se u zrušené nezobrazuje');
+  assert.ok(!/Vezměte s sebou platný doklad/.test(html), 'pokyn k dokladu se u zrušené nezobrazuje');
+  assert.ok(!/Vratná kauce při převzetí/.test(html));
+  assert.match(html, /Stav rezervace/);
+  assert.match(html, /summary__row--total"><dt>Vráceno<\/dt><dd>600 Kč/);
+  assert.match(html, /Poplatek 600 Kč jsme vrátili původní platební metodou/);
   // opakované storno → 409
   r = await post(`/rezervace/${mgmtToken}/storno`, { _csrf: mgmtCsrf, potvrdit: '1' });
   assert.equal(r.status, 409);
@@ -339,6 +361,13 @@ test('krok 4 převodem (bez modulu plateb): rezervace awaiting_fee, pokyny s IBA
   assert.match(html, /QR kód se připravuje|QR Platba/);
   const row = srv.db.prepare('SELECT * FROM reservations WHERE customer_id IN (SELECT id FROM customers WHERE email_hmac = ?)').get(srv.app.fieldCrypto.hmacEmail('alena.prevodova@example.com'));
   assert.equal(row.status, 'awaiting_fee');
+  // demo: odkaz na simulaci příchozí platby (feature platby, /simulace-banky) s VS a částkou v Kč
+  assert.match(html, new RegExp(`href="/simulace-banky\\?vs=${row.number}&amp;castka=300"`), 'odkaz „Simulovat příchozí platbu (demo)“');
+  assert.match(html, /Simulovat příchozí platbu \(demo\)/);
+  const tokA = reservations.tokenFor(row, srv.app.secret);
+  const manageHtml = await (await srv.fetch(`/rezervace/${tokA}`)).text().then(nb);
+  assert.match(manageHtml, new RegExp(`href="/simulace-banky\\?vs=${row.number}&amp;castka=300"`), 'odkaz i ve správě u čekajícího převodu');
+  assert.equal((await srv.fetch(`/simulace-banky?vs=${row.number}&castka=300`)).status, 200, 'cílová stránka existuje');
   assert.ok(row.expires_at > new Date().toISOString());
   assert.ok(srv.db.prepare('SELECT marketing_consent_at FROM customers WHERE id = ?').get(row.customer_id).marketing_consent_at);
   // opakovaná volba metody použije tutéž rezervaci (žádný duplikát)
@@ -394,6 +423,41 @@ test('/api/v1/dostupnost: mapa typ → velikost → počet, blockedDates, filtr 
   assert.equal((await srv.fetch('/api/v1/dostupnost?od=x&do=y')).status, 400);
   assert.equal((await srv.fetch(`/api/v1/dostupnost?od=${day(61)}&do=${day(60)}`)).status, 400);
   assert.equal((await srv.fetch(`/api/v1/dostupnost?od=${day(60)}&do=${day(61)}&typ=neni`)).status, 404);
+});
+
+test('otevírací doba z adminu (settings.openingHours): zavřené pondělí blokuje kalendář, API i validaci termínu', async () => {
+  srv.jar.clear();
+  const { setSetting } = require('../src/tenants');
+  // první pondělí za ≥ 7 dní
+  let monday = day(7);
+  while (availability.utcToLocal(availability.localToUtc(monday, '12:00')).dayKey !== 'mon') monday = availability.addDays(monday, 1);
+  const tuesday = availability.addDays(monday, 1);
+  const before = await (await srv.fetch(`/api/v1/dostupnost?od=${monday}&do=${tuesday}`)).json();
+  assert.ok(!before.blockedDates.includes(monday), 'výchozí: pondělí otevřeno');
+  setSetting(srv.db, 'openingHours', { ...srv.tenant.openingHours, mon: null });
+  try {
+    const api = await (await srv.fetch(`/api/v1/dostupnost?od=${tuesday}&do=${availability.addDays(tuesday, 1)}`)).json();
+    assert.ok(api.blockedDates.includes(monday), 'API: pondělí v blockedDates');
+    const page = await (await srv.fetch('/rezervace')).text().then(nb);
+    assert.match(page, new RegExp(`data-blocked="\\[[^"]*${monday}`), 'kalendář blokuje pondělí');
+    assert.match(page, /<dt>Po<\/dt><dd>zavřeno<\/dd>/, 'boční karta ukazuje zavřené pondělí');
+    const token = await srv.csrf('/rezervace');
+    const r = await stepTerm(token, monday, tuesday);
+    assert.equal(r.status, 422);
+    assert.match(await r.text().then(nb), /zavřeno \(Zavírací den\)/);
+    assert.equal((await stepTerm(token, tuesday, availability.addDays(tuesday, 1))).status, 303, 'úterý projde');
+  } finally {
+    srv.db.prepare("DELETE FROM settings WHERE key = 'openingHours'").run();
+  }
+  const after = await (await srv.fetch(`/api/v1/dostupnost?od=${monday}&do=${tuesday}`)).json();
+  assert.ok(!after.blockedDates.includes(monday), 'po obnovení nastavení pondělí opět otevřeno');
+});
+
+test('kalendářový JS hledá navigaci jen uvnitř mřížky (closest nesmí dojít k <html data-nav>)', () => {
+  const src = require('node:fs').readFileSync(require('node:path').join(__dirname, '..', 'public', 'js', 'rezervace.js'), 'utf8');
+  assert.ok(!src.includes("closest('[data-nav]')"), "closest('[data-nav]') by našel <html data-nav=\"transparent\"> z layoutu");
+  assert.match(src, /closest\('\.calendar__nav\[data-nav\]'\)/);
+  assert.match(src, /grid\.contains\(nav\)/);
 });
 
 test('job údržby je zaregistrován a běží nad všemi tenanty', async () => {

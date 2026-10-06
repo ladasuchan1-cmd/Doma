@@ -1,6 +1,7 @@
 'use strict';
 // Presety tří designů (SPEC kap. 7). Téma = soubor public/themes/<nazev>.css + layoutové varianty,
 // které layout.js zapíše do atributů <html data-theme data-hero data-nav data-cards>.
+// heroAlt = alternativní text hero fotky tématu public/img/demo/<tema>/hero.jpg (použije feature home).
 // Vstup: žádný. Výstup: THEMES (slovník), THEME_NAMES, isTheme(), getTheme().
 
 const THEMES = Object.freeze({
@@ -11,6 +12,7 @@ const THEMES = Object.freeze({
     cards: 'photo-top',
     fonts: Object.freeze({ display: 'Fraunces', body: 'Inter', accent: 'Caveat' }),
     css: '/themes/outdoor.css',
+    heroAlt: 'Rybník s lesem na Třeboňsku',
     hint: 'zemitý, fotografický, osobní',
     description:
       'Pro půjčovny u řek, rybníků a v chráněných krajinách. Krémové pozadí, lesní zelená a terakota, měkký serif Fraunces ' +
@@ -23,6 +25,7 @@ const THEMES = Object.freeze({
     cards: 'overlay',
     fonts: Object.freeze({ display: 'Barlow Condensed', body: 'Space Grotesk' }),
     css: '/themes/sport.css',
+    heroAlt: 'Jezdec na horském kole ve skoku v lese',
     hint: 'tmavý, kontrastní, dynamický',
     description:
       'Pro MTB, trailparky a závodní klientelu. Tmavé pozadí, limetková zelená s černým textem, červené CTA. Kondenzované ' +
@@ -35,6 +38,7 @@ const THEMES = Object.freeze({
     cards: 'soft',
     fonts: Object.freeze({ display: 'Bricolage Grotesque', body: 'Nunito' }),
     css: '/themes/family.css',
+    heroAlt: 'Rodina na kolech na stezce parkem',
     hint: 'světlý, vzdušný, přátelský',
     description:
       'Pro města, lázně a rodiny s dětmi. Bílá a mint, petrolejová primární barva, korálové CTA. Zaoblený Nunito, hravé ' +

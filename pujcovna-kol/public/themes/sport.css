@@ -7,7 +7,7 @@
    data-nav=bar (plný tmavý pruh, na mobilu sticky rezervační lišta dole), data-cards=overlay (text přes fotku).
    Poloměry 0–2 px, přechody 150 ms, hover posun 4 px, prefers-reduced-motion vypíná ticker i posuny.
    Pravidla: přepisuje JEN proměnné a layoutové varianty přes [data-theme="sport"] …; HTML se nemění.
-   Fotky: public/img/demo/sport/ (CC BY, viz ATTRIBUTION.md), hero jen přes --hero-image.
+   Fotky: public/img/demo/sport/ (CC0 / CC BY z Wikimedia Commons, 1600 px, viz ATTRIBUTION.md), hero jen přes --hero-image.
    ===================================================================================================== */
 
 /* ---------- 1. Tokeny ---------- */

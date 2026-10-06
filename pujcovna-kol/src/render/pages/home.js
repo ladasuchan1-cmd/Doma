@@ -1,5 +1,7 @@
 'use strict';
-// Stránka: domovská (feature home). Vstup: { tenant, types, settings, heroImage, theme }. Výstup: Html tělo.
+// Stránky feature home: domovská – vstup { tenant, texts, types, settings, heroImage, heroAlt, theme } (texts = efektivní
+// texty z layout.siteTexts; bez nich tenant.texts); /fotografie – vstup { tenant, groups } z home.loadPhotoCredits
+// (skupiny podle složek public/img/demo/* s položkami { file, title, author, license, source }). Výstup: Html tělo.
 
 const { html } = require('../html');
 const c = require('../components');
@@ -17,8 +19,8 @@ const STEPS = [
   { label: 'Vyzvedněte s dokladem', description: 'Při převzetí předložíte platný doklad totožnosti – zapíšeme jeho typ a číslo.' },
 ];
 
-function home({ tenant, types, settings, heroImage }) {
-  const texts = tenant.texts || {};
+function home({ tenant, texts: effectiveTexts, types, settings, heroImage, heroAlt }) {
+  const texts = effectiveTexts || tenant.texts || {};
   const fee = settings && settings.feeMinor ? settings.feeMinor.default : null;
   const freeHours = settings && settings.cancellation ? settings.cancellation.freeHoursBefore : null;
   return html`
@@ -31,7 +33,7 @@ ${c.hero({
   secondaryCta: 'Prohlédnout kola',
   secondaryHref: '/kola',
   image: heroImage,
-  imageAlt: heroImage ? 'Cyklisté na hrázi rybníka na Třeboňsku' : '',
+  imageAlt: heroImage ? heroAlt || 'Krajina Třeboňska' : '',
 })}
 
 ${c.section({
@@ -120,4 +122,43 @@ ${c.section({
 `;
 }
 
-module.exports = { home, USP, STEPS };
+/** Jedna položka attribution: náhled, popis, autor, licence (odkaz), zdroj (odkaz). */
+function creditRow(group, it) {
+  const src = `${group.src}/${it.file}`;
+  const lic = it.license;
+  return [
+    html`<a class="credits__thumb-link" href="${src}" rel="noopener"><img class="credits__thumb" src="${src}" alt="" loading="lazy" width="120" height="80"></a>`,
+    html`<span class="credits__title">${it.title}</span>${it.original && it.original !== it.title ? html`<br><span class="credits__original">${it.original}</span>` : ''}`,
+    it.author || '–',
+    lic ? html`${lic.url ? html`<a href="${lic.url}" rel="license noopener">${lic.name}</a>` : lic.name}${lic.note ? html`<br><span class="credits__note">${lic.note}</span>` : ''}` : '–',
+    it.source ? html`<a href="${it.source}" rel="noopener">${/wikimedia\.org/.test(it.source) ? 'Wikimedia Commons' : /flickr\.com/.test(it.source) ? 'Flickr' : 'zdroj'}</a>` : '–',
+  ];
+}
+
+/** Stránka /fotografie – autoři a licence fotografií (CC BY attribution). */
+function fotografie({ tenant, groups }) {
+  const total = groups.reduce((n, g) => n + g.items.length, 0);
+  return html`
+${c.section({
+  variant: 'page-head',
+  title: 'Fotografie: autoři a licence',
+  titleTag: 'h1',
+  lead: `Fotografie na webu ${tenant.name} pocházejí z Wikimedia Commons a jsou zveřejněné pod svobodnými licencemi Creative Commons (CC0, CC BY). Licence CC BY vyžaduje uvedení autora a licence – zde je přehled všech ${total} použitých snímků. Fotografie jsou ilustrační; úpravy se omezují na zmenšení, ořez a barevné ladění přes CSS daného designu.`,
+})}
+${c.section({
+  variant: 'credits',
+  children: html`
+    ${groups.length
+      ? groups.map(
+          (g) => html`<div class="credits__group" id="${g.dir}">
+    ${c.table({ caption: g.label, head: ['Náhled', 'Popis', 'Autor', 'Licence', 'Zdroj'], rows: g.items.map((it) => creditRow(g, it)) })}
+  </div>`
+        )
+      : c.notice('Seznam fotografií se nepodařilo načíst (chybí public/img/demo/*/ATTRIBUTION.md).', 'warning')}
+    <p class="credits__footnote">Obrázky zajímavostí na stránkách <a href="/okoli">Tipy na výlety</a> a v <a href="/mapa">mapě</a> uvádějí autora a licenci přímo u každého snímku. Mapové podklady © <a href="https://www.openstreetmap.org/copyright" rel="noopener">přispěvatelé OpenStreetMap</a>, <a href="https://www.cyclosm.org/" rel="noopener">CyclOSM</a>. Logo a ilustrace jsou vlastním dílem provozovatele.</p>
+  `,
+})}
+`;
+}
+
+module.exports = { home, fotografie, USP, STEPS };

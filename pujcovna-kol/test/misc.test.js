@@ -131,13 +131,19 @@ test('jobs: registrace, spuštění při startu, chyba nezastaví, runNow', asyn
   });
   assert.throws(() => jobs.register('ok', 60_000, () => {}), /už zaregistrovaný/);
   assert.throws(() => jobs.register('x', 10, () => {}), /everyMs/);
-  jobs.start({ marker: 42 });
-  await new Promise((r) => setTimeout(r, 20));
+  // start() vrací Promise po dokončení prvních běhů; událost 'done' chodí za každý běh (žádné čekání „na čas“)
+  const done = [];
+  jobs.events.on('done', (e) => done.push(e));
+  await jobs.start({ marker: 42 });
   assert.equal(runs, 1);
   assert.equal(errors.length, 1);
   assert.equal(errors[0].job, 'fail');
+  assert.deepEqual(done.map((d) => d.name).sort(), ['fail', 'ok']);
+  assert.equal(done.find((d) => d.name === 'fail').error, 'rozbité');
+  await jobs.whenIdle();
   await jobs.runNow('ok');
   assert.equal(runs, 2);
+  assert.equal(done.length, 3);
   const list = jobs.list();
   assert.equal(list.find((j) => j.name === 'fail').lastError, 'rozbité');
   jobs.stop();
@@ -161,7 +167,10 @@ test('demo-data: seed vytvoří admina idempotentně, --reset vyčistí tabulky'
   assert.equal(verifyPasswordSync('kolo-demo-2026', u.password_hash), true);
   db.prepare("INSERT INTO seasons(name, date_from, date_to) VALUES ('X', '2026-01-01', '2026-02-01')").run();
   await demoData.seed({ db, tenant, config, fieldCrypto, reset: true, log: silent });
-  assert.equal(db.prepare('SELECT COUNT(*) AS n FROM seasons').get().n, 0);
+  // reset smazal ručně vloženou sezónu; demo data (SPEC kap. 14) sezónu „Hlavní sezóna“ a 6 typů kol založí znovu
+  assert.equal(db.prepare("SELECT COUNT(*) AS n FROM seasons WHERE name = 'X'").get().n, 0);
+  assert.ok(db.prepare("SELECT COUNT(*) AS n FROM seasons WHERE name = 'Hlavní sezóna'").get().n >= 1);
+  assert.equal(db.prepare('SELECT COUNT(*) AS n FROM bike_types').get().n, 6);
   assert.equal(db.prepare('SELECT COUNT(*) AS n FROM users').get().n, 1);
   assert.ok(db.prepare('SELECT COUNT(*) AS n FROM settings').get().n >= 15, 'settings zůstávají');
   const src = fs.readFileSync(path.join(ROOT, 'tools', 'demo-data.js'), 'utf8');
@@ -230,14 +239,20 @@ test('feature loader: načte moduly, přeskočí demoOnly mimo demo, ignoruje ch
   const { loadFeatures } = require('../server');
   const { createRouter } = require('../src/http/router');
   const silent = { info() {}, warn() {}, error() {}, debug() {} };
+  // ověřuje se podmnožina – ostatní moduly přidávají další features (kola, rezervace, pravni, mapa, platby, admin…)
   const r1 = loadFeatures({ config: { demo: true }, log: silent, router: createRouter() });
-  assert.deepEqual(r1.loaded, ['design', 'home', 'kontakt']);
-  assert.deepEqual(
-    r1.nav.map((n) => n.href),
-    ['/kontakt', '/design']
-  );
+  for (const name of ['design', 'home', 'kontakt']) assert.ok(r1.loaded.includes(name), `demo: feature ${name}`);
+  assert.deepEqual([...r1.loaded].sort(), r1.loaded, 'seřazeno podle názvu souboru');
+  assert.equal(new Set(r1.loaded).size, r1.loaded.length, 'bez duplicit');
+  const hrefs = r1.nav.map((n) => n.href);
+  for (const href of ['/kontakt', '/design']) assert.ok(hrefs.includes(href), `nav obsahuje ${href}`);
+  assert.ok(hrefs.indexOf('/kontakt') < hrefs.indexOf('/design'), 'Kontakt (order 90) před Design (order 95)');
+  for (let i = 1; i < r1.nav.length; i++) assert.ok((r1.nav[i - 1].order ?? 50) <= (r1.nav[i].order ?? 50), 'nav seřazeno podle order');
   const r2 = loadFeatures({ config: { demo: false }, log: silent, router: createRouter() });
-  assert.deepEqual(r2.loaded, ['home', 'kontakt']);
+  assert.ok(!r2.loaded.includes('design'), 'design (demoOnly) mimo demo chybí');
+  assert.ok(!r2.nav.some((n) => n.href === '/design'));
+  for (const name of ['home', 'kontakt']) assert.ok(r2.loaded.includes(name), `prod: feature ${name}`);
+  assert.deepEqual(r1.loaded.filter((n) => n !== 'design'), r2.loaded, 'mimo demo se liší jen o demoOnly moduly');
   const r3 = loadFeatures({ config: { demo: true }, log: silent, router: createRouter(), dir: '/neexistuje/vubec' });
   assert.deepEqual(r3.loaded, []);
 });

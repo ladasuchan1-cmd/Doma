@@ -3,7 +3,12 @@
 // (title „Stránka · Název půjčovny“, description, viewport, styly base + fonty + téma + feature, preload fontů, favicon,
 // canonical, JSON-LD), <body>: skip-link, <header class="site-header"> (logo, <nav class="site-nav"> z nav všech
 // features, CTA „Rezervovat“), <main id="obsah">, <footer class="site-footer"> (kontakt, otevírací doba, odkazy,
-// attribution map, verze), v demo režimu <aside class="design-switch">.
+// attribution map, odkaz „Fotografie: autoři a licence“ na /fotografie, verze), v demo režimu <aside class="design-switch">.
+// Texty (description, „o půjčovně“ v patičce) = tenant.texts přepsané settings.texts z adminu (siteTexts).
+// Logo: tenants/<slug>/logo.svg se vkládá jako inline SVG (soubor je náš, načte se jednou a cachuje; root <svg> dostane
+// class="site-logo__img" aria-hidden="true", odkaz nese aria-label), aby ho téma mohlo obarvit přes CSS `color`
+// (fill="currentColor" v SVG; base.css nastavuje výchozí černou jako u dřívějšího <img>, filtry témat tedy dál fungují).
+// Není-li soubor použitelný, vloží se <img src="/tenant/logo.svg"> jako dřív.
 // Vstup: ctx + { title, description, body, feature, jsonLd, canonicalPath, noindex, bodyClass }. Výstup: string HTML.
 
 const fs = require('node:fs');
@@ -11,7 +16,7 @@ const path = require('node:path');
 const { html, raw, attr, joinHtml } = require('./html');
 const { contactCard } = require('./components');
 const { THEMES, getTheme } = require('../themes');
-const { publicBaseUrl } = require('../tenants');
+const { publicBaseUrl, getTexts } = require('../tenants');
 const { assetUrl } = require('../http/static');
 
 const FONT_SLUGS = {
@@ -52,6 +57,54 @@ function fontPreloads(publicDir, themeName) {
   return out;
 }
 
+const logoCache = new Map();
+/**
+ * Obsah tenants/<slug>/logo.svg připravený k inline vložení, nebo null. Odstraní XML prolog a komentáře, z kořenového
+ * <svg> vyhodí role, aria-*, width, height, class a id a doplní class, aria-hidden, focusable a rozměry 160×40 (poměr 4:1
+ * podle viewBox 320×80; skutečnou výšku určuje CSS). SVG se <script> nebo bez uzavíracího tagu se nepoužije.
+ */
+function tenantLogoSvg(tenant) {
+  const file = path.join(tenant.dir || '', 'logo.svg');
+  if (logoCache.has(file)) return logoCache.get(file);
+  let out = null;
+  try {
+    const svg = fs
+      .readFileSync(file, 'utf8')
+      .replace(/<\?xml[\s\S]*?\?>/g, '')
+      .replace(/<!--[\s\S]*?-->/g, '')
+      .trim();
+    const open = /^<svg\b([^>]*)>/i.exec(svg);
+    if (open && /<\/svg>\s*$/i.test(svg) && !/<script\b|\bon[a-z]+\s*=|javascript:/i.test(svg)) {
+      const attrs = open[1].replace(/\s(role|aria-[a-z]+|width|height|class|id|focusable)\s*=\s*"[^"]*"/gi, '');
+      out = `<svg class="site-logo__img" aria-hidden="true" focusable="false" width="160" height="40"${attrs}>${svg.slice(open[0].length)}`;
+    }
+  } catch {
+    /* logo.svg chybí → <img> */
+  }
+  logoCache.set(file, out);
+  return out;
+}
+
+/** Logo v hlavičce i patičce: inline SVG, nebo <img>. */
+function logoMarkup(tenant, logoUrl) {
+  const svg = tenantLogoSvg(tenant);
+  return svg ? raw(svg) : html`<img class="site-logo__img" src="${logoUrl}" alt="" width="160" height="40">`;
+}
+
+/**
+ * Efektivní texty webu pro ctx: tenant.texts přepsané settings.texts (admin → Obsah). ctx.settings čte DB líně;
+ * selže-li (např. ctx bez DB v testech komponent), platí jen výchozí texty z tenant.json.
+ */
+function siteTexts(ctx) {
+  let settings = null;
+  try {
+    settings = ctx.settings || null;
+  } catch {
+    settings = null;
+  }
+  return getTexts(ctx.tenant, settings);
+}
+
 function navItems(ctx) {
   const items = (ctx.app && ctx.app.nav) || [];
   const current = ctx.url.pathname;
@@ -82,10 +135,12 @@ function layout(ctx, page) {
   const theme = getTheme(themeName);
   const feature = page.feature && ctx.app && ctx.app.features ? ctx.app.features[page.feature] : null;
   const asset = (p) => assetUrl(p, { publicDir: config.publicDir, version: config.version });
+  const texts = siteTexts(ctx);
   const fullTitle = page.title ? `${page.title} · ${tenant.name}` : `${tenant.name} – ${tenant.brand.claim || 'půjčovna kol'}`;
-  const description = page.description || tenant.texts.heroText || tenant.texts.about || tenant.name;
+  const description = page.description || texts.heroText || texts.about || tenant.name;
   const canonical = publicBaseUrl(tenant, { host: ctx.req.headers.host, secure: ctx.secure }) + (page.canonicalPath || ctx.url.pathname);
   const logo = (tenant.brand && tenant.brand.logo) || '/tenant/logo.svg';
+  const logoHtml = logoMarkup(tenant, logo);
   const nav = navItems(ctx);
   const cta = nav.find((n) => n.cta) || { label: 'Rezervovat', href: '/rezervace' };
   const year = new Date().getFullYear();
@@ -114,7 +169,7 @@ ${page.jsonLd ? raw(`<script type="application/ld+json">${JSON.stringify(page.js
 <a class="skip-link" href="#obsah">Přejít k obsahu</a>
 <header class="site-header">
   <div class="container site-header__inner">
-    <a class="site-logo" href="/" aria-label="${tenant.name} – domů"><img class="site-logo__img" src="${logo}" alt="" width="160" height="40"><span class="site-logo__text">${tenant.name}</span></a>
+    <a class="site-logo" href="/" aria-label="${tenant.name} – domů">${logoHtml}<span class="site-logo__text">${tenant.name}</span></a>
     <input class="nav-toggle" type="checkbox" id="nav-toggle" aria-hidden="true">
     <label class="nav-toggle__label" for="nav-toggle"><span class="nav-toggle__bar"></span><span class="visually-hidden">Menu</span></label>
     <nav class="site-nav" aria-label="Hlavní navigace">
@@ -131,8 +186,8 @@ ${page.body}
 <footer class="site-footer">
   <div class="container site-footer__grid">
     <div class="site-footer__col site-footer__about">
-      <a class="site-logo site-logo--footer" href="/"><img class="site-logo__img" src="${logo}" alt="" width="160" height="40"><span class="site-logo__text">${tenant.name}</span></a>
-      ${tenant.texts.about ? html`<p class="site-footer__about-text">${tenant.texts.about}</p>` : ''}
+      <a class="site-logo site-logo--footer" href="/" aria-label="${tenant.name} – domů">${logoHtml}<span class="site-logo__text">${tenant.name}</span></a>
+      ${texts.about ? html`<p class="site-footer__about-text">${texts.about}</p>` : ''}
     </div>
     <div class="site-footer__col">${contactCard(tenant.business, tenant.openingHours, { title: 'Kontakt a otevírací doba' })}</div>
     <div class="site-footer__col">
@@ -141,7 +196,7 @@ ${page.body}
     </div>
   </div>
   <div class="container site-footer__bottom">
-    <p class="site-footer__legal">© ${year} ${tenant.business.legalName || tenant.name}. Mapové podklady © <a href="https://www.openstreetmap.org/copyright" rel="noopener">přispěvatelé OpenStreetMap</a>, <a href="https://www.cyclosm.org/" rel="noopener">CyclOSM</a>.${config.demo ? html` <span class="site-footer__demo">Demo verze – fiktivní půjčovna, žádné peníze se nepřevádějí.</span>` : ''}</p>
+    <p class="site-footer__legal">© ${year} ${tenant.business.legalName || tenant.name}. Mapové podklady © <a href="https://www.openstreetmap.org/copyright" rel="noopener">přispěvatelé OpenStreetMap</a>, <a href="https://www.cyclosm.org/" rel="noopener">CyclOSM</a>. <a class="site-footer__credits" href="${PHOTO_CREDITS_PATH}">Fotografie: autoři a licence</a>.${config.demo ? html` <span class="site-footer__demo">Demo verze – fiktivní půjčovna, žádné peníze se nepřevádějí.</span>` : ''}</p>
     <p class="site-footer__version">Verze ${config.version}</p>
   </div>
 </footer>
@@ -152,6 +207,8 @@ ${config.demo ? designSwitch(ctx) : ''}
 }
 
 const THEME_COLORS = { outdoor: '#2F5D3A', sport: '#0E0F12', family: '#0F766E' };
+/** Stránka s autory a licencemi fotografií (CC BY vyžaduje attribution na dostupném místě) – servíruje feature home. */
+const PHOTO_CREDITS_PATH = '/fotografie';
 
 /** Veřejný pomocník: JSON-LD LocalBusiness z tenant.json (pro domovskou stránku). */
 function localBusinessJsonLd(tenant, baseUrl) {
@@ -176,4 +233,4 @@ function localBusinessJsonLd(tenant, baseUrl) {
   return JSON.parse(JSON.stringify(out));
 }
 
-module.exports = { layout, localBusinessJsonLd, FOOTER_LINKS, fontPreloads, FONT_SLUGS, joinHtml };
+module.exports = { layout, localBusinessJsonLd, siteTexts, FOOTER_LINKS, PHOTO_CREDITS_PATH, fontPreloads, FONT_SLUGS, tenantLogoSvg, logoMarkup, joinHtml };

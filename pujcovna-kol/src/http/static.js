@@ -126,6 +126,9 @@ async function serveStatic(req, res, { publicDir, pathname }) {
     }
   }
   if (!stat || !stat.isFile()) {
+    // Prefix /admin/ sdílí statika (public/admin/*.js) se stránkami administrace (/admin/rezervace, …):
+    // neexistující soubor pod /admin/ proto propadá do routeru (admin 6. 10., viz docs/TODO-INTEGRACE.md).
+    if (pathname.startsWith('/admin/')) return false;
     res.writeHead(404, { 'Content-Type': 'text/plain; charset=utf-8', 'Cache-Control': 'no-cache' });
     res.end(req.method === 'HEAD' ? undefined : 'Soubor nenalezen.');
     return true;

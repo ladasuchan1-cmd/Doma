@@ -276,6 +276,10 @@ address {
 .site-logo__img {
   height: 40px;
   width: auto;
+  /* inline SVG s fill="currentColor": výchozí černá jako dřívější <img> (filtry témat fungují beze změny);
+     téma může obarvit přes `color` (nebo --logo-color) a `filter: none` */
+  color: var(--logo-color, #000);
+  flex-shrink: 0;
 }
 .site-logo__text {
   display: none;

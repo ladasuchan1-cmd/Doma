@@ -337,7 +337,7 @@ test('/okoli: 20 karet poiCard seřazených podle vzdálenosti s attribution u o
   assert.match(html, /<h1 class="section__title">Tipy na výlety<\/h1>/);
   assert.equal((html.match(/<article class="card card--poi">/g) || []).length, 20);
   assert.equal((html.match(/<p class="card__attribution">Foto: <a href="https:\/\/commons\.wikimedia\.org\//g) || []).length, 20, 'attribution u každého obrázku');
-  assert.equal((html.match(/<img src="\/okoli\/img\/Q\d+\.jpg" alt="[^"]+" loading="lazy"/g) || []).length, 20);
+  assert.equal((html.match(/<img src="\/okoli\/img\/Q\d+\.jpg\?v=[0-9a-z]+" alt="[^"]+" loading="lazy"/g) || []).length, 20);
   assert.match(html, /creativecommons\.org\/licenses\/by-sa\//);
   assert.match(html, /od půjčovny<\/p>/);
   assert.match(html, /href="https:\/\/cs\.wikipedia\.org\/wiki\/[^"]+" rel="noopener" target="_blank">Wikipedie<\/a>/);
@@ -442,13 +442,14 @@ test('GPX ke stažení: Content-Type application/gpx+xml, název souboru, validn
   assert.equal((await srv.fetch(route.gpxHref, { method: 'POST', body: {} })).status, 405);
 });
 
-test('/okoli/img: obrázek zajímavosti s cache a ETag/304, jen Q<id>.jpg, traversal → 404', async () => {
+test('/okoli/img: obrázek zajímavosti s cache a ETag/304, verzované URL immutable, jen Q<id>.jpg, traversal → 404', async () => {
   const api = await (await srv.fetch('/api/v1/okoli.json')).json();
   const src = api.pois[0].image.src;
+  assert.match(src, /^\/okoli\/img\/Q\d+\.jpg\?v=[0-9a-z]+$/, 'odkaz nese verzi souboru (?v=mtime)');
   const res = await srv.fetch(src);
   assert.equal(res.status, 200);
   assert.equal(res.headers.get('content-type'), 'image/jpeg');
-  assert.equal(res.headers.get('cache-control'), 'public, max-age=86400');
+  assert.equal(res.headers.get('cache-control'), 'public, max-age=31536000, immutable');
   const etag = res.headers.get('etag');
   assert.ok(etag);
   const buf = await res.arrayBuffer();
@@ -458,8 +459,49 @@ test('/okoli/img: obrázek zajímavosti s cache a ETag/304, jen Q<id>.jpg, trave
   assert.equal(again.status, 304);
   const head = await srv.fetch(src, { method: 'HEAD' });
   assert.equal(head.status, 200);
+  // bez verze nebo s cizí verzí jen 1 den (soubor se mohl změnit)
+  const plain = src.split('?')[0];
+  assert.equal((await srv.fetch(plain)).headers.get('cache-control'), 'public, max-age=86400');
+  assert.equal((await srv.fetch(`${plain}?v=stara`)).headers.get('cache-control'), 'public, max-age=86400');
+  // stránky /okoli i /mapa odkazují na verzované URL
+  const page = await (await srv.fetch('/okoli')).text();
+  assert.ok(page.includes(`src="${src}"`), 'karta na /okoli používá verzované URL');
   for (const bad of ['/okoli/img/Q1.jpg', '/okoli/img/..%2Ftenant.json', '/okoli/img/../tenant.json', '/okoli/img/ATTRIBUTION.md', '/okoli/img/Q1749860.png', '/okoli/img/x.jpg']) {
     assert.equal((await srv.fetch(bad)).status, 404, bad);
+  }
+});
+
+test('/okoli/img: obrázky mají vlastní kbelík rate limitu – 20 obrázků na stránku nespotřebuje tokeny „public“ (QA nález 429)', async () => {
+  const api = await (await srv.fetch('/api/v1/okoli.json')).json();
+  const srcs = api.pois.map((p) => p.image.src);
+  assert.equal(srcs.length, 20);
+  assert.equal(mapa.routes.find((r) => r[1] === '/okoli/img/:file')[3].rateLimit, mapa.IMAGE_RATE_KEY);
+  assert.notEqual(mapa.IMAGE_RATE_KEY, 'public');
+  const ips = ['127.0.0.1', '::ffff:127.0.0.1', '::1'];
+  const rl = srv.app.rateLimiter;
+  for (const ip of ips) {
+    rl.reset(ip, 'public');
+    rl.reset(ip, mapa.IMAGE_RATE_KEY);
+  }
+  // 15 zobrazení /okoli + všech 20 obrázků (QA reprodukce) → žádné 429
+  for (let i = 0; i < 15; i++) {
+    assert.equal((await srv.fetch('/okoli')).status, 200, `/okoli #${i + 1}`);
+    for (const s of srcs) assert.equal((await srv.fetch(s)).status, 200, s);
+  }
+  // kbelík 'public' ztratil jen 15 tokenů (stránky), obrázky z něj nic nevzaly
+  const publicLeft = Math.max(...ips.map((ip) => rl.consume(ip, 'public').remaining));
+  assert.ok(publicLeft >= 300 - 15 - 2 && publicLeft < 300, `public remaining = ${publicLeft}`);
+  const imgLeft = Math.min(...ips.map((ip) => rl.consume(ip, mapa.IMAGE_RATE_KEY).remaining));
+  assert.ok(imgLeft <= 300 - 300 + 1, `obrázkový kbelík je po 300 požadavcích prázdný (remaining = ${imgLeft})`);
+  // i s vyčerpaným kbelíkem obrázků zůstává web průchodný: stránky 200, obrázek 429 s Retry-After
+  for (const ip of ips) for (let i = 0; i < 300; i++) rl.consume(ip, mapa.IMAGE_RATE_KEY);
+  const blocked = await srv.fetch(srcs[0]);
+  assert.equal(blocked.status, 429);
+  assert.ok(blocked.headers.get('retry-after'));
+  for (const p of ['/okoli', '/mapa', '/podminky', '/rezervace']) assert.equal((await srv.fetch(p)).status, 200, p);
+  for (const ip of ips) {
+    rl.reset(ip, 'public');
+    rl.reset(ip, mapa.IMAGE_RATE_KEY);
   }
 });
 

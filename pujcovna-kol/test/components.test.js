@@ -3,6 +3,7 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const c = require('../src/render/components');
+const { html } = require('../src/render/html');
 
 test('hero, section, grid, button mají předepsané třídy', () => {
   const h = c.hero({ title: 'T<', text: 'x', cta: 'Rezervovat', ctaHref: '/rezervace', image: '/img/a.jpg', imageAlt: 'alt' }).toString();
@@ -34,6 +35,11 @@ test('bikeCard: struktura a cena „od“', () => {
   assert.match(out, /class="btn btn--secondary" href="\/kola\/trek"/);
   assert.match(out, /badge badge--success/);
   assert.match(c.bikeCard({ slug: 'a', name: 'A', category: 'kids', sizes: [] }, { available: 0 }).toString(), /badge--danger">Obsazeno/);
+  // volitelná jednotka a předpona ceny (výsledky filtru s termínem)
+  const unit = c.bikeCard({ slug: 'a', name: 'A', category: 'kids', sizes: [] }, { price: 35000, unit: 'den při 3 dnech', pricePrefix: '' }).toString();
+  assert.match(unit, /<p class="price"><strong class="price__amount">350\u00a0Kč<\/strong> <span class="price__unit">\/ den při 3 dnech<\/span><\/p>/);
+  const noUnit = c.bikeCard({ slug: 'a', name: 'A', category: 'kids', sizes: [] }, { price: 35000, unit: '' }).toString();
+  assert.match(noUnit, /<strong class="price__amount">350\u00a0Kč<\/strong><\/p>/);
 });
 
 test('field a form: label, input, hint, error, hidden _csrf', () => {
@@ -54,6 +60,28 @@ test('field a form: label, input, hint, error, hidden _csrf', () => {
   assert.match(form, /<form class="form" method="post" action="\/kontakt">/);
   assert.match(form, /<input type="hidden" name="_csrf" value="tok&lt;en">/);
   assert.match(form, /<div class="form__actions"><button class="btn btn--primary" type="submit">/);
+  // třída z attrs se sloučí s „form“ – jediný atribut class (prohlížeč by druhý ignoroval)
+  const styled = c.form({ action: '/x', csrf: 't', attrs: { class: 'form pay-method pay-method--demo', novalidate: true, 'data-term-form': true }, children: ['x'] }).toString();
+  assert.match(styled, /^<form class="form pay-method pay-method--demo" method="post" action="\/x" novalidate data-term-form>/);
+  assert.equal((styled.match(/ class="/g) || []).length, 1, 'jen jeden atribut class na <form>');
+  const extra = c.form({ action: '/y', attrs: { class: 'form--filters' }, children: ['x'] }).toString();
+  assert.match(extra, /^<form class="form form--filters" method="post" action="\/y">/);
+});
+
+test('steps: odkazy na hotové kroky jen dokud průchod běží; po posledním kroku (Hotovo) bez odkazů', () => {
+  const items = [
+    { label: 'Termín', href: '/rezervace' },
+    { label: 'Kola', href: '/rezervace/kola' },
+    { label: 'Hotovo' },
+  ];
+  const running = c.steps(items, 1).toString();
+  assert.match(running, /<li class="steps__item is-done"><a class="steps__link" href="\/rezervace">/);
+  const finished = c.steps(items, 2).toString();
+  assert.ok(!/steps__link/.test(finished), 'na posledním kroku žádné odkazy zpět');
+  assert.match(finished, /<li class="steps__item is-done"><span class="steps__num"/);
+  assert.match(finished, /<li class="steps__item is-active" aria-current="step">/);
+  assert.match(c.steps(items, 2, { links: true }).toString(), /steps__link/, 'links: true vynutí odkazy');
+  assert.ok(!/steps__link/.test(c.steps(items, 1, { links: false }).toString()), 'links: false odkazy vypne');
 });
 
 test('steps, table, badge, notice, price, summary, tabs', () => {
@@ -85,6 +113,11 @@ test('calendarRange: data atributy + fallback dvou date inputů', () => {
   assert.equal((out.match(/type="date"/g) || []).length, 2);
   assert.match(out, /name="od"/);
   assert.match(out, /name="do"/);
+  assert.ok(!/calendar__status/.test(out), 'bez after je výstup jako dřív');
+  // volitelný parametr after: Html za fallbackem (např. výběr času) + živý region pro stav
+  const withAfter = c.calendarRange({ min: '2026-07-01', after: html`<div class="time-grid">čas</div>` }).toString();
+  assert.match(withAfter, /<\/div>\s*<div class="time-grid">čas<\/div>\s*<\/div>\s*<div class="calendar__grid"/);
+  assert.match(withAfter, /<p class="calendar__status" aria-live="polite"><\/p>/);
 });
 
 test('timeline, contactCard, poiCard, routeCard', () => {

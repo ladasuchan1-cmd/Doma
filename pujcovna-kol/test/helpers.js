@@ -4,6 +4,8 @@
 //   const srv = await startServer(); const res = await srv.fetch('/'); … await srv.stop();
 // fetch přidává hlavičku Origin u POST/PUT/PATCH/DELETE (jako prohlížeč; vypne init.noOrigin), sleduje Set-Cookie
 // (jedna doména), umožňuje přepsat Host (přes node:http – globální fetch to neumí) a nesleduje přesměrování.
+// Výchozí env vypíná automatické naplnění demo dat při startu (PK_DEMO_AUTOSEED=0) – test si data naplní sám, nebo
+// předá env { PK_DEMO_AUTOSEED: '1' }.
 // Vstup: { env } (přepisy proměnných prostředí), { startJobs }. Výstup: { url, port, fetch, csrf, stop, db, dataDir, tenantsDir, app, instance }.
 
 const fs = require('node:fs');
@@ -73,6 +75,7 @@ function tempEnv(overrides = {}) {
     PK_TRUST_PROXY: '0',
     PK_SECRET: 'test-secret-test-secret-test-secret-0123456789',
     PK_RESET_DEMO_HOUR: '',
+    PK_DEMO_AUTOSEED: '0', // testy začínají s prázdnou DB; demo data si test naplní sám (tools/demo-data seed())
     APP_VERSION: 'test',
     LOG_LEVEL: 'silent',
     ...overrides,
@@ -129,8 +132,8 @@ async function startServer(opts = {}) {
           const h = new Headers(pairs);
           let decoded = raw;
           const enc = res.headers['content-encoding'];
-          if (enc === 'gzip') decoded = zlib.gunzipSync(raw);
-          else if (enc === 'br') decoded = zlib.brotliDecompressSync(raw);
+          if (raw.length && enc === 'gzip') decoded = zlib.gunzipSync(raw);
+          else if (raw.length && enc === 'br') decoded = zlib.brotliDecompressSync(raw);
           resolve({
             status: res.statusCode,
             ok: res.statusCode >= 200 && res.statusCode < 300,

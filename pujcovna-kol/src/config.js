@@ -12,6 +12,7 @@
 //   PK_ADMIN_USER        e-mail výchozího admina při prvním startu (v demu demo@ksprehledy.cz)
 //   PK_ADMIN_PASSWORD    heslo výchozího admina (v demu pevné kolo-demo-2026, jinak náhodné vytištěné do konzole)
 //   PK_RESET_DEMO_HOUR   hodina nočního resetu demo dat (3); prázdný řetězec = vypnuto
+//   PK_DEMO_AUTOSEED     1 = v demo režimu při startu naplnit demo data, je-li tabulka bike_types prázdná (1); 0 = ne
 //   APP_VERSION          verze aplikace do patičky a ?v= u statických souborů (výchozí z package.json)
 //   LOG_LEVEL            debug | info | warn | error | silent (info)
 
@@ -69,6 +70,7 @@ function loadConfig(env = process.env) {
     adminUser: env.PK_ADMIN_USER || (demo ? DEMO_ADMIN_EMAIL : 'admin@example.com'),
     adminPassword: env.PK_ADMIN_PASSWORD || (demo ? DEMO_ADMIN_PASSWORD : null),
     resetDemoHour,
+    demoAutoSeed: demo && envBool(env.PK_DEMO_AUTOSEED, true),
     version: env.APP_VERSION || packageVersion(),
     logLevel: env.LOG_LEVEL || 'info',
     bodyLimitBytes: BODY_LIMIT_BYTES,

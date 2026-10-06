@@ -338,6 +338,80 @@ async function seed({ db, tenant, config, fieldCrypto, reset = false, log = defa
       summary.outbox = db.prepare('SELECT COUNT(*) AS n FROM outbox').get().n;
     }
     // === /REZERVACE ===
+
+    // === PLATBY ===
+    // Agent platby: k seedovaným rezervacím doplní SPAYD s datem splatnosti u čekajících převodů, záznamy notifikací
+    // simulační brány (webhook_events) k zaplaceným platbám kartou, doklady (zjednodušené daňové doklady k poplatkům,
+    // opravný doklad k vratce stornované rezervace, konečné doklady uzavřených rezervací), zápis dokladu totožnosti
+    // zákazníkům vydaných rezervací a smlouvy / protokoly (SML- + PP-, VP-) k vydaným, vráceným a uzavřeným rezervacím.
+    // Běží jen při --reset nebo do prázdné tabulky documents.
+    if (reset || db.prepare('SELECT COUNT(*) AS n FROM documents').get().n === 0) {
+      const reservations = require('../src/domain/reservations');
+      const documents = require('../src/domain/documents');
+      const bank = require('../src/payments/bank-transfer');
+      const mockGateway = require('../src/payments/mock-gateway');
+      const { getSettings, publicBaseUrl } = require('../src/tenants');
+      const settings = getSettings(db, tenant);
+      const deps = { tenant, settings, fieldCrypto, now: nowIso(), log: { info() {}, warn() {}, error() {}, debug() {} } };
+      const business = tenant.business || {};
+      let iban = null;
+      try {
+        iban = business.iban && bank.validateIban(business.iban) ? business.iban : bank.ibanFromCzAccount(business.accountNumber);
+      } catch {
+        iban = null;
+      }
+      // 1) čekající / propadlé převody: SPAYD podle specifikace (vč. DT = expirace rezervace)
+      if (iban) {
+        for (const p of db.prepare("SELECT p.*, r.expires_at, r.number FROM payments p JOIN reservations r ON r.id = p.reservation_id WHERE p.method = 'bank_transfer' AND p.purpose = 'fee'").all()) {
+          const spayd = bank.spayd({ iban, amountMinor: p.amount_minor, vs: p.vs || p.number, msg: `Rezervace ${p.number}`, dueDate: p.expires_at || p.created_at });
+          db.prepare('UPDATE payments SET spayd = ? WHERE id = ?').run(spayd, p.id);
+        }
+      }
+      // 2) notifikace simulační brány k zaplaceným / blokovaným platbám kartou (jako po skutečném průchodu bránou)
+      const insEvent = db.prepare('INSERT OR IGNORE INTO webhook_events(provider, event_id, payload, received_at, processed_at) VALUES (?, ?, ?, ?, ?)');
+      for (const p of db.prepare("SELECT * FROM payments WHERE provider = ? AND status IN ('paid', 'authorized', 'released', 'partially_captured', 'captured', 'refunded')").all(mockGateway.PROVIDER)) {
+        const status = ['paid', 'refunded'].includes(p.status) ? 'paid' : 'authorized';
+        insEvent.run(mockGateway.PROVIDER, `mock:${p.provider_ref}:${status}`, JSON.stringify({ transId: p.provider_ref, status }), p.updated_at, p.updated_at);
+      }
+      // 3) doklady k platbám, opravný doklad k vratce, konečné doklady uzavřených rezervací (idempotentně)
+      documents.syncAll(db, deps);
+      // 4) doklad totožnosti u vydaných / vrácených / uzavřených rezervací: zápis typu a čísla je podmínkou výdeje (SPEC
+      //    kap. 0, rozhodnutí 1), proto ho demo zákazníkům těchto rezervací doplní (fiktivní čísla; stejný zápis jako
+      //    admin „Zapsat doklad“: typ, šifrované číslo, souhlas při výdeji, výmaz po idDocRetentionDays od vrácení).
+      const ID_DOC_TYPES = ['občanský průkaz', 'cestovní pas', 'řidičský průkaz'];
+      const retentionDays = Number(settings.idDocRetentionDays) > 0 ? Number(settings.idDocRetentionDays) : 30;
+      const issuedReservations = db.prepare("SELECT * FROM reservations WHERE status IN ('checked_out', 'returned', 'closed') ORDER BY id").all();
+      const auditAt = (r, action) => {
+        const row = db.prepare("SELECT at FROM audit_log WHERE entity = 'reservation' AND entity_id = ? AND action = ? ORDER BY id LIMIT 1").get(String(r.id), action);
+        return row ? row.at : null;
+      };
+      for (const r of issuedReservations) {
+        const pickupAt = auditAt(r, 'reservation.check_out') || r.from_at;
+        const customer = r.customer_id ? db.prepare('SELECT id, id_doc_type, anonymized_at FROM customers WHERE id = ?').get(r.customer_id) : null;
+        if (!customer || customer.anonymized_at || customer.id_doc_type) continue;
+        const type = ID_DOC_TYPES[customer.id % ID_DOC_TYPES.length];
+        const number = String(100000000 + ((customer.id * 7919 + 4242) % 900000000)); // fiktivní 9-místné číslo
+        const deleteAfter = new Date(Math.max(new Date(r.to_at).getTime(), new Date(pickupAt).getTime()) + retentionDays * 86400000).toISOString();
+        db.prepare('UPDATE customers SET id_doc_type = ?, id_doc_number_enc = ?, id_doc_consent_at = ?, id_doc_delete_after = ? WHERE id = ?').run(type, fieldCrypto.enc(number), pickupAt, deleteAfter, customer.id);
+        db.prepare('INSERT INTO audit_log(at, user_id, action, entity, entity_id, meta, ip_hash) VALUES (?, ?, ?, ?, ?, ?, NULL)').run(pickupAt, summary.adminId, 'customer.id_doc_recorded', 'customer', String(customer.id), JSON.stringify({ reservationId: r.id, type, deleteAfter, demo: true }));
+      }
+      // 5) smlouva + předávací protokol (SML- a PP-) u vydaných / vrácených / uzavřených rezervací, protokol o vrácení (VP-)
+      //    u vrácených / uzavřených; údaje (kola s výrobním číslem, kauce, škoda, čísla dokladů) dopočítá documents.contractParams
+      const operator = { id: summary.adminId, name: 'Správce D.' };
+      for (const r of issuedReservations) {
+        const detail = reservations.loadDetail(db, r);
+        const bikes = detail.itemRows.map((row) => ({ itemId: row.id, bikeId: row.bike_id }));
+        const ebike = detail.itemRows.some((row) => row.category === 'ebike');
+        documents.issueContract(db, { reservation: r, kind: 'contract', tenant, settings, fieldCrypto, operator, bikes, legal: ebike ? { KOLO_BATERIE_PROCENTA: '100' } : {}, now: auditAt(r, 'reservation.check_out') || r.from_at });
+        if (r.status === 'returned' || r.status === 'closed') {
+          documents.issueContract(db, { reservation: r, kind: 'return_protocol', tenant, settings, fieldCrypto, operator, bikes, legal: ebike ? { KOLO_VRACENI_BATERIE_PROCENTA: '40' } : {}, now: auditAt(r, 'reservation.return') || r.to_at });
+        }
+      }
+      summary.payments = db.prepare('SELECT COUNT(*) AS n FROM payments').get().n;
+      summary.documents = db.prepare('SELECT COUNT(*) AS n FROM documents').get().n;
+      summary.webhookEvents = db.prepare('SELECT COUNT(*) AS n FROM webhook_events').get().n;
+    }
+    // === /PLATBY ===
   });
   log.info('Demo data naplněna', summary);
   return summary;

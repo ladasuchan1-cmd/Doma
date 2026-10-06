@@ -85,8 +85,12 @@ function notice(text, tone = 'info', { title } = {}) {
   return html`<div class="notice notice--${t}" role="${t === 'danger' || t === 'warning' ? 'alert' : 'status'}">${title ? html`<strong class="notice__title">${title}</strong> ` : ''}${content(text)}</div>`;
 }
 
-/** Karta typu kola. type = řádek bike_types (sizes JSON pole). */
-function bikeCard(type, { price: priceMinor, available, href, image, imageAlt } = {}) {
+/**
+ * Karta typu kola. type = řádek bike_types (sizes JSON pole).
+ * unit = jednotka u ceny (výchozí „den“ → „/ den“); u výsledků filtru s termínem lze předat např. „den při 3 dnech“
+ * nebo '' (bez jednotky). pricePrefix = předpona ceny (výchozí „od“, '' = bez předpony).
+ */
+function bikeCard(type, { price: priceMinor, available, href, image, imageAlt, unit = 'den', pricePrefix = 'od' } = {}) {
   const sizes = Array.isArray(type.sizes) ? type.sizes : [];
   const photos = Array.isArray(type.photos) ? type.photos : [];
   const img = image || (photos[0] && (typeof photos[0] === 'string' ? photos[0] : photos[0].src)) || null;
@@ -99,7 +103,7 @@ function bikeCard(type, { price: priceMinor, available, href, image, imageAlt } 
     <span class="badge">${CATEGORY_LABELS[type.category] || type.category}</span>
     <h3 class="card__title"><a href="${link}">${type.name}</a></h3>
     ${sizeText ? html`<p class="card__meta">${sizeText}</p>` : ''}
-    ${priceMinor !== undefined && priceMinor !== null ? price(priceMinor, 'den', { prefix: 'od' }) : ''}
+    ${priceMinor !== undefined && priceMinor !== null ? price(priceMinor, unit || null, { prefix: pricePrefix || null }) : ''}
     ${available !== undefined && available !== null ? html`<p class="card__availability">${available > 0 ? badge(`${format.plural(available, 'kolo volné', 'kola volná', 'kol volných')}`, 'success') : badge('Obsazeno', 'danger')}</p>` : ''}
     ${button({ label: 'Detail', href: link, variant: 'secondary' })}
   </div>
@@ -137,23 +141,36 @@ function field({ label, name, type = 'text', value, required, hint, error, optio
 </div>`;
 }
 
-/** Formulář s hidden _csrf. */
+/**
+ * Formulář s hidden _csrf. Třída z `attrs.class` se sloučí s výchozí „form“ (bez duplicit), aby nevznikl druhý
+ * atribut class, který prohlížeč ignoruje: attrs { class: 'form pay-method' } → <form class="form pay-method" …>.
+ */
 function form({ action, method = 'post', csrf, children, attrs, submit, submitVariant = 'primary' } = {}) {
   const m = String(method).toLowerCase() === 'get' ? 'get' : 'post';
-  return html`<form class="form" method="${m}"${attr({ action, ...attrs })}>
+  const { class: extraClass, className, ...rest } = attrs || {};
+  const classes = [...new Set(['form', ...String(extraClass || className || '').split(/\s+/).filter(Boolean)])].join(' ');
+  return html`<form class="${classes}" method="${m}"${attr({ action, ...rest })}>
   ${m === 'post' && csrf ? html`<input type="hidden" name="_csrf" value="${csrf}">` : ''}
   ${content(children)}
   ${submit ? html`<div class="form__actions">${button({ label: submit, type: 'submit', variant: submitVariant })}</div>` : ''}
 </form>`;
 }
 
-/** Kroky 1-2-3. items: řetězce nebo { label, href, description }. */
-function steps(items, activeIndex = -1) {
-  return html`<ol class="steps">${(items || []).map((it, i) => {
+/**
+ * Kroky 1-2-3. items: řetězce nebo { label, href, description }. Hotové kroky (i < activeIndex) s `href` jsou odkazy,
+ * ale jen dokud průchod běží: je-li aktivní poslední krok (např. „Hotovo“ po dokončení rezervace), odkazy zpět se
+ * nevypisují – vedly by na smazaný rozepsaný stav a působily jako možnost upravit hotovou rezervaci.
+ * opts.links: true = odkazy vždy, false = nikdy, 'auto' (výchozí) = podle pravidla výše.
+ */
+function steps(items, activeIndex = -1, { links = 'auto' } = {}) {
+  const list = items || [];
+  const finished = activeIndex >= 0 && activeIndex === list.length - 1;
+  const withLinks = links === true || (links === 'auto' && !finished);
+  return html`<ol class="steps">${list.map((it, i) => {
     const item = typeof it === 'object' ? it : { label: it };
     const state = i < activeIndex ? 'is-done' : i === activeIndex ? 'is-active' : '';
     const inner = html`<span class="steps__num" aria-hidden="true">${i + 1}</span><span class="steps__label">${item.label}</span>${item.description ? html`<span class="steps__desc">${item.description}</span>` : ''}`;
-    return html`<li class="${cls('steps__item', state)}"${attr({ 'aria-current': i === activeIndex ? 'step' : null })}>${item.href && i < activeIndex ? html`<a class="steps__link" href="${item.href}">${inner}</a>` : inner}</li>`;
+    return html`<li class="${cls('steps__item', state)}"${attr({ 'aria-current': i === activeIndex ? 'step' : null })}>${withLinks && item.href && i < activeIndex ? html`<a class="steps__link" href="${item.href}">${inner}</a>` : inner}</li>`;
   })}</ol>`;
 }
 
@@ -182,15 +199,19 @@ function summary(rows) {
 /**
  * Kalendářový výběr termínu: wrapper pro progresivní JS + fallback dvou <input type="date"> bez JS.
  * blocked: pole ISO dat (YYYY-MM-DD) nebo intervalů { from, to }, předává se v data-blocked (JSON).
+ * after: volitelný Html (nebo pole) vložený do .calendar__fallback za oba inputy (např. výběr času vyzvednutí/vrácení);
+ * .calendar__status je prázdný živý region (aria-live) pro hlášky klientského JS. Bez `after` je výstup shodný jako dříve.
  */
-function calendarRange({ name = 'termin', min, max, blocked = [], from, to, fromName = 'od', toName = 'do', labels = {} } = {}) {
+function calendarRange({ name = 'termin', min, max, blocked = [], from, to, fromName = 'od', toName = 'do', labels = {}, after } = {}) {
   const minDate = min || format.isoDate(new Date());
   return html`<div class="calendar" data-calendar data-name="${name}" data-min="${minDate}"${attr({ 'data-max': max || null })} data-blocked="${JSON.stringify(blocked || [])}">
   <div class="calendar__fallback">
     ${field({ label: labels.from || 'Od', name: fromName, type: 'date', value: from, required: true, min: minDate, max })}
     ${field({ label: labels.to || 'Do', name: toName, type: 'date', value: to, required: true, min: minDate, max })}
+    ${after ? content(after) : ''}
   </div>
   <div class="calendar__grid" hidden aria-hidden="true"></div>
+  ${after ? html`<p class="calendar__status" aria-live="polite"></p>` : ''}
 </div>`;
 }
 

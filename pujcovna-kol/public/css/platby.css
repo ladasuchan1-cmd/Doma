@@ -1,0 +1,229 @@
+/* Styly feature „platby“: simulační platební brána (samostatná stránka), demo simulace banky, lišta dokladu.
+   Jen přes tokeny z base.css; brána je záměrně neutrální (nezávislá na tématu webu – jako brána třetí strany). */
+
+/* --- Simulační brána --------------------------------------------------------------------------------- */
+.gw {
+  min-height: 100vh;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  background: var(--gray-100, #eceff3);
+  color: var(--text);
+  font-family: var(--font-body, system-ui, sans-serif);
+}
+.gw__banner {
+  background: repeating-linear-gradient(135deg, #ffd43b 0 16px, #212529 16px 32px);
+  padding: var(--space-2);
+}
+.gw__banner {
+  color: #212529;
+  font-size: var(--step-0, 1rem);
+  text-align: center;
+  display: flex;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+/* text na pruzích čitelně: žlutý podklad za textem */
+.gw__banner strong {
+  background: #ffd43b;
+  padding: 2px 8px;
+  border-radius: var(--radius-sm);
+  letter-spacing: 0.04em;
+}
+.gw__main {
+  flex: 1;
+  display: grid;
+  place-items: start center;
+  padding: var(--space-8) var(--space-4);
+}
+.gw__card {
+  width: min(100%, 560px);
+  background: #fff;
+  color: #1a1a1a;
+  border: 1px solid #d6d6d6;
+  border-radius: var(--radius-lg);
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.12);
+  padding: var(--space-7) var(--space-6);
+  display: grid;
+  gap: var(--space-5);
+}
+.gw__card .summary,
+.gw__card .notice,
+.gw__card .btn {
+  --text: #1a1a1a;
+  --text-muted: #555;
+  --border: #d6d6d6;
+  --surface: #f4f4f4;
+  --bg: #fff;
+}
+.gw__head {
+  display: grid;
+  gap: var(--space-2);
+}
+.gw__brand {
+  margin: 0;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  font-size: var(--step--1, 0.875rem);
+  color: #555;
+}
+.gw__brand-tag {
+  display: inline-block;
+  margin-left: var(--space-2);
+  padding: 1px 8px;
+  border-radius: var(--radius-pill);
+  background: #ffd43b;
+  color: #212529;
+  font-size: 0.75rem;
+}
+.gw__title {
+  margin: 0;
+  font-size: var(--step-3, 1.8rem);
+  line-height: 1.15;
+  color: #1a1a1a;
+}
+.gw__lead {
+  margin: 0;
+  color: #555;
+}
+.gw__fake-card {
+  border: 1px dashed #b5b5b5;
+  border-radius: var(--radius-md);
+  padding: var(--space-4);
+  background: linear-gradient(135deg, #f8f9fa, #e9ecef);
+  display: grid;
+  gap: var(--space-2);
+}
+.gw__fake-row {
+  display: flex;
+  gap: var(--space-3);
+  align-items: baseline;
+  flex-wrap: wrap;
+}
+.gw__fake-label {
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: #666;
+}
+.gw__fake-value {
+  font-family: var(--font-mono, ui-monospace, monospace);
+  font-size: 1.1rem;
+  letter-spacing: 0.08em;
+}
+.gw__fake-note {
+  margin: 0;
+  font-size: 0.8rem;
+  color: #666;
+}
+.gw__actions {
+  display: grid;
+  gap: var(--space-3);
+}
+.gw__form {
+  margin: 0;
+}
+.gw__form .btn {
+  width: 100%;
+  justify-content: center;
+}
+.gw__actions--result {
+  margin: 0;
+}
+.gw__security,
+.gw__hint {
+  margin: 0;
+  font-size: var(--step--1, 0.875rem);
+  color: #555;
+  display: flex;
+  gap: var(--space-2);
+  align-items: flex-start;
+}
+.gw__security .icon {
+  flex: 0 0 auto;
+  width: 20px;
+  height: 20px;
+}
+.gw__foot {
+  padding: var(--space-5) var(--space-4);
+  text-align: center;
+  font-size: var(--step--1, 0.875rem);
+  color: #555;
+}
+.gw__foot p {
+  margin: 0 auto;
+  max-width: 60ch;
+}
+
+/* --- Demo simulace banky ----------------------------------------------------------------------------- */
+.banksim {
+  display: grid;
+  gap: var(--space-6);
+  align-items: start;
+}
+@media (min-width: 900px) {
+  .banksim {
+    grid-template-columns: minmax(0, 3fr) minmax(280px, 2fr);
+  }
+}
+.banksim__side {
+  display: grid;
+  gap: var(--space-4);
+}
+.banksim__pending {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: var(--space-2);
+}
+.banksim__pending li {
+  padding: var(--space-2) var(--space-3);
+  background: var(--surface);
+  border-radius: var(--radius-sm);
+}
+.banksim__pending small {
+  color: var(--text-muted);
+}
+
+/* --- Lišta dokladu v layoutu webu -------------------------------------------------------------------- */
+.doc-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: var(--space-5);
+}
+.doc-toolbar p {
+  margin: 0;
+}
+.doc-frame {
+  background: #fff;
+  color: #1a1a1a;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: clamp(var(--space-4), 4vw, var(--space-8));
+  overflow-x: auto;
+}
+@media print {
+  .site-header,
+  .site-footer,
+  .design-switch,
+  .doc-toolbar,
+  .skip-link,
+  .section--doc .notice {
+    display: none !important;
+  }
+  .doc-frame {
+    border: 0;
+    padding: 0;
+  }
+}
+.gw__banner-text {
+  background: #fff;
+  padding: 2px 8px;
+  border-radius: var(--radius-sm);
+}

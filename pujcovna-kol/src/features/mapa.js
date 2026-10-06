@@ -9,7 +9,12 @@
 //                                  půjčovna, podklad, barvy sítí)
 //   GET /okoli                     20 tipů jako karty (poiCard) seřazené podle vzdálenosti, filtr typu ?typ=, attribution
 //                                  u každého obrázku, admin override poi_overrides (hidden / custom_text / sort)
-//   GET /okoli/img/:file           obrázky zajímavostí z tenants/<slug>/okoli/img/ (jen Q<id>.jpg), cache 1 den, ETag
+//   GET /okoli/img/:file           obrázky zajímavostí z tenants/<slug>/okoli/img/ (jen Q<id>.jpg), ETag/304; odkazy nesou
+//                                  ?v=<mtime> → s platnou verzí Cache-Control immutable (1 rok), bez ní 1 den
+// Rate limit obrázků: stránka /okoli načte 20 obrázků, které by s klíčem 'public' (300/15 min) vyčerpaly limit celého webu
+// (QA nález: ~14 zobrazení /okoli z jedné IP → 429 i na /rezervace). Obrázky proto mají vlastní klíč IMAGE_RATE_KEY –
+// ratelimit.js pro neznámý profil použije limity 'public', ale kbelík je oddělený (`${key}|${ip}`), takže obrázky nikdy
+// nespotřebují tokeny stránek. Vlastní profil s vyšším limitem / statické servírování je požadavek na kostru (TODO-INTEGRACE).
 // Podklad: MAPY_API_KEY v env → Mapy.cz outdoor (logo + attribution), jinak CyclOSM. Attribution OSM/CyclOSM je na mapě
 // i v patičce (layout). Vstup: ctx (tenant.dir, db). Výstup: stránky / JSON / GPX / obrázky. Bez zápisu do DB.
 
@@ -34,9 +39,15 @@ const NETWORKS = Object.freeze({
 const TILE_ATTRIBUTION = { cyclosm: '© přispěvatelé OpenStreetMap, CyclOSM', mapy: '© Seznam.cz, a.s. a další (Mapy.cz), © přispěvatelé OpenStreetMap' };
 const IMAGE_FILE = /^Q\d{1,12}\.jpg$/;
 const GPX_FILE = /^([rwnc]\d{1,12})\.gpx$/; // r = relace OSM, c = cyklostezka (way) – id z cyklo-ski-mapa
+/** Klíč rate limitu obrázků zajímavostí – oddělený kbelík od 'public' (viz hlavička souboru). */
+const IMAGE_RATE_KEY = 'okoli-img';
+const IMAGE_CACHE_VERSIONED = 'public, max-age=31536000, immutable';
+const IMAGE_CACHE_PLAIN = 'public, max-age=86400';
 
 // --------------------------------------------------------------------------------------------- data
 const okoliCache = new Map(); // file → { mtimeMs, data }
+const imageVersionCache = new Map(); // dir → { checkedAt, versions: Map(file → verze) }
+const IMAGE_VERSION_TTL_MS = 60 * 1000;
 
 /** Načte okoli.json tenanta (cache podle mtime). Bez souboru vrací null. */
 function loadOkoli(tenant) {
@@ -53,6 +64,35 @@ function loadOkoli(tenant) {
   } catch {
     return null;
   }
+}
+
+/** Verze souboru obrázku (mtime v base36) pro ?v= – umožňuje Cache-Control immutable. Chybějící soubor → null. */
+function imageVersion(tenant, file) {
+  if (!tenant || !tenant.dir || !IMAGE_FILE.test(String(file || ''))) return null;
+  const dir = path.join(tenant.dir, 'okoli', 'img');
+  const now = Date.now();
+  let entry = imageVersionCache.get(dir);
+  if (!entry || now - entry.checkedAt > IMAGE_VERSION_TTL_MS) {
+    entry = { checkedAt: now, versions: new Map() };
+    imageVersionCache.set(dir, entry);
+  }
+  if (entry.versions.has(file)) return entry.versions.get(file);
+  let v = null;
+  try {
+    const st = fs.statSync(path.join(dir, file));
+    if (st.isFile()) v = Math.floor(st.mtimeMs).toString(36);
+  } catch {
+    v = null;
+  }
+  entry.versions.set(file, v);
+  return v;
+}
+
+/** URL obrázku zajímavosti (s ?v=, pokud soubor existuje). */
+function imageSrc(tenant, file) {
+  const base = `/okoli/img/${encodeURIComponent(file)}`;
+  const v = imageVersion(tenant, file);
+  return v ? `${base}?v=${v}` : base;
 }
 
 /** Načte poi_overrides (admin: skrýt, vlastní text, pořadí) → Map(poi_id → row). */
@@ -75,8 +115,9 @@ function mapyNavigateUrl(lat, lon) {
  * Zajímavosti pro výstup: aplikuje poi_overrides, doplní obrázek (src), odkazy; řadí podle sort (override) a vzdálenosti.
  * @param {object} okoli
  * @param {Map} overrides
+ * @param {object} [tenant] pro verzované URL obrázků (?v=mtime); bez tenanta URL bez verze
  */
-function visiblePois(okoli, overrides) {
+function visiblePois(okoli, overrides, tenant = null) {
   const out = [];
   for (const p of okoli.pois) {
     const o = overrides.get(String(p.id));
@@ -99,7 +140,7 @@ function visiblePois(okoli, overrides) {
       image: img
         ? {
             file: img.file,
-            src: `/okoli/img/${encodeURIComponent(img.file)}`,
+            src: tenant ? imageSrc(tenant, img.file) : `/okoli/img/${encodeURIComponent(img.file)}`,
             alt: `${p.name}`,
             author: img.author || null,
             license: img.license || null,
@@ -221,7 +262,7 @@ async function mapaHandler(ctx) {
   const okoli = requireOkoli(ctx);
   const filter = networkFilter(ctx.query);
   const routes = okoli ? visibleRoutes(okoli) : [];
-  const pois = okoli ? visiblePois(okoli, loadOverrides(ctx.db)) : [];
+  const pois = okoli ? visiblePois(okoli, loadOverrides(ctx.db), ctx.tenant) : [];
   const tiles = tilesConfig(ctx);
   const focusPoi = /^Q\d{1,12}$/.test(String(ctx.query.poi || '')) ? String(ctx.query.poi) : null;
   ctx.render(
@@ -244,7 +285,7 @@ async function mapaHandler(ctx) {
 
 async function okoliHandler(ctx) {
   const okoli = requireOkoli(ctx);
-  const all = okoli ? visiblePois(okoli, loadOverrides(ctx.db)) : [];
+  const all = okoli ? visiblePois(okoli, loadOverrides(ctx.db), ctx.tenant) : [];
   const types = [];
   for (const p of all) {
     const t = types.find((x) => x.key === (p.typeKey || p.type));
@@ -270,7 +311,7 @@ async function okoliApi(ctx) {
     tiles: { provider: tiles.provider, attribution: tiles.attribution, mapyKey: tiles.mapyKey || undefined },
     networks: NETWORKS,
     routes: okoli ? visibleRoutes(okoli).map(({ id, nazev, ref, sit, net, druh, delkaKm, delkaCelkemKm, color, weight, netLabel, elevation, bbox, geom, gpxHref }) => ({ id, nazev, ref, sit, net, druh, delkaKm, delkaCelkemKm, color, weight, netLabel, elevation, bbox, geom, gpxHref })) : [],
-    pois: okoli ? visiblePois(okoli, loadOverrides(ctx.db)).map(({ sort, customText, ...p }) => p) : [],
+    pois: okoli ? visiblePois(okoli, loadOverrides(ctx.db), ctx.tenant).map(({ sort, customText, ...p }) => p) : [],
   };
   sendCompressed(ctx, { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'public, max-age=600' }, JSON.stringify(body));
 }
@@ -320,7 +361,9 @@ async function imageHandler(ctx) {
   }
   if (!stat.isFile()) return ctx.notFound('Obrázek nenalezen.');
   const etag = `W/"${stat.size.toString(16)}-${Math.floor(stat.mtimeMs).toString(16)}"`;
-  const headers = { 'Content-Type': mimeType(file), 'Cache-Control': 'public, max-age=86400', ETag: etag, 'Last-Modified': stat.mtime.toUTCString() };
+  // ?v=<mtime> shodné s aktuálním souborem → immutable (prohlížeč se už neptá, neutrácí tokeny rate limitu); jinak 1 den
+  const versioned = ctx.query.v !== undefined && String(ctx.query.v) === Math.floor(stat.mtimeMs).toString(36);
+  const headers = { 'Content-Type': mimeType(file), 'Cache-Control': versioned ? IMAGE_CACHE_VERSIONED : IMAGE_CACHE_PLAIN, ETag: etag, 'Last-Modified': stat.mtime.toUTCString() };
   const inm = String(ctx.req.headers['if-none-match'] || '');
   if (inm && inm.split(',').some((t) => t.trim().replace(/^W\//, '') === etag.replace(/^W\//, ''))) {
     ctx.send(304, headers, null);
@@ -337,7 +380,8 @@ module.exports = {
     ['GET', '/mapa/gpx/:file', gpxHandler, { rateLimit: 'public' }],
     ['GET', '/api/v1/okoli.json', okoliApi, { rateLimit: 'api' }],
     ['GET', '/okoli', okoliHandler, { rateLimit: 'public' }],
-    ['GET', '/okoli/img/:file', imageHandler, { rateLimit: 'public' }],
+    // vlastní kbelík rate limitu (viz hlavička): 20 obrázků na stránku nesmí vyčerpat limit 'public' celého webu
+    ['GET', '/okoli/img/:file', imageHandler, { rateLimit: IMAGE_RATE_KEY }],
   ],
   nav: [
     { label: 'Mapa', href: '/mapa', order: 40 },
@@ -347,7 +391,10 @@ module.exports = {
   js: ['/vendor/leaflet/leaflet.js', '/js/mapa.js'],
   NETWORKS,
   TILE_ATTRIBUTION,
+  IMAGE_RATE_KEY,
   loadOkoli,
+  imageVersion,
+  imageSrc,
   loadOverrides,
   visiblePois,
   visibleRoutes,

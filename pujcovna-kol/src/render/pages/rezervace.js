@@ -41,9 +41,32 @@ function statusBadge(status) {
   return c.badge(STATUS_LABELS[status] || status, STATUS_TONES[status] || 'neutral');
 }
 
-/** Krok 1 – termín. values: { od, od_cas, do, do_cas, typ }; slots: ['08:00', …]; blocked: ['YYYY-MM-DD'] */
-function termin({ csrf, values, errors, slots, blocked, minDate, maxDate, tenant, preselect }) {
-  const rows = format.openingHoursRows(tenant.openingHours || {});
+/** Stavy, ve kterých rezervace skončila bez pronájmu – správa ukáže jen stav a vratku (bez ICS, doplatku, pokynů k výdeji). */
+const ENDED_STATES = Object.freeze(['cancelled_by_customer', 'cancelled_by_operator', 'expired', 'no_show']);
+/** Stavy, ve kterých má smysl nabízet ICS a připomínat doklad totožnosti (vyzvednutí je před zákazníkem). */
+const UPCOMING_STATES = Object.freeze(['awaiting_fee', 'confirmed']);
+
+/** Částka v Kč pro parametr castka= simulace banky (parseKc přijímá „300“ i „995.50“). */
+function kcParam(minor) {
+  return (Number(minor) / 100).toFixed(2).replace(/\.00$/, '');
+}
+
+/** Odkaz na doklad se správcovským tokenem (bez tokenu nebo admin session vrací /doklady 404). */
+function docHref(number, token, { print = false } = {}) {
+  return `/doklady/${encodeURIComponent(number)}${print ? '.html' : ''}?t=${encodeURIComponent(token)}`;
+}
+
+/** Odkaz „Simulovat příchozí platbu (demo)“ na stránku feature platby (/simulace-banky, jen PK_DEMO=1). */
+function bankSimLink({ vs, amountMinor }) {
+  return html`<p class="bank-box__demo">${c.badge('DEMO', 'warning')} <a class="bank-box__demo-link" href="/simulace-banky?vs=${encodeURIComponent(vs)}&amp;castka=${encodeURIComponent(kcParam(amountMinor))}">Simulovat příchozí platbu (demo)</a> <small>– v ukázce nahradí bankovní převod; žádné peníze se nepřevádějí.</small></p>`;
+}
+
+/**
+ * Krok 1 – termín. values: { od, od_cas, do, do_cas, typ }; slots: ['08:00', …]; blocked: ['YYYY-MM-DD'];
+ * openingHours: efektivní otevírací doba (tenant + nastavení z adminu), bez ní tenant.openingHours.
+ */
+function termin({ csrf, values, errors, slots, blocked, minDate, maxDate, tenant, openingHours, preselect }) {
+  const rows = format.openingHoursRows(openingHours || tenant.openingHours || {});
   return {
     title: 'Rezervace – termín',
     noindex: false,
@@ -280,8 +303,11 @@ ${stepHeader(3, 'Rezervační poplatek', `Zaplacením poplatku ${format.money(fe
   };
 }
 
-/** Pokyny k převodu (po volbě „převod“). payment: { amountMinor, iban, accountNumber, vs, spayd, qrSvg, expiresAt } */
-function prevod({ reservation, payment, token, tenant, notice }) {
+/**
+ * Pokyny k převodu (po volbě „převod“). payment: { amountMinor, iban, accountNumber, vs, spayd, qrSvg, expiresAt };
+ * demo = PK_DEMO (zobrazí odkaz na simulaci příchozí platby).
+ */
+function prevod({ reservation, payment, token, tenant, notice, demo }) {
   const manage = `/rezervace/${encodeURIComponent(token)}`;
   return {
     title: 'Rezervace – platba převodem',
@@ -291,7 +317,7 @@ ${stepHeader(3, 'Platba převodem', `Rezervace č. ${reservation.number} je zalo
 <section class="section section--step"><div class="container step-layout">
   <div class="step-main">
     ${notice ? c.notice(notice, 'info') : ''}
-    ${bankInstructions({ reservation, payment, tenant })}
+    ${bankInstructions({ reservation, payment, tenant, demo })}
     <p class="step-actions">${c.button({ label: 'Pokračovat na potvrzení', href: `/rezervace/hotovo/${encodeURIComponent(token)}`, variant: 'primary' })} ${c.button({ label: 'Správa rezervace', href: manage, variant: 'ghost' })}</p>
   </div>
   <aside class="step-side"><div class="info-card"><h2 class="info-card__title">Co bude dál</h2><p class="info-card__text">Platbu párujeme podle variabilního symbolu${payment.expiresAt ? html`; rezervaci držíme do <strong>${format.dateTime(payment.expiresAt)}</strong>` : ''}. Jakmile dorazí, pošleme potvrzení a doklad. Stav sledujte na stránce správy rezervace.</p></div></aside>
@@ -299,22 +325,31 @@ ${stepHeader(3, 'Platba převodem', `Rezervace č. ${reservation.number} je zalo
   };
 }
 
-function bankInstructions({ reservation, payment, tenant }) {
+/**
+ * Pokyny k převodu. payment.capturedMinor > 0 = částečná úhrada: zobrazí se zbytek k doplacení (payments.spayd už nese
+ * QR na zbytek). demo = PK_DEMO → odkaz „Simulovat příchozí platbu (demo)“ (/simulace-banky, feature platby).
+ */
+function bankInstructions({ reservation, payment, tenant, demo = false }) {
   const b = tenant.business || {};
   const iban = payment.iban || b.iban || '';
+  const vs = payment.vs || reservation.number;
+  const captured = Math.max(0, Number(payment.capturedMinor) || 0);
+  const due = Math.max(0, Number(payment.amountMinor) - captured);
   return html`<div class="bank-box">
   <div class="bank-box__data">
+    ${captured > 0 ? c.notice(html`Zatím přišlo <strong>${format.money(captured)}</strong> z ${format.money(payment.amountMinor)}. Doplaťte prosím zbývajících <strong>${format.money(due)}</strong> se stejným variabilním symbolem.`, 'warning') : ''}
     ${c.summary([
-      ['Částka', html`<strong>${format.money(payment.amountMinor)}</strong>`],
+      [captured > 0 ? 'Zbývá uhradit' : 'Částka', html`<strong>${format.money(due)}</strong>`],
       ['IBAN', html`<code>${iban}</code>`],
       b.accountNumber ? ['Číslo účtu', html`<code>${b.accountNumber}</code>${b.bankName ? html` <small>(${b.bankName})</small>` : ''}`] : null,
-      ['Variabilní symbol', html`<code>${payment.vs || reservation.number}</code>`],
+      ['Variabilní symbol', html`<code>${vs}</code>`],
       ['Zpráva pro příjemce', `Rezervace ${reservation.number}`],
       payment.expiresAt ? ['Uhradit do', format.dateTime(payment.expiresAt)] : null,
     ].filter(Boolean))}
+    ${demo ? bankSimLink({ vs, amountMinor: due }) : ''}
   </div>
   <div class="bank-box__qr">
-    ${payment.qrSvg ? html`<div class="bank-box__qr-img" role="img" aria-label="QR Platba ${format.money(payment.amountMinor)}, VS ${payment.vs || reservation.number}">${raw(payment.qrSvg)}</div><p class="bank-box__qr-hint">Naskenujte v bankovní aplikaci (QR Platba).</p>` : html`<div class="bank-box__qr-placeholder">${c.icon('card')}<p>QR kód se připravuje – použijte údaje vlevo.</p></div>`}
+    ${payment.qrSvg ? html`<div class="bank-box__qr-img" role="img" aria-label="QR Platba ${format.money(due)}, VS ${vs}">${raw(payment.qrSvg)}</div><p class="bank-box__qr-hint">Naskenujte v bankovní aplikaci (QR Platba).</p>` : html`<div class="bank-box__qr-placeholder">${c.icon('card')}<p>QR kód se připravuje – použijte údaje vlevo.</p></div>`}
     ${payment.spayd ? html`<p class="bank-box__spayd"><small>SPAYD: <code>${payment.spayd}</code></small></p>` : ''}
   </div>
 </div>`;
@@ -355,6 +390,53 @@ ${stepHeader(4, awaiting ? 'Rezervace založena – čeká na poplatek' : 'Rezer
   };
 }
 
+/** Souhrn peněz ve správě: aktivní rezervace = cena, poplatek, zaplaceno, doplatek, kauce; skončená = zaplaceno, vratka, propadlý poplatek. */
+function moneySummary(r, detail) {
+  const sum = (type) => detail.ledger.filter((l) => l.type === type).reduce((a, l) => a + (Number(l.amount_minor) || 0), 0);
+  if (ENDED_STATES.includes(r.status)) {
+    const refund = sum('refund');
+    const forfeited = sum('fee_forfeited');
+    const pendingRefund = detail.payments.some((p) => p.purpose === 'refund' && p.status === 'pending');
+    return c.summary(
+      [
+        ['Cena pronájmu', format.money(r.total_minor)],
+        ['Zaplacený poplatek', format.money(r.paid_minor)],
+        refund > 0 ? { label: pendingRefund ? 'Vratka (čeká na odeslání)' : 'Vráceno', value: format.money(refund), strong: true } : null,
+        forfeited > 0 ? { label: 'Propadlý poplatek', value: format.money(forfeited), strong: true } : null,
+        refund === 0 && forfeited === 0 ? ['K vrácení', format.money(0)] : null,
+      ].filter(Boolean)
+    );
+  }
+  return c.summary([
+    ['Cena pronájmu', format.money(r.total_minor)],
+    ['Rezervační poplatek', format.money(r.fee_minor)],
+    ['Zaplaceno', format.money(r.paid_minor)],
+    { label: 'Zbývá doplatit', value: format.money(detail.balanceMinor), strong: true },
+    ['Vratná kauce při převzetí', format.money(r.deposit_minor)],
+  ]);
+}
+
+/** Boční karta správy: u skončené rezervace jen stav a vratka, jinak ICS, kontakt a pokyny k vyzvednutí. */
+function manageSideCard(r, detail, manage) {
+  if (ENDED_STATES.includes(r.status)) {
+    const refund = detail.ledger.filter((l) => l.type === 'refund').reduce((a, l) => a + (Number(l.amount_minor) || 0), 0);
+    const pendingRefund = detail.payments.some((p) => p.purpose === 'refund' && p.status === 'pending');
+    const text = r.status === 'expired' ? 'Rezervace vypršela bez úhrady poplatku – termín není blokovaný.' : r.status === 'no_show' ? 'Kola nebyla vyzvednuta; rezervační poplatek propadl jako úplata za zajištění termínu.' : refund > 0 ? (pendingRefund ? `Vratku ${format.money(refund)} odešleme převodem na účet, ze kterého platba přišla; potvrzení pošleme e-mailem.` : `Poplatek ${format.money(refund)} jsme vrátili původní platební metodou.`) : Number(r.paid_minor) > 0 ? 'Rezervační poplatek propadl podle storno pravidel.' : 'Poplatek nebyl uhrazen, nic se nevrací.';
+    return html`<div class="info-card">
+      <h2 class="info-card__title">Stav rezervace</h2>
+      <p class="info-card__status">${statusBadge(r.status)}</p>
+      <p class="info-card__text">${text}</p>
+      <p class="info-card__actions"><a class="btn btn--primary" href="/rezervace">Nová rezervace</a> <a class="btn btn--ghost" href="/kontakt">Kontaktovat půjčovnu</a></p>
+    </div>`;
+  }
+  const upcoming = UPCOMING_STATES.includes(r.status);
+  return html`<div class="info-card">
+      <h2 class="info-card__title">Rychlé odkazy</h2>
+      <p class="info-card__actions">${upcoming || r.status === 'checked_out' ? html`<a class="btn btn--secondary" href="${manage}/kalendar.ics" download="rezervace-${r.number}.ics">Přidat do kalendáře (ICS)</a> ` : ''}<a class="btn btn--ghost" href="/kontakt">Kontaktovat půjčovnu</a></p>
+      <p class="info-card__text">Vyzvednutí: ${format.dateTime(r.from_at)}<br>Vrácení: ${format.dateTime(r.to_at)}${upcoming ? html`<br>Vezměte s sebou platný doklad totožnosti.` : ''}</p>
+    </div>`;
+}
+
 /** Správa rezervace přes token. */
 function sprava({ reservation, detail, token, csrf, quote, tenant, settings, demo, providerAvailable, notice, noticeTone, pendingTransfer, errors = {} }) {
   const r = reservation;
@@ -377,7 +459,7 @@ function sprava({ reservation, detail, token, csrf, quote, tenant, settings, dem
       ? html`<div class="manage__block">
       <h2>Rezervační poplatek</h2>
       ${c.notice(html`Rezervace čeká na úhradu poplatku <strong>${format.money(r.fee_minor)}</strong>${r.expires_at ? html` do <strong>${format.dateTime(r.expires_at)}</strong>` : ''}. Po jeho přijetí termín závazně zablokujeme.`, 'warning')}
-      ${pendingTransfer ? bankInstructions({ reservation: r, payment: pendingTransfer, tenant }) : ''}
+      ${pendingTransfer ? bankInstructions({ reservation: r, payment: pendingTransfer, tenant, demo }) : ''}
       <div class="pay-methods pay-methods--inline">
         ${c.form({ action: `${manage}/zaplatit`, method: 'post', csrf, attrs: { class: 'form pay-method' }, children: html`<input type="hidden" name="metoda" value="karta"><div class="pay-method__body"><h3 class="pay-method__title">Platební karta</h3></div>${c.button({ label: `Zaplatit kartou ${format.money(r.fee_minor)}`, type: 'submit', variant: 'primary', disabled: !providerAvailable })}` })}
         ${!pendingTransfer ? c.form({ action: `${manage}/zaplatit`, method: 'post', csrf, attrs: { class: 'form pay-method' }, children: html`<input type="hidden" name="metoda" value="prevod"><div class="pay-method__body"><h3 class="pay-method__title">Převod / QR</h3></div>${c.button({ label: 'Zobrazit údaje k převodu', type: 'submit', variant: 'secondary' })}` }) : ''}
@@ -395,13 +477,7 @@ function sprava({ reservation, detail, token, csrf, quote, tenant, settings, dem
           ...detail.accessories.map((a) => [{ value: a.label, header: true }, '–', { value: String(a.qty), align: 'right' }, { value: format.money(a.amountMinor), align: 'right' }]),
         ],
       })}
-      ${c.summary([
-        ['Cena pronájmu', format.money(r.total_minor)],
-        ['Rezervační poplatek', format.money(r.fee_minor)],
-        ['Zaplaceno', format.money(r.paid_minor)],
-        { label: 'Zbývá doplatit', value: format.money(detail.balanceMinor), strong: true },
-        ['Vratná kauce při převzetí', format.money(r.deposit_minor)],
-      ])}
+      ${moneySummary(r, detail)}
     </div>
     <div class="manage__block">
       <h2>Platby</h2>
@@ -418,7 +494,7 @@ function sprava({ reservation, detail, token, csrf, quote, tenant, settings, dem
     <div class="manage__block">
       <h2>Doklady</h2>
       ${detail.documents.length
-        ? html`<ul class="doc-list">${detail.documents.map((d) => html`<li><a href="/doklady/${encodeURIComponent(d.number)}">${DOC_LABELS[d.type] || d.type} ${d.number}</a> <small>(${format.date(d.issued_at)})</small></li>`)}</ul>`
+        ? html`<ul class="doc-list">${detail.documents.map((d) => html`<li><a href="${docHref(d.number, token)}">${DOC_LABELS[d.type] || d.type} ${d.number}</a> <small>(${format.date(d.issued_at)})</small> <a class="doc-list__print" href="${docHref(d.number, token, { print: true })}" target="_blank" rel="noopener">tisk</a></li>`)}</ul>`
         : html`<p class="manage__empty">Doklady se vystaví po přijetí platby a při výdeji kol.</p>`}
     </div>
     ${cancellable
@@ -448,15 +524,11 @@ function sprava({ reservation, detail, token, csrf, quote, tenant, settings, dem
       : ''}
   </div>
   <aside class="manage__side">
-    <div class="info-card">
-      <h2 class="info-card__title">Rychlé odkazy</h2>
-      <p class="info-card__actions"><a class="btn btn--secondary" href="${manage}/kalendar.ics" download="rezervace-${r.number}.ics">Přidat do kalendáře (ICS)</a> <a class="btn btn--ghost" href="/kontakt">Kontaktovat půjčovnu</a></p>
-      <p class="info-card__text">Vyzvednutí: ${format.dateTime(r.from_at)}<br>Vrácení: ${format.dateTime(r.to_at)}<br>Vezměte s sebou platný doklad totožnosti.</p>
-    </div>
+    ${manageSideCard(r, detail, manage)}
     ${detail.mails.length ? html`<div class="info-card"><h2 class="info-card__title">Odeslané e-maily</h2><ul class="mail-list">${detail.mails.map((m) => html`<li>${m.subject} <small>(${format.dateTime(m.created_at)})</small></li>`)}</ul></div>` : ''}
   </aside>
 </div></section>`,
   };
 }
 
-module.exports = { STEP_ITEMS, PAYMENT_LABELS, METHOD_LABELS, LEDGER_LABELS, DOC_LABELS, stepHeader, termin, kola, udaje, poplatek, prevod, hotovo, sprava, summaryCard, bankInstructions, statusBadge };
+module.exports = { STEP_ITEMS, PAYMENT_LABELS, METHOD_LABELS, LEDGER_LABELS, DOC_LABELS, ENDED_STATES, UPCOMING_STATES, stepHeader, termin, kola, udaje, poplatek, prevod, hotovo, sprava, summaryCard, bankInstructions, bankSimLink, docHref, kcParam, statusBadge };

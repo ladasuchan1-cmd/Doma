@@ -9,11 +9,14 @@
 //       při nedostatku vyhodí AvailabilityError („Kolo mezitím někdo rezervoval“). Volat uvnitř transaction(db, …)
 //       (BEGIN IMMEDIATE) těsně před INSERTem – SQLite má jediného zapisovatele, dvě souběžné rezervace posledního
 //       kola tak nemohou projít obě.
-//   Otevírací doba: openingHoursFor(tenant, dateIso) → ['09:00','18:00'] | null; isClosedDay(db, tenant, dateIso);
-//       blockedDates({ db, tenant, from, to }) → ['YYYY-MM-DD', …] pro kalendář; timeSlots(open, close, step);
+//   Otevírací doba: effectiveOpeningHours(tenant, settings) → { mon: ['09:00','18:00'] | null, … } – výchozí z tenant.json
+//       přepsaná hodnotami z adminu (settings.openingHours; null = zavřeno); openingHoursFor(tenant, dateIso, settings)
+//       → ['09:00','18:00'] | null; isClosedDay(db, tenant, dateIso, settings); blockedDates({ db, tenant, settings, from, to })
+//       → ['YYYY-MM-DD', …] pro kalendář; timeSlots(open, close, step); allTimeSlots(tenant, { settings, stepMinutes });
 //       validateRange({ db, tenant, settings, fromAt, toAt, now }) → { ok, errors }
 //   Čas: localToUtc('2026-07-12', '09:00') → Date (UTC) podle Prahy; utcToLocal(iso) → { date, time, dayKey }.
-// Vstupy: db tenanta, tenant (openingHours), settings (bufferMinutes, maxRentalDays), časy ISO UTC.
+// Vstupy: db tenanta, tenant (openingHours), settings (openingHours, bufferMinutes, maxRentalDays), časy ISO UTC.
+// Parametr settings je všude volitelný – bez něj platí jen tenant.openingHours (zpětně kompatibilní).
 
 const format = require('../render/format');
 
@@ -91,11 +94,27 @@ function addDays(dateIso, n) {
 // ---------------------------------------------------------------------------------------------------------
 // Otevírací doba a zavírací dny
 
+/** Platný zápis dne: ['HH:MM', 'HH:MM'] s neprázdnými hodnotami; cokoli jiného (null, [], chybí) = zavřeno. */
+function normalizeDay(v) {
+  return Array.isArray(v) && v.length === 2 && v[0] && v[1] ? [String(v[0]), String(v[1])] : null;
+}
+
+/**
+ * Efektivní otevírací doba: tenant.openingHours (výchozí z tenant.json) přepsaná klíči ze settings.openingHours
+ * (admin → Nastavení; `null` u dne = zavřeno). Vrací { mon: ['09:00','18:00'] | null, …, sun } pro všech 7 dní.
+ */
+function effectiveOpeningHours(tenant, settings) {
+  const base = tenant && tenant.openingHours && typeof tenant.openingHours === 'object' ? tenant.openingHours : {};
+  const over = settings && settings.openingHours && typeof settings.openingHours === 'object' ? settings.openingHours : {};
+  const out = {};
+  for (const key of format.DAY_KEYS) out[key] = normalizeDay(Object.hasOwn(over, key) ? over[key] : base[key]);
+  return out;
+}
+
 /** Otevírací doba pro den (['09:00','18:00']) nebo null (zavřeno / nenastaveno). */
-function openingHoursFor(tenant, dateIso) {
+function openingHoursFor(tenant, dateIso, settings) {
   const key = format.dayKey(dateIso);
-  const v = tenant && tenant.openingHours ? tenant.openingHours[key] : null;
-  return Array.isArray(v) && v.length === 2 && v[0] && v[1] ? [v[0], v[1]] : null;
+  return key ? effectiveOpeningHours(tenant, settings)[key] : null;
 }
 
 /** Zavírací dny (tabulka closures): plná data YYYY-MM-DD nebo opakující se MM-DD. */
@@ -114,23 +133,27 @@ function closureFor(db, dateIso) {
 }
 
 /** Je den zavřený (zavírací den, nebo bez otevírací doby)? Vrací { closed, reason } */
-function closedInfo(db, tenant, dateIso) {
+function closedInfo(db, tenant, dateIso, settings) {
   const closure = closureFor(db, dateIso);
   if (closure) return { closed: true, reason: closure.reason || 'Zavřeno' };
-  if (!openingHoursFor(tenant, dateIso)) return { closed: true, reason: 'Zavírací den' };
+  if (!openingHoursFor(tenant, dateIso, settings)) return { closed: true, reason: 'Zavírací den' };
   return { closed: false, reason: null };
 }
 
-function isClosedDay(db, tenant, dateIso) {
-  return closedInfo(db, tenant, dateIso).closed;
+function isClosedDay(db, tenant, dateIso, settings) {
+  return closedInfo(db, tenant, dateIso, settings).closed;
 }
 
 /** Seznam zavřených dní v rozsahu (výchozí dnes … +365 dní) – pro data-blocked kalendáře. */
-function blockedDates({ db, tenant, from, to, now = new Date() }) {
+function blockedDates({ db, tenant, settings, from, to, now = new Date() }) {
   const start = from || format.isoDate(now);
   const end = to || addDays(start, 365);
+  const hours = effectiveOpeningHours(tenant, settings);
   const out = [];
-  for (let d = start; d <= end; d = addDays(d, 1)) if (isClosedDay(db, tenant, d)) out.push(d);
+  for (let d = start; d <= end; d = addDays(d, 1)) {
+    const key = format.dayKey(d);
+    if (closureFor(db, d) || !key || !hours[key]) out.push(d);
+  }
   return out;
 }
 
@@ -147,19 +170,25 @@ function timeSlots(open, close, stepMinutes = SLOT_MINUTES) {
   return out;
 }
 
-/** Všechny sloty napříč týdnem (sjednocení otevíracích dob) – pro select bez znalosti data. */
-function allTimeSlots(tenant, stepMinutes = SLOT_MINUTES) {
+/**
+ * Všechny sloty napříč týdnem (sjednocení otevíracích dob) – pro select bez znalosti data.
+ * Druhý parametr: číslo (krok v minutách, zpětně kompatibilní) nebo { settings, stepMinutes }.
+ */
+function allTimeSlots(tenant, opts) {
+  const o = typeof opts === 'number' ? { stepMinutes: opts } : opts || {};
+  const stepMinutes = Number(o.stepMinutes) > 0 ? Number(o.stepMinutes) : SLOT_MINUTES;
+  const hours = effectiveOpeningHours(tenant, o.settings);
   const set = new Set();
   for (const key of format.DAY_KEYS) {
-    const v = tenant && tenant.openingHours ? tenant.openingHours[key] : null;
-    if (Array.isArray(v) && v.length === 2 && v[0] && v[1]) for (const s of timeSlots(v[0], v[1], stepMinutes)) set.add(s);
+    const v = hours[key];
+    if (v) for (const s of timeSlots(v[0], v[1], stepMinutes)) set.add(s);
   }
   return [...set].sort();
 }
 
 /** Je okamžik v otevírací době dne (včetně krajních časů)? */
-function isWithinOpening(tenant, local) {
-  const hours = openingHoursFor(tenant, local.date);
+function isWithinOpening(tenant, local, settings) {
+  const hours = openingHoursFor(tenant, local.date, settings);
   if (!hours) return false;
   const toMin = (s) => {
     const [h, m] = String(s).split(':').map(Number);
@@ -186,18 +215,18 @@ function validateRange({ db, tenant, settings = {}, fromAt, toAt, now = new Date
   const lf = utcToLocal(from);
   const lt = utcToLocal(to);
   if (!errors.od) {
-    const ci = closedInfo(db, tenant, lf.date);
+    const ci = closedInfo(db, tenant, lf.date, settings);
     if (ci.closed) errors.od = `${format.date(lf.date)} máme zavřeno (${ci.reason}). Vyberte prosím jiný den vyzvednutí.`;
-    else if (!isWithinOpening(tenant, lf)) {
-      const h = openingHoursFor(tenant, lf.date);
+    else if (!isWithinOpening(tenant, lf, settings)) {
+      const h = openingHoursFor(tenant, lf.date, settings);
       errors.od = `Vyzvednutí je možné jen v otevírací době (${format.date(lf.date)}: ${h[0]}–${h[1]}).`;
     }
   }
   if (!errors.do) {
-    const ci = closedInfo(db, tenant, lt.date);
+    const ci = closedInfo(db, tenant, lt.date, settings);
     if (ci.closed) errors.do = `${format.date(lt.date)} máme zavřeno (${ci.reason}). Vyberte prosím jiný den vrácení.`;
-    else if (!isWithinOpening(tenant, lt)) {
-      const h = openingHoursFor(tenant, lt.date);
+    else if (!isWithinOpening(tenant, lt, settings)) {
+      const h = openingHoursFor(tenant, lt.date, settings);
       errors.do = `Vrácení je možné jen v otevírací době (${format.date(lt.date)}: ${h[0]}–${h[1]}).`;
     }
   }
@@ -207,14 +236,14 @@ function validateRange({ db, tenant, settings = {}, fromAt, toAt, now = new Date
 /**
  * Termín z formulářových hodnot: od/do (YYYY-MM-DD) + volitelné časy HH:MM; bez času se použije otevírací doba
  * (začátek dne vyzvednutí, konec dne vrácení; zavřený den → 09:00 / 18:00). Vrací { fromAt, toAt, od, do, odCas, doCas }
- * nebo null při neplatném vstupu.
+ * nebo null při neplatném vstupu. settings (volitelné) = otevírací doba z adminu.
  */
-function termFromDates({ tenant, od, do: doDate, odCas, doCas }) {
+function termFromDates({ tenant, settings, od, do: doDate, odCas, doCas }) {
   const dateRe = /^\d{4}-\d{2}-\d{2}$/;
   const timeRe = /^\d{2}:\d{2}$/;
   if (!dateRe.test(String(od || '')) || !dateRe.test(String(doDate || ''))) return null;
-  const hoursFrom = openingHoursFor(tenant, od) || ['09:00', '18:00'];
-  const hoursTo = openingHoursFor(tenant, doDate) || ['09:00', '18:00'];
+  const hoursFrom = openingHoursFor(tenant, od, settings) || ['09:00', '18:00'];
+  const hoursTo = openingHoursFor(tenant, doDate, settings) || ['09:00', '18:00'];
   const tFrom = timeRe.test(String(odCas || '')) ? odCas : hoursFrom[0];
   const tTo = timeRe.test(String(doCas || '')) ? doCas : hoursTo[1];
   try {
@@ -331,6 +360,7 @@ module.exports = {
   utcToLocal,
   localToUtc,
   addDays,
+  effectiveOpeningHours,
   openingHoursFor,
   closureFor,
   closedInfo,

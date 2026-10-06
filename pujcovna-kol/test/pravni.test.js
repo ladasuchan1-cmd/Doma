@@ -78,6 +78,10 @@ test('renderLegal: všech pět šablon bez {{ a bez interních sekcí; texty odr
   assert.match(op.html, /aplikace\.mvcr\.cz\/neplatne-doklady/, 'odkaz na Databázi neplatných dokladů MV ČR');
   assert.match(op.html, /Policie ČR/, 'statistika Policie ČR');
   assert.match(op.html, /archiv\.policie\.gov\.cz/, 'zdroj statistiky s URL');
+  // údaj za rok 2024 musí mít rok i odkaz na primární zdroj (Statistické přehledy kriminality PČR), QA nález
+  assert.match(op.html, /v roce 2024 celkem 3 971 krádeží/, 'ověřený údaj 2024');
+  assert.match(op.html, /<a href="https:\/\/archiv\.policie\.gov\.cz\/clanek\/statisticke-prehledy-kriminality-za-rok-2024\.aspx"[^>]*>2024<\/a>/, 'odkaz na Statistické přehledy kriminality 2024');
+  assert.ok(!/ztrojnásobil|v roce 2010/.test(op.html), 'pražské údaje 2010–2014 nejsou v celostátním srovnání');
   assert.match(op.html, /nejméně 48 hodin před začátkem nájmu<\/td><td>100 %/, 'storno tabulka ze settings');
   assert.match(op.html, /úplat\w+ za zajištění/, 'poplatek = úplata za zajištění služby');
   assert.match(op.html, /zjednodušený daňový doklad/i);
@@ -95,6 +99,134 @@ test('renderLegal: všech pět šablon bez {{ a bez interních sekcí; texty odr
   assert.ok(!/ČÁST D/.test(bezD.html));
   assert.match(bezD.html, /Jana &lt;Nováková&gt;/);
   assert.throws(() => pravni.renderLegal('neexistuje', params), /Neznámý právní dokument/);
+});
+
+test('šablony bez editorských značek: všech 5 dokumentů bez [VARIANTA / [při / [Volitelné / [ONLINE / [NA MÍSTĚ / {{ / …………; varianty řídí booleovské parametry', () => {
+  const MARKERS = ['[VARIANTA', '[při', '[Volitelné', '[ONLINE', '[NA MÍSTĚ', '[E-KOLO', '[jen ', '[Výchozí', '{{', '(opakuje se', '= ano', '= ne', '> 0'];
+  // údaje rezervace / protokolu a smlouvy s provozovatelem doplňuje admin – pro test je vyplníme testovacími hodnotami
+  const filled = Object.fromEntries(Object.entries(params).map(([k, v]) => [k, typeof v === 'string' && v.includes(pravni.BLANK) ? `TEST-${k}` : v]));
+  for (const doc of pravni.LEGAL_DOCS) {
+    const r = pravni.renderLegal(doc, filled);
+    assert.deepEqual(r.missing, [], doc);
+    for (const m of MARKERS) assert.ok(!r.html.includes(m), `${doc}: zbylá značka „${m}“`);
+    assert.ok(!r.html.includes(pravni.BLANK), `${doc}: „…………“ s vyplněnými údaji`);
+  }
+  // veřejné dokumenty jsou bez „…………“ už s holými demo parametry (nic nedoplňuje admin)
+  for (const doc of ['obchodni-podminky', 'zasady-ochrany-osobnich-udaju']) assert.ok(!pravni.renderLegal(doc, params).html.includes(pravni.BLANK), `${doc}: „…………“`);
+  // booleovské parametry odvozené z nastavení dema
+  assert.equal(params.EVIDENCE_UCETNICTVI, 'ano');
+  assert.equal(params.DOKLAD_ZJEDNODUSENY, 'ano');
+  assert.equal(params.ANALYTIKA, 'ne');
+  assert.equal(params.PODPIS_OBRAZOVKA, 'ano');
+  assert.equal(params.DOKLAD_CISLO_PLNE, 'ne');
+  assert.equal(params.POJISTOVNA_UVEDENA, 'ne');
+  assert.equal(params.POPLATEK_NABITI_UCTUJEME, 'ne');
+  assert.equal(params.SMLOUVA_REZIM, 'online');
+  assert.equal(params.SMLOUVA_NA_MISTE, 'ne');
+  assert.equal(params.KOLA, 'ano');
+
+  // plátce (demo) vs. neplátce s daňovou evidencí
+  const op = pravni.renderLegal('obchodni-podminky', params).html;
+  assert.match(op, /<blockquote><p>Jsme plátci DPH, DIČ CZ00000000\.<\/p><\/blockquote>/);
+  assert.ok(!/Nejsme plátci DPH/.test(op));
+  assert.ok(!/Platba na místě|zaplatím na místě/.test(op), 'čl. 3.6 se bez PLATBA_NA_MISTE_POVOLENA nezobrazí');
+  assert.ok(!/Elektrokolo s baterií pod 20 %/.test(op), 'řádek o nabití bez paušálu zmizí');
+  assert.match(op, /Nájemné za nevyužitou dobu se nevrací/);
+  assert.ok(!/Nájemné za celé nevyužité dny vracíme/.test(op));
+  const np = pravni.legalParams({ ...tenant, business: { ...tenant.business, legalName: 'Jan Novák', vatPayer: false, register: undefined } }, { ...tenant.settings, allowPayOnSite: true, chargingFlatMinor: 15000, earlyReturnRefund: true });
+  assert.equal(np.EVIDENCE_UCETNICTVI, 'ne');
+  const opNp = pravni.renderLegal('obchodni-podminky', np).html;
+  assert.match(opNp, /<blockquote><p>Nejsme plátci DPH\.<\/p><\/blockquote>/);
+  assert.ok(!/DIČ|Jsme plátci DPH|včetně DPH/.test(opNp));
+  assert.match(opNp, /zaplatím na místě/);
+  assert.match(opNp, new RegExp(`<td>Elektrokolo s baterií pod 20 %</td><td>paušál za nabití ${format.money(15000)}</td>`));
+  assert.match(opNp, /Nájemné za celé nevyužité dny vracíme/);
+  const zas = pravni.renderLegal('zasady-ochrany-osobnich-udaju', params).html;
+  assert.match(zas, /IČO 00000000, DIČ CZ00000000/);
+  assert.match(zas, /<td>Daňové doklady \(daňový doklad k přijaté platbě/);
+  assert.match(zas, /<td>Účetní doklady a záznamy<\/td>/);
+  assert.match(zas, /zjednodušený daňový doklad/);
+  assert.match(zas, /není cookie lišta/);
+  assert.ok(!/__Host-souhlas|analyticke-cookies|Analytické cookies<\/h3>/.test(zas), 'bez analytiky žádná cookie lišta');
+  assert.match(zas, /zpracováváme v Evropské unii\.<\/strong>/);
+  assert.match(zas, /kola nemají GPS/);
+  assert.match(zas, /<strong>Podpis na obrazovce\.<\/strong>/);
+  assert.ok(!/Listinné protokoly\.<\/strong>/.test(zas));
+  assert.ok(!/<td>11<\/td>/.test(zas), 'řádek 11 (GPS) se bez lokátorů nezobrazí');
+  const zasNp = pravni.renderLegal('zasady-ochrany-osobnich-udaju', np).html;
+  assert.ok(!/<td>Daňové doklady \(daňový/.test(zasNp));
+  assert.match(zasNp, /a daňová evidence<\/td>/);
+  assert.ok(!/IČO 00000000, DIČ/.test(zasNp));
+  // zapnutá analytika, GPS, pojišťovna, papírový podpis s plným číslem
+  const an = pravni.legalParams(tenant, { ...tenant.settings, analyticsTool: 'Matomo', analyticsProvider: 'InnoCraft', gpsTrackers: true, insurance: 'Pojišťovna XY', signatureMode: 'papir', idDocPrint: 'plne', secondIdDoc: true, recordBirthAddress: true });
+  assert.equal(an.ANALYTIKA, 'ano');
+  const zasAn = pravni.renderLegal('zasady-ochrany-osobnich-udaju', an).html;
+  assert.match(zasAn, /<h3 id="analyticke-cookies">Analytické cookies<\/h3>/);
+  assert.match(zasAn, /__Host-souhlas/);
+  assert.match(zasAn, /analytické cookies nástroje Matomo/);
+  assert.ok(!/není cookie lišta/.test(zasAn));
+  assert.match(zasAn, /<td>11<\/td><td><strong>Sledování polohy kola lokátorem<\/strong>/);
+  assert.match(zasAn, /<strong>Pojišťovna XY<\/strong> – pojišťovna/);
+  assert.match(zasAn, /<strong>Listinné protokoly\.<\/strong> Smlouvu o nájmu a protokoly podepisujeme na papíře ve dvou vyhotoveních; na výtisku je číslo dokladu uvedeno celé\./);
+  assert.match(zasAn, /<td><strong>Druhý doklad<\/strong><\/td>/);
+  assert.match(zasAn, /<td><strong>Datum narození a adresa bydliště<\/strong><\/td>/);
+  const zz = pravni.renderLegal('zaznam-o-cinnostech-zpracovani', an).html;
+  assert.match(zz, /<h4 id="a10-mereni-navstevnosti-webu">A10 – Měření návštěvnosti webu<\/h4>/);
+  assert.match(zz, /<td>A10<\/td><td>Měření návštěvnosti webu nástrojem Matomo<\/td>/);
+  assert.ok(!/A10 – Měření/.test(pravni.renderLegal('zaznam-o-cinnostech-zpracovani', params).html));
+  // smlouva: online/na místě, obrazovka/papír, kauce hotově, vrácení bez nájemce, e-kolo řádky
+  const sm = pravni.renderLegal('smlouva-o-najmu-a-predavaci-protokol', params).html;
+  assert.match(sm, /2\.3 Smlouva vznikla potvrzením vaší rezervace/);
+  assert.match(sm, /7\.2 Smlouvu podepisujete na obrazovce/);
+  assert.match(sm, /IČO 00000000, DIČ CZ00000000, sídlo/);
+  assert.ok(!/Displej \/ ovladač|zaškolení<\/strong> k elektrokolu|Protokol podepisuje jen obsluha|Účet pro vrácení kauce, nebude-li/.test(sm));
+  assert.match(sm, /<td>včetně DPH<\/td>/);
+  const smNa = pravni.renderLegal('smlouva-o-najmu-a-predavaci-protokol', { ...np, SMLOUVA_NA_MISTE: 'ano', PODPIS_OBRAZOVKA: 'ne', KAUCE_HOTOVE: 'ano', VRACENI_BEZ_NAJEMCE: 'ano', KOLO_JE_EKOLO: 'ano' }).html;
+  assert.match(smNa, /2\.3 Rezervaci č\. ………… jsme založili na výdejním místě/);
+  assert.ok(!/Smlouva vznikla potvrzením/.test(smNa));
+  assert.match(smNa, /7\.2 Smlouva je vyhotovena ve dvou stejnopisech/);
+  assert.match(smNa, /Účet pro vrácení kauce, nebude-li možné/);
+  assert.match(smNa, /Protokol podepisuje jen obsluha/);
+  assert.match(smNa, /Displej \/ ovladač/);
+  assert.match(smNa, /<td>nejsme plátci DPH<\/td>/);
+  assert.match(smNa, /Konečné vyúčtování č\./);
+  assert.ok(!/Konečný daňový doklad č\./.test(smNa));
+  // cyklus přes kola: pole KOLA → řádek B.1, B.2, C.2 a tabulka B.3 pro každé kolo
+  const kola = [
+    { KOLO_PORADI: '1', KOLO_TYP: 'Trek <FX>', KOLO_INVENTARNI_KOD: 'TK-07', KOLO_JE_EKOLO: 'ne' },
+    { KOLO_PORADI: '2', KOLO_TYP: 'Cube e', KOLO_INVENTARNI_KOD: 'EK-02', KOLO_JE_EKOLO: 'ano', KOLO_BATERIE_PROCENTA: '80', KOLO_VRACENI_BATERIE_PROCENTA: '55' },
+  ];
+  const smK = pravni.renderLegal('smlouva-o-najmu-a-predavaci-protokol', { ...params, KOLA: kola }).html;
+  assert.equal((smK.match(/<td>TK-07<\/td>/g) || []).length, 2, 'B.1 + C.2');
+  assert.equal((smK.match(/<td>EK-02<\/td>/g) || []).length, 2);
+  assert.match(smK, /<td>Trek &lt;FX&gt;<\/td>/);
+  assert.equal((smK.match(/Kontrolovaná část/g) || []).length, 2, 'B.3 pro každé kolo');
+  assert.equal((smK.match(/Displej \/ ovladač/g) || []).length, 1, 'e-kolo řádky jen u elektrokola');
+  assert.match(smK, /Baterie – nabití 80 %/);
+  assert.match(smK, /<td>55 %<\/td>/);
+  // výřez protokolu B (documents.js) s polem funguje stejně
+  const onlyB = pravni.renderLegal('smlouva-o-najmu-a-predavaci-protokol', { ...params, KOLA: kola }, { only: [/^ČÁST B/, /^B\.\d/] }).html;
+  assert.equal((onlyB.match(/<td>EK-02<\/td>/g) || []).length, 1);
+  assert.ok(!/ČÁST A|ČÁST C/.test(onlyB));
+});
+
+test('nadpisy mají stabilní id (slug) – kotvy pro rezervaci: /podminky#8-prevzeti-kola, /soukromi#3-proc-udaje-zpracovavame-a-na-jakem-pravnim-zaklade', () => {
+  const op = pravni.renderLegal('obchodni-podminky', params);
+  const ids = op.headings.filter((h) => h.level === 2).map((h) => h.id);
+  assert.deepEqual(ids.slice(0, 3), ['1-kdo-jsme-a-jak-nas-kontaktovat', '2-co-tyto-podminky-upravuji', '3-rezervace-a-uzavreni-smlouvy']);
+  assert.ok(ids.includes('8-prevzeti-kola'));
+  assert.ok(ids.includes('6-storno-a-zmeny-rezervace-zruseni-z-nasi-strany'));
+  assert.ok(ids.includes('12-zavady-a-reklamace') && ids.includes('13-mimosoudni-reseni-sporu'));
+  assert.match(op.html, /<h2 id="8-prevzeti-kola">/);
+  const zas = pravni.renderLegal('zasady-ochrany-osobnich-udaju', params);
+  const zids = zas.headings.filter((h) => h.level === 2).map((h) => h.id);
+  assert.ok(zids.includes('3-proc-udaje-zpracovavame-a-na-jakem-pravnim-zaklade'));
+  assert.ok(zids.includes('2-jake-udaje-zpracovavame') && zids.includes('7-cookies-a-podobne-technologie'));
+  // id nezávisí na variantě (plátce / neplátce, analytika)
+  const np = pravni.legalParams({ ...tenant, business: { ...tenant.business, legalName: 'Jan Novák', vatPayer: false, register: undefined } }, { ...tenant.settings, analyticsTool: 'Matomo' });
+  assert.deepEqual(pravni.renderLegal('obchodni-podminky', np).headings.filter((h) => h.level === 2).map((h) => h.id), ids);
+  assert.deepEqual(pravni.renderLegal('zasady-ochrany-osobnich-udaju', np).headings.filter((h) => h.level === 2).map((h) => h.id), zids);
+  assert.equal(md.slugify('8. Převzetí kola'), '8-prevzeti-kola');
 });
 
 let srv;
@@ -125,6 +257,8 @@ test('/podminky, /soukromi, /reklamace: 200 v layoutu, bez {{, bez interních č
   assert.equal((op.match(/<h1\b/g) || []).length, 1, 'jediný h1');
   assert.match(op, /<nav class="legal-toc"/);
   assert.match(op, /href="#8-prevzeti-kola"/);
+  assert.match(op, /<h2 id="8-prevzeti-kola">/);
+  for (const m of ['[VARIANTA', '[při', '[Volitelné', '[ONLINE', '[NA MÍSTĚ', pravni.BLANK]) assert.ok(!op.includes(m), `/podminky: „${m}“`);
   assert.match(op, /Verze 1\.0, účinná od 5\. 10\. 2026/);
   assert.match(op, /neplatne-doklady/);
   assert.match(op, /nejméně 48 hodin před začátkem nájmu/);
@@ -132,6 +266,8 @@ test('/podminky, /soukromi, /reklamace: 200 v layoutu, bez {{, bez interních č
   assert.match(zas, /<title>Ochrana osobních údajů · Půjčovna kol U Tří dubů<\/title>/);
   assert.match(zas, /Stručně na úvod/);
   assert.match(zas, /U Tří dubů s\.r\.o\./);
+  assert.match(zas, /<h2 id="3-proc-udaje-zpracovavame-a-na-jakem-pravnim-zaklade">/);
+  for (const m of ['[VARIANTA', '[při', '[Volitelné', '[jen ', '[Výchozí', pravni.BLANK]) assert.ok(!zas.includes(m), `/soukromi: „${m}“`);
   const rek = await (await srv.fetch('/reklamace')).text();
   assert.match(rek, /<h2 id="12-zavady-a-reklamace">/);
   assert.match(rek, /<h2 id="13-mimosoudni-reseni-sporu">/);

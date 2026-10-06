@@ -11,8 +11,12 @@
 //   {{PARAM}}              → hodnota: řetězec/číslo (escapované), Html fragment (vloží se beze změny),
 //                            { markdown, inline } (markdown se vloží jako zdroj, je-li placeholder sám na řádku,
 //                            jinak text `inline`)
-//   {{#X}}…{{/X}}          → obsah jen je-li X pravdivé (viz isTruthy: '', 'ne', 'false', '0', '—', '-', null… = nepravda)
+//   {{#X}}…{{/X}}          → obsah jen je-li X pravdivé (viz isTruthy: '', 'ne', 'false', '0', '—', '-', null, []… = nepravda);
+//                            je-li X pole záznamů, obsah se opakuje pro každý záznam a jeho klíče ({ KOLO_TYP: … })
+//                            dosazují a vyhodnocují podmínky uvnitř bloku (cyklus, např. řádek tabulky pro každé kolo)
 //   {{^X}}…{{/X}}          → obsah jen je-li X nepravdivé
+//   Značka {{#X}} / {{^X}} / {{/X}} sama na řádku „spolkne“ i svůj konec řádku, takže blok obalující celé odstavce
+//   nebo řádky tabulky nezanechá prázdný řádek (tabulka zůstane celistvá); skrytý blok zmizí včetně řádků značek.
 //   <!-- INTERNI: nerenderovat --> … <!-- /INTERNI -->  → vyhozeno
 //   sekce „## Parametry“, „## K ověření advokátem“, „## Příloha pro advokáta…“ a úvodní rámeček
 //   „> **Návrh připravený jako podklad…“ → vyhozeny (do dalšího nadpisu stejné nebo vyšší úrovně)
@@ -36,6 +40,7 @@ const SAFE_URL_RE = /^(https?:\/\/|mailto:|tel:|\/(?!\/)|#)/i;
 /** Pravdivost hodnoty parametru pro {{#X}} / {{^X}}. */
 function isTruthy(value) {
   if (value === null || value === undefined || value === false) return false;
+  if (Array.isArray(value)) return value.length > 0;
   if (typeof value === 'number') return value !== 0;
   if (typeof value === 'object') return true;
   return !FALSY_TEXT.has(String(value).trim().toLowerCase());
@@ -74,10 +79,13 @@ function headingText(line) {
 // ---------------------------------------------------------------------------------------------------------
 // Šablonování
 
-/** Vyhodí bloky <!-- INTERNI … --> … <!-- /INTERNI --> a ostatní HTML komentáře. */
+/**
+ * Vyhodí bloky <!-- INTERNI … --> … <!-- /INTERNI --> a ostatní HTML komentáře. Značky INTERNI platí jen samy na
+ * začátku řádku – zmínka značky uvnitř textu (např. v `kódu` v tabulce Parametry) blok neukončí.
+ */
 function stripComments(src) {
   return String(src)
-    .replace(/<!--\s*INTERNI\b[^>]*-->[\s\S]*?<!--\s*\/INTERNI\s*-->/g, '')
+    .replace(/(^|\n)[ \t]*<!--\s*INTERNI\b[^>\n]*-->[ \t]*(?:\n[\s\S]*?)?\n[ \t]*<!--\s*\/INTERNI\s*-->[ \t]*(?=\n|$)/g, '$1')
     .replace(/<!--[\s\S]*?-->/g, '');
 }
 
@@ -141,8 +149,33 @@ function findClose(src, name, from) {
   return null;
 }
 
-/** Vyhodnotí bloky {{#X}}…{{/X}} a {{^X}}…{{/X}}. */
-function applyConditionals(src, params) {
+const HIDDEN = '\u0002';
+
+/** Založí slot (hodnota se dosadí až do výsledného HTML – text escapovaně, raw beze změny) a vrátí jeho značku. */
+function slotRef(slots, kind, value) {
+  return `${SENT}${slots.push({ kind, value }) - 1}${SENT}`;
+}
+
+/**
+ * Dosadí hodnoty jednoho záznamu cyklu do těla bloku: skalární hodnoty přes sloty (zůstanou escapované a nevykládají
+ * se jako markdown), objekty a pole ponechá vnořeným blokům / globálnímu dosazení.
+ */
+function bindItem(inner, item, slots) {
+  return inner.replace(PLACEHOLDER_RE, (all, name) => {
+    if (!Object.hasOwn(item, name)) return all;
+    const v = item[name];
+    if (v === null || v === undefined) return '';
+    if (isHtml(v)) return slotRef(slots, 'raw', String(v));
+    if (typeof v === 'object') return all;
+    return slotRef(slots, 'text', String(v));
+  });
+}
+
+/**
+ * Vyhodnotí bloky {{#X}}…{{/X}} a {{^X}}…{{/X}}; {{#X}} nad polem záznamů je cyklus. Značky samy na řádku spolknou
+ * svůj konec řádku (viz hlavička). `slots` sbírá hodnoty dosazené v cyklech (sdílí se se substitute()).
+ */
+function applyConditionals(src, params, slots = []) {
   const openRe = /\{\{([#^])([A-Z][A-Z0-9_]*)\}\}/g;
   let out = '';
   let pos = 0;
@@ -150,23 +183,38 @@ function applyConditionals(src, params) {
     openRe.lastIndex = pos;
     const m = openRe.exec(src);
     if (!m) break;
-    const close = findClose(src, m[2], m.index + m[0].length);
+    const tagEnd = m.index + m[0].length;
+    const close = findClose(src, m[2], tagEnd);
     if (!close) {
       // neuzavřený blok → značku ponecháme jako text
-      out += src.slice(pos, m.index + m[0].length);
-      pos = m.index + m[0].length;
+      out += src.slice(pos, tagEnd);
+      pos = tagEnd;
       continue;
     }
+    const openAlone = (m.index === 0 || src[m.index - 1] === '\n') && src[tagEnd] === '\n';
+    const closeAlone = src[close.start - 1] === '\n' && (close.end === src.length || src[close.end] === '\n');
     out += src.slice(pos, m.index);
-    const inner = src.slice(m.index + m[0].length, close.start);
-    const show = m[1] === '#' ? isTruthy(params[m[2]]) : !isTruthy(params[m[2]]);
-    out += show ? applyConditionals(inner, params) : HIDDEN; // značka skrytého bloku – prázdný řádek se pak smaže
-    pos = close.end;
+    const inner = src.slice(openAlone ? tagEnd + 1 : tagEnd, close.start);
+    const value = params[m[2]];
+    const show = m[1] === '#' ? isTruthy(value) : !isTruthy(value);
+    if (!show) {
+      out += HIDDEN; // značka skrytého bloku – řádek, který zbyl prázdný, se pak smaže
+      pos = close.end;
+      continue;
+    }
+    if (m[1] === '#' && Array.isArray(value)) {
+      // blok pokrývající celé řádky (např. {{#KOLA}}| … |{{/KOLA}}) se opakuje po řádcích, blok uvnitř věty plynule
+      const lineBlock = (m.index === 0 || src[m.index - 1] === '\n') && (close.end === src.length || src[close.end] === '\n');
+      const sep = lineBlock && !inner.endsWith('\n') ? '\n' : '';
+      out += value.map((item) => applyConditionals(bindItem(inner, item && typeof item === 'object' ? item : {}, slots), { ...params, ...(item && typeof item === 'object' ? item : {}) }, slots)).join(sep);
+    } else {
+      out += applyConditionals(inner, params, slots);
+    }
+    // zobrazený blok se značkami na samostatných řádcích nezanechá za uzavírací značkou prázdný řádek
+    pos = openAlone && closeAlone && src[close.end] === '\n' ? close.end + 1 : close.end;
   }
   return out + src.slice(pos);
 }
-
-const HIDDEN = '\u0002';
 
 /** Smaže řádky, které zbyly prázdné po skrytém bloku (např. podmíněný řádek tabulky), jinak značku jen odstraní. */
 function dropHiddenLines(src) {
@@ -182,8 +230,7 @@ function dropHiddenLines(src) {
  * Dosadí parametry: textové hodnoty nahradí sloty (dosadí se escapované až po renderu), markdown hodnoty
  * se vloží do zdroje. Vrací { source, slots, missing }.
  */
-function substitute(src, params) {
-  const slots = [];
+function substitute(src, params, slots = []) {
   const missing = [];
   const lines = src.split('\n');
   const out = lines.map((line) => {
@@ -199,25 +246,27 @@ function substitute(src, params) {
       }
       const v = params[name];
       if (v === null || v === undefined) return '';
-      if (isHtml(v)) return `${SENT}${slots.push({ kind: 'raw', value: String(v) }) - 1}${SENT}`;
+      if (isHtml(v)) return slotRef(slots, 'raw', String(v));
+      if (Array.isArray(v)) return slotRef(slots, 'text', v.map((x) => (x && typeof x === 'object' ? '' : String(x))).filter(Boolean).join(', '));
       if (typeof v === 'object') {
-        if (typeof v.html === 'string') return `${SENT}${slots.push({ kind: 'raw', value: v.html }) - 1}${SENT}`;
-        if (typeof v.inline === 'string') return `${SENT}${slots.push({ kind: 'text', value: v.inline }) - 1}${SENT}`;
-        if (typeof v.markdown === 'string') return `${SENT}${slots.push({ kind: 'text', value: plainText(v.markdown) }) - 1}${SENT}`;
-        return `${SENT}${slots.push({ kind: 'text', value: String(v) }) - 1}${SENT}`;
+        if (typeof v.html === 'string') return slotRef(slots, 'raw', v.html);
+        if (typeof v.inline === 'string') return slotRef(slots, 'text', v.inline);
+        if (typeof v.markdown === 'string') return slotRef(slots, 'text', plainText(v.markdown));
+        return slotRef(slots, 'text', String(v));
       }
-      return `${SENT}${slots.push({ kind: 'text', value: String(v) }) - 1}${SENT}`;
+      return slotRef(slots, 'text', String(v));
     });
   });
   return { source: out.join('\n'), slots, missing };
 }
 
-/** Celé šablonování bez renderu (komentáře, interní sekce, podmínky, dosazení). */
+/** Celé šablonování bez renderu (komentáře, interní sekce, podmínky a cykly, dosazení). */
 function applyTemplate(src, params = {}, opts = {}) {
+  const slots = [];
   let s = stripComments(src);
   s = stripInternal(s, opts);
-  s = dropHiddenLines(applyConditionals(s, params));
-  return substitute(s, params);
+  s = dropHiddenLines(applyConditionals(s, params, slots));
+  return substitute(s, params, slots);
 }
 
 /** Nahradí sloty ve výsledném HTML (text escapovaně, raw beze změny). */

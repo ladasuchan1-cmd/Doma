@@ -2,13 +2,31 @@
 // Kontext požadavku ctx (SPEC kap. 3): req, res, tenant, db, theme, url, params, query, body, cookies, session,
 // adminSession, csrfToken(), ip, render(), redirect(), json(), html(), notFound(), log, settings, requestId.
 // Tělo (application/x-www-form-urlencoded nebo JSON) čte readBody() s limitem 256 KB → 413; jiný typ → 415.
+// Odpovědi send()/html()/json()/text() se u textových typů od 1 KB komprimují gzip/brotli podle Accept-Encoding
+// (stejně jako statika) a nesou Vary: Accept-Encoding.
 // Vstup: { req, res, app, tenant, db, theme, params, opts, log, requestId, secure, ip }. Výstup: ctx.
 
 const crypto = require('node:crypto');
+const zlib = require('node:zlib');
 const { createSession, parseCookies, serializeCookie, appendSetCookie } = require('./session');
 const { HttpError } = require('./errors');
+const { isCompressible, pickEncoding } = require('./static');
 const { getSettings } = require('../tenants');
 const { isHtml } = require('../render/html');
+
+const COMPRESS_MIN_BYTES = 1024;
+
+/**
+ * Zkomprimuje tělo odpovědi podle Accept-Encoding (br > gzip), je-li typ textový a tělo dost velké.
+ * Synchronně – dynamické stránky mají desítky KB, komprese trvá jednotky ms. Vrací { body, encoding|null }.
+ */
+function compressBody(buf, { acceptEncoding, contentType }) {
+  if (!buf || buf.length < COMPRESS_MIN_BYTES || !isCompressible(contentType)) return { body: buf, encoding: null };
+  const encoding = pickEncoding(acceptEncoding);
+  if (encoding === 'br') return { body: zlib.brotliCompressSync(buf, { params: { [zlib.constants.BROTLI_PARAM_QUALITY]: 4, [zlib.constants.BROTLI_PARAM_SIZE_HINT]: buf.length } }), encoding };
+  if (encoding === 'gzip') return { body: zlib.gzipSync(buf, { level: 6 }), encoding };
+  return { body: buf, encoding: null };
+}
 
 function clientIp(req, { trustProxy = false } = {}) {
   if (trustProxy) {
@@ -128,13 +146,22 @@ function createContext(init) {
     setCookie(name, value, opts = {}) {
       appendSetCookie(res, serializeCookie(name, value, { secure: opts.secure ?? secure, ...opts }));
     },
-    /** Nízkoúrovňové odeslání. */
+    /** Nízkoúrovňové odeslání; textová těla komprimuje podle Accept-Encoding (Vary: Accept-Encoding). */
     send(status, headers, body) {
       if (finished) return;
       finished = true;
-      const buf = body === null || body === undefined ? null : Buffer.isBuffer(body) ? body : Buffer.from(String(body), 'utf8');
+      let buf = body === null || body === undefined ? null : Buffer.isBuffer(body) ? body : Buffer.from(String(body), 'utf8');
       res.statusCode = status;
       for (const [k, v] of Object.entries(headers || {})) if (v !== undefined) res.setHeader(k, v);
+      if (buf && status !== 204 && status !== 304 && !res.getHeader('Content-Encoding')) {
+        const contentType = res.getHeader('Content-Type');
+        if (isCompressible(contentType)) res.setHeader('Vary', 'Accept-Encoding');
+        const c = compressBody(buf, { acceptEncoding: req.headers['accept-encoding'], contentType });
+        if (c.encoding) {
+          res.setHeader('Content-Encoding', c.encoding);
+          buf = c.body;
+        }
+      }
       if (buf) res.setHeader('Content-Length', String(buf.length));
       if (req.method === 'HEAD' || !buf) res.end();
       else res.end(buf);
@@ -188,4 +215,4 @@ function createContext(init) {
   return ctx;
 }
 
-module.exports = { createContext, readBody, clientIp, ipHash, queryObject };
+module.exports = { createContext, readBody, clientIp, ipHash, queryObject, compressBody, COMPRESS_MIN_BYTES };

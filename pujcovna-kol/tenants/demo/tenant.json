@@ -7,6 +7,8 @@
   "brand": { "logo": "/tenant/logo.svg", "claim": "Kola, která vás vezmou dál", "primary": null },
   "business": { "legalName": "U Tří dubů s.r.o.", "ico": "00000000", "dic": "CZ00000000", "vatPayer": true,
     "address": "Masarykovo nám. 1, 379 01 Třeboň", "email": "info@ksprehledy.cz", "phone": "+420 000 000 000",
+    "premises": "Masarykovo nám. 1, 379 01 Třeboň (přízemí, vchod z náměstí – demo)",
+    "representative": "jednatel společnosti (demo)",
     "iban": "CZ6508000000192000145399", "accountNumber": "19-2000145399/0800", "bankName": "Česká spořitelna (demo)" },
   "location": { "lat": 49.0035, "lon": 14.7708, "radiusKm": 25 },
   "openingHours": { "mon": ["09:00","18:00"], "tue": ["09:00","18:00"], "wed": ["09:00","18:00"], "thu": ["09:00","18:00"], "fri": ["09:00","18:00"], "sat": ["08:00","19:00"], "sun": ["08:00","19:00"] },
@@ -28,6 +30,12 @@
     "cleaningFlatMinor": 30000
   },
   "legal": { "version": "1.0", "effectiveFrom": "2026-10-05", "operatorName": "KS Přehledy (provozovatel musteru)", "operatorIco": "00000000",
+    "operatorAddress": "Cyklistická 1, 370 01 České Budějovice – demo",
+    "operatorEmail": "provozovatel@ksprehledy.cz",
+    "operatorIncidentContact": "provozovatel@ksprehledy.cz, +420 000 000 001 (nepřetržitě – demo)",
+    "operatorRepresentative": "jednatel provozovatele (demo)",
+    "operatorRegister": "zapsaný v obchodním rejstříku vedeném Krajským soudem v Českých Budějovicích – demo",
+    "operatorPrivacyContact": "pověřená osoba pro ochranu údajů, provozovatel@ksprehledy.cz (demo)",
     "processors": ["Hetzner Online GmbH (hosting, Německo – EU)", "e-mailová služba (bude doplněna)"] },
   "texts": { "heroTitle": "Půjčte si kolo a objevte Třeboňsko", "heroText": "Trekové, horské i elektrokola, dětská kola a vozíky. Rezervujte online za minutu, vyzvedněte u nás na náměstí.",
     "about": "Rodinná půjčovna v centru Třeboně. Kola servisujeme po každém vrácení, k zapůjčení dáváme zámek, mapu a tipy na výlety." }

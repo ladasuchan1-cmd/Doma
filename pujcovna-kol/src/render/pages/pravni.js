@@ -27,11 +27,13 @@ function demoNote(version) {
 
 function legal({ title, lead, doc, version, effectiveFrom, demo, toc: showToc = true, excerptOf, contact }) {
   const meta = [version ? `Verze ${version}` : null, effectiveFrom ? `účinná od ${effectiveFrom}` : null].filter(Boolean).join(', ');
+  const tocHtml = showToc ? toc(doc.headings) : '';
+  // dvousloupcová mřížka (obsah + text) jen když obsah skutečně existuje; výňatek /reklamace je jednosloupcový
   return html`
 ${c.section({ variant: 'page-head', title, titleTag: 'h1', lead })}
 <section class="section section--legal">
-  <div class="container legal-layout">
-    ${showToc ? toc(doc.headings) : ''}
+  <div class="container legal-layout${tocHtml ? ' legal-layout--toc' : ''}">
+    ${tocHtml}
     <div class="legal-main">
       <p class="legal-meta">${meta}${excerptOf ? html` · výňatek z dokumentu <a href="${excerptOf.href}">${excerptOf.label}</a>` : ''}</p>
       <article class="legal">${raw(withoutFirstH1(doc.html))}</article>

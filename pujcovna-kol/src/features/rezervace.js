@@ -168,11 +168,12 @@ function renderTermin(ctx, { values, errors = {}, status = 200, preselect = null
       csrf: ctx.csrfToken(),
       values,
       errors,
-      slots: availability.allTimeSlots(ctx.tenant),
-      blocked: availability.blockedDates({ db: ctx.db, tenant: ctx.tenant, from: minDate, to: maxDate, now: today }),
+      slots: availability.allTimeSlots(ctx.tenant, { settings: ctx.settings }),
+      blocked: availability.blockedDates({ db: ctx.db, tenant: ctx.tenant, settings: ctx.settings, from: minDate, to: maxDate, now: today }),
       minDate,
       maxDate,
       tenant: ctx.tenant,
+      openingHours: availability.effectiveOpeningHours(ctx.tenant, ctx.settings),
       preselect,
     },
     { feature: 'rezervace', status, canonicalPath: '/rezervace', description: 'Online rezervace kol v Třeboni: vyberte termín, kola a zaplaťte rezervační poplatek. Potvrzení ihned e-mailem.' }
@@ -445,7 +446,7 @@ async function handlePaymentChoice(ctx, { reservation, token, metoda, backRender
     } else {
       notice = 'QR kód a automatické párování platby se připravují. Údaje k převodu platí; po připsání platby obsluha rezervaci potvrdí ručně.';
     }
-    ctx.render(page.prevod, { reservation, payment, token, tenant: ctx.tenant, notice }, { feature: 'rezervace', noindex: true });
+    ctx.render(page.prevod, { reservation, payment, token, tenant: ctx.tenant, notice, demo: !!ctx.config.demo }, { feature: 'rezervace', noindex: true });
     return undefined;
   }
   if (metoda === 'demo') {
@@ -519,7 +520,7 @@ function pendingTransferOf(ctx, r) {
   const p = ctx.db.prepare("SELECT * FROM payments WHERE reservation_id = ? AND purpose = 'fee' AND method = 'bank_transfer' AND status IN ('created', 'pending') ORDER BY id DESC LIMIT 1").get(r.id);
   if (!p) return null;
   const b = ctx.tenant.business || {};
-  return { amountMinor: p.amount_minor, iban: b.iban || null, accountNumber: b.accountNumber || null, vs: p.vs || r.number, spayd: p.spayd || null, qrSvg: qrFor(p.spayd), expiresAt: r.expires_at };
+  return { amountMinor: p.amount_minor, capturedMinor: Number(p.captured_minor) || 0, iban: b.iban || null, accountNumber: b.accountNumber || null, vs: p.vs || r.number, spayd: p.spayd || null, qrSvg: qrFor(p.spayd), expiresAt: r.expires_at };
 }
 
 function renderSprava(ctx, r, { notice = null, noticeTone = 'info', status = 200, errors = {} } = {}) {
@@ -651,7 +652,7 @@ async function dostupnostApi(ctx) {
   let fromAt;
   let toAt;
   if (isDate(q.od) && isDate(q.do)) {
-    const t = availability.termFromDates({ tenant: ctx.tenant, od: q.od, do: q.do, odCas: q.od_cas, doCas: q.do_cas });
+    const t = availability.termFromDates({ tenant: ctx.tenant, settings: ctx.settings, od: q.od, do: q.do, odCas: q.od_cas, doCas: q.do_cas });
     if (!t) throw new HttpError(400, 'Neplatný termín.');
     fromAt = t.fromAt;
     toAt = t.toAt;
@@ -679,7 +680,7 @@ async function dostupnostApi(ctx) {
     do: toAt.toISOString(),
     available: map,
     total: Object.values(map).reduce((sum, sizes) => sum + Object.values(sizes).reduce((a, b) => a + b, 0), 0),
-    blockedDates: availability.blockedDates({ db: ctx.db, tenant: ctx.tenant, from: blockedFrom, to: availability.addDays(blockedFrom, 365) }),
+    blockedDates: availability.blockedDates({ db: ctx.db, tenant: ctx.tenant, settings: ctx.settings, from: blockedFrom, to: availability.addDays(blockedFrom, 365) }),
     types: ctx.db.prepare('SELECT id, slug, name FROM bike_types WHERE active = 1 ORDER BY sort, name').all(),
   });
 }

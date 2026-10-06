@@ -9,8 +9,8 @@ Verze šablony {{VERZE}}, účinnost od {{UCINNOST_OD}}. Dokument generuje muste
 **Jak číst návrh**
 
 - `{{NAZEV_PARAMETRU}}` je proměnná, kterou doplní systém. Jsou tří druhů – **nastavení půjčovny** (shodné s OP a Zásadami, mění se jen s novou verzí dokumentů), **údaje rezervace** (doplní systém z rezervace) a **údaje vyplňované obsluhou** při převzetí nebo vrácení (zaškrtávací pole ☐, částky, poznámky). Všechny jsou v tabulce *Parametry* níže.
-- Bloky **[VARIANTA A – plátce DPH]** / **[VARIANTA B – neplátce DPH]** se zobrazí podle `{{PLATCE_DPH}}`; bloky **[ONLINE]** / **[NA MÍSTĚ]** podle toho, zda rezervace vznikla přes web, nebo ji obsluha založila až na výdejním místě; řádky označené **[E-KOLO]** se tisknou, jen je-li v rezervaci elektrokolo.
-- Řádky tabulek označené *(opakuje se pro každé kolo)* systém vygeneruje tolikrát, kolik kol rezervace obsahuje; placeholdery `{{KOLO_…}}` se vztahují k danému řádku.
+- Varianty textu jsou šablonové bloky, které renderer vyhodnotí (do tisku se značky nedostanou): `{{#PLATCE_DPH}}…{{/PLATCE_DPH}}` / `{{^PLATCE_DPH}}…{{/PLATCE_DPH}}` (plátce / neplátce DPH); `{{^SMLOUVA_NA_MISTE}}…{{/SMLOUVA_NA_MISTE}}` (rezervace vznikla přes web) / `{{#SMLOUVA_NA_MISTE}}…{{/SMLOUVA_NA_MISTE}}` (obsluha ji založila až na výdejním místě); řádky a věty v `{{#KOLO_JE_EKOLO}}…{{/KOLO_JE_EKOLO}}` se tisknou, jen je-li kolo elektrokolo; `{{^PODPIS_OBRAZOVKA}}…{{/PODPIS_OBRAZOVKA}}` jen při podpisu na papíře, `{{#PODPIS_OBRAZOVKA}}…{{/PODPIS_OBRAZOVKA}}` jen při podpisu na obrazovce.
+- Řádky tabulek (a tabulka B.3) uzavřené v bloku `{{#KOLA}}…{{/KOLA}}` systém vygeneruje tolikrát, kolik kol rezervace obsahuje: parametr `{{KOLA}}` je pole záznamů s hodnotami `{{KOLO_…}}` pro každé kolo. Není-li pole předáno („ano“), blok se vytiskne jednou s hodnotami `{{KOLO_…}}` sloučenými do jedné buňky.
 - Dokument má čtyři části: **A** smlouva (cíl 1 strana A4 u čl. 1–4 a 6–7; poučení v čl. 5 tiskne systém menším písmem, reálně tedy 1–2 strany), **B** předávací protokol (1 strana, u více než 3 kol příloha), **C** protokol o vrácení (1 strana, tiskne se až při vrácení), **D** informace, co se z protokolu ukládá do systému a co se maže (netiskne se, je součástí dokumentace a Zásad). Každý údaj se zapisuje jen na jednom místě: forma kauce a stav doplatku v B.4, nikoli v čl. 3–4.
 - Odkazy na předpisy: **OZ** = zákon č. 89/2012 Sb., občanský zákoník; **ZOS** = zákon č. 634/1992 Sb., o ochraně spotřebitele; **GDPR** = nařízení (EU) 2016/679; **ZDPH** = zákon č. 235/2004 Sb., o dani z přidané hodnoty; **zákon o občanských průkazech** = zákon č. 269/2021 Sb.; **ZEK** = zákon č. 127/2005 Sb., o elektronických komunikacích (v tomto dokumentu se nepoužívá – cookies řeší Zásady); **zákon o silničním provozu** = zákon č. 361/2000 Sb.; **TZ** = zákon č. 40/2009 Sb., trestní zákoník; **zákon o el. podpisu** = zákon č. 297/2016 Sb. Znění citovaných paragrafů ověřeno k 5. 10. 2026 (zakonyprolidi.cz pro zákony č. 269/2021 Sb., 634/1992 Sb., 297/2016 Sb. a § 5 zákona č. 361/2000 Sb.; pracepropravniky.cz a podnikatel.cz pro OZ; businesscenter.podnikatel.cz pro ZDPH; mesec.cz pro TZ; eur-lex.europa.eu pro GDPR; zakony.centrum.cz pro § 58 zákona o silničním provozu). Oponentura (10/2026) potvrdila existenci a obsah ostatních citací a opravila tyto: § 28 odst. 8 ZDPH → § 37a ZDPH (základ daně konečného dokladu), § 2969 odst. 1 OZ (obvyklá cena „v době poškození“, ne „v době převzetí“), § 1807 OZ vypuštěn (poplatek není zálohou ve smyslu tohoto ustanovení), § 19 ZOS ponechán jen u reklamace vad kola, § 2051 OZ u spotřebitele nepoužit; § 39 písm. d) a § 65 odst. 1 písm. d) zákona č. 269/2021 Sb. a § 37a ZDPH ověřeny znovu 5. 10. 2026 (zakonyprolidi.cz, pracepropravniky.cz).
 - Zákazníka oslovujeme „vy“, půjčovnu „my“ – stejně jako v OP. Text má být srozumitelný bez právníka, ale s přesnými odkazy, aby advokát kontroloval rychle.
@@ -60,11 +60,17 @@ Verze šablony {{VERZE}}, účinnost od {{UCINNOST_OD}}. Dokument generuje muste
 | `{{UZEMI_UZIVANI}}` | Území, kde lze kolo užívat | nastavení | území České republiky |
 | `{{SPOLUUCAST_KRADEZ}}` | Volitelné omezení náhrady při krádeži řádně uzamčeného a nahlášeného kola (text nebo prázdné) | nastavení | neuplatňuje se |
 | `{{POJISTENI}}` | Informace o pojištění kol | nastavení | kola nejsou pojištěna pro případ škody způsobené nájemcem |
+| `{{SMLOUVA_REZIM}}` | Jak smlouva vznikla: `online` (rezervace přes web, potvrzená zaplacením poplatku) nebo `na-miste` (obsluha založila rezervaci až na výdejním místě) | rezervace | online |
+| `{{SMLOUVA_NA_MISTE}}` | Odvozuje systém ze `{{SMLOUVA_REZIM}}`: „ano“ při `na-miste`; řídí variantu čl. 2.3 | systém | ne |
+| `{{POPLATEK_NABITI_UCTUJEME}}` | Odvozuje systém: „ano“, je-li `{{POPLATEK_NABITI}}` vyšší než 0 Kč (řádek vyúčtování, věta o nabití) | systém | ne |
+| `{{KAUCE_HOTOVE}}` | „ano“, je-li kauce složena hotově (`{{KAUCE_FORMA}}` = hotove) – zobrazí větu o účtu pro vratku v čl. 1 | systém / obsluha | ne |
+| `{{VRACENI_BEZ_NAJEMCE}}` | „ano“, vrací-li se kola bez společné kontroly nebo po domluvě mimo otevírací dobu (`{{VRACENI_BEZ_KONTROLY}}` nebo `{{VRACENI_MIMO_OTEVIRACI_DOBU}}` = ano) – zobrazí odstavec C.5 o podpisu jen obsluhou | systém / obsluha | ne |
 | `{{DOBA_CISLO_DOKLADU}}` | Jak dlouho po vrácení kola a vypořádání kauce držíme typ a číslo dokladu (pak automatický výmaz) | nastavení | 30 dní |
 | `{{DOBA_SMLOUVA}}` | Jak dlouho uchováváme smlouvu, protokoly a fotodokumentaci | nastavení | 3 roky od vrácení kola |
 | `{{ZAPISOVAT_NAROZENI_ADRESU}}` | Zapisovat do smlouvy i datum narození a adresu nájemce? (rozhodnutí půjčovny, viz „K ověření advokátem“ bod 9). **Při `ano`:** údaje se zapisují **podle sdělení nájemce**, nikdy opisem z občanského průkazu (§ 39 písm. d) zákona o občanských průkazech), a je nutné zároveň upravit Zásady odd. 2 a 4 a Záznam o činnostech (činnost A3) – jinak jsou dokumenty v rozporu | nastavení | ne |
 | `{{DOKLAD_CISLO_TISK}}` | Jak tisknout číslo dokladu: `maskovane` (jen poslední 3 znaky, plné číslo zůstává pouze šifrovaně v systému) nebo `plne`. **`plne` se uplatní jen při papírovém tisku** (`{{PODPIS_ZPUSOB}}` = papir); e-mailová kopie, HTML verze protokolu a náhled v adminu po výmazu jsou **vždy maskované** | nastavení | maskovane |
 | `{{PODPIS_ZPUSOB}}` | Jak se podepisuje: `papir` (2 vyhotovení) nebo `obrazovka` (podpis prstem/stylusem na tabletu, kopie e-mailem – bez obrázku podpisu, viz `{{PODPIS_NAJEMCE}}`) | nastavení | obrazovka |
+| `{{PODPIS_OBRAZOVKA}}` | Odvozuje systém z `{{PODPIS_ZPUSOB}}`: „ano“ při podpisu na obrazovce, „ne“ při papíru; řídí bloky `{{#PODPIS_OBRAZOVKA}}` / `{{^PODPIS_OBRAZOVKA}}` (čl. 7.2, část D) | systém | ano |
 | `{{OBSLUHA_JMENO_FORMAT}}` | Jak se na listinu tiskne jméno obsluhy: `plne` nebo `jmeno_a_iniciala` (jméno a iniciála příjmení); plné jméno a ID účtu zůstávají v systému (`handovers.by_user_id`) | nastavení | jmeno_a_iniciala |
 | **Dokumenty a verze** | | | |
 | `{{VERZE}}` | Verze této šablony (každá změna textu = nová verze) | nastavení | 1.1 (po zapracování oponentury) |
@@ -101,17 +107,18 @@ Verze šablony {{VERZE}}, účinnost od {{UCINNOST_OD}}. Dokument generuje muste
 | `{{NAJEMCE_UCET_VRATKA}}` | Číslo účtu nájemce pro vrácení hotovostní kauce nebo její zadržené části, nelze-li vrátit hotově na místě. Vyplní nájemce při převzetí jen u `{{KAUCE_FORMA}}` = hotove, nebo dodatečně přes Správu rezervace / e-mailem (`customers.refund_account_enc`, nové pole) | nájemce | – |
 | `{{POCET_DALSICH_JEZDCU}}` | Počet dalších osob, které budou kola užívat (bez jmen) | rezervace / obsluha | 0 |
 | `{{POCET_NEZLETILYCH}}` | Z toho mladších 18 let | obsluha | 0 |
-| **Kola** *(opakuje se pro každé kolo)* | | | |
+| `{{KOLA}}` | Pole záznamů kol (každý záznam nese hodnoty `{{KOLO_…}}` níže) – řídí cyklus `{{#KOLA}}…{{/KOLA}}` v B.1, B.2, B.3 a C.2 | systém | ano (jeden průchod se sloučenými hodnotami) |
+| **Kola** – hodnoty pro každé kolo uvnitř bloku `{{#KOLA}}…{{/KOLA}}` | | | |
 | `{{KOLO_PORADI}}` | Pořadové číslo kola v protokolu | systém | 1, 2, … |
 | `{{KOLO_TYP}}` | Typ / model kola (`bike_types.name`) | rezervace | *(příklad)* Trekové kolo Trek FX 2 |
-| `{{KOLO_JE_EKOLO}}` | Je to elektrokolo? Řídí řádky [E-KOLO] | rezervace | ne |
+| `{{KOLO_JE_EKOLO}}` | Je to elektrokolo? Řídí bloky `{{#KOLO_JE_EKOLO}}…{{/KOLO_JE_EKOLO}}` | rezervace | ne |
 | `{{KOLO_INVENTARNI_KOD}}` | Inventární kód na štítku s QR (`bikes.inventory_code`) | obsluha (sken) | *(příklad)* TK-07 |
 | `{{KOLO_VELIKOST}}` | Velikost rámu | rezervace | *(příklad)* M / 17" |
 | `{{KOLO_VYROBNI_CISLO}}` | Výrobní číslo rámu (`bikes.frame_no_enc`) – pro policii při krádeži | systém | – |
 | `{{KOLO_HODNOTA}}` | Obvyklá cena kola podle evidence půjčovny k datu převzetí – **horní hranice náhrady** při poškození, ztrátě, zničení či krádeži (OP čl. 10.2–10.3; v OP parametr HODNOTA_KOLA). Skutečná náhrada se řídí § 2969 odst. 1 OZ (obvyklá cena v době poškození, resp. účelné náklady opravy); evidenci aktualizovat nejméně ročně | systém (evidence kol) | – |
 | `{{KOLO_KAUCE}}` | Kauce za toto kolo | systém | {{KAUCE_KOLO}} / {{KAUCE_EKOLO}} |
 | `{{KOLO_PRISLUSENSTVI}}` | Předané příslušenství (zámek + počet klíčů, přilba, nabíječka, baterie, světla, brašna, sada na defekt, dětská sedačka/vozík) s cenou náhrady podle ceníku | obsluha | – |
-| `{{KOLO_BATERIE_PROCENTA}}` | [E-KOLO] Nabití baterie při předání | obsluha | – |
+| `{{KOLO_BATERIE_PROCENTA}}` | Nabití baterie při předání (jen elektrokolo) | obsluha | – |
 | `{{KOLO_POSKOZENI_POZNAMKA}}` | Existující poškození a opotřebení při předání (text) | obsluha | „bez poškození“ |
 | `{{KOLO_FOTO_POCET}}` | Počet fotografií kola pořízených při předání a uložených v systému k protokolu | systém | – |
 | **Kauce – záznam při převzetí** | | | |
@@ -133,7 +140,7 @@ Verze šablony {{VERZE}}, účinnost od {{UCINNOST_OD}}. Dokument generuje muste
 | `{{KOLO_VRACENI_STAV}}` | *(per kolo)* Souhrn stavu při vrácení (v pořádku / poškozeno / chybí) | obsluha | – |
 | `{{KOLO_VRACENI_POSKOZENI}}` | *(per kolo)* Popis nového poškození (co, kde, rozsah) | obsluha | – |
 | `{{KOLO_VRACENI_FOTO_POCET}}` | *(per kolo)* Počet fotografií poškození uložených v systému | systém | – |
-| `{{KOLO_VRACENI_BATERIE_PROCENTA}}` | *(per kolo)* [E-KOLO] Nabití baterie při vrácení | obsluha | – |
+| `{{KOLO_VRACENI_BATERIE_PROCENTA}}` | *(per kolo)* Nabití baterie při vrácení (jen elektrokolo) | obsluha | – |
 | `{{KOLO_VRACENI_PRISLUSENSTVI_CHYBI}}` | *(per kolo)* Chybějící nebo zničené příslušenství | obsluha | „nic“ |
 | `{{NAJEMNE_PRODLENI}}` | Nájemné za dobu prodlení (OP čl. 11.3) | systém | 0 Kč |
 | `{{POKUTA_OTEVIRACI_DOBA}}` | Smluvní pokuta za vrácení po otevírací době bez domluvy (OP čl. 11.4) | systém | 0 Kč |
@@ -161,9 +168,9 @@ Verze šablony {{VERZE}}, účinnost od {{UCINNOST_OD}}. Dokument generuje muste
 
 ## 1. Kdo s kým smlouvu uzavírá
 
-**Půjčovna (pronajímatel, „my“):** {{PUJCOVNA_NAZEV}}, IČO {{PUJCOVNA_ICO}} [VARIANTA A: , DIČ {{PUJCOVNA_DIC}}], sídlo {{PUJCOVNA_SIDLO}}, {{PUJCOVNA_REJSTRIK}}. Výdejní místo: {{PUJCOVNA_PROVOZOVNA}}, otevírací doba {{OTEVIRACI_DOBA}}. Kontakt: {{PUJCOVNA_TELEFON}}, {{PUJCOVNA_EMAIL}}, web {{WEB_SUBDOMENA}}. Při předání nás zastupuje {{OBSLUHA_JMENO}} (pověřená osoba, § 430 odst. 1 OZ).
+**Půjčovna (pronajímatel, „my“):** {{PUJCOVNA_NAZEV}}, IČO {{PUJCOVNA_ICO}}{{#PLATCE_DPH}}, DIČ {{PUJCOVNA_DIC}}{{/PLATCE_DPH}}, sídlo {{PUJCOVNA_SIDLO}}, {{PUJCOVNA_REJSTRIK}}. Výdejní místo: {{PUJCOVNA_PROVOZOVNA}}, otevírací doba {{OTEVIRACI_DOBA}}. Kontakt: {{PUJCOVNA_TELEFON}}, {{PUJCOVNA_EMAIL}}, web {{WEB_SUBDOMENA}}. Při předání nás zastupuje {{OBSLUHA_JMENO}} (pověřená osoba, § 430 odst. 1 OZ).
 
-**Nájemce („vy“):** {{NAJEMCE_JMENO}}, tel. {{NAJEMCE_TELEFON}}, e-mail {{NAJEMCE_EMAIL}}. Předložený doklad totožnosti: {{NAJEMCE_DOKLAD_TYP}} č. {{NAJEMCE_DOKLAD_CISLO_TISK}} – do dokladu jsme nahlédli, ověřili jeho platnost (Databáze neplatných dokladů Ministerstva vnitra ČR, https://aplikace.mvcr.cz/neplatne-doklady/) a zapsali jeho typ a číslo; nekopírujeme ho a nepřijímáme jako zástavu (§ 39 písm. b) a c) zákona o občanských průkazech). **Zápis typu a čísla dokladu je podmínkou nájmu (OP čl. 8.3). Předložíte-li občanský průkaz, podpisem této smlouvy dáváte souhlas se zapsáním jeho typu a čísla pro účely této smlouvy (§ 39 písm. d) zákona o občanských průkazech).** Přijímáme: {{DOKLADY_AKCEPTOVANE}}. Bez předložení platného dokladu a souhlasu se zápisem kolo nevydáme a rezervace se posuzuje jako nevyzvednutá (OP čl. 6.5 a 8.2–8.3). *(Jen při {{ZAPISOVAT_NAROZENI_ADRESU}} = ano:)* Datum narození a bydliště **podle vašeho sdělení** (z dokladu je neopisujeme): {{NAJEMCE_DATUM_NAROZENI}}, {{NAJEMCE_ADRESA}}. *(Jen při {{KAUCE_FORMA}} = hotove:)* Účet pro vrácení kauce, nebude-li možné ji vrátit hotově na místě (čl. 4.2 a): {{NAJEMCE_UCET_VRATKA}} – lze doplnit i později přes Správu rezervace.
+**Nájemce („vy“):** {{NAJEMCE_JMENO}}, tel. {{NAJEMCE_TELEFON}}, e-mail {{NAJEMCE_EMAIL}}. Předložený doklad totožnosti: {{NAJEMCE_DOKLAD_TYP}} č. {{NAJEMCE_DOKLAD_CISLO_TISK}} – do dokladu jsme nahlédli, ověřili jeho platnost (Databáze neplatných dokladů Ministerstva vnitra ČR, https://aplikace.mvcr.cz/neplatne-doklady/) a zapsali jeho typ a číslo; nekopírujeme ho a nepřijímáme jako zástavu (§ 39 písm. b) a c) zákona o občanských průkazech). **Zápis typu a čísla dokladu je podmínkou nájmu (OP čl. 8.3). Předložíte-li občanský průkaz, podpisem této smlouvy dáváte souhlas se zapsáním jeho typu a čísla pro účely této smlouvy (§ 39 písm. d) zákona o občanských průkazech).** Přijímáme: {{DOKLADY_AKCEPTOVANE}}. Bez předložení platného dokladu a souhlasu se zápisem kolo nevydáme a rezervace se posuzuje jako nevyzvednutá (OP čl. 6.5 a 8.2–8.3).{{#ZAPISOVAT_NAROZENI_ADRESU}} Datum narození a bydliště **podle vašeho sdělení** (z dokladu je neopisujeme): {{NAJEMCE_DATUM_NAROZENI}}, {{NAJEMCE_ADRESA}}.{{/ZAPISOVAT_NAROZENI_ADRESU}}{{#KAUCE_HOTOVE}} Účet pro vrácení kauce, nebude-li možné ji vrátit hotově na místě (čl. 4.2 a): {{NAJEMCE_UCET_VRATKA}} – lze doplnit i později přes Správu rezervace.{{/KAUCE_HOTOVE}}
 
 **Další jezdci:** kola budou užívat i další osoby bez vlastní smlouvy – počet {{POCET_DALSICH_JEZDCU}}, z toho mladších 18 let {{POCET_NEZLETILYCH}}. Za jejich užívání kol odpovídáte vy (OP čl. 2.3 a 8.2).
 
@@ -173,23 +180,22 @@ Verze šablony {{VERZE}}, účinnost od {{UCINNOST_OD}}. Dokument generuje muste
 
 2.2 **Doba nájmu: od {{NAJEM_OD}} do {{NAJEM_DO}}.** Kola vrátíte na místě {{MISTO_VRACENI}} nejpozději v uvedený čas, v otevírací době. Zpoždění do {{TOLERANCE_POZDNI}} neúčtujeme; za delší prodlení platíte další nájemné ({{SAZBA_POZDNI}}, OP čl. 11.3); za vrácení po konci otevírací doby bez předchozí telefonické domluvy smluvní pokutu {{POPLATEK_POZDNI_PAUSAL}} za rezervaci – kryje náklady na obsluhu, která na vás musí čekat nebo se kvůli vám vrátit mimo otevírací dobu, a nahrazuje náhradu škody za tento čas (OP čl. 11.4; § 2048 odst. 1 a § 2050 OZ). Zdržíte-li se, zavolejte {{PUJCOVNA_TELEFON}} – prodloužení domluvíme, je-li kolo volné.
 
-2.3 **[ONLINE]** Smlouva vznikla potvrzením vaší rezervace č. {{REZERVACE_CISLO}} (odeslána {{REZERVACE_DATUM}}, potvrzena {{REZERVACE_POTVRZENI_DATUM}}) podle OP čl. 3. Tato listina ji potvrzuje a doplňuje o konkrétní kola, kauci a stav při předání; spolu s OP verze {{OP_VERZE}}, které jste při rezervaci odsouhlasili, a s potvrzením rezervace tvoří úplnou smlouvu (OP čl. 15.6). Údaje o kolech, příslušenství, kauci a čase vrácení platí podle protokolu, ve všem ostatním platí OP (OP čl. 8.7; § 1751 odst. 1 OZ).
-**[NA MÍSTĚ]** Rezervaci č. {{REZERVACE_CISLO}} jsme založili na výdejním místě; smlouva vzniká podpisem této listiny. Obchodní podmínky verze {{OP_VERZE}} jsme vám před podpisem předložili (vytištěné / na obrazovce) a jsou trvale dostupné na {{PODMINKY_URL}}; stávají se součástí smlouvy (§ 1751 odst. 1 OZ). Podpisem potvrzujete, že jste se s nimi seznámili, zejména s přehledem všech částek, které vám můžeme účtovat (OP čl. 4.7), a souhlasíte s nimi.
+2.3 {{^SMLOUVA_NA_MISTE}}Smlouva vznikla potvrzením vaší rezervace č. {{REZERVACE_CISLO}} (odeslána {{REZERVACE_DATUM}}, potvrzena {{REZERVACE_POTVRZENI_DATUM}}) podle OP čl. 3. Tato listina ji potvrzuje a doplňuje o konkrétní kola, kauci a stav při předání; spolu s OP verze {{OP_VERZE}}, které jste při rezervaci odsouhlasili, a s potvrzením rezervace tvoří úplnou smlouvu (OP čl. 15.6). Údaje o kolech, příslušenství, kauci a čase vrácení platí podle protokolu, ve všem ostatním platí OP (OP čl. 8.7; § 1751 odst. 1 OZ).{{/SMLOUVA_NA_MISTE}}{{#SMLOUVA_NA_MISTE}}Rezervaci č. {{REZERVACE_CISLO}} jsme založili na výdejním místě; smlouva vzniká podpisem této listiny. Obchodní podmínky verze {{OP_VERZE}} jsme vám před podpisem předložili (vytištěné / na obrazovce) a jsou trvale dostupné na {{PODMINKY_URL}}; stávají se součástí smlouvy (§ 1751 odst. 1 OZ). Podpisem potvrzujete, že jste se s nimi seznámili, zejména s přehledem všech částek, které vám můžeme účtovat (OP čl. 4.7), a souhlasíte s nimi.{{/SMLOUVA_NA_MISTE}}
 
 ## 3. Cena a platby
 
 | Položka | Částka | Poznámka |
 |---|---|---|
-| Nájemné celkem (kola + příslušenství, celý termín) | **{{CENA_CELKEM}}** | [VARIANTA A: včetně DPH] [VARIANTA B: nejsme plátci DPH] |
+| Nájemné celkem (kola + příslušenství, celý termín) | **{{CENA_CELKEM}}** | {{#PLATCE_DPH}}včetně DPH{{/PLATCE_DPH}}{{^PLATCE_DPH}}nejsme plátci DPH{{/PLATCE_DPH}} |
 | Zaplacený rezervační poplatek | − {{POPLATEK_ZAPLACENO}} | zaplacen {{POPLATEK_ZAPLACENO_DNE}}, doklad č. {{DOKLAD_POPLATEK_CISLO}}; {{POPLATEK_KOLO}} za kolo / {{POPLATEK_EKOLO}} za elektrokolo; je úplatou za zajištění služby (blokaci kol na termín) a při řádném využití rezervace se v plné výši započítává na nájemné; storno před převzetím se řídí OP čl. 6 |
 | Doplatek | **{{DOPLATEK}}** | stav úhrady je zapsán v části B.4 |
 | **Zbývá zaplatit při převzetí** | **{{K_UHRADE_PRI_PREVZETI}}** | hotově nebo kartou přes terminál; kauce (čl. 4) se platí zvlášť |
 
-Nájemné platíte předem; tím se po dohodě odchylujeme od § 2324 OZ (OP čl. 4.3). **[VARIANTA A]** Doklad k přijatému rezervačnímu poplatku jsme vystavili do 15 dnů od jeho přijetí (§ 28 odst. 8 ZDPH) – do 10 000 Kč jako zjednodušený daňový doklad (§ 30 ZDPH, bez vašich identifikačních údajů), nad 10 000 Kč jako běžný daňový doklad; po skončení nájmu vystavíme konečný daňový doklad (stejné pravidlo pro typ dokladu), v němž se základ daně sníží o základ daně z již zdaněného poplatku (§ 37a ZDPH; OP čl. 4.5). **[VARIANTA B]** Po skončení nájmu vystavíme konečné vyúčtování s odečtením poplatku. Storno rezervace se týká jen doby před převzetím (OP čl. 6: {{STORNO_TABULKA}}); od převzetí kol se nájemné za nevyužitou dobu nevrací (OP čl. 11.7).
+Nájemné platíte předem; tím se po dohodě odchylujeme od § 2324 OZ (OP čl. 4.3). {{#PLATCE_DPH}}Doklad k přijatému rezervačnímu poplatku jsme vystavili do 15 dnů od jeho přijetí (§ 28 odst. 8 ZDPH) – do 10 000 Kč jako zjednodušený daňový doklad (§ 30 ZDPH, bez vašich identifikačních údajů), nad 10 000 Kč jako běžný daňový doklad; po skončení nájmu vystavíme konečný daňový doklad (stejné pravidlo pro typ dokladu), v němž se základ daně sníží o základ daně z již zdaněného poplatku (§ 37a ZDPH; OP čl. 4.5).{{/PLATCE_DPH}}{{^PLATCE_DPH}}Po skončení nájmu vystavíme konečné vyúčtování s odečtením poplatku.{{/PLATCE_DPH}} Storno rezervace se týká jen doby před převzetím (OP čl. 6: {{STORNO_TABULKA}}); od převzetí kol se nájemné za nevyužitou dobu nevrací (OP čl. 11.7).
 
 ## 4. Kauce
 
-4.1 **Výše: {{KAUCE_CELKEM}}** ({{KAUCE_KOLO}} za kolo, {{KAUCE_EKOLO}} za elektrokolo; rozpis u každého kola v části B). Kauce je vratná jistota (§ 2010 odst. 1 OZ) pro naše pohledávky z této smlouvy – náhradu škody, ztráty nebo krádeže kola či příslušenství, nájemné za prodlení, smluvní pokutu a paušály podle OP čl. 11 (OP čl. 5.3). Není součástí ceny ani limitem vaší odpovědnosti (OP čl. 5.5) a není pojištěním. **[VARIANTA A]** Kauce není úplatou za plnění, nepodléhá DPH (§ 2 odst. 1 ZDPH) a nevystavuje se k ní daňový doklad; její přijetí a vrácení potvrzujeme jen v protokolu.
+4.1 **Výše: {{KAUCE_CELKEM}}** ({{KAUCE_KOLO}} za kolo, {{KAUCE_EKOLO}} za elektrokolo; rozpis u každého kola v části B). Kauce je vratná jistota (§ 2010 odst. 1 OZ) pro naše pohledávky z této smlouvy – náhradu škody, ztráty nebo krádeže kola či příslušenství, nájemné za prodlení, smluvní pokutu a paušály podle OP čl. 11 (OP čl. 5.3). Není součástí ceny ani limitem vaší odpovědnosti (OP čl. 5.5) a není pojištěním.{{#PLATCE_DPH}} Kauce není úplatou za plnění, nepodléhá DPH (§ 2 odst. 1 ZDPH) a nevystavuje se k ní daňový doklad; její přijetí a vrácení potvrzujeme jen v protokolu.{{/PLATCE_DPH}}
 
 4.2 **Forma.** Kauci skládáte jednou z těchto forem; **zvolená forma a reference transakce jsou zapsány v části B.4**:
 - **a) hotově** – vracíme hotově ihned při řádném vrácení kol; nejste-li při kontrole kol přítomni (čl. C.1), převodem na účet uvedený v čl. 1 do {{LHUTA_VRATKY_KAUCE_PREVODEM}}.
@@ -209,14 +215,14 @@ Je-li dluh vyšší než kauce, rozdíl je splatný do {{LHUTA_UHRADY_SKODY}} od
 Podrobně v OP čl. 9–12. Zejména:
 
 - **Užívání.** Kolo užívejte šetrně, k účelu, pro který je určeno, a udržujte ho ve stavu, v jakém jste ho převzali, s přihlédnutím k obvyklému opotřebení (§ 2213, § 2325 odst. 1 OZ). Dodržujte pravidla silničního provozu; **jízda pod vlivem alkoholu nebo jiných návykových látek je zakázána** (§ 5 odst. 2 písm. a) a b) zákona o silničním provozu).
-- **Zámek.** Kdykoli kolo opustíte, i na okamžik, uzamkněte ho dodaným zámkem **za rám k pevnému předmětu**; přes noc ho uložte do uzamčené místnosti. [E-KOLO] Baterii při delším parkování vyjměte a vezměte s sebou.
+- **Zámek.** Kdykoli kolo opustíte, i na okamžik, uzamkněte ho dodaným zámkem **za rám k pevnému předmětu**; přes noc ho uložte do uzamčené místnosti.{{#KOLO_JE_EKOLO}} Baterii při delším parkování vyjměte a vezměte s sebou.{{/KOLO_JE_EKOLO}}
 - **Přilba.** Cyklista mladší 18 let musí mít za jízdy nasazenou a řádně připevněnou přilbu (§ 58 odst. 1 zákona o silničním provozu). Všem ostatním přilbu důrazně doporučujeme. Zapůjčení přilby: {{PRILBA_PODMINKY}}.
-- **Zákaz předání třetí osobě a komerčního užití.** Kolo nesmíte přenechat nikomu jinému než jezdcům uvedeným v čl. 1 (§ 2215 odst. 1 OZ – jen s naším souhlasem), půjčovat ho dál, **užívat ke komerčním účelům (rozvoz, kurýrní služba, pronájem, výuka za úplatu) ani k přepravě osob nebo nákladu nad rámec výbavy a nosnosti kola**. Zakázány jsou závody, bikeparky, skoky a triky, úpravy kola, [E-KOLO] zásahy do pohonu a baterie a jiná než dodaná nabíječka, a jízda mimo {{UZEMI_UZIVANI}} bez naší domluvy (OP čl. 9.1 a 9.3).
+- **Zákaz předání třetí osobě a komerčního užití.** Kolo nesmíte přenechat nikomu jinému než jezdcům uvedeným v čl. 1 (§ 2215 odst. 1 OZ – jen s naším souhlasem), půjčovat ho dál, **užívat ke komerčním účelům (rozvoz, kurýrní služba, pronájem, výuka za úplatu) ani k přepravě osob nebo nákladu nad rámec výbavy a nosnosti kola**. Zakázány jsou závody, bikeparky, skoky a triky, úpravy kola,{{#KOLO_JE_EKOLO}} zásahy do pohonu a baterie a jiná než dodaná nabíječka,{{/KOLO_JE_EKOLO}} a jízda mimo {{UZEMI_UZIVANI}} bez naší domluvy (OP čl. 9.1 a 9.3).
 - **Závada.** Zjistíte-li závadu ovlivňující bezpečnost nebo funkci, přestaňte jezdit a zavolejte {{PUJCOVNA_TELEFON}} (§ 2214 OZ; OP čl. 12.2). **Je-li kolo nezpůsobilé k jízdě, máte právo je vrátit a žádat odstranění vady, jiné kolo, nebo zrušení smlouvy s vrácením nájemného za nevyužitou dobu (§ 2322 odst. 3 OZ); nemůžeme-li závadu odstranit ani kolo vyměnit bez zbytečného odkladu, máte právo na přiměřenou slevu (§ 2208 odst. 1 OZ).** Opravy bez domluvy nezadávejte (OP čl. 9.5); reklamace OP čl. 12.
 - **Krádež.** Krádež kola, baterie nebo příslušenství **neprodleně oznamte Policii ČR (158) a nám**; předáte nám číslo jednací oznámení, zámek s klíči a popis, jak bylo kolo uzamčeno (OP čl. 10.5). Krádež je trestný čin (§ 205 TZ); policii poskytneme výrobní číslo z části B.
 - **Nehoda.** Při zranění volejte 155/112. Každou nehodu, při které se kolo poškodilo, nám oznamte co nejdříve, nejpozději při vrácení.
 - **Odpovědnost za škodu.** Od převzetí do vrácení odpovídáte za poškození, zničení, ztrátu i odcizení kola a příslušenství, i když je způsobil jiný jezdec nebo vznikly při pádu bez cizího zavinění (§ 2913 odst. 1 OZ; OP čl. 10.1). Při poškození hradíte skutečné účelně vynaložené náklady opravy; při ztrátě, zničení nebo krádeži obvyklou cenu kola **v době, kdy ke škodě došlo** (§ 2969 odst. 1 OZ) – v obou případech **nejvýše částku uvedenou u kola v části B, která je horní hranicí náhrady** (OP čl. 10.2–10.3); za příslušenství paušály podle ceníku náhrad ({{CENIK_URL}}; OP čl. 10.4). Neodpovídáte za běžné opotřebení ani za vady, které kolo mělo při převzetí. {{SPOLUUCAST_KRADEZ}} {{POJISTENI}}. Za újmu, kterou způsobíte sobě nebo jiným, odpovídá jezdec (OP čl. 10.9).
-- **Vrácení.** Kola vraťte včas, kompletní a běžně čistá (silné znečištění: paušál {{POPLATEK_CISTENI}} za kolo); [E-KOLO] pokud možno nabitá *(jen je-li {{POPLATEK_NABITI}} > 0:)* – pod 20 % účtujeme {{POPLATEK_NABITI}}. Nevrátíte-li kolo do 24 hodin po konci nájmu a nebudete reagovat, postupujeme podle OP čl. 11.8.
+- **Vrácení.** Kola vraťte včas, kompletní a běžně čistá (silné znečištění: paušál {{POPLATEK_CISTENI}} za kolo){{#KOLO_JE_EKOLO}}; elektrokolo pokud možno nabité{{#POPLATEK_NABITI_UCTUJEME}} – pod 20 % účtujeme {{POPLATEK_NABITI}}{{/POPLATEK_NABITI_UCTUJEME}}{{/KOLO_JE_EKOLO}}. Nevrátíte-li kolo do 24 hodin po konci nájmu a nebudete reagovat, postupujeme podle OP čl. 11.8.
 
 ## 6. Vaše prohlášení
 
@@ -224,7 +230,7 @@ Podpisem potvrzujete, že:
 
 - ☐ je vám **nejméně 18 let** a jste plně svéprávný (§ 30 odst. 1 OZ); předložili jste platný doklad podle čl. 1;
 - ☐ kola a příslušenství jste si **prohlédli**; jejich stav odpovídá části B a jiné poškození jste při prohlídce nezjistili. Víte, že kolo nezpůsobilé k provozu máte právo odmítnout (§ 2322 odst. 3 OZ) a že se zápis v části B zohlední při vrácení (§ 2225 odst. 1 OZ): poškození, které v B.3 není zapsáno, se má za vzniklé během nájmu, můžete však prokázat opak;
-- ☐ [E-KOLO] absolvovali jste **zaškolení** k elektrokolu (zapínání, režimy, dojezd, baterie a nabíjení, displej, zamykání – OP čl. 8.5) a pokynům rozumíte;
+{{#KOLO_JE_EKOLO}}- ☐ absolvovali jste **zaškolení** k elektrokolu (zapínání, režimy, dojezd, baterie a nabíjení, displej, zamykání – OP čl. 8.5) a pokynům rozumíte;{{/KOLO_JE_EKOLO}}
 - ☐ seznámili jste se s **Obchodními podmínkami verze {{OP_VERZE}}** ({{PODMINKY_URL}}); kopii máte v potvrzovacím e-mailu / dostanete e-mailem spolu s touto smlouvou;
 - ☐ dostali jste **informace o zpracování osobních údajů** (čl. 13 GDPR): správcem je {{PUJCOVNA_NAZEV}}. Jméno, kontakt, údaje o rezervaci, smlouvu, protokoly, fotografie kol a váš podpis zpracováváme pro plnění smlouvy a vedení účetnictví (čl. 6 odst. 1 písm. b) a c) GDPR) a uchováváme {{DOBA_SMLOUVA}}, účetní a daňové doklady po zákonnou dobu. Typ a číslo dokladu zapisujeme na základě oprávněného zájmu – ověření totožnosti a platnosti dokladu (Databáze neplatných dokladů MV ČR) a ochrana majetku a vymáhání škody při krádežích kol (čl. 6 odst. 1 písm. f) GDPR; u občanského průkazu navíc s vaším souhlasem podle čl. 1, který vyžaduje § 39 písm. d) zákona o občanských průkazech) – **zápis je podmínkou nájmu, bez předložení dokladu a souhlasu kolo nevydáme** (OP čl. 8.2–8.3); číslo držíme šifrovaně a automaticky ho smažeme {{DOBA_CISLO_DOKLADU}} po vrácení kol a vypořádání kauce, **déle jen při nevyřešené škodě, krádeži nebo nezaplacení**. Údaje vidí provozovatel systému {{PROVOZOVATEL_NAZEV}} (zpracovatel), při platbě kartou nebo preautorizaci platební brána {{PLATEBNI_BRANA}} a při převodu naše banka (samostatní správci), dále e-mailová služba a účetní. Máte právo na přístup, opravu, výmaz, omezení, přenositelnost, **námitku** (čl. 21 GDPR) a stížnost u Úřadu pro ochranu osobních údajů. Úplné Zásady verze {{ZASADY_VERZE}}: {{ZASADY_URL}}. *(Toto je informace, ne žádost o souhlas se zpracováním podle GDPR – ten k uzavření smlouvy nepotřebujeme. Souhlas se zapsáním údajů z občanského průkazu vyžaduje zákon o občanských průkazech a dáváte ho předložením dokladu a podpisem, čl. 1.)*
 - ☐ za jezdce uvedené v čl. 1 odpovídáte; u nezletilých jste jejich zákonný zástupce nebo máte jeho souhlas.
@@ -233,7 +239,7 @@ Podpisem potvrzujete, že:
 
 7.1 Smlouva se řídí právem České republiky, zejména OZ a ZOS. Vady kola reklamujte podle OP čl. 12 – reklamaci vyřídíme do 30 dnů (§ 19 odst. 3 ZOS); námitky proti vyúčtování vyřídíme ve stejné lhůtě obdobně jako reklamaci (OP čl. 12.5). Spotřebitelský spor lze řešit mimosoudně u České obchodní inspekce, https://www.coi.gov.cz/informace-o-adr/ (§ 14 odst. 1 ZOS; OP čl. 13).
 
-7.2 *(při {{PODPIS_ZPUSOB}} = papir:)* Smlouva je vyhotovena ve dvou stejnopisech, každá strana obdrží jeden. *(při {{PODPIS_ZPUSOB}} = obrazovka:)* Smlouvu podepisujete na obrazovce; takto zachycený obsah a podpis mají písemnou formu (§ 561 odst. 1 a § 562 odst. 1 OZ; § 7 zákona o el. podpisu) a kopii vám ihned pošleme na {{NAJEMCE_EMAIL}} – v kopii je číslo dokladu maskované a místo obrázku podpisu je záznam o elektronickém podpisu (čas, číslo smlouvy).
+7.2 {{^PODPIS_OBRAZOVKA}}Smlouva je vyhotovena ve dvou stejnopisech, každá strana obdrží jeden.{{/PODPIS_OBRAZOVKA}}{{#PODPIS_OBRAZOVKA}}Smlouvu podepisujete na obrazovce; takto zachycený obsah a podpis mají písemnou formu (§ 561 odst. 1 a § 562 odst. 1 OZ; § 7 zákona o el. podpisu) a kopii vám ihned pošleme na {{NAJEMCE_EMAIL}} – v kopii je číslo dokladu maskované a místo obrázku podpisu je záznam o elektronickém podpisu (čas, číslo smlouvy).{{/PODPIS_OBRAZOVKA}}
 
 7.3 Ústní ujednání, která nejsou v této smlouvě nebo v protokolu, nejsou závazná (OP čl. 15.6). Šablona verze {{VERZE}}, účinná od {{UCINNOST_OD}}.
 
@@ -254,22 +260,21 @@ Podpisem potvrzujete, že:
 
 | # | Typ / model | Inventární kód | Velikost | Výrobní číslo rámu | Obvyklá cena kola při převzetí = horní hranice náhrady (OP čl. 10.2–10.3) | Kauce |
 |---|---|---|---|---|---|---|
-| {{KOLO_PORADI}} | {{KOLO_TYP}} | {{KOLO_INVENTARNI_KOD}} | {{KOLO_VELIKOST}} | {{KOLO_VYROBNI_CISLO}} | {{KOLO_HODNOTA}} | {{KOLO_KAUCE}} |
-| *(opakuje se pro každé kolo)* | | | | | | |
+{{#KOLA}}| {{KOLO_PORADI}} | {{KOLO_TYP}} | {{KOLO_INVENTARNI_KOD}} | {{KOLO_VELIKOST}} | {{KOLO_VYROBNI_CISLO}} | {{KOLO_HODNOTA}} | {{KOLO_KAUCE}} |{{/KOLA}}
 | **Celkem** | | | | | | **{{KAUCE_CELKEM}}** |
 
 ## B.2 Příslušenství předané s koly
 
 | # kola | Příslušenství (druh, počet, u zámku počet klíčů, u baterie její číslo) | Náhrada při ztrátě (ceník náhrad, OP čl. 10.4) |
 |---|---|---|
-| {{KOLO_PORADI}} | {{KOLO_PRISLUSENSTVI}} | podle ceníku {{CENIK_URL}} |
-| *(opakuje se pro každé kolo)* | | |
+{{#KOLA}}| {{KOLO_PORADI}} | {{KOLO_PRISLUSENSTVI}} | podle ceníku {{CENIK_URL}} |{{/KOLA}}
 
 ## B.3 Stav kol při předání
 
 Zkontrolujeme společně. ☐ = v pořádku; jinak poznámka. Zápis v této části a fotografie pořízené při předání se podle § 2225 odst. 1 OZ zohlední při vrácení. **Má se za to, že poškození, které zde není zapsáno, při převzetí neexistovalo; můžete však prokázat opak** (např. vlastní fotografií). Proto si kolo prohlédněte pozorně a každé poškození nechte zapsat.
 
-| Kontrolovaná část | Kolo {{KOLO_PORADI}} ({{KOLO_INVENTARNI_KOD}}) *(sloupec se opakuje pro každé kolo)* |
+{{#KOLA}}
+| Kontrolovaná část | Kolo {{KOLO_PORADI}} ({{KOLO_INVENTARNI_KOD}}) |
 |---|---|
 | Rám, vidlice, řídítka, představec (praskliny, promáčkliny) | ☐ |
 | Brzdy přední / zadní (účinnost, destičky/špalky, lanka či hadice) | ☐ / ☐ |
@@ -278,11 +283,13 @@ Zkontrolujeme společně. ☐ = v pořádku; jinak poznámka. Zápis v této č�
 | Osvětlení přední / zadní, odrazky, zvonek | ☐ / ☐ |
 | Sedlo, sedlovka, pedály, stojánek, blatníky, nosič | ☐ |
 | Zámek funkční, počet klíčů | ☐ … ks |
-| [E-KOLO] Baterie – nabití {{KOLO_BATERIE_PROCENTA}} %, upevnění, klíč baterie, nabíječka | ☐ |
-| [E-KOLO] Displej / ovladač, motor, zapnutí a přepínání režimů | ☐ |
+{{#KOLO_JE_EKOLO}}| Baterie – nabití {{KOLO_BATERIE_PROCENTA}} %, upevnění, klíč baterie, nabíječka | ☐ |{{/KOLO_JE_EKOLO}}
+{{#KOLO_JE_EKOLO}}| Displej / ovladač, motor, zapnutí a přepínání režimů | ☐ |{{/KOLO_JE_EKOLO}}
 | Celkově čisté, bez chybějících dílů | ☐ |
 | **Existující poškození a opotřebení** (kde, co, rozsah) | {{KOLO_POSKOZENI_POZNAMKA}} |
 | **Fotodokumentace** při předání (uložena v systému k tomuto protokolu, náhled na vyžádání) | {{KOLO_FOTO_POCET}} fotografií |
+
+{{/KOLA}}
 
 ## B.4 Kauce a doplatek – záznam
 
@@ -320,10 +327,9 @@ Převzetím kol a podpisem potvrzujete, že jste převzali kola a příslušenst
 
 ## C.2 Stav kol a příslušenství při vrácení
 
-| # | Kolo (inv. kód) | Stav | Nové poškození – popis (porovnáno s částí B) | Foto | [E-KOLO] Baterie | Chybějící / zničené příslušenství |
+| # | Kolo (inv. kód) | Stav | Nové poškození – popis (porovnáno s částí B) | Foto | Baterie (e-kolo) | Chybějící / zničené příslušenství |
 |---|---|---|---|---|---|---|
-| {{KOLO_PORADI}} | {{KOLO_INVENTARNI_KOD}} | {{KOLO_VRACENI_STAV}} | {{KOLO_VRACENI_POSKOZENI}} | {{KOLO_VRACENI_FOTO_POCET}} ks | {{KOLO_VRACENI_BATERIE_PROCENTA}} % | {{KOLO_VRACENI_PRISLUSENSTVI_CHYBI}} |
-| *(opakuje se pro každé kolo)* | | | | | | |
+{{#KOLA}}| {{KOLO_PORADI}} | {{KOLO_INVENTARNI_KOD}} | {{KOLO_VRACENI_STAV}} | {{KOLO_VRACENI_POSKOZENI}} | {{KOLO_VRACENI_FOTO_POCET}} ks | {{#KOLO_JE_EKOLO}}{{KOLO_VRACENI_BATERIE_PROCENTA}} %{{/KOLO_JE_EKOLO}}{{^KOLO_JE_EKOLO}}–{{/KOLO_JE_EKOLO}} | {{KOLO_VRACENI_PRISLUSENSTVI_CHYBI}} |{{/KOLA}}
 
 Běžné opotřebení (sjeté pláště a destičky úměrné délce nájmu, drobné oděrky laku, prach z cesty) **není** poškozením a neúčtuje se (OP čl. 10.1, 11.5).
 
@@ -334,12 +340,12 @@ Běžné opotřebení (sjeté pláště a destičky úměrné délce nájmu, dro
 | Nájemné za dobu prodlení | OP čl. 11.3 ({{SAZBA_POZDNI}}) | {{NAJEMNE_PRODLENI}} |
 | Smluvní pokuta – vrácení po otevírací době bez domluvy | OP čl. 11.4 ({{POPLATEK_POZDNI_PAUSAL}}; § 2048 odst. 1 OZ; nahrazuje náhradu škody za tento čas, § 2050 OZ) | {{POKUTA_OTEVIRACI_DOBA}} |
 | Umytí silně znečištěného kola | OP čl. 11.5 ({{POPLATEK_CISTENI}} za kolo) | {{CASTKA_CISTENI}} |
-| [E-KOLO] Nabití baterie pod 20 % *(jen je-li {{POPLATEK_NABITI}} > 0)* | OP čl. 11.6 | {{CASTKA_NABITI}} |
+{{#POPLATEK_NABITI_UCTUJEME}}| Nabití baterie elektrokola pod 20 % | OP čl. 11.6 | {{CASTKA_NABITI}} |{{/POPLATEK_NABITI_UCTUJEME}}
 | Náhrada škody na kolech: {{SKODA_POPIS}} | OP čl. 10.2–10.3; § 2969 odst. 1 OZ (účelné náklady opravy / obvyklá cena kola v době poškození); ceník oprav {{CENIK_URL}}; **nejvýše částka uvedená u kola v části B** | {{SKODA_CASTKA}} ☐ vyčísleno ☐ **odhad** ({{SKODA_JE_ODHAD}}) – odhad se nezapočítává, jen zadržuje (C.4); konečné vyúčtování s doklady do {{LHUTA_VYUCTOVANI_SKODY}} |
 | Ztracené / zničené příslušenství | OP čl. 10.4, ceník náhrad | {{NAHRADA_PRISLUSENSTVI}} |
 | **Celkem k úhradě** | | **{{VYUCTOVANI_CELKEM}}** |
 
-Jiné částky než uvedené v OP čl. 4.7 neúčtujeme. **[VARIANTA A]** Nájemné za prodlení a paušály za umytí a nabití jsou úplatou za službu včetně DPH; smluvní pokuta a náhrada škody nejsou předmětem DPH (§ 2 odst. 1 ZDPH). Konečný daňový doklad č. {{KONECNY_DOKLAD_CISLO}}. **[VARIANTA B]** Konečné vyúčtování č. {{KONECNY_DOKLAD_CISLO}}.
+Jiné částky než uvedené v OP čl. 4.7 neúčtujeme. {{#PLATCE_DPH}}Nájemné za prodlení a paušály za umytí a nabití jsou úplatou za službu včetně DPH; smluvní pokuta a náhrada škody nejsou předmětem DPH (§ 2 odst. 1 ZDPH). Konečný daňový doklad č. {{KONECNY_DOKLAD_CISLO}}.{{/PLATCE_DPH}}{{^PLATCE_DPH}}Konečné vyúčtování č. {{KONECNY_DOKLAD_CISLO}}.{{/PLATCE_DPH}}
 
 ## C.4 Vypořádání kauce
 
@@ -359,7 +365,9 @@ Jiné částky než uvedené v OP čl. 4.7 neúčtujeme. **[VARIANTA A]** Nájem
 
 Podpis nájemce potvrzuje vrácení kol, převzetí tohoto protokolu a vrácené části kauce; **není uznáním dluhu ve sporné části**. Nesouhlasíte-li s vyúčtováním, zapište námitky zde nebo je pošlete do 14 dnů na {{PUJCOVNA_EMAIL}}; vyřídíme je do 30 dnů obdobně jako reklamaci (OP čl. 12.5) a spornou část do vyřízení nevymáháme. Vady kola během nájmu reklamujte na {{PUJCOVNA_TELEFON}} nebo {{PUJCOVNA_EMAIL}}; reklamaci vyřídíme do 30 dnů (§ 19 odst. 3 ZOS; OP čl. 12.3–12.4). Nepodaří-li se spor urovnat, můžete se obrátit na Českou obchodní inspekci, https://www.coi.gov.cz/informace-o-adr/ (§ 14 ZOS; OP čl. 13).
 
-*(při {{VRACENI_BEZ_KONTROLY}} = ano nebo {{VRACENI_MIMO_OTEVIRACI_DOBU}} = ano – po domluvě:)* Protokol podepisuje jen obsluha; kopii s fotografiemi z kontroly posíláme na {{NAJEMCE_EMAIL}} a námitky můžete uplatnit do 14 dnů od doručení (OP čl. 12.5). Hotovostní kauci nebo její zadrženou část vracíme převodem na {{NAJEMCE_UCET_VRATKA}} do {{LHUTA_VRATKY_KAUCE_PREVODEM}}; nemáme-li číslo účtu, doplňte ho přes Správu rezervace nebo e-mailem – lhůta běží od jeho sdělení.
+{{#VRACENI_BEZ_NAJEMCE}}
+Protokol podepisuje jen obsluha; kopii s fotografiemi z kontroly posíláme na {{NAJEMCE_EMAIL}} a námitky můžete uplatnit do 14 dnů od doručení (OP čl. 12.5). Hotovostní kauci nebo její zadrženou část vracíme převodem na {{NAJEMCE_UCET_VRATKA}} do {{LHUTA_VRATKY_KAUCE_PREVODEM}}; nemáme-li číslo účtu, doplňte ho přes Správu rezervace nebo e-mailem – lhůta běží od jeho sdělení.
+{{/VRACENI_BEZ_NAJEMCE}}
 
 Vrácením kol nájem končí; typ a číslo vašeho dokladu totožnosti smažeme automaticky {{DOBA_CISLO_DOKLADU}} po vypořádání kauce (déle jen při nevyřešené škodě, krádeži nebo nezaplacení). Kopii protokolu a konečný doklad posíláme na {{NAJEMCE_EMAIL}} (číslo dokladu maskované, místo obrázku podpisu záznam o elektronickém podpisu).
 
@@ -388,10 +396,10 @@ Vrácením kol nájem končí; typ a číslo vašeho dokladu totožnosti smažem
 | Vyúčtování (položky, částky, odhad vs. vyčísleno), konečný doklad | `documents` (`final_doc`, případně `credit_note`), `ledger_entries`, `payments` | 10 let od konce zdaňovacího období (§ 35 odst. 2 ZDPH) u daňových dokladů; jinak 5 let účetně | daňové doklady se nemažou ani na žádost – anonymizují se jen osobní údaje, které zákon nevyžaduje |
 | Jméno, telefon, e-mail nájemce | `customers` (`name_enc`, `phone_enc`, `email_enc`, HMAC otisk e-mailu) | {{DOBA_SMLOUVA}} od vrácení kola z **poslední** rezervace zákazníka (jeden záznam `customers` může mít více rezervací; starší rezervace zůstávají navázané, dokud běží lhůta u kterékoli z nich); poté anonymizace (`anonymized_at`) | šifrováno aplikací (AES-256-GCM), klíč mimo DB. **Pro autora Zásad a Záznamu o činnostech:** stejné počítání lhůty promítnout do Zásad odd. 4 a činnosti A1 |
 | **Typ a číslo dokladu totožnosti** | `customers.id_doc_type`, `customers.id_doc_number_enc` | **{{DOBA_CISLO_DOKLADU}} po vrácení kol a vypořádání kauce → automatický výmaz** jobem `retence`; déle jen při nevyřešené škodě, krádeži nebo nezaplacení – do vyřešení | čl. 5 odst. 1 písm. c) a e) GDPR (minimalizace, omezení uložení); stanovisko ÚOOÚ k prokazování totožnosti; každý přístup k poli se zapisuje do `audit_log`. U občanského průkazu je souhlas se zapsáním (§ 39 písm. d) zákona o občanských průkazech) součástí podepsané smlouvy (čl. 1) – uložen s `documents`, samostatné pole není třeba |
-| Datum narození a adresa *(jen při {{ZAPISOVAT_NAROZENI_ADRESU}} = ano)* | `customers.address_enc`, nové pole `birth_date_enc` (**doplnit do PLAN.md kap. 4** – tabulka `customers` ho dosud nemá) | jako smlouva | **podle sdělení nájemce, ne opisem z dokladu** (§ 39 písm. d) zákona o občanských průkazech); titul: plnění smlouvy / oprávněný zájem – označení žalovaného (§ 79 odst. 1 o. s. ř.); při `ano` upravit Zásady odd. 2 a 4 a Záznam o činnostech A3; rozhodnutí půjčovny, viz „K ověření advokátem“ bod 9 |
-| Číslo účtu nájemce pro vratku *(jen při {{KAUCE_FORMA}} = hotove, nebo sděleno dodatečně)* | `customers.refund_account_enc` (nové pole – **doplnit do PLAN.md kap. 4**); u provedené vratky účet příjemce v `payments` (purpose `refund`) | jako smlouva; u provedené vratky jako účetní doklad (5 let) | účel: vrácení hotovostní kauce nebo její zadržené části, není-li nájemce přítomen (čl. 6 odst. 1 písm. b) GDPR); Zásady odd. 4 s číslem účtu pro vratku již počítají |
+{{#ZAPISOVAT_NAROZENI_ADRESU}}| Datum narození a adresa (je-li zápis zapnut) | `customers.address_enc`, nové pole `birth_date_enc` (**doplnit do PLAN.md kap. 4** – tabulka `customers` ho dosud nemá) | jako smlouva | **podle sdělení nájemce, ne opisem z dokladu** (§ 39 písm. d) zákona o občanských průkazech); titul: plnění smlouvy / oprávněný zájem – označení žalovaného (§ 79 odst. 1 o. s. ř.); při `ano` upravit Zásady odd. 2 a 4 a Záznam o činnostech A3; rozhodnutí půjčovny, viz „K ověření advokátem“ bod 9 |{{/ZAPISOVAT_NAROZENI_ADRESU}}
+| Číslo účtu nájemce pro vratku (u kauce složené hotově, nebo sděleno dodatečně) | `customers.refund_account_enc` (nové pole – **doplnit do PLAN.md kap. 4**); u provedené vratky účet příjemce v `payments` (purpose `refund`) | jako smlouva; u provedené vratky jako účetní doklad (5 let) | účel: vrácení hotovostní kauce nebo její zadržené části, není-li nájemce přítomen (čl. 6 odst. 1 písm. b) GDPR); Zásady odd. 4 s číslem účtu pro vratku již počítají |
 | Jméno obsluhy, která kola vydala / převzala | `handovers.by_user_id` → `users` (plné jméno, ID účtu) | jako smlouva; `audit_log` | na listinu a do e-mailové kopie jde jen tvar podle {{OBSLUHA_JMENO_FORMAT}} (výchozí: jméno a iniciála příjmení) – pro identifikaci pověřené osoby (§ 430 odst. 1 OZ) i interní dohledání stačí; plné jméno zaměstnance se minimalizuje (čl. 5 odst. 1 písm. c) GDPR) |
-| Podpisy *(při podpisu na obrazovce)* | obrázek podpisu uložený k `documents` (šifrovaný soubor), s časem a identifikátorem zařízení | jako smlouva | § 562 odst. 2 OZ – záznamy vedené systematicky a chráněné proti změnám se považují za spolehlivé; podpis se nikde jinde nepoužívá. **V e-mailové kopii a HTML verzi se obrázek podpisu nahrazuje textem** „podepsáno elektronicky dne {{PREDANI_CAS}} / {{VRACENI_CAS}}, záznam č. {{SMLOUVA_CISLO}} / {{PROTOKOL_VRACENI_CISLO}}“ – obrázek zůstává jen v systému (čl. 5 odst. 1 písm. c) a f), čl. 32 GDPR) |
+{{#PODPIS_OBRAZOVKA}}| Podpisy (na obrazovce) | obrázek podpisu uložený k `documents` (šifrovaný soubor), s časem a identifikátorem zařízení | jako smlouva | § 562 odst. 2 OZ – záznamy vedené systematicky a chráněné proti změnám se považují za spolehlivé; podpis se nikde jinde nepoužívá. **V e-mailové kopii a HTML verzi se obrázek podpisu nahrazuje textem** „podepsáno elektronicky dne {{PREDANI_CAS}} / {{VRACENI_CAS}}, záznam č. {{SMLOUVA_CISLO}} / {{PROTOKOL_VRACENI_CISLO}}“ – obrázek zůstává jen v systému (čl. 5 odst. 1 písm. c) a f), čl. 32 GDPR) |{{/PODPIS_OBRAZOVKA}}
 | Verze OP a Zásad, k nimž se podpis váže | `reservations.terms_version`, `documents.data` | jako smlouva | aby bylo kdykoli dohledatelné, co přesně nájemce podepsal |
 | Námitky nájemce | `handovers.note` + e-mail v `outbox` | jako smlouva / do vyřízení reklamace | |
 
@@ -404,7 +412,7 @@ Vrácením kol nájem končí; typ a číslo vašeho dokladu totožnosti smažem
 - **Obrázek podpisu** – není součástí e-mailové kopie ani HTML verze (nahrazen textovým záznamem o podpisu); existuje jen jako šifrovaný soubor k `documents`.
 - **Osobní údaje po uplynutí {{DOBA_SMLOUVA}}** od vrácení kola z poslední rezervace zákazníka – job `retence` nahradí jméno, kontakt, účet pro vratku a podpis anonymními hodnotami; zůstává jen anonymní záznam o výpůjčce (statistika) a účetní/daňové doklady po zákonnou dobu.
 - **Fotodokumentace** – maže se spolu s protokolem; při nevyřešené škodě až po jejím vyřešení.
-- **Papírové stejnopisy** (při `{{PODPIS_ZPUSOB}}` = papir) – půjčovna je uloží v uzamčené skříni, přístup jen oprávněná obsluha, skartace po {{DOBA_SMLOUVA}}; doporučujeme místo papíru podpis na obrazovce.
+{{^PODPIS_OBRAZOVKA}}- **Papírové stejnopisy** – půjčovna je uloží v uzamčené skříni, přístup jen oprávněná obsluha, skartace po {{DOBA_SMLOUVA}}; doporučujeme místo papíru podpis na obrazovce.{{/PODPIS_OBRAZOVKA}}
 
 ## D.3 Co se při podpisu děje v systému
 

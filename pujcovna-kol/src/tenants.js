@@ -1,6 +1,7 @@
 'use strict';
 // Tenanty: načtení tenants/*/tenant.json, výběr tenanta podle hlavičky Host, téma podle hostu,
-// kopie výchozích settings do tabulky settings při prvním startu (SPEC kap. 3 a 5).
+// kopie výchozích settings do tabulky settings při prvním startu (SPEC kap. 3 a 5), efektivní texty webu
+// (tenant.texts přepsané settings.texts z adminu – getTexts).
 // Vstup: adresář tenantů (config.tenantsDir). Výstup: pole tenantů { slug, dir, file, ...tenant.json }.
 
 const fs = require('node:fs');
@@ -120,6 +121,21 @@ function getSettings(db, tenant) {
 }
 
 /**
+ * Efektivní texty webu: výchozí `tenant.texts` z tenant.json přepsané neprázdnými hodnotami ze `settings.texts`
+ * (admin → Obsah ukládá klíče heroTitle, heroText, about, contactNote, pickupNote; prázdné = výchozí).
+ * @param {object} tenant
+ * @param {object|null} [settings] výsledek getSettings (nebo ctx.settings)
+ */
+function getTexts(tenant, settings) {
+  const out = { ...((tenant && tenant.texts) || {}) };
+  const over = settings && settings.texts && typeof settings.texts === 'object' ? settings.texts : {};
+  for (const [k, v] of Object.entries(over)) {
+    if (typeof v === 'string' && v.trim()) out[k] = v;
+  }
+  return out;
+}
+
+/**
  * Veřejná URL tenanta pro canonical a JSON-LD, např. https://ksprehledy.cz. Bez hostu první nelokální host.
  * Nelokální hosty mají vždy https (veřejně běží jen za TLS proxy); localhost/127.0.0.1 http, pokud požadavek nebyl https.
  */
@@ -130,4 +146,4 @@ function publicBaseUrl(tenant, { host, secure = false } = {}) {
   return `${scheme}://${host ? String(host).trim().toLowerCase() : h}`;
 }
 
-module.exports = { loadTenants, loadTenant, normalizeHost, resolveTenant, themeForHost, seedSettings, getSettings, getSetting, setSetting, publicBaseUrl };
+module.exports = { loadTenants, loadTenant, normalizeHost, resolveTenant, themeForHost, seedSettings, getSettings, getTexts, getSetting, setSetting, publicBaseUrl };

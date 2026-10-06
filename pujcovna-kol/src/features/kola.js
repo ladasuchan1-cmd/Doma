@@ -58,7 +58,7 @@ function totalsBySize(db, typeId) {
 function termFromQuery(ctx) {
   const q = ctx.query;
   if (!q.od && !q.do) return { term: null, error: null };
-  const term = availability.termFromDates({ tenant: ctx.tenant, od: q.od, do: q.do, odCas: q.od_cas, doCas: q.do_cas });
+  const term = availability.termFromDates({ tenant: ctx.tenant, settings: ctx.settings, od: q.od, do: q.do, odCas: q.od_cas, doCas: q.do_cas });
   if (!term) return { term: null, error: 'Zadejte prosím platný termín: datum vrácení musí být stejné nebo pozdější než datum vyzvednutí.' };
   const days = pricing.lengthOf(term.fromAt, term.toAt).days;
   if (days > availability.DEFAULT_MAX_RENTAL_DAYS) return { term: null, error: `Online lze rezervovat nejvýše ${availability.DEFAULT_MAX_RENTAL_DAYS} dní. Pro delší pronájem nás kontaktujte.` };
@@ -136,7 +136,7 @@ function apiTerm(ctx) {
   const q = ctx.query;
   const isDate = (v) => /^\d{4}-\d{2}-\d{2}$/.test(String(v || ''));
   if (isDate(q.od) && isDate(q.do)) {
-    const t = availability.termFromDates({ tenant: ctx.tenant, od: q.od, do: q.do, odCas: q.od_cas, doCas: q.do_cas });
+    const t = availability.termFromDates({ tenant: ctx.tenant, settings: ctx.settings, od: q.od, do: q.do, odCas: q.od_cas, doCas: q.do_cas });
     if (!t) throw new HttpError(400, 'Neplatný termín.');
     return t;
   }

@@ -3,14 +3,20 @@
 // Konkrétní úlohy (expirace rezervací, auto-uvolnění kauce, retence, noční reset dema) dodávají feature moduly přes
 // exports.jobs = [{ name, everyMs, fn }] – loader v server.js je zaregistruje. fn(deps) dostane
 // { config, log, tenants, dbs, secret, fieldCrypto, now } a může být async; výjimky se zalogují, úloha běží dál.
-// Vstup: { log }. Výstup: { register, start, stop, runNow, list }.
+// start() vrací Promise, která se splní po dokončení prvních běhů všech úloh (testy nečekají „na čas“); každý dokončený
+// běh navíc vyvolá událost 'done' ({ name, ms, error }) na jobs.events (EventEmitter) a 'idle', když žádná úloha neběží.
+// Vstup: { log }. Výstup: { register, start, stop, runNow, list, events, whenIdle, started }.
+
+const { EventEmitter } = require('node:events');
 
 const MIN_INTERVAL_MS = 1000;
 
 function createJobs({ log } = {}) {
   const jobs = new Map(); // name → { name, everyMs, fn, timer, runs, lastRunAt, lastError, running }
+  const events = new EventEmitter();
   let deps = null;
   let started = false;
+  let runningCount = 0;
 
   function register(name, everyMs, fn) {
     if (!name || typeof name !== 'string') throw new Error('Job musí mít název.');
@@ -26,6 +32,7 @@ function createJobs({ log } = {}) {
   async function run(job) {
     if (job.running) return;
     job.running = true;
+    runningCount++;
     const startedAt = Date.now();
     try {
       await job.fn(deps || {});
@@ -38,22 +45,34 @@ function createJobs({ log } = {}) {
       job.running = false;
       job.runs++;
       job.lastRunAt = new Date().toISOString();
+      runningCount--;
+      events.emit('done', { name: job.name, ms: Date.now() - startedAt, error: job.lastError });
+      if (runningCount === 0) events.emit('idle');
     }
   }
 
+  /** První běh hned po startu (asynchronně, aby nezdržel listen), pak každých everyMs. Vrací Promise prvního běhu. */
   function schedule(job) {
-    if (job.timer) return;
-    // první běh hned po startu (asynchronně, aby nezdržel listen), pak každých everyMs
-    setImmediate(() => run(job));
+    if (job.timer) return Promise.resolve();
+    const first = new Promise((resolve) => setImmediate(() => run(job).then(resolve, resolve)));
     job.timer = setInterval(() => run(job), job.everyMs);
     if (typeof job.timer.unref === 'function') job.timer.unref();
+    return first;
   }
 
+  /** Spustí všechny úlohy; vrací Promise splněnou po dokončení jejich prvních běhů. */
   function start(dependencies) {
     deps = dependencies || {};
     started = true;
-    for (const job of jobs.values()) schedule(job);
+    const firsts = [...jobs.values()].map((job) => schedule(job));
     if (log && jobs.size) log.info('Jobs spuštěny', { count: jobs.size, names: [...jobs.keys()] });
+    return Promise.all(firsts).then(() => undefined);
+  }
+
+  /** Promise splněná, až neběží žádná úloha (hned, pokud žádná neběží). */
+  function whenIdle() {
+    if (runningCount === 0) return Promise.resolve();
+    return new Promise((resolve) => events.once('idle', resolve));
   }
 
   function stop() {
@@ -75,7 +94,7 @@ function createJobs({ log } = {}) {
     return [...jobs.values()].map((j) => ({ name: j.name, everyMs: j.everyMs, runs: j.runs, lastRunAt: j.lastRunAt, lastError: j.lastError }));
   }
 
-  return { register, start, stop, runNow, list, get started() { return started; } };
+  return { register, start, stop, runNow, list, whenIdle, events, get started() { return started; } };
 }
 
 module.exports = { createJobs, MIN_INTERVAL_MS };

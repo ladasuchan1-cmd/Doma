@@ -181,8 +181,12 @@
 }
 .map-preview {
   position: relative;
+  width: 100%;
+  max-width: 100%;
   aspect-ratio: 4 / 3;
-  min-height: 320px;
+  /* Bez min-height: s aspect-ratio se min-height přenáší na min-width (320 px → 427 px) a na mobilu náhled přetékal
+     o 53 px (QA). Výšku určuje jen poměr stran, shora omezený jako .map-canvas. */
+  max-height: min(72vh, 720px);
   overflow: hidden;
   border-radius: var(--card-radius);
   border: 1px solid var(--border);

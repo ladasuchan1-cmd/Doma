@@ -31,10 +31,12 @@
   font-size: var(--step--1);
 }
 
-/* Detail typu */
+/* Detail typu. Jediný sloupec musí být minmax(0, 1fr): implicitní sloupec `auto` by se roztáhl na min-content obsahu
+   (dva <input type=date> vedle sebe, tabulka ceníku se 7 sloupci) a stránka by na mobilu přetékala do strany. */
 .detail {
   display: grid;
   gap: var(--space-6);
+  grid-template-columns: minmax(0, 1fr);
   grid-template-areas: 'media' 'side' 'body';
 }
 @media (min-width: 900px) {
@@ -52,12 +54,16 @@
   grid-area: side;
   display: grid;
   gap: var(--space-5);
+  min-width: 0;
   position: sticky;
   top: calc(var(--header-height, 72px) + var(--space-4));
 }
 .detail__body {
   grid-area: body;
   min-width: 0;
+}
+.detail__body .table-wrap {
+  max-width: 100%;
 }
 .detail__body h2 {
   margin-top: var(--space-6);
@@ -183,11 +189,25 @@
   margin: 0 0 var(--space-3);
   font-size: var(--step-1);
 }
+.term-form {
+  min-width: 0;
+}
 .term-form__grid {
   display: grid;
   gap: var(--space-3);
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
   margin-bottom: var(--space-3);
+}
+.term-form__grid .field {
+  min-width: 0;
+}
+.term-form__grid .field__input {
+  min-width: 0;
+  width: 100%;
+  max-width: 100%;
+}
+.price-box {
+  min-width: 0;
 }
 
 /* Velikosti */

@@ -162,16 +162,20 @@
     }
 
     grid.addEventListener('click', function (e) {
-      var nav = e.target.closest('[data-nav]');
-      if (nav) {
-        view.m += Number(nav.getAttribute('data-nav'));
+      // Hledat jen uvnitř mřížky: obecný selektor na atribut data-nav by přes closest() došel až k <html data-nav="…">
+      // (atribut tématu z layoutu, např. „transparent“) a Number(…) = NaN by rozbilo zobrazený měsíc.
+      var nav = e.target.closest('.calendar__nav[data-nav]');
+      if (nav && grid.contains(nav)) {
+        var step = Number(nav.getAttribute('data-nav'));
+        if (!Number.isFinite(step)) step = 0;
+        view.m += step;
         if (view.m < 0) { view.m = 11; view.y--; }
         if (view.m > 11) { view.m = 0; view.y++; }
         render();
         return;
       }
-      var day = e.target.closest('[data-date]');
-      if (!day || day.disabled) return;
+      var day = e.target.closest('.calendar__day[data-date]');
+      if (!day || !grid.contains(day) || day.disabled) return;
       var iso = day.getAttribute('data-date');
       if (!start || (start && end)) {
         start = iso;
