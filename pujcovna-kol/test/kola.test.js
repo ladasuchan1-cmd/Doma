@@ -23,11 +23,11 @@ function futureDate(days) {
   return availability.addDays(availability.utcToLocal(new Date()).date, days);
 }
 
-test('/kola: karty všech 6 typů s cenou od, filtry fungují přes GET bez JS', async () => {
+test('/kola: karty všech 12 typů (6 skutečných modelů + 6 ukázkových) s cenou od, filtry fungují přes GET bez JS', async () => {
   const res = await srv.fetch('/kola');
   assert.equal(res.status, 200);
   const html = await res.text().then(nb);
-  assert.equal((html.match(/<article class="card card--bike">/g) || []).length, 6);
+  assert.equal((html.match(/<article class="card card--bike">/g) || []).length, 12);
   assert.match(html, /<form class="form filters" method="get" action="\/kola"/);
   assert.match(html, /<select class="field__input field__input--select" id="f-kategorie" name="kategorie"/);
   assert.match(html, /od <\/span><strong class="price__amount">290 Kč/, 'trek od 290 Kč (pásmo 7+)');
@@ -35,10 +35,10 @@ test('/kola: karty všech 6 typů s cenou od, filtry fungují přes GET bez JS',
   assert.match(html, /<script src="\/js\/kola.js\?v=test" defer>/);
   assert.match(html, /<title>Kola k zapůjčení · Půjčovna kol U Tří dubů<\/title>/);
   const ebike = await (await srv.fetch('/kola?kategorie=ebike')).text().then(nb);
-  assert.equal((ebike.match(/<article class="card card--bike">/g) || []).length, 2);
+  assert.equal((ebike.match(/<article class="card card--bike">/g) || []).length, 7, '5 skutečných e-kol + 2 ukázková');
   assert.match(ebike, /<option value="ebike" selected>/);
   const xl = await (await srv.fetch('/kola?velikost=XL')).text().then(nb);
-  assert.equal((xl.match(/<article class="card card--bike">/g) || []).length, 3, 'XL: trek, mtb, e-mtb');
+  assert.equal((xl.match(/<article class="card card--bike">/g) || []).length, 5, 'XL: eXP SUV, eWAY, trek, mtb, e-mtb');
   const none = await (await srv.fetch('/kola?kategorie=kids&velikost=XL')).text().then(nb);
   assert.match(none, /neodpovídá žádné kolo/);
   const bad = await (await srv.fetch('/kola?kategorie=<script>')).text().then(nb);
@@ -107,7 +107,7 @@ test('/cenik: všechny typy, sezóna, příslušenství, poplatek, kauce, storno
   assert.match(html, /<h2 class="section__title">Mimo sezónu<\/h2>/);
   assert.match(html, /<h2 class="section__title">Hlavní sezóna<\/h2>/);
   assert.match(html, /15\. 6\. – 15\. 9\. \d{4}/);
-  assert.equal((html.match(/<a href="\/kola\/[a-z0-9-]+">/g) || []).length, 12, '6 typů × 2 tabulky');
+  assert.equal((html.match(/<a href="\/kola\/[a-z0-9-]+">/g) || []).length, 24, '12 typů × 2 tabulky');
   assert.match(html, /1 020 Kč/, 'sezónní e-kolo 890 × 1,15 → 1 020');
   assert.match(html, /Cyklistická přilba<\/th><td class="is-right">50 Kč<\/td>/);
   assert.match(html, /Zámek<\/th><td class="is-right">zdarma<\/td>/);

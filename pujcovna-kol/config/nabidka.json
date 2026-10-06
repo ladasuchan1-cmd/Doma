@@ -3,32 +3,29 @@
     "verze": "0.1",
     "platnostOd": "2026-10-06",
     "zastupneCeny": true,
-    "poznamka": "Nákupní ceny kol (nakupniCena) jsou SKUTEČNÉ vstupy zadavatele (6. 10. 2026, předpoklad: bez DPH). Všechny ostatní částky a procenta (prodejní ceny, zůstatkové hodnoty, náklady kapitálu, ceny webu, správy, servisu, doplňků, interní náklady) jsou NÁVRH K POTVRZENÍ – proto zastupneCeny: true. Jediný zdroj cen pro konfigurátor; vzorce viz docs/NABIDKA-MODEL.md, sekce Výpočty. Částky v Kč bez haléřů, bez DPH. Financování pronájmu z vlastního kapitálu (rocniUrok = náklad vlastního kapitálu); dodavatelské financování je budoucí varianta."
+    "poznamka": "Veřejný ceník nabídky – JEDINÝ zdroj veřejných cen konfigurátoru (vzorce viz docs/NABIDKA-MODEL.md, sekce Výpočty). Částky v Kč bez haléřů, bez DPH. NÁKUPNÍ CENY KOL SEM NEPATŘÍ (validace je odmítne): čtou se jen z interního souboru mimo git (PK_NABIDKA_INTERNI, výchozí $PK_DATA/nabidka.interni.json; vzor config/nabidka.interni.example.json). Prodejní ceny, zůstatkové hodnoty, náklad kapitálu, ceny webu, správy, servisu, doplňků a interní náklady jsou NÁVRH K POTVRZENÍ – proto zastupneCeny: true. Financování pronájmu z vlastního kapitálu (rocniUrok = náklad vlastního kapitálu); dodavatelské financování je budoucí varianta."
   },
   "tridyKol": [
     {
       "id": "zakladni",
       "nazev": "Trekové/městské kolo",
-      "nakupniCena": 20000,
       "prodejniCena": 25000,
       "zustatkova36m": 8000,
-      "popis": "Hliníkový rám, 24–27 převodů nebo náboj Nexus, kotoučové brzdy, nosič, blatníky, osvětlení. Nákupní cena = vstup zadavatele; prodejní cena = návrh (marže 20 % z prodejní ceny), zůstatková po 36 m = návrh 32 % prodejní ceny."
+      "popis": "Hliníkový rám, 24–27 převodů nebo náboj Nexus, kotoučové brzdy, nosič, blatníky, osvětlení. Prodejní cena = návrh (marže 20 % z prodejní ceny), zůstatková po 36 m = návrh 32 % prodejní ceny."
     },
     {
       "id": "trek",
       "nazev": "Trekové/horské kolo vyšší třídy",
-      "nakupniCena": 40000,
       "prodejniCena": 50000,
       "zustatkova36m": 16000,
-      "popis": "Odpružená vidlice, hydraulické brzdy, 1x11/1x12, odolné pláště; pro terén okolo horských penzionů. Nákupní cena = vstup zadavatele; prodejní cena = návrh (marže 20 %), zůstatková po 36 m = návrh 32 %."
+      "popis": "Odpružená vidlice, hydraulické brzdy, 1x11/1x12, odolné pláště; pro terén okolo horských penzionů. Prodejní cena = návrh (marže 20 %), zůstatková po 36 m = návrh 32 %."
     },
     {
       "id": "ekolo",
       "nazev": "Trekové e-kolo (středový motor)",
-      "nakupniCena": 70000,
       "prodejniCena": 88000,
       "zustatkova36m": 26500,
-      "popis": "Středový motor Bosch/Shimano/Yamaha, baterie 500–750 Wh, hydraulické brzdy, nosič, osvětlení. Nákupní cena = vstup zadavatele; prodejní cena = návrh (marže 20,5 %), zůstatková po 36 m = návrh 30 % (degradace baterie)."
+      "popis": "Středový motor Bosch/Shimano/Yamaha, baterie 500–750 Wh, hydraulické brzdy, nosič, osvětlení. Prodejní cena = návrh (marže 20,5 %), zůstatková po 36 m = návrh 30 % (degradace baterie)."
     }
   ],
   "pronajem": {
@@ -44,7 +41,7 @@
   },
   "zkouska": {
     "mesice": 4,
-    "nasobekSazby36m": 2.0,
+    "nasobekSazby36m": 2,
     "zalohaProcent": 0.5,
     "kauceProcent": 0.1,
     "minKol": 5,

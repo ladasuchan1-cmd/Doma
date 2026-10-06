@@ -265,7 +265,9 @@ const [src, dst, secret] = process.argv.slice(1);
     console.log("  " + f + " → " + fs.statSync(target).size + " B");
   }
   if (fs.existsSync(secret)) fs.copyFileSync(secret, path.join(dst, "secret"));
-  fs.writeFileSync(path.join(dst, "INFO.txt"), "Záloha Půjčovny kol " + new Date().toISOString() + "\ndb/*.db = konzistentní kopie data/tenants/*.db\nsecret = obsah /data/.secret (klíč k šifrovaným polím – bez něj jsou údaje zákazníků nečitelné)\n");
+  const interni = path.join(path.dirname(secret), "nabidka.interni.json");
+  if (fs.existsSync(interni)) fs.copyFileSync(interni, path.join(dst, "nabidka.interni.json"));
+  fs.writeFileSync(path.join(dst, "INFO.txt"), "Záloha Půjčovny kol " + new Date().toISOString() + "\ndb/*.db = konzistentní kopie data/tenants/*.db\nsecret = obsah /data/.secret (klíč k šifrovaným polím – bez něj jsou údaje zákazníků nečitelné)\nnabidka.interni.json = interní ceník s nákupními cenami kol (je-li; mimo git, patří jen na server)\n");
   console.log("  databází: " + files.length);
 })().catch((e) => { console.error("Záloha selhala: " + e.message); process.exit(1); });
 '

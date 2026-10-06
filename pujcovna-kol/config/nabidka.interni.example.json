@@ -1,0 +1,16 @@
+{
+  "_poznamka": "VZOR interního souboru s nákupními cenami kol. Skutečný soubor NIKDY nepatří do gitu: na serveru leží v datovém svazku ($PK_DATA/nabidka.interni.json, tj. /data/nabidka.interni.json v kontejneru; cesta přepsatelná PK_NABIDKA_INTERNI), lokálně v data/ nebo config/nabidka.interni.json (oba v .gitignore). Hodnoty zde jsou UKÁZKOVÉ (pro vývoj a testy), ne skutečné. Nákupní ceny se nikdy nezobrazují veřejně – jen v interním bloku konfigurátoru pro přihlášené správce. Změna souboru se projeví do 2 s bez restartu (kontrola mtime).",
+  "tridyKol": {
+    "zakladni": { "nakupniCena": 18000 },
+    "trek": { "nakupniCena": 36000 },
+    "ekolo": { "nakupniCena": 64000 }
+  },
+  "modely": {
+    "superior-exp-6-4-steps": { "nakupniCena": 33000 },
+    "superior-exp-6-4-steps-suv": { "nakupniCena": 34000 },
+    "superior-eway-6-4": { "nakupniCena": 45000 },
+    "rock-machine-eblizzard-30-s": { "nakupniCena": 40000 },
+    "rock-machine-crossride-e400-b-touring": { "nakupniCena": 31000 },
+    "superior-racer-20": { "nakupniCena": 6500 }
+  }
+}

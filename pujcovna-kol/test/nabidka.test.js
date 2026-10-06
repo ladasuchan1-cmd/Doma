@@ -15,8 +15,10 @@ const domain = require('../src/domain/nabidka');
 const feature = require('../src/features/nabidka');
 
 const FIXTURE = path.join(__dirname, 'fixtures', 'nabidka.json');
+const INTERNI = path.join(__dirname, 'fixtures', 'nabidka.interni.json');
 const raw = JSON.parse(fs.readFileSync(FIXTURE, 'utf8'));
-const { config } = domain.validateConfig(raw);
+const rawInterni = JSON.parse(fs.readFileSync(INTERNI, 'utf8'));
+const { config } = domain.validateConfig(raw, rawInterni);
 const run = (q) => domain.compute(domain.normalizeInput(q, config), config);
 const BAD_TOKENS = /\{\{|undefined|NaN/;
 
@@ -24,8 +26,19 @@ const BAD_TOKENS = /\{\{|undefined|NaN/;
 // Doména
 
 test('validateConfig: fixtura projde, procenta jako podíly, interní klíče doplňků; chybná struktura vrátí české chyby', () => {
-  const v = domain.validateConfig(raw);
+  const v = domain.validateConfig(raw, rawInterni);
   assert.ok(v.ok, v.errors.join(' '));
+  assert.equal(v.config.meta.nakupniCenyZeSouboru, true);
+  assert.equal(v.config.meta.nakupniCenyOdvozene, false);
+  assert.equal(v.config.tridyKol[0].nakupniCena, 18000);
+  const bezInterni = domain.validateConfig(raw, null);
+  assert.ok(bezInterni.ok, bezInterni.errors.join(' '));
+  assert.equal(bezInterni.config.meta.nakupniCenyOdvozene, true);
+  assert.equal(bezInterni.config.tridyKol.find((t) => t.id === 'zakladni').nakupniCena, 20000, '25000 × 0,8');
+  const verejnaSNakupni = domain.validateConfig({ ...raw, tridyKol: raw.tridyKol.map((t) => ({ ...t, nakupniCena: 1 })) }, rawInterni);
+  assert.equal(verejnaSNakupni.ok, false);
+  assert.ok(verejnaSNakupni.errors.some((e) => /do veřejného souboru nepatří/.test(e)));
+  assert.equal(domain.validateConfig(raw, { tridyKol: { foo: 1 } }).ok, false);
   assert.equal(v.config.pronajem.rocniUrok, 0.07);
   assert.equal(v.config.interni.nakladyDoplnkuProcentCeny.Prilby, 0.7);
   assert.equal(v.config.interni.nakladySpravyHodinMesicne, 3);
@@ -33,7 +46,7 @@ test('validateConfig: fixtura projde, procenta jako podíly, interní klíče do
   assert.match(v.config.tridyKol[0].popisVerejny, /^Hliníkový rám/);
   assert.equal(domain.pct(10), 0.1, 'celá čísla jsou procenta');
   assert.equal(domain.pct(0.35), 0.35, 'desetinná ≤ 1 jsou podíly');
-  const bad = domain.validateConfig({ ...raw, tridyKol: raw.tridyKol.slice(0, 2), pronajem: { ...raw.pronajem, minKol: 'x' } });
+  const bad = domain.validateConfig({ ...raw, tridyKol: raw.tridyKol.slice(0, 2), pronajem: { ...raw.pronajem, minKol: 'x' } }, rawInterni);
   assert.equal(bad.ok, false);
   assert.ok(bad.errors.some((e) => /tridyKol/.test(e)));
   assert.ok(bad.errors.some((e) => /minKol/.test(e)));
@@ -41,7 +54,7 @@ test('validateConfig: fixtura projde, procenta jako podíly, interní klíče do
 });
 
 test('sazby za 1 kolo podle NABIDKA-MODEL.md: pronájem 24/36 m, zůstatek 24 m, zkouška', () => {
-  const expected = { zakladni: [563, 617, 13667, 1234], trek: [1127, 1234, 27333, 2468], ekolo: [2004, 2198, 47000, 4396] };
+  const expected = { zakladni: [454, 535, 13667, 1070], trek: [907, 1071, 27333, 2142], ekolo: [1675, 1952, 47000, 3904] };
   for (const t of config.tridyKol) {
     const [m24, m36, z24, zk] = expected[t.id];
     assert.equal(domain.monthlyRate(t, 24, config.pronajem).celkem, m24, `${t.id} 24 m`);
@@ -50,12 +63,12 @@ test('sazby za 1 kolo podle NABIDKA-MODEL.md: pronájem 24/36 m, zůstatek 24 m,
     assert.equal(domain.zustatkova(t, 36), t.zustatkova36m, `${t.id} zůstatek 36 m = zustatkova36m`);
     assert.equal(Math.round(2 * domain.monthlyRate(t, 36, config.pronajem).celkem), zk, `${t.id} zkouška`);
   }
-  // 24 m nesmí používat zustatkova36m: e-kolo by vyšlo 2 802 Kč a odkup 26 500
+  // 24 m nesmí používat zustatkova36m
   const ekolo = config.tridyKol[2];
   assert.ok(domain.zustatkova(ekolo, 24) > ekolo.zustatkova36m + 15000);
   const r = run({ ekolo: 5, porizeni: 'pronajem24' });
   assert.equal(r.souhrn.odkupNaKonci, 5 * 47000);
-  assert.equal(r.porizeni.radky[0].zaKolo, 2004);
+  assert.equal(r.porizeni.radky[0].zaKolo, 1675);
 });
 
 test('scénář penzion (5 kol: 2 trek + 3 e-kola, web šablona, partner servis, přilby, nabíječka)', () => {
@@ -64,76 +77,76 @@ test('scénář penzion (5 kol: 2 trek + 3 e-kola, web šablona, partner servis,
   assert.equal(k.souhrn.jednorazove, 410000);
   assert.equal(k.souhrn.mesicne, 1890);
   assert.deepEqual(k.souhrn.horizonty.map((h) => h.castka), [437180, 491540]);
-  assert.equal(k.interni.marze, 126925);
+  assert.equal(k.interni.marze, 152925);
   assert.equal(k.interni.podilPartnera, 39015);
   assert.equal(k.souhrn.kauce, 0);
 
   const p = run({ ...base, porizeni: 'pronajem36' });
   assert.equal(p.souhrn.jednorazove, 46000);
-  assert.equal(p.souhrn.mesicne, 10952);
-  assert.equal(p.porizeni.mesicne, 9062);
+  assert.equal(p.souhrn.mesicne, 9888);
+  assert.equal(p.porizeni.mesicne, 7998);
   assert.equal(p.souhrn.kauce, 36400);
   assert.equal(p.souhrn.odkupNaKonci, 111500);
-  assert.deepEqual(p.souhrn.horizonty.map((h) => h.castka), [181924, 453772]);
-  assert.equal(p.interni.marze, 157325);
+  assert.deepEqual(p.souhrn.horizonty.map((h) => h.castka), [169156, 415468]);
+  assert.equal(p.interni.marze, 147965);
   assert.equal(p.interni.podilPartnera, 39015);
-  assert.equal(Math.round(p.interni.marzeProcent * 100), 35);
+  assert.equal(Math.round(p.interni.marzeProcent * 100), 36);
   assert.equal(p.interni.varovani.length, 0);
 
   const z = run({ ...base, porizeni: 'zkouska' });
-  assert.equal(z.zkouska.celkem, 72496);
-  assert.equal(z.zkouska.mesicne, 18124);
-  assert.equal(z.zkouska.zaloha, 36248);
-  assert.equal(z.zkouska.zapocet, 25374);
+  assert.equal(z.zkouska.celkem, 63984);
+  assert.equal(z.zkouska.mesicne, 15996);
+  assert.equal(z.zkouska.zaloha, 31992);
+  assert.equal(z.zkouska.zapocet, 22394);
   assert.equal(z.zkouska.odkup, 291200);
   assert.equal(z.zkouska.kauce, 36400);
   assert.equal(z.interni.nakladyZkousky, 19425);
-  assert.equal(z.souhrn.mesicne, 19024, 'kola + servis partnera; web a přilby v ceně');
+  assert.equal(z.souhrn.mesicne, 16896, 'kola + servis partnera; web a přilby v ceně');
   assert.equal(z.souhrn.jednorazove, 25000, 'jen nabíječka; přilby v ceně zkoušky');
   assert.equal(z.souhrn.rocne, 0, 'sezónní prohlídka v ceně zkoušky');
   assert.ok(z.web.vCeneZkousky && z.servis.prohlidkaVCeneZkousky);
   assert.ok(z.doplnky.find((d) => d.id === 'prilby').vCeneZkousky);
   assert.equal(z.souhrn.horizonty.length, 1);
-  assert.equal(z.souhrn.horizonty[0].castka, 25000 + 4 * 19024);
-  assert.ok(z.interni.varovani.some((w) => /započte 25374/.test(w)));
+  assert.equal(z.souhrn.horizonty[0].castka, 25000 + 4 * 16896);
+  assert.ok(z.interni.varovani.some((w) => /započte 22394/.test(w)));
 });
 
 test('scénář hotel (20 kol, předplacená správa, pojištění) a resort (50 kol, GPS, 2. design)', () => {
   const hotel = { zakladni: 6, trek: 6, ekolo: 8, web: 'sablona', sprava: 'predplacena', servis: 'partner', doplnky: 'prilby,nabijecky,pojisteni' };
   const hp = run({ ...hotel, porizeni: 'pronajem36' });
   assert.equal(hp.souhrn.jednorazove, 64000);
-  assert.equal(hp.souhrn.mesicne, 39580);
-  assert.equal(hp.porizeni.mesicne, 28690);
+  assert.equal(hp.souhrn.mesicne, 36142);
+  assert.equal(hp.porizeni.mesicne, 25252);
   assert.equal(hp.souhrn.kauce, 115400);
   assert.equal(hp.souhrn.odkupNaKonci, 356000);
-  assert.deepEqual(hp.souhrn.horizonty.map((h) => h.castka), [556960, 1542880]);
-  assert.equal(hp.interni.marze, 503060);
+  assert.deepEqual(hp.souhrn.horizonty.map((h) => h.castka), [515704, 1419112]);
+  assert.equal(hp.interni.marze, 472820);
   assert.equal(hp.interni.podilPartnera, 156060);
   const sprava = hp.interni.polozky.find((p) => p.id === 'sprava');
   assert.equal(sprava.naklady, 36 * 3 * 600, 'náklad správy = 3 h × 600 Kč měsíčně');
   const hk = run({ ...hotel, porizeni: 'koupe' });
   assert.equal(hk.souhrn.jednorazove, 1218000);
   assert.deepEqual(hk.souhrn.horizonty.map((h) => h.castka), [1366680, 1664040]);
-  assert.equal(hk.interni.marze, 405860);
+  assert.equal(hk.interni.marze, 489860);
   const hz = run({ ...hotel, porizeni: 'zkouska' });
-  assert.equal(hz.zkouska.celkem, 229520);
-  assert.equal(hz.souhrn.mesicne, 63380);
-  assert.equal(hz.zkouska.zapocet, 80332);
+  assert.equal(hz.zkouska.celkem, 202016);
+  assert.equal(hz.souhrn.mesicne, 56504);
+  assert.equal(hz.zkouska.zapocet, 70706);
   assert.equal(hz.zkouska.odkup, 923200);
 
   const resort = { zakladni: 15, trek: 15, ekolo: 20, web: 'sablona', dalsiDesign: '1', sprava: 'predplacena', servis: 'partner', doplnky: 'prilby,nabijecky,pojisteni,gps' };
   const rp = run({ ...resort, porizeni: 'pronajem36' });
-  assert.equal(rp.souhrn.mesicne, 94615);
-  assert.equal(rp.porizeni.mesicne, 71725);
+  assert.equal(rp.souhrn.mesicne, 86020);
+  assert.equal(rp.porizeni.mesicne, 63130);
   assert.equal(rp.souhrn.jednorazove, 180000, 'dokument počítá 2 nabíjecí stanice (205 000) – config umí jen jednu');
   assert.equal(rp.interni.podilPartnera, 390150);
-  assert.equal(rp.souhrn.horizonty[1].castka, 3721140);
+  assert.equal(rp.souhrn.horizonty[1].castka, 3411720);
   const rk = run({ ...resort, porizeni: 'koupe' });
   assert.equal(rk.souhrn.jednorazove, 3090000 - 25000);
-  assert.ok(rk.interni.marzeProcent > 0.2 && rk.interni.marzeProcent < 0.23);
+  assert.ok(rk.interni.marzeProcent > 0.26 && rk.interni.marzeProcent < 0.28);
   const rz = run({ ...resort, porizeni: 'zkouska' });
-  assert.equal(rz.zkouska.celkem, 573800);
-  assert.equal(rz.zkouska.zapocet, 200830);
+  assert.equal(rz.zkouska.celkem, 505040);
+  assert.equal(rz.zkouska.zapocet, 176764);
 });
 
 test('min. kol → upozornění (pronájem i zkouška, ne koupě); jenEkolo doplněk jen s e-koly; publicResult bez interni; práh marže', () => {
@@ -151,10 +164,17 @@ test('min. kol → upozornění (pronájem i zkouška, ne koupě); jenEkolo dopl
   const pub = domain.publicResult(s);
   assert.equal('interni' in pub, false);
   assert.ok(JSON.stringify(pub).indexOf('marze') === -1, 'veřejný výsledek bez slova marže');
+  assert.ok(!/nakupni/i.test(JSON.stringify(pub)), 'veřejný výsledek bez nákupních údajů');
+  assert.ok(!/"interni"/.test(JSON.stringify(pub)), 'veřejný výsledek bez klíče interni');
+  assert.equal('nakupniCenyOdvozene' in pub.meta, false);
   // práh marže: konfigurace s nulovou marží pronájmu hlásí varování
-  const low = domain.validateConfig({ ...raw, pronajem: { ...raw.pronajem, marzeRocni: 0 }, web: { ...raw.web, sablona: { jednorazove: 6000, mesicne: 150 } } }).config;
+  const low = domain.validateConfig({ ...raw, pronajem: { ...raw.pronajem, marzeRocni: 0 }, web: { ...raw.web, sablona: { jednorazove: 6000, mesicne: 150 } } }, rawInterni).config;
   const lr = domain.compute(domain.normalizeInput({ zakladni: 5, porizeni: 'pronajem36', web: 'sablona', servis: 'vlastni' }, low), low);
   assert.ok(lr.interni.varovani.some((w) => /pod prahem/.test(w)));
+  // odvozené nákupní ceny (bez interního souboru) → varování
+  const bezCfg = domain.validateConfig(raw, null).config;
+  const odv = domain.compute(domain.normalizeInput({ ekolo: 5, porizeni: 'pronajem36' }, bezCfg), bezCfg);
+  assert.ok(odv.interni.varovani.some((w) => /Nákupní ceny kol nejsou nastaveny/.test(w)));
 });
 
 test('normalizeInput: limity, neznámé hodnoty → výchozí, doplnky čárkou i opakovaně; inputToQuery round-trip', () => {
@@ -173,8 +193,20 @@ test('config/nabidka.json (existuje-li) má platnou strukturu a sedí se zmrazen
     test.skip ? null : null;
     return;
   }
-  const v = domain.validateConfig(JSON.parse(fs.readFileSync(real, 'utf8')));
+  const realText = fs.readFileSync(real, 'utf8');
+  const realRaw = JSON.parse(realText);
+  const v = domain.validateConfig(realRaw, rawInterni);
   assert.ok(v.ok, v.errors.join(' '));
+  assert.ok(!JSON.stringify(realRaw).includes('nakupniCena'), 'veřejný soubor nesmí obsahovat nákupní ceny');
+  const modelyText = fs.readFileSync(feature.MODELY_PATH, 'utf8');
+  const modelyRaw = JSON.parse(modelyText);
+  const seznam = Array.isArray(modelyRaw) ? modelyRaw : (modelyRaw.modely || Object.values(modelyRaw));
+  assert.ok(seznam.length >= 1);
+  for (const m of seznam) {
+    assert.ok(m.slug && m.znacka && m.model, 'model má slug, znacka, model');
+    assert.ok(m.cenaVerejna > 0, `${m.slug}: cenaVerejna > 0`);
+  }
+  assert.ok(!/nakupni/i.test(modelyText), 'config/kola-modely.json bez nákupních údajů');
   for (const t of v.config.tridyKol) assert.ok(domain.monthlyRate(t, 36, v.config.pronajem).celkem > 0);
 });
 
@@ -206,12 +238,14 @@ let srv;
 const logLines = [];
 test.before(async () => {
   feature.setConfigPath(FIXTURE);
+  feature.setInterniPath(INTERNI);
   const log = createLogger({ level: 'debug', stdout: { write: (l) => logLines.push(l) }, stderr: { write: (l) => logLines.push(l) } });
   srv = await startServer({ log });
 });
 test.after(async () => {
   if (srv) await srv.stop();
   feature.setConfigPath(feature.DEFAULT_CONFIG_PATH);
+  feature.setInterniPath(null);
 });
 
 async function adminLogin() {
@@ -236,17 +270,25 @@ test('stránka /nabidka: 200 ve 3 tématech, bez {{ / undefined / NaN, bez inlin
     assert.match(html, /<ol class="steps">/);
     assert.match(html, /name="trek" required="" |name="trek"/);
     assert.match(html, /value="6"[^>]*data-nabidka-count="zakladni"|data-nabidka-count="zakladni"/);
-    assert.match(html, /39\u00a0580\u00a0Kč/, 'měsíčně hotel');
-    assert.match(html, /1\u00a0542\u00a0880\u00a0Kč/, '3 roky hotel');
+    assert.match(html, /36\u00a0142\u00a0Kč/, 'měsíčně hotel');
+    assert.match(html, /1\u00a0419\u00a0112\u00a0Kč/, '3 roky hotel');
     assert.match(html, /badge badge--warning">ukázkové ceny/);
     assert.match(html, /Odkup kol na konci/);
     assert.match(html, /name="konfigurace" value="zakladni=6&amp;trek=6&amp;ekolo=8&amp;porizeni=pronajem36[^"]*doplnky=prilby%2Cpojisteni%2Cnabijecky"/);
     assert.ok(!/nab-internal/.test(html), 'veřejnost nevidí interní blok');
     assert.ok(!/marže/i.test(html), 'veřejnost nevidí slovo marže');
+    assert.ok(html.includes('id="modely"'));
+    assert.ok(html.includes('Konkrétní modely, které flotilu tvoří'));
+    assert.ok(html.includes('Superior eXP 6.4 STEPS'));
+    assert.match(html, /53\u00a0990\u00a0Kč/);
+    assert.ok(html.includes('href="/kola/superior-exp-6-4-steps"'));
+    assert.ok(html.includes('nab-class__examples'));
+    assert.ok(!/nakupn/i.test(html), 'veřejnost nevidí nákupní ceny');
+    assert.ok(!/33\u00a0000/.test(html) && !html.includes('33 000'), 'ani nákupní cenu modelu');
   }
   const zk = await (await srv.fetch('/nabidka?trek=2&ekolo=3&porizeni=zkouska&servis=partner&doplnky=prilby,nabijecky')).text();
   assert.match(zk, /Celkem za zkoušku \(4 měsíce\)/);
-  assert.match(zk, /započteme <strong>25\u00a0374\u00a0Kč<\/strong>/);
+  assert.match(zk, /započteme <strong>22\u00a0394\u00a0Kč<\/strong>/);
   assert.match(zk, /Start nejpozději 15\. 6\./);
   assert.match(zk, /v ceně zkoušky/);
   const malo = await (await srv.fetch('/nabidka?zakladni=2&porizeni=pronajem36')).text();
@@ -266,6 +308,7 @@ test('API /api/v1/nabidka/spocitat: JSON bez interních polí, doplnky čárkou,
   assert.equal('interni' in j, false);
   assert.ok(!/marže|marze|naklady|provize/i.test(JSON.stringify({ ...j, html: '' })), 'bez interních slov');
   assert.ok(!/nab-internal/.test(j.html));
+  assert.ok(!/nakupni/i.test(JSON.stringify(j)), 'API bez nákupních údajů');
   assert.equal(j.souhrn.pocetKol, 10);
   assert.deepEqual(j.doplnky.map((d) => d.id), ['pojisteni', 'gps']);
   assert.equal(j.zkouska.mesice, 4);
@@ -285,11 +328,14 @@ test('interní blok jen s admin session (/nabidka i API); ?interni=0 ho skryje; 
   const html = await (await srv.fetch(q)).text();
   assert.match(html, /nab-internal/);
   assert.match(html, /Naše marže/);
-  assert.match(html, /157\u00a0325\u00a0Kč/, 'marže penzion pronájem 36');
+  assert.match(html, /147\u00a0965\u00a0Kč/, 'marže penzion pronájem 36');
+  assert.ok(html.includes('Nákupní ceny tříd (interní soubor)'));
+  assert.ok(html.includes('Konkrétní modely: veřejná cena výrobce'));
+  assert.match(html, /33\u00a0000\u00a0Kč/, 'nákupní cena eXP z interního souboru');
   assert.match(html, /39\u00a0015\u00a0Kč/, 'podíl partnera');
   assert.ok(!/nab-internal/.test(await (await srv.fetch(q + '&interni=0')).text()));
   const api = await (await srv.fetch('/api/v1/nabidka/spocitat?trek=2&ekolo=3&porizeni=pronajem36&servis=partner&doplnky=prilby,nabijecky')).json();
-  assert.equal(api.interni.marze, 157325);
+  assert.equal(api.interni.marze, 147965);
   assert.match(api.html, /nab-internal/);
   // odhlášení → zase nic
   const logout = await srv.fetch('/admin/logout', { method: 'POST', body: { _csrf: (await srv.fetch('/admin')).headers.get('x-none') || '' } });
@@ -337,7 +383,7 @@ test('poptávka: CSRF 403, validace 422 s předvyplněním, honeypot, úspěch �
   assert.match(row.subject, /^Poptávka NAB-\d{4}-000001: 5 kol, zkušební období 4 měsíce$/);
   assert.equal(row.to_hmac, srv.app.fieldCrypto.hmacEmail('provozovatel@ksprehledy.cz'));
   assert.match(row.body_text, /Penzion U Rybníka/);
-  assert.match(row.body_text, /Měsíčně: 19\u00a0024 Kč/);
+  assert.match(row.body_text, /Měsíčně: 16\u00a0896 Kč/);
   const payload = JSON.parse(row.payload);
   assert.equal(payload.kind, 'nabidka');
   assert.equal(srv.app.fieldCrypto.dec(payload.nazev_enc), pii.nazev);
@@ -348,9 +394,9 @@ test('poptávka: CSRF 403, validace 422 s předvyplněním, honeypot, úspěch �
   for (const s of ['Nováková', 'novakova@', '777 000', 'Rybníka', 'květnu']) assert.ok(!row.payload.includes(s), `payload bez „${s}“`);
   assert.equal(payload.konfigurace.porizeni, 'zkouska');
   assert.deepEqual(payload.konfigurace.kola, { zakladni: 0, trek: 2, ekolo: 3 });
-  assert.equal(payload.vysledek.zkouska.celkem, 72496);
+  assert.equal(payload.vysledek.zkouska.celkem, 63984);
   assert.equal('interni' in payload.vysledek, false);
-  assert.equal(payload.interni.nakupniCelkem, 290000);
+  assert.equal(payload.interni.nakupniCelkem, 2 * 36000 + 3 * 64000);
   assert.equal(payload.cenik.zastupneCeny, true);
   // děkujeme
   const thanks = await srv.fetch(loc);

@@ -1,8 +1,12 @@
 'use strict';
 // Doména „nabídka“ – nabídkový konfigurátor pro hotely, penziony a půjčovny (kola + rezervační web + správa + servis).
 // Čisté funkce bez DB a HTTP; částky v Kč (celé, zaokrouhlené po položkách), procenta jako podíl 0–1.
-//   validateConfig(json)          → { ok, errors[], config } – kontrola struktury config/nabidka.json a normalizace
-//                                    procent (hodnota > 1 = procenta, ≤ 1 = podíl; rocniUrok 8 i 0.08 = 8 %)
+//   validateConfig(json, interni) → { ok, errors[], config } – kontrola struktury config/nabidka.json a normalizace
+//                                    procent (hodnota > 1 = procenta, ≤ 1 = podíl; rocniUrok 8 i 0.08 = 8 %).
+//                                    NÁKUPNÍ CENY kol nejsou ve veřejném souboru (validace je tam zakáže) – přicházejí
+//                                    z druhého, interního souboru mimo git (`interni` = { tridyKol: {id: {nakupniCena}},
+//                                    modely: {slug: {nakupniCena}} }); bez něj se odvodí z prodejní ceny a prahu marže
+//                                    (meta.nakupniCenyOdvozene = true). Nákupní ceny nikdy nejdou do publicResult.
 //   normalizeInput(query, config) → vstup konfigurátoru { kola: {zakladni, trek, ekolo}, porizeni, web, dalsiDesign,
 //                                    sprava, servis, doplnky[] } (neznámé hodnoty → výchozí; počty 0–MAX_KOL)
 //   compute(input, config)        → výsledek: kola[], porizeni{}, web{}, sprava{}, servis{}, doplnky[], souhrn{},
@@ -60,7 +64,7 @@ function isNum(v, { min = 0 } = {}) {
  * @param {object} raw
  * @returns {{ ok: boolean, errors: string[], config: object|null }}
  */
-function validateConfig(raw) {
+function validateConfig(raw, interniRaw = null) {
   const errors = [];
   const need = (cond, msg) => {
     if (!cond) errors.push(msg);
@@ -75,12 +79,41 @@ function validateConfig(raw) {
       errors.push(`Třída kol s neznámým id „${t && t.id}“.`);
       continue;
     }
-    for (const k of ['nakupniCena', 'prodejniCena', 'zustatkova36m']) need(isNum(t[k]), `tridyKol.${t.id}.${k} musí být nezáporné číslo.`);
+    for (const k of ['prodejniCena', 'zustatkova36m']) need(isNum(t[k]), `tridyKol.${t.id}.${k} musí být nezáporné číslo.`);
+    need(t.nakupniCena === undefined, `tridyKol.${t.id}.nakupniCena: nákupní ceny do veřejného souboru nepatří – patří jen do interního souboru mimo git (PK_NABIDKA_INTERNI).`);
     need(typeof t.nazev === 'string' && t.nazev, `tridyKol.${t.id}.nazev chybí.`);
-    if (isNum(t.zustatkova36m) && isNum(t.nakupniCena)) need(t.zustatkova36m <= t.nakupniCena, `tridyKol.${t.id}: zůstatková hodnota nesmí převýšit nákupní cenu.`);
-    tridy[t.id] = { id: t.id, nazev: String(t.nazev || t.id), popis: String(t.popis || ''), popisVerejny: publicDescription(t.popis), nakupniCena: r0(t.nakupniCena), prodejniCena: r0(t.prodejniCena), zustatkova36m: r0(t.zustatkova36m) };
+    tridy[t.id] = { id: t.id, nazev: String(t.nazev || t.id), popis: String(t.popis || ''), popisVerejny: publicDescription(t.popis), nakupniCena: 0, prodejniCena: r0(t.prodejniCena), zustatkova36m: r0(t.zustatkova36m) };
   }
   for (const id of TRIDY) need(tridy[id], `Chybí třída kol „${id}“.`);
+
+  // Interní soubor (mimo git): nákupní ceny tříd a konkrétních modelů. Chybí-li, odvodí se nákupní cena třídy z prodejní
+  // ceny a prahu marže (interni.prahMarzeProcent) – konfigurátor funguje, interní pohled to označí.
+  const modelyNakup = {};
+  let nakupniZeSouboru = false;
+  if (interniRaw !== null && interniRaw !== undefined) {
+    need(interniRaw && typeof interniRaw === 'object' && !Array.isArray(interniRaw), 'Interní soubor cen není objekt.');
+    const it = interniRaw && typeof interniRaw === 'object' ? interniRaw : {};
+    if (it.tridyKol !== undefined) need(it.tridyKol && typeof it.tridyKol === 'object' && !Array.isArray(it.tridyKol), 'Interní soubor: „tridyKol“ musí být objekt {id: {nakupniCena}}.');
+    for (const [id, v] of Object.entries(it.tridyKol && typeof it.tridyKol === 'object' ? it.tridyKol : {})) {
+      if (!TRIDY.includes(id)) {
+        errors.push(`Interní soubor: neznámá třída kol „${id}“.`);
+        continue;
+      }
+      const cena = v && typeof v === 'object' ? v.nakupniCena : v;
+      need(isNum(cena), `Interní soubor: tridyKol.${id}.nakupniCena musí být nezáporné číslo.`);
+      if (isNum(cena) && tridy[id]) {
+        tridy[id].nakupniCena = r0(cena);
+        nakupniZeSouboru = true;
+      }
+    }
+    if (it.modely !== undefined) need(it.modely && typeof it.modely === 'object' && !Array.isArray(it.modely), 'Interní soubor: „modely“ musí být objekt {slug: {nakupniCena}}.');
+    for (const [slug, v] of Object.entries(it.modely && typeof it.modely === 'object' ? it.modely : {})) {
+      const cena = v && typeof v === 'object' ? v.nakupniCena : v;
+      need(/^[a-z0-9-]{1,80}$/.test(slug), `Interní soubor: neplatný slug modelu „${slug}“.`);
+      need(isNum(cena), `Interní soubor: modely.${slug}.nakupniCena musí být nezáporné číslo.`);
+      if (isNum(cena)) modelyNakup[slug] = r0(cena);
+    }
+  }
 
   need(pronajem && typeof pronajem === 'object', 'Chybí „pronajem“.');
   const p = pronajem || {};
@@ -129,9 +162,23 @@ function validateConfig(raw) {
   const i = interni || {};
   for (const k of ['prahMarzeProcent', 'nakladyHostingMesicne', 'nakladyKonzultaceHodina', 'nakladyNasazeniWebu']) need(isNum(i[k]), `interni.${k} musí být číslo.`);
 
+  // nákupní ceny tříd: ze souboru, jinak odvozené (prodejní × (1 − práh marže)); každá třída samostatně
+  const prah = pct(i.prahMarzeProcent);
+  let nakupniOdvozene = false;
+  for (const id of TRIDY) {
+    const t = tridy[id];
+    if (!t) continue;
+    if (!(t.nakupniCena > 0)) {
+      t.nakupniCena = r0(t.prodejniCena * (1 - (Number.isFinite(prah) ? prah : 0.2)));
+      t.nakupniCenaOdvozena = true;
+      nakupniOdvozene = true;
+    } else t.nakupniCenaOdvozena = false;
+    need(t.zustatkova36m <= t.nakupniCena, `tridyKol.${id}: zůstatková hodnota (${t.zustatkova36m}) nesmí převýšit nákupní cenu.`);
+  }
+
   if (errors.length) return { ok: false, errors, config: null };
   const config = {
-    meta: { verze: String(meta.verze ?? ''), platnostOd: String(meta.platnostOd ?? ''), zastupneCeny: !!meta.zastupneCeny, poznamka: String(meta.poznamka ?? '') },
+    meta: { verze: String(meta.verze ?? ''), platnostOd: String(meta.platnostOd ?? ''), zastupneCeny: !!meta.zastupneCeny, poznamka: String(meta.poznamka ?? ''), nakupniCenyOdvozene: nakupniOdvozene, nakupniCenyZeSouboru: nakupniZeSouboru },
     tridyKol: TRIDY.map((id) => tridy[id]),
     pronajem: { mesice: [24, 36], rocniUrok: pct(p.rocniUrok), marzeRocni: pct(p.marzeRocni), kauceProcent: pct(p.kauceProcent), minKol: p.minKol, servisVCene: !!p.servisVCene },
     zkouska: { mesice: z.mesice, nasobekSazby36m: Number(z.nasobekSazby36m), zalohaProcent: pct(z.zalohaProcent), kauceProcent: pct(z.kauceProcent), minKol: z.minKol, startNejpozdeji: String(z.startNejpozdeji ?? ''), zapocetPriPokracovaniProcent: pct(z.zapocetPriPokracovaniProcent), odkupPoZkousceProcentProdejni: pct(z.odkupPoZkousceProcentProdejni), vCene: z.vCene.map(String) },
@@ -148,6 +195,8 @@ function validateConfig(raw) {
       nakladySpravyHodinMesicne: isNum(i.nakladySpravyHodinMesicne) ? i.nakladySpravyHodinMesicne : 1,
       // interni.naklady<Doplnek>ProcentCeny → { doplnek: podíl }
       nakladyDoplnkuProcentCeny: Object.fromEntries(Object.entries(i).filter(([k, v]) => /^naklady(.+)ProcentCeny$/.test(k) && isNum(v)).map(([k, v]) => [/^naklady(.+)ProcentCeny$/.exec(k)[1], pct(v)])),
+      // nákupní ceny konkrétních modelů (slug → Kč) jen z interního souboru; nikdy do veřejného výstupu
+      modelyNakup,
     },
   };
   return { ok: true, errors: [], config };
@@ -254,11 +303,13 @@ function doplnekNakladPodil(interni, id) {
 function compute(input, config) {
   const upozorneni = [];
   const tridyById = Object.fromEntries(config.tridyKol.map((t) => [t.id, t]));
-  const kola = TRIDY.filter((id) => input.kola[id] > 0).map((id) => ({ id, nazev: tridyById[id].nazev, pocet: input.kola[id], prodejniCena: tridyById[id].prodejniCena, prodejniCelkem: tridyById[id].prodejniCena * input.kola[id], nakupniCelkem: tridyById[id].nakupniCena * input.kola[id] }));
+  // veřejná část (kola[]) bez nákupních cen – ty jen v interni.kola / interni.nakupniCelkem
+  const kola = TRIDY.filter((id) => input.kola[id] > 0).map((id) => ({ id, nazev: tridyById[id].nazev, pocet: input.kola[id], prodejniCena: tridyById[id].prodejniCena, prodejniCelkem: tridyById[id].prodejniCena * input.kola[id] }));
+  const kolaInterni = kola.map((k) => ({ id: k.id, pocet: k.pocet, nakupniCena: tridyById[k.id].nakupniCena, nakupniCelkem: tridyById[k.id].nakupniCena * k.pocet, odvozena: !!tridyById[k.id].nakupniCenaOdvozena }));
   const pocetKol = sum(kola, 'pocet');
   const pocetEkol = input.kola.ekolo;
   const prodejniCelkem = sum(kola, 'prodejniCelkem');
-  const nakupniCelkem = sum(kola, 'nakupniCelkem');
+  const nakupniCelkem = sum(kolaInterni, 'nakupniCelkem');
   if (pocetKol === 0) upozorneni.push({ kod: 'zadna-kola', text: 'Zadejte prosím počet kol alespoň v jedné třídě.' });
   const isZkouska = input.porizeni === 'zkouska';
   const horizon = isZkouska ? config.zkouska.mesice : input.porizeni === 'pronajem24' ? 24 : 36;
@@ -433,7 +484,8 @@ function compute(input, config) {
   for (const p of polozky) if (p.trzby > 0 && p.marze < 0) varovani.push(`Položka „${p.label}“ je ztrátová (${p.marze} Kč).`);
   if (input.web === 'namiru') varovani.push('Web na míru: marže počítána z ceny „od“ – skutečná cena po konzultaci.');
   if (zkouska) varovani.push(`Zkouška: při pokračování pronájmem se započte ${zkouska.zapocet} Kč (snižuje marži na ${marze - zkouska.zapocet} Kč); zisk stojí na ex-demo prodeji vrácených kol za ≈ ${Math.round(zkouska.odkupProcent * 100)} % prodejní ceny.`);
-  const interni = { horizontMesice: horizon, trzby, naklady, marze, marzeProcent, prahMarzeProcent: config.interni.prahMarzeProcent, podilPartnera: partner, polozky, varovani, nakupniCelkem, nakladyZkousky: zkouska ? ip.find((p) => p.id === 'kola').naklady : null };
+  if (config.meta.nakupniCenyOdvozene && pocetKol > 0) varovani.push('Nákupní ceny kol nejsou nastaveny (chybí interní soubor cen) – počítá se s odhadem prodejní cena × (1 − práh marže).');
+  const interni = { horizontMesice: horizon, trzby, naklady, marze, marzeProcent, prahMarzeProcent: config.interni.prahMarzeProcent, podilPartnera: partner, polozky, varovani, kola: kolaInterni, nakupniCelkem, nakupniCenyOdvozene: !!config.meta.nakupniCenyOdvozene, nakladyZkousky: zkouska ? ip.find((p) => p.id === 'kola').naklady : null };
 
   return { vstup: input, meta: config.meta, kola, porizeni, zkouska, web: webOut, sprava: spravaOut, servis: servisOut, doplnky, souhrn, upozorneni, interni };
 }
@@ -442,7 +494,29 @@ function compute(input, config) {
 function publicResult(result) {
   if (!result) return result;
   const { interni, ...rest } = result;
+  // meta bez příznaků o interním souboru (veřejnost nemá vědět ani to, zda existuje)
+  if (rest.meta) {
+    const { nakupniCenyOdvozene, nakupniCenyZeSouboru, ...meta } = rest.meta;
+    rest.meta = meta;
+  }
   return rest;
+}
+
+/**
+ * Interní tabulka konkrétních modelů (jen pro admin pohled): veřejná cena s DPH → bez DPH, nákupní cena z interního
+ * souboru, marže. Modely bez nákupní ceny v souboru mají nakupniCena null.
+ * @param {Array<{slug, znacka, model, cenaVerejna}>} modely  z config/kola-modely.json
+ * @param {object} config  z validateConfig
+ * @param {number} dph  sazba DPH (0.21)
+ */
+function modelyInterni(modely, config, dph = 0.21) {
+  const nakup = (config && config.interni && config.interni.modelyNakup) || {};
+  return (Array.isArray(modely) ? modely : []).map((m) => {
+    const bezDph = r0(Number(m.cenaVerejna || 0) / (1 + dph));
+    const n = Object.prototype.hasOwnProperty.call(nakup, m.slug) ? nakup[m.slug] : null;
+    const marze = n === null ? null : bezDph - n;
+    return { slug: m.slug, nazev: `${m.znacka || ''} ${m.model || ''}`.trim(), tridaNabidky: m.tridaNabidky || null, cenaVerejna: r0(m.cenaVerejna), cenaBezDph: bezDph, nakupniCena: n, marze, marzeProcent: marze === null || bezDph <= 0 ? null : marze / bezDph };
+  });
 }
 
 /** Doplňky dostupné pro vstup (jenEkolo jen s e-koly). */
@@ -470,6 +544,7 @@ module.exports = {
   monthlyRate,
   compute,
   publicResult,
+  modelyInterni,
   availableDoplnky,
   pct,
 };

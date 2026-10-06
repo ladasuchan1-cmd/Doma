@@ -136,7 +136,8 @@ ls -la /opt/zalohy-pujcovna-kol/                              # pujcovna-kol-202
 
 Archiv obsahuje: `data/db/*.db` – **konzistentní online kopie** všech `data/tenants/*.db` (uvnitř kontejneru přes
 `node:sqlite` `backup()`, ekvivalent `sqlite3 .backup`; u staršího Node `VACUUM INTO`), `data/secret` – obsah
-`/data/.secret` (klíč k šifrovaným polím a HMAC; **bez něj jsou údaje zákazníků nečitelné**), `tenants/` – kopie
+`/data/.secret` (klíč k šifrovaným polím a HMAC; **bez něj jsou údaje zákazníků nečitelné**), `data/nabidka.interni.json` –
+interní ceník s nákupními cenami kol (je-li, kap. 6b), `tenants/` – kopie
 konfigurace tenantů z repa (tenant.json, logo, okoli.json, obrázky), `.env` serveru a `INFO.txt`. Archiv má práva
 600, složka 700. **Obsahuje klíč i osobní údaje** – mimo server ho ukládejte jen šifrovaně (plán: restic na Hetzner
 Storage Box + Litestream, PLAN kap. 12). V demu se data každou noc resetují, záloha je tedy hlavně kvůli `.secret`
@@ -148,12 +149,47 @@ a nastavení; v ostrém provozu (`PK_DEMO=0`) je to jediná záloha rezervací.
 cd /opt/Doma/pujcovna-kol/deploy && docker compose stop app
 mkdir -p /tmp/obnova && tar -xzf /opt/zalohy-pujcovna-kol/pujcovna-kol-2026-10-06-0230.tar.gz -C /tmp/obnova
 docker run --rm -v pujcovna-kol_data:/data -v /tmp/obnova/data:/obnova:ro alpine sh -c \
-  'rm -f /data/tenants/*.db-wal /data/tenants/*.db-shm && cp /obnova/db/*.db /data/tenants/ && cp /obnova/secret /data/.secret && chown -R 1000:1000 /data && chmod 600 /data/.secret'
+  'rm -f /data/tenants/*.db-wal /data/tenants/*.db-shm && cp /obnova/db/*.db /data/tenants/ && cp /obnova/secret /data/.secret && { [ -f /obnova/nabidka.interni.json ] && cp /obnova/nabidka.interni.json /data/; true; } && chown -R 1000:1000 /data && chmod 600 /data/.secret; chmod 600 /data/nabidka.interni.json 2>/dev/null; true'
 docker compose start app && rm -rf /tmp/obnova
 ```
 
 Zkouška obnovy patří k provozu (PLAN kap. 7): aspoň jednou za čtvrtletí obnovit zálohu na testovacím serveru a
 zapsat výsledek.
+
+## 6b. Interní ceník s nákupními cenami kol (mimo git)
+
+Konfigurátor `/nabidka` počítá marže z nákupních cen kol. Ty **nikdy nepatří do gitu ani na veřejnou stránku** – veřejný
+`config/nabidka.json` je bez nich (validace by soubor s `nakupniCena` odmítla) a čtou se jen z interního souboru
+v datovém svazku: `/data/nabidka.interni.json` (cesta přepsatelná `PK_NABIDKA_INTERNI`). Vzor s ukázkovými hodnotami
+je `config/nabidka.interni.example.json`; změna souboru se projeví do 2 s bez restartu. Bez souboru konfigurátor běží
+s odhadem (prodejní cena × (1 − práh marže)) a interní blok pro správce to označí varováním. Nákupní ceny vidí jen
+přihlášený správce v interním bloku `/nabidka` (tabulka tříd a konkrétních modelů z `config/kola-modely.json`).
+
+Zápis na serveru (svazek dat se jmenuje `pujcovna-kol_data`; hodnoty vyplňte podle skutečnosti – do gitu, chatu ani
+e-mailu je nekopírujte):
+
+```bash
+cat > /root/nabidka.interni.json <<'JSON'
+{
+  "tridyKol": { "zakladni": { "nakupniCena": 0 }, "trek": { "nakupniCena": 0 }, "ekolo": { "nakupniCena": 0 } },
+  "modely": {
+    "superior-exp-6-4-steps": { "nakupniCena": 0 },
+    "superior-exp-6-4-steps-suv": { "nakupniCena": 0 },
+    "superior-eway-6-4": { "nakupniCena": 0 },
+    "rock-machine-eblizzard-30-s": { "nakupniCena": 0 },
+    "rock-machine-crossride-e400-b-touring": { "nakupniCena": 0 },
+    "superior-racer-20": { "nakupniCena": 0 }
+  }
+}
+JSON
+docker run --rm -v pujcovna-kol_data:/data -v /root/nabidka.interni.json:/src.json:ro alpine sh -c \
+  'cp /src.json /data/nabidka.interni.json && chown 1000:1000 /data/nabidka.interni.json && chmod 600 /data/nabidka.interni.json'
+shred -u /root/nabidka.interni.json
+docker logs pujcovna-kol --since 10s 2>&1 | grep -i 'nabídka'   # „konfigurace cen načtena … interniSoubor: nabidka.interni.json“
+```
+
+Nákupní cena 0 znamená „nenastaveno“ (třída se pak počítá odhadem). Soubor je součástí zálohy (`hetzner.sh zaloha` →
+`data/nabidka.interni.json` v archivu) a při obnově se kopíruje spolu s `.secret`.
 
 ## 7. Přechod na wildcard certifikát (DNS-01) – ostrá verze
 

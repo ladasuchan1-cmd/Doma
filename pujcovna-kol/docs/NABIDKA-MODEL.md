@@ -1,9 +1,26 @@
 # Nabídka „Kola + web + správa + servis“ pro hotely, penziony a půjčovny – obchodní model
 
-Stav: návrh k rozhodnutí, 6. 10. 2026. Jediný zdroj cen je [`config/nabidka.json`](../config/nabidka.json); tento dokument vysvětluje
-model, vzorce a ukazuje tři scénáře spočítané přesně z těchto hodnot. **Nákupní ceny kol jsou skutečné vstupy zadavatele
-(20 000 / 40 000 / 70 000 Kč, předpoklad bez DPH); všechno ostatní – prodejní ceny, zůstatkové hodnoty, náklad kapitálu, ceny webu,
-správy, servisu, doplňků a interní náklady – je náš NÁVRH K POTVRZENÍ** (`meta.zastupneCeny: true`). Všechny částky bez DPH.
+Stav: návrh k rozhodnutí, 6. 10. 2026. Veřejný zdroj cen je [`config/nabidka.json`](../config/nabidka.json); tento dokument vysvětluje
+model, vzorce a ukazuje tři scénáře spočítané přesně z těchto hodnot. Všechny částky bez DPH. **Prodejní ceny, zůstatkové hodnoty,
+náklad kapitálu, ceny webu, správy, servisu, doplňků a interní náklady jsou náš NÁVRH K POTVRZENÍ** (`meta.zastupneCeny: true`).
+
+**Nákupní ceny kol nejsou nikde v gitu ani v tomto dokumentu.** Architektura dat:
+
+| Soubor | Co obsahuje | Kde leží |
+|---|---|---|
+| `config/nabidka.json` | jen VEŘEJNÉ ceny: prodejní, zůstatkové, web, správa, servis, doplňky a interní nákladové parametry (`interni.*`). Validace ho **odmítne**, pokud by obsahoval `nakupniCena` | git |
+| `config/kola-modely.json` | veřejné údaje o konkrétních modelech (název, doporučená cena výrobce vč. DPH, odkaz) | git |
+| interní soubor s nákupními cenami tříd a konkrétních modelů | `nakupniCena` pro třídy (`tridyKol`) i modely (`modely`) | MIMO git: cesta `PK_NABIDKA_INTERNI`, jinak `$PK_DATA/nabidka.interni.json` (na serveru `/data/nabidka.interni.json` v datovém svazku), lokálně i `config/nabidka.interni.json` (v `.gitignore`) |
+| `config/nabidka.interni.example.json` | VZOR interního souboru s **UKÁZKOVÝMI** hodnotami (třídy 18 000 / 36 000 / 64 000 Kč; modely viz soubor) | git |
+
+Chybí-li interní soubor, konfigurátor funguje dál a nákupní cenu odvodí jako prodejní × (1 − `interni.prahMarzeProcent`)
+(`meta.nakupniCenyOdvozene = true`); interní blok to označí varováním. Nákupní ceny se zobrazují **jen v interním bloku pro přihlášené
+správce** (tabulka tříd a tabulka konkrétních modelů: veřejná cena výrobce bez DPH vs. nákupní, marže), nikdy veřejně. Konkrétní
+modely z `config/kola-modely.json` se zobrazují na /nabidka v sekci „Konkrétní modely, které flotilu tvoří“ a v demu půjčovny jako typy kol.
+
+**Všechny nákupní ceny, marže a scénáře v tomto dokumentu jsou počítány z UKÁZKOVÝCH nákupních cen** z `config/nabidka.interni.example.json`
+(18 000 / 36 000 / 64 000 Kč za třídy `zakladni` / `trek` / `ekolo`). Skutečné nákupní ceny jsou pouze v interním souboru na serveru;
+skutečné marže se od ukázkových liší.
 
 Navazuje na [PLAN.md](../PLAN.md) kap. 15, otevřený bod 3 („obchodní model musteru“): zde ho rozpracováváme na pět linií A–E,
 které si klient kombinuje v konfigurátoru. Princip: **každá kombinace musí mít naši hrubou marži ≥ `interni.prahMarzeProcent`
@@ -21,7 +38,7 @@ nevyplatí doprava, zaškolení ani servisní smlouva.
 
 | Varianta | Co klient dostane | Náš zisk | Pojistky |
 |---|---|---|---|
-| **Koupě** | kola za `prodejniCena`, dodání, sestavení, záruka výrobce, 2 roky přednostní odkup při obměně | `prodejniCena − nakupniCena` (návrh 20 % z prodejní ceny) | platba předem nebo 50 % při objednávce + 50 % při dodání; vlastnictví přechází zaplacením |
+| **Koupě** | kola za `prodejniCena`, dodání, sestavení, záruka výrobce, 2 roky přednostní odkup při obměně | `prodejniCena − nakupniCena` (s ukázkovými nákupními cenami ≈ 27–28 % z prodejní ceny) | platba předem nebo 50 % při objednávce + 50 % při dodání; vlastnictví přechází zaplacením |
 | **Pronájem 24 / 36 m** (operativní leasing s odkupem) | kola za měsíční splátku, na konci odkup za pevnou zůstatkovou cenu (`zustatkova36m`, pro 24 m lineárně přepočtená), vrácení nebo výměna za nová | marže `marzeRocni` (12 % ročně z nákupní ceny) nad anuitou; anuita pokrývá kapitál a jeho náklad `rocniUrok` | kauce `kauceProcent` × prodejní cena (vratná), min. délka = celá doba, předčasné ukončení = doplacení zbývajících splátek do zůstatkové hodnoty, protokol o stavu při vrácení s ceníkem oprav |
 | **Zkušební období 4 měsíce** | flotila na jednu sezónu za vyšší sazbu (`nasobekSazby36m` = 2,0× splátky 36 m); **v ceně** web s 1 designem, zaškolení, 1 konzultace/měsíc, 1 sezónní prohlídka, přilby a zámky | vysoká sazba kryje depreciaci a náklady na rozjezd; po zkoušce buď pokračování (pronájem/koupě se započtením 35 % zkušební ceny), odkup kol za 80 % prodejní ceny, nebo vrácení → ex-demo prodej / další klient | záloha 50 % předem, zbytek do 30 dnů; vratná kauce 10 %; **start nejpozději 15. 6.** (`startNejpozdeji`), aby zkouška pokryla hlavní sezónu; předávací protokol s ceníkem oprav; min. 5 kol |
 
@@ -32,10 +49,10 @@ riziko nesplácení a předčasného vrácení. Ve výsledku je úrok naším v�
 počítáme jako náklad). **Budoucí varianta:** dodavatelské financování (výrobce / distributor nese kapitál, my platíme jeho
 splátky) – model zůstává stejný, jen `rocniUrok` se nastaví na sazbu dodavatele a odpadá vázání vlastních peněz.
 
-**Proč zkouška funguje pro obě strany:** klient za 4 měsíce zaplatí u e-kola 4 × 4 396 = 17 584 Kč, tj. 20 % kupní ceny,
+**Proč zkouška funguje pro obě strany:** klient za 4 měsíce zaplatí u e-kola 4 × 3 904 = 15 616 Kč, tj. 18 % kupní ceny,
 a vyzkouší, zda hosté kola chtějí. My na zkoušce vyděláme i při vrácení: po jedné sezóně má kolo hodnotu ex-demo ≈ 80 %
-prodejní ceny (70 400 Kč), což je nad nákupní cenou 70 000 Kč – zkušební nájem je tedy prakticky celý zisk, z něhož se hradí
-web, zaškolení a prohlídka (viz scénáře). Vrácená kola jdou k dalšímu klientovi (druhá sezóna za nižší sazbu) nebo do
+prodejní ceny (70 400 Kč), což je nad **ukázkovou** nákupní cenou 64 000 Kč (skutečná je jen v interním souboru) – zkušební nájem je
+tedy prakticky celý zisk, z něhož se hradí web, zaškolení a prohlídka (viz scénáře). Vrácená kola jdou k dalšímu klientovi (druhá sezóna za nižší sazbu) nebo do
 ex-demo prodeje v kamenné prodejně zadavatele.
 
 **Co se stane s webem:** při vrácení kol po zkoušce web běží dál za `web.sablona.mesicne`, pokud klient chce; jinak se po 30 dnech
@@ -76,8 +93,14 @@ Pojištění flotily 120 Kč/kolo/měs (odhad podle KoloNaOperák, kde je pojiš
 
 ## 2. Výpočty (pseudokód pro konfigurátor, klíče 1:1 s `config/nabidka.json`)
 
+Konfigurátor nejdřív načte veřejný `config/nabidka.json` (validace ho odmítne, pokud obsahuje `nakupniCena`) a pak interní soubor
+(`PK_NABIDKA_INTERNI` → `$PK_DATA/nabidka.interni.json` → lokálně `config/nabidka.interni.json`; změna se projeví do 2 s bez restartu).
+`validateConfig(veřejný, interní)` z nich složí jednu konfiguraci, ve které má každá třída `T.nakupniCena`. Bez interního souboru se
+`T.nakupniCena = prodejniCena × (1 − interni.prahMarzeProcent)` a `meta.nakupniCenyOdvozene = true`. Veřejný výstup konfigurátoru nákupní
+ceny nikdy neobsahuje, jen blok `interni` pro přihlášené správce.
+
 ```
-C = načti config/nabidka.json;  T = C.tridyKol[id];  R(x) = zaokrouhli na celé Kč
+C = načti config/nabidka.json + interní soubor (nákupní ceny);  T = C.tridyKol[id];  R(x) = zaokrouhli na celé Kč
 mix = { id třídy: počet }      // např. { trek: 2, ekolo: 3 }
 
 zustatkova(T, mesice)   = T.zustatkova36m + (T.prodejniCena − T.zustatkova36m) × (36 − mesice) / 36
@@ -87,7 +110,7 @@ anuita(T, mesice)       = i = C.pronajem.rocniUrok / 12
                           // ekvivalentní zápis: anuita(T.nakupniCena − zustatkova(T, m), i, m) + zustatkova(T, m) × i
 pronajemMesicne(T, m)   = R( anuita(T, m) + T.nakupniCena × C.pronajem.marzeRocni / 12 )     // za 1 kolo
                           // POZOR: pro 24 m se musí použít zustatkova(T, 24) (lineární přepočet), ne zustatkova36m –
-                          // jinak by klient po 2 letech odkoupil kolo za cenu po 3 letech (náš prodělek ≈ 20 000 Kč na e-kole)
+                          // jinak by klient po 2 letech odkoupil kolo za cenu po 3 letech (náš prodělek by byl řádově desítky tisíc Kč na e-kole)
 koupe(mix)              = Σ T.prodejniCena × pocet
 pronajemMesicneFlotila  = Σ pronajemMesicne(T, m) × pocet;   kauce = R(C.pronajem.kauceProcent × koupe(mix))
 odkupNaKonci            = Σ zustatkova(T, m) × pocet
@@ -122,24 +145,45 @@ podilPartnera(mesicu)   = (servis × mesicu + prohlidkaRocne × mesicu/12) × (1
 kontrola                = marzeNase / tržby ≥ C.interni.prahMarzeProcent, jinak konfigurátor kombinaci označí „nelze nabídnout“
 ```
 
-Sazby za jedno kolo podle současných hodnot:
+Sazby za jedno kolo podle současných veřejných hodnot a **UKÁZKOVÝCH nákupních cen**:
 
 | Třída | Nákupní | Prodejní | Zůst. 36 m | Zůst. 24 m | Pronájem 24 m | Pronájem 36 m | Zkouška/měs | 36 splátek + odkup | Marže prodeje | Marže pronájmu |
 |---|---|---|---|---|---|---|---|---|---|---|
-| Trekové/městské | 20 000 | 25 000 | 8 000 | 13 667 | 563 | 617 | 1 234 | 30 212 | 20,0 % | 32,4 % |
-| Trekové/horské vyšší | 40 000 | 50 000 | 16 000 | 27 333 | 1 127 | 1 234 | 2 468 | 60 424 | 20,0 % | 32,4 % |
-| E-kolo středový motor | 70 000 | 88 000 | 26 500 | 47 000 | 2 004 | 2 198 | 4 396 | 105 628 | 20,5 % | 31,8 % |
+| Trekové/městské | 18 000 | 25 000 | 8 000 | 13 667 | 454 | 535 | 1 070 | 27 260 | 28,0 % | 34,0 % |
+| Trekové/horské vyšší | 36 000 | 50 000 | 16 000 | 27 333 | 907 | 1 071 | 2 142 | 54 556 | 28,0 % | 34,0 % |
+| E-kolo středový motor | 64 000 | 88 000 | 26 500 | 47 000 | 1 675 | 1 952 | 3 904 | 96 772 | 27,3 % | 33,9 % |
 
-Pronájem na 36 m s odkupem stojí klienta 1,20× kupní ceny – trh (KoloNaOperák: e-kolo 59 999 Kč → 3 075 Kč/měs na 24 m,
+Nákupní ceny v tabulce jsou **ukázkové** z `config/nabidka.interni.example.json`; skutečné jsou pouze v interním souboru na serveru.
+(„36 splátek + odkup“ = 36 × splátka + zůstatková hodnota, např. 36 × 535 + 8 000 = 27 260; marže pronájmu = (36 splátek + odkup − nákupní) / (36 splátek + odkup).)
+
+Pronájem na 36 m s odkupem stojí klienta ≈ 1,1× kupní ceny (27 260 / 25 000 = 1,09×, 54 556 / 50 000 = 1,09×, 96 772 / 88 000 = 1,10×) – trh (KoloNaOperák: e-kolo 59 999 Kč → 3 075 Kč/měs na 24 m,
 tj. 1,23× **včetně** servisu a pojištění) ukazuje, že je prostor případně sazbu zvýšit nebo servis přibalit.
+
+### 2b. Konkrétní modely
+
+Konkrétní modely, které flotilu tvoří, jsou ve [`config/kola-modely.json`](../config/kola-modely.json) – jen veřejné údaje (název, doporučená
+cena výrobce vč. DPH, odkaz, velikosti, popis, ceník půjčovny pro demo). Doporučené ceny výrobce vč. DPH k 6. 10. 2026:
+
+| Model | Cena vč. DPH (aktuální) | Běžná cena |
+|---|---|---|
+| Superior eXP 6.4 STEPS | 53 990 Kč | 91 990 Kč |
+| Superior eXP 6.4 STEPS SUV | 56 990 Kč | 93 990 Kč |
+| Superior eWAY 6.4 | 75 990 Kč | 75 990 Kč |
+| Rock Machine eBlizzard 30 S | 67 990 Kč | 79 990 Kč |
+| Rock Machine Crossride e400 B Touring | 52 990 Kč | 64 990 Kč |
+| Superior Racer 20 (dětské) | 10 990 Kč | 10 990 Kč |
+
+Nákupní ceny modelů jsou (stejně jako u tříd) jen v interním souboru mimo git (blok `modely`, vzor v `config/nabidka.interni.example.json`).
+**Pozor na rozpor s prodejními cenami tříd:** veřejná cena těchto e-kol bez DPH vychází na ≈ 44–63 tis. Kč, což je výrazně POD prodejní cenou
+třídy „ekolo“ v konfigurátoru (88 000 Kč bez DPH). Prodejní ceny tříd je proto třeba sladit se skutečnou flotilou (viz otevřené rozhodnutí 11 v sekci 8);
+do té doby jsou výpočty v sekci 3 ilustrativní.
 
 ---
 
-## 3. Tři scénáře (spočítáno z `nabidka.json`, Kč bez DPH)
+## 3. Tři scénáře (spočítáno z `nabidka.json` a UKÁZKOVÝCH nákupních cen z `nabidka.interni.example.json`, Kč bez DPH)
 
 Společná konfigurace: web šablona, servis u partnera, přilby a zámky, 1 sezónní prohlídka ročně. Řádek „Zkouška“ předpokládá
-přechod na pronájem 36 m po 4 měsících se započtením 35 %; sloupec „3 roky“ zahrnuje zkoušku + 32 splátek (pronájem běží do
-40. měsíce). Náš hrubý zisk = tržby − nákup kol (u pronájmu jen marže nad anuitou) − přímé náklady (nasazení, hosting,
+přechod na pronájem 36 m po 4 měsících se započtením 35 %; sloupec „3 roky“ zahrnuje zkoušku (4 měsíce) + 32 splátek pronájmu (celkem 36 měsíců); „1 rok“ = jednorázově (vč. celé ceny zkoušky) + 4 × měsíčně mimo kola ve zkoušce + 8 × měsíčně pronájmu − započet. Náš hrubý zisk = tržby − nákup kol (u pronájmu jen marže nad anuitou) − přímé náklady (nasazení, hosting,
 hodiny, nákup doplňků, výplata partnera); procento = podíl na tržbách za 3 roky.
 
 ### Penzion – 5 kol (2 trek + 3 e-kola; správa sami; 1 nabíjecí stanice)
@@ -148,12 +192,12 @@ Měsíčně bez kol: web 990 + servis 900 = 1 890 Kč; prohlídka 4 500 Kč/rok;
 
 | Model | Jednorázově | Měsíčně | 1 rok | 3 roky | Náš hrubý zisk (3 r.) | Podíl partnera (3 r.) |
 |---|---|---|---|---|---|---|
-| Koupě | 410 000 | 1 890 | 437 180 | 491 540 | 126 925 (26 %) | 39 015 |
-| Pronájem 36 m | 46 000 + kauce 36 400 (vratná) | 10 952 (kola 9 062) | 181 924 | 453 772 + odkup 111 500 | 157 325 (35 %) | 39 015 |
-| Zkouška → pronájem | 97 496 (záloha 36 248 předem, zbytek do 30 dnů) + kauce 36 400 | zkouška 19 024; poté 10 952 | 163 338 | 435 186 | 160 837 (37 %) | 41 565 |
+| Koupě | 410 000 | 1 890 | 437 180 | 491 540 | 152 925 (31 %) | 39 015 |
+| Pronájem 36 m | 46 000 + kauce 36 400 (vratná) | 9 888 (kola 7 998) | 169 156 | 415 468 + odkup 111 500 | 147 965 (36 %) | 39 015 |
+| Zkouška → pronájem | 88 984 (záloha 31 992 předem, zbytek do 30 dnů) + kauce 36 400 | zkouška 16 896; poté 9 888 | 149 294 | 395 606 | 144 735 (37 %) | 39 015 |
 
-Zkouška samotná: 72 496 Kč za 4 měsíce, započet 25 374 Kč, odkup kol po zkoušce 291 200 Kč. Při vrácení kol a ex-demo prodeji
-za 291 200 Kč je zisk zkoušky 54 271 Kč (náklady zkoušky bez kol 19 425 Kč).
+Zkouška samotná: 63 984 Kč za 4 měsíce, započet 22 394 Kč, odkup kol po zkoušce 291 200 Kč. Při vrácení kol a ex-demo prodeji
+za 291 200 Kč je zisk zkoušky 71 759 Kč (náklady zkoušky bez kol 19 425 Kč).
 
 ### Hotel – 20 kol (6 základní + 6 trek + 8 e-kol; správa předplacená; pojištění; 1 nabíjecí stanice)
 
@@ -161,29 +205,50 @@ Měsíčně bez kol: web 990 + správa 3 900 + servis 3 600 + pojištění 2 400
 
 | Model | Jednorázově | Měsíčně | 1 rok | 3 roky | Náš hrubý zisk (3 r.) | Podíl partnera (3 r.) |
 |---|---|---|---|---|---|---|
-| Koupě | 1 218 000 | 10 890 | 1 366 680 | 1 664 040 | 405 860 (24 %) | 156 060 |
-| Pronájem 36 m | 64 000 + kauce 115 400 | 39 580 (kola 28 690) | 556 960 | 1 542 880 + odkup 356 000 | 503 060 (33 %) | 156 060 |
-| Zkouška → pronájem | 254 520 (záloha 114 760) + kauce 115 400 | zkouška 63 380; poté 39 580 | 514 828 | 1 500 748 | 550 288 (37 %) | 166 260 |
+| Koupě | 1 218 000 | 10 890 | 1 366 680 | 1 664 040 | 489 860 (29 %) | 156 060 |
+| Pronájem 36 m | 64 000 + kauce 115 400 | 36 142 (kola 25 252) | 515 704 | 1 419 112 + odkup 356 000 | 472 820 (33 %) | 156 060 |
+| Zkouška → pronájem | 227 016 (záloha 101 008 předem, zbytek do 30 dnů) + kauce 115 400 | zkouška 56 504; poté 36 142 | 469 446 | 1 372 854 | 496 530 (36 %) | 156 060 |
 
-Zkouška: 229 520 Kč za 4 měsíce, započet 80 332 Kč, odkup 923 200 Kč; zisk zkoušky při vrácení a ex-demo prodeji 189 220 Kč.
+Zkouška: 202 016 Kč za 4 měsíce, započet 70 706 Kč, odkup 923 200 Kč; zisk zkoušky při vrácení a ex-demo prodeji 245 716 Kč (náklady zkoušky bez kol 43 500 Kč).
 
-### Resort – 50 kol (15 + 15 + 20 e-kol; správa předplacená; pojištění; GPS; 2 nabíjecí stanice; 2. design)
+### Resort – 50 kol (15 + 15 + 20 e-kol; správa předplacená; pojištění; GPS; 1 nabíjecí stanice; 2. design)
 
-Měsíčně bez kol: web 990 + správa 3 900 + servis 9 000 + pojištění 6 000 + GPS 3 000 = 22 890 Kč; prohlídka 45 000 Kč/rok; doplňky jednorázově 185 000 Kč.
+Měsíčně bez kol: web 990 + správa 3 900 + servis 9 000 + pojištění 6 000 + GPS 3 000 = 22 890 Kč; prohlídka 45 000 Kč/rok; doplňky jednorázově 160 000 Kč
+(přilby 60 000, nabíječka 25 000, GPS 75 000) + 2. design 5 000 Kč. Konfigurace umí jen 1 nabíjecí stanici.
 
 | Model | Jednorázově | Měsíčně | 1 rok | 3 roky | Náš hrubý zisk (3 r.) | Podíl partnera (3 r.) |
 |---|---|---|---|---|---|---|
-| Koupě | 3 090 000 | 22 890 | 3 409 680 | 4 049 040 | 890 640 (22 %) | 390 150 |
-| Pronájem 36 m | 205 000 + kauce 288 500 | 94 615 (kola 71 725) | 1 385 380 | 3 746 140 + odkup 890 000 | 1 133 640 (30 %) | 390 150 |
-| Zkouška → pronájem | 698 800 (záloha 286 900) + kauce 288 500 | zkouška 161 450; poté 94 615 | 1 326 890 | 3 687 650 | 1 294 950 (35 %) | 415 650 |
+| Koupě | 3 065 000 | 22 890 | 3 384 680 | 4 024 040 | 1 095 640 (27 %) | 390 150 |
+| Pronájem 36 m | 180 000 + kauce 288 500 | 86 020 (kola 63 130) | 1 257 240 | 3 411 720 + odkup 890 000 | 1 053 040 (31 %) | 390 150 |
+| Zkouška → pronájem | 610 040 (záloha 252 520 předem, zbytek do 30 dnů) + kauce 288 500 | zkouška 144 260; poté 86 020 | 1 193 436 | 3 347 916 | 1 160 556 (35 %) | 390 150 |
 
-Zkouška: 573 800 Kč za 4 měsíce, započet 200 830 Kč, odkup 2 308 000 Kč; zisk zkoušky při vrácení 490 150 Kč.
+Zkouška: 505 040 Kč za 4 měsíce, započet 176 764 Kč, odkup 2 308 000 Kč; zisk zkoušky při vrácení a ex-demo prodeji 631 390 Kč (náklady zkoušky bez kol 91 650 Kč).
 
-**Čtení výsledků:** všechny kombinace jsou nad prahem 20 %; koupě je marží nejslabší (u resortu 22 % – velkoobjemová sleva
-by ji srazila pod práh, proto konfigurátor musí hlídat `prahMarzeProcent` i u slev). Pronájem váže kapitál (penzion 290 000 Kč,
-hotel 920 000 Kč, resort 2 300 000 Kč v nákupních cenách), ale přináší o čtvrtinu vyšší zisk a vazbu na 3 roky. Zkouška je
-pro klienta nejnižší vstupní práh a pro nás nejvýnosnější varianta – za předpokladu, že ex-demo kola prodáme za ≈ 80 % prodejní
-ceny; při 75 % je zisk zkoušky u penzionu 36 071 Kč, při 70 % 17 871 Kč a **při 65 % je zkouška na nule** (−329 Kč).
+<!-- Výpočet řádku „Zkouška → pronájem“ (kód: compute() pro porizeni=zkouska a porizeni=pronajem36 z test/fixtures/nabidka*.json, ukázkové nákupní ceny 18 000 / 36 000 / 64 000):
+  jednorázově = souhrn.jednorazove(zkouška) + zkouska.celkem                       (penzion 25 000 + 63 984 = 88 984)
+  1 rok  = jednorázově + 4 × (měsíčně zkoušky − kola zkoušky) + 8 × měsíčně pronájmu − zkouska.zapocet
+           penzion: 88 984 + 4 × 900 + 8 × 9 888 − 22 394 = 149 294
+           hotel:   227 016 + 4 × 6 000 + 8 × 36 142 − 70 706 = 469 446
+           resort:  610 040 + 4 × 18 000 + 8 × 86 020 − 176 764 = 1 193 436
+  3 roky = 1 rok + 24 × měsíčně pronájmu + 2 × roční prohlídky (1. prohlídka je v ceně zkoušky)
+           penzion: 149 294 + 24 × 9 888 + 2 × 4 500 = 395 606;  hotel: 469 446 + 24 × 36 142 + 2 × 18 000 = 1 372 854;
+           resort: 1 193 436 + 24 × 86 020 + 2 × 45 000 = 3 347 916
+  zisk   = interni.marze zkoušky (4 měs.) − započet + 32/36 × (marže pronájmu 36 m z položek kola, web-provoz, správa, servis, pojištění, GPS měsíčně)
+           + 2/3 × marže položky servis-rocne
+           penzion: 50 099 − 22 394 + 32/36 × 130 140 + 2/3 × 2 025 = 144 735 (36,6 % z 395 606)
+           hotel: 496 530 (36,2 %); resort: 1 160 556 (34,7 %)
+  podíl partnera = jako u pronájmu 36 m (servis 36 měs. + 3 prohlídky; zkouška ho jen předplácí) -->
+
+Zisk zkoušky při vrácení = cena zkoušky + ex-demo prodej kol (80 % prodejní ceny) − nákupní cena kol − náklady zkoušky bez kol; nákupní ceny jsou ukázkové.
+
+**Čtení výsledků:** všechny kombinace jsou nad prahem 20 %; koupě má v ukázkových číslech marži 27–31 % (u resortu nejnižší –
+velkoobjemová sleva by ji srazila k prahu, proto konfigurátor musí hlídat `prahMarzeProcent` i u slev). Pronájem váže kapitál
+(penzion 264 000 Kč, hotel 836 000 Kč, resort 2 090 000 Kč v nákupních cenách; **ukázkové nákupní ceny**) a má o 4–5 procentních bodů
+vyšší marži než koupě (31–36 %), absolutní zisk za 3 roky je ale o ≈ 3–4 % nižší a přidává vazbu na 3 roky a odkup kol po skončení.
+Zkouška je pro klienta nejnižší vstupní práh a její zisk v řádku „zkouška → pronájem“ je srovnatelný s pronájmem (hotel a resort
+mírně nad, penzion mírně pod) – za předpokladu, že ex-demo kola prodáme za ≈ 80 % prodejní ceny. Zisk zkoušky klesá s dosažitelnou
+ex-demo cenou: u penzionu je 71 759 Kč při 80 %, 53 559 Kč při 75 %, 35 359 Kč při 70 %, 17 159 Kč při 65 % a nulový při ≈ 60 %
+(u hotelu a resortu ≈ 58–59 %; vše s ukázkovými nákupními cenami, bod zvratu je nutné ověřit na pilotu se skutečnými cenami).
 Dosažitelnou ex-demo cenu je proto nutné ověřit na pilotu dřív, než se zkouška nabídne plošně.
 
 ---
@@ -246,8 +311,8 @@ námi schválené díly, sezónní prohlídka do 15. 4. a po 15. 10., servisní 
 
 ## 7. Co musí dodat zadavatel
 
-1. **Nákupní ceny** – dodány (20 / 40 / 70 tis. Kč); potvrdit, že jsou bez DPH, a doplnit konkrétní modely a dodací lhůty.
-2. **Prodejní ceny a marži** – potvrdit návrh 20 % z prodejní ceny (25 / 50 / 88 tis. Kč), nebo zadat vlastní.
+1. **Nákupní ceny** – dodány zadavatelem a uloženy pouze v interním souboru na serveru (mimo git); potvrdit, že jsou bez DPH, a doplnit dodací lhůty.
+2. **Prodejní ceny a marži** – potvrdit návrh prodejních cen (25 / 50 / 88 tis. Kč) a minimální marži (práh 20 %), nebo zadat vlastní; ceny je třeba sladit s konkrétními modely (viz 2b).
 3. **Zůstatkové hodnoty po 36 m** – potvrdit návrh 30–32 % prodejní ceny; ideálně podle zkušenosti s bazarem prodejny.
 4. **Financování** – strop vlastního kapitálu vázaného v pronájmech a potvrzení nákladu kapitálu 7 %; jednání o dodavatelském financování.
 5. **Partnerské servisy** – seznam kandidátů podle regionů prvních klientů, jejich hodinové sazby.
@@ -266,3 +331,4 @@ námi schválené díly, sezónní prohlídka do 15. 4. a po 15. 10., servisní 
 8. Vlastní doména klienta u šablony (`klient.cz` místo subdomény) – za příplatek, nebo jen v „na míru“.
 9. Hranice pro povinné GPS lokátory (návrh od 20 kol / u všech e-kol).
 10. Pojištění: v ceně pronájmu (jako KoloNaOperák) nebo doplněk.
+11. Sladění prodejních cen tříd se skutečnou flotilou: veřejná cena konkrétních e-kol bez DPH (≈ 44–63 tis. Kč, viz 2b) je výrazně pod prodejní cenou třídy „ekolo“ (88 000 Kč); rozhodnout, zda snížit prodejní ceny tříd, nebo flotilu složit z dražších modelů, a pak přepočítat scénáře.

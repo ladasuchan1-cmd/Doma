@@ -408,18 +408,18 @@ test('/api/v1/dostupnost: mapa typ → velikost → počet, blockedDates, filtr 
   assert.equal(res.status, 200);
   const body = await res.json();
   assert.equal(body.ok, true);
-  assert.equal(Object.keys(body.available).length, 6);
+  assert.equal(Object.keys(body.available).length, 12);
   const trek = srv.db.prepare("SELECT id FROM bike_types WHERE slug = 'trek-fx-2'").get().id;
   assert.deepEqual(body.available[trek], { S: 1, M: 2, L: 1, XL: 1 });
-  assert.equal(body.total, 22);
+  assert.equal(body.total, 43, '22 ukázkových kusů + 21 kusů skutečných modelů');
   assert.ok(body.blockedDates.some((d) => d.endsWith('-12-25')));
-  assert.equal(body.types.length, 6);
+  assert.equal(body.types.length, 12);
   const one = await (await srv.fetch(`/api/v1/dostupnost?od=${day(60)}&do=${day(61)}&typ=trek-fx-2&velikost=M`)).json();
   assert.deepEqual(one.available, { [trek]: { M: 2 } });
   // zabrané kolo v termínu demo rezervace (awaiting_fee: 2× e-kolo L za 10 dní)
   const aw = srv.db.prepare("SELECT from_at, to_at FROM reservations WHERE status IN ('awaiting_fee', 'confirmed') ORDER BY from_at DESC LIMIT 1").get();
   const busy = await (await srv.fetch(`/api/v1/dostupnost?od=${encodeURIComponent(aw.from_at)}&do=${encodeURIComponent(aw.to_at)}`)).json();
-  assert.ok(busy.total < 22);
+  assert.ok(busy.total < 43);
   assert.equal((await srv.fetch('/api/v1/dostupnost?od=x&do=y')).status, 400);
   assert.equal((await srv.fetch(`/api/v1/dostupnost?od=${day(61)}&do=${day(60)}`)).status, 400);
   assert.equal((await srv.fetch(`/api/v1/dostupnost?od=${day(60)}&do=${day(61)}&typ=neni`)).status, 404);

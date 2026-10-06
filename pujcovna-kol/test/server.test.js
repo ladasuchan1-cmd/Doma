@@ -353,7 +353,7 @@ test('demo režim: při prázdné tabulce bike_types server sám naplní demo da
   assert.equal(srv.db.prepare('SELECT COUNT(*) AS n FROM bike_types').get().n, 0, 'výchozí test env má autoseed vypnutý');
   const seeded = await startServer({ env: { PK_DEMO_AUTOSEED: '1' } });
   try {
-    assert.equal(seeded.db.prepare('SELECT COUNT(*) AS n FROM bike_types').get().n, 6);
+    assert.equal(seeded.db.prepare('SELECT COUNT(*) AS n FROM bike_types').get().n, 12);
     assert.ok(seeded.db.prepare('SELECT COUNT(*) AS n FROM reservations').get().n >= 1);
     assert.equal(seeded.db.prepare('SELECT COUNT(*) AS n FROM users').get().n, 1, 'admin z ensureAdmin se neduplikuje');
     const home = await (await seeded.fetch('/')).text();

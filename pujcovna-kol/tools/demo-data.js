@@ -6,6 +6,7 @@
 // kusy, sezóny, ceník, příslušenství, zavírací dny) doplní agent kola, sekci // === REZERVACE === (rezervace, zákazníci,
 // platby, ledger, doklady, outbox, audit) doplní agent rezervace. Každý edituje jen svou sekci.
 
+const fs = require('node:fs');
 const path = require('node:path');
 const { loadConfig, ensureSecret, DEMO_ADMIN_EMAIL, DEMO_ADMIN_PASSWORD } = require('../src/config');
 const { openTenantDb, nowIso, transaction } = require('../src/db');
@@ -124,6 +125,24 @@ async function seed({ db, tenant, config, fieldCrypto, reset = false, log = defa
           photos: [photo('canyon-grail-1.jpg', 'Gravel kolo s titanovým rámem', 'Jeff Dieffenbach', ...CC_BY_4, `${COMMONS}Titanium-frame-gravel-bicycle.jpg`), photo('canyon-grail-2.jpg', 'Gravel kolo v tunelu na cyklostezce', 'Tristan Schmurr', ...CC_BY_2, `${COMMONS}Gravel_bike_inside_Hovelange_tunnel.jpg`)],
         },
       ];
+      // Konkrétní modely (nástřel skutečné flotily) z config/kola-modely.json – jen veřejné údaje (název, veřejná cena
+      // výrobce, specifikace); nákupní ceny tam nejsou a do DB se nikdy nezapisují. Řadí se před ukázkové typy výše.
+      // Fotky: ilustrační CC BY soubory z téže složky (atribuce převzatá z definic výše podle názvu souboru).
+      const PHOTO_BY_FILE = Object.fromEntries(TYPES.flatMap((t) => t.photos).map((p) => [path.basename(p.src), p]));
+      const MODELY = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'config', 'kola-modely.json'), 'utf8')).modely || [];
+      for (const t of TYPES) t.sort += MODELY.length;
+      MODELY.forEach((m, i) => {
+        const pk = m.pujcovna || {};
+        const base = PHOTO_BY_FILE[m.foto && m.foto.soubor] || {};
+        TYPES.push({
+          slug: m.slug, name: m.nazev || `${m.znacka} ${m.model}`, category: m.kategorie || 'ebike', sort: i + 1, sizes: m.velikosti || ['M'],
+          deposit: pk.kauce ?? 5000, fee: pk.poplatek ?? 300, value: Math.round(m.cenaVerejna || 0),
+          day: pk.den || [500, 450, 400, 350], hour: pk.hodina ?? 100, halfday: pk.pulden ?? 300, bikes: pk.kusy || ['M'], code: pk.kod || `M${i + 1}`,
+          description: `${m.popis || ''} Doporučená výška jezdce: ${Object.entries(m.vyskaJezdce || {}).map(([k, v]) => `${k} ${v}`).join(' · ')}.`.trim(),
+          specs: { ...(m.specs || {}), Barvy: (m.barvy || []).join(', '), 'Doporučená výška jezdce': Object.entries(m.vyskaJezdce || {}).map(([k, v]) => `${k} ${v}`).join(' · ') },
+          photos: m.foto && base.src ? [{ ...base, alt: m.foto.alt || base.alt }] : [],
+        });
+      });
       const ACCESSORIES = [
         { slug: 'prilba', name: 'Cyklistická přilba', price: 50, stock: 15 },
         { slug: 'detska-sedacka', name: 'Dětská sedačka (do 22 kg)', price: 100, stock: 4 },

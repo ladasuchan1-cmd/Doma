@@ -1,0 +1,34 @@
+{
+  "_poznamka": "Testovací fixtura interního souboru – UKÁZKOVÉ nákupní ceny (ne skutečné), zmrazené pro testy.",
+  "tridyKol": {
+    "zakladni": {
+      "nakupniCena": 18000
+    },
+    "trek": {
+      "nakupniCena": 36000
+    },
+    "ekolo": {
+      "nakupniCena": 64000
+    }
+  },
+  "modely": {
+    "superior-exp-6-4-steps": {
+      "nakupniCena": 33000
+    },
+    "superior-exp-6-4-steps-suv": {
+      "nakupniCena": 34000
+    },
+    "superior-eway-6-4": {
+      "nakupniCena": 45000
+    },
+    "rock-machine-eblizzard-30-s": {
+      "nakupniCena": 40000
+    },
+    "rock-machine-crossride-e400-b-touring": {
+      "nakupniCena": 31000
+    },
+    "superior-racer-20": {
+      "nakupniCena": 6500
+    }
+  }
+}

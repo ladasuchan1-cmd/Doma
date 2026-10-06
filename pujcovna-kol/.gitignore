@@ -8,3 +8,5 @@ node_modules/
 *.db-shm
 .secret
 deploy/.env
+# interní ceník s nákupními cenami kol – NIKDY do gitu (čte se z $PK_DATA nebo odsud, viz config/nabidka.interni.example.json)
+config/nabidka.interni.json

@@ -51,18 +51,44 @@ function choiceGroup(children, { label }) {
 // ---------------------------------------------------------------------------------------------------------
 // Kroky
 
-function stepKola({ config, input }) {
-  const cards = config.tridyKol.map(
-    (t) => html`<article class="nab-class">
+function stepKola({ config, input, modely = [] }) {
+  const cards = config.tridyKol.map((t) => {
+    const priklady = modely.filter((m) => m.tridaNabidky === t.id);
+    return html`<article class="nab-class">
   <div class="nab-class__body">
     <h3 class="nab-class__title">${t.nazev}</h3>
     <p class="nab-class__text">${t.popisVerejny || t.popis}</p>
     <p class="nab-class__price">Prodejní cena ${kc(t.prodejniCena)} / kolo</p>
+    ${priklady.length ? html`<p class="nab-class__examples">Např. ${priklady.map((m, i) => html`${i ? ', ' : ''}<a href="#modely">${m.znacka} ${m.model}</a>`)}</p>` : ''}
   </div>
   ${c.field({ label: 'Počet kusů', name: t.id, type: 'number', value: input.kola[t.id], min: 0, max: domain.MAX_KOL, step: 1, inputmode: 'numeric', attrs: { 'data-nabidka-count': t.id } })}
-</article>`
-  );
+</article>`;
+  });
   return c.section({ id: 'krok-kola', eyebrow: 'Krok 1', title: 'Kolik kol a jakých', lead: 'Zadejte počty kusů podle tříd. Mix tříd je běžný – základní kola pro většinu hostů, elektrokola pro náročnější výlety.', children: c.grid(cards, 3), variant: 'nab-step' });
+}
+
+const KATEGORIE_MODELU = { ebike: 'Elektrokolo', kids: 'Dětské kolo', trek: 'Trekové kolo', mtb: 'Horské kolo', city: 'Městské kolo', gravel: 'Gravel' };
+
+/**
+ * Konkrétní modely (nástřel flotily) z config/kola-modely.json – jen veřejné údaje: název, kategorie, doporučená cena
+ * výrobce vč. DPH (a běžná cena, je-li vyšší), velikosti, odkaz na výrobce a na detail v demu půjčovny.
+ */
+function modelySection({ modely = [], modelyMeta = {} }) {
+  if (!modely.length) return '';
+  const rows = modely.map((m) => [
+    html`<strong>${m.znacka} ${m.model}</strong><br><small class="nab-muted">${KATEGORIE_MODELU[m.kategorie] || m.kategorie || ''}${m.tridaNabidky ? html` · třída „${(modelyMeta.tridy && modelyMeta.tridy[m.tridaNabidky]) || m.tridaNabidky}“` : ''}</small>`,
+    { value: html`${kc(m.cenaVerejna)}${m.cenaKatalogova > m.cenaVerejna ? html` <small class="nab-muted">(běžně ${kc(m.cenaKatalogova)})</small>` : ''}`, align: 'right' },
+    (m.velikosti || []).join(', '),
+    html`<a href="/kola/${m.slug}">v půjčovně</a>${m.url ? html` · <a href="${m.url}" rel="noopener nofollow" target="_blank">u výrobce</a>` : ''}`,
+  ]);
+  return c.section({
+    id: 'modely',
+    eyebrow: 'Příklady',
+    title: 'Konkrétní modely, které flotilu tvoří',
+    lead: 'Nástřel kol pro první sezónu: doporučené prodejní ceny výrobce včetně DPH podle jeho webu (ke dni stažení), pro orientaci – konfigurátor počítá s třídami výše. Fotky v demu jsou ilustrační.',
+    children: html`${c.table({ compact: true, head: ['Model', 'Cena výrobce vč. DPH', 'Velikosti', 'Odkazy'], rows })}${modelyMeta.stazeno ? html`<p class="nab-muted">Ceny staženy ${format.date(modelyMeta.stazeno) || modelyMeta.stazeno} z webu výrobce; mohou se měnit.</p>` : ''}`,
+    variant: 'nab-step',
+  });
 }
 
 function stepPorizeni({ config, input }) {
@@ -152,6 +178,8 @@ function internalBlock(result, config) {
     { label: `Marže (${pctText(i.marzeProcent)}, práh ${pctText(i.prahMarzeProcent)})`, value: kc(i.marze), strong: true },
   ])}
   ${c.table({ compact: true, head: ['Položka', 'Tržby', 'Náklady', 'Marže'], rows: i.polozky.map((p) => [html`${p.label}<br><small class="nab-muted">${p.perioda}${p.poznamka ? html` · ${p.poznamka}` : ''}</small>`, { value: kc(p.trzby), align: 'right' }, { value: kc(p.naklady), align: 'right' }, { value: html`${kc(p.marze)} <small class="nab-muted">(${pctText(p.marzeProcent)})</small>`, align: 'right' }]) })}
+  ${i.kola && i.kola.length ? c.table({ compact: true, caption: 'Nákupní ceny tříd (interní soubor)', head: ['Třída', 'Kusů', 'Nákupní / kolo', 'Celkem'], rows: i.kola.map((k) => [k.id, String(k.pocet), { value: html`${kc(k.nakupniCena)}${k.odvozena ? html` <small class="nab-muted">(odhad)</small>` : ''}`, align: 'right' }, { value: kc(k.nakupniCelkem), align: 'right' }]) }) : ''}
+  ${i.modely && i.modely.length ? c.table({ compact: true, caption: 'Konkrétní modely: veřejná cena výrobce (bez DPH) vs. nákupní cena z interního souboru', head: ['Model', 'Bez DPH', 'Nákupní', 'Marže'], rows: i.modely.map((m) => [html`${m.nazev}${m.tridaNabidky ? html` <small class="nab-muted">(${m.tridaNabidky})</small>` : ''}`, { value: kc(m.cenaBezDph), align: 'right' }, { value: m.nakupniCena === null ? html`<span class="nab-muted">není v souboru</span>` : kc(m.nakupniCena), align: 'right' }, { value: m.marze === null ? '–' : html`${kc(m.marze)} <small class="nab-muted">(${pctText(m.marzeProcent)})</small>`, align: 'right' }]) }) : ''}
   ${i.varovani.map((v) => c.notice(v, 'warning'))}
   ${config && config.meta ? html`<p class="nab-muted nab-internal__meta">Ceník verze ${config.meta.verze}${config.meta.poznamka ? html` · ${config.meta.poznamka}` : ''}</p>` : ''}
 </section>`;
@@ -250,7 +278,7 @@ ${c.form({
 // Stránky
 
 /** Konfigurátor. data: { tenant, config, input, result, internal, csrf, values, errors, query } */
-function nabidka({ config, input, result, internal, csrf, values, errors, query }) {
+function nabidka({ config, input, result, internal, csrf, values, errors, query, modely = [], modelyMeta = {} }) {
   return html`
 ${c.section({
     variant: 'page-head',
@@ -262,7 +290,7 @@ ${c.section({
   })}
 <div class="container nab-layout">
   <form class="nab-form" method="get" action="/nabidka" data-nabidka-form>
-    ${stepKola({ config, input })}
+    ${stepKola({ config, input, modely })}
     ${stepPorizeni({ config, input })}
     ${stepWeb({ config, input })}
     ${stepSprava({ config, input })}
@@ -271,6 +299,7 @@ ${c.section({
   </form>
   <aside class="nab-summary" data-nabidka-summary aria-live="polite" aria-label="Souhrn nabídky">${summaryFragment({ result, internal, config })}</aside>
 </div>
+${modelySection({ modely, modelyMeta })}
 ${inquiryForm({ csrf, values, errors, query })}
 `;
 }

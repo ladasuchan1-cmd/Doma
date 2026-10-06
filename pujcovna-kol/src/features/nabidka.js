@@ -36,13 +36,24 @@ const PAGE_SIZE = 50;
 // Konfigurace cen
 
 /**
- * Načítání config/nabidka.json s kontrolou mtime (každé 2 s) – změna souboru se projeví bez restartu.
- * get() vrací { config|null, error|null, mtime, path }.
+ * Načítání config/nabidka.json (veřejný ceník) + volitelného INTERNÍHO souboru s nákupními cenami (mimo git) s kontrolou
+ * mtime obou souborů (každé 2 s) – změna se projeví bez restartu. get() vrací { config|null, error|null, mtime, path,
+ * interniPath, interniError }. Interní soubor: PK_NABIDKA_INTERNI, jinak první existující z $PK_DATA/nabidka.interni.json
+ * a config/nabidka.interni.json; chybí-li, nákupní ceny se odvodí (domain.validateConfig) a interní pohled to označí.
+ * Obsah interního souboru se nikdy neloguje.
  */
-function createConfigLoader({ filePath = DEFAULT_CONFIG_PATH, log = null } = {}) {
-  let state = { config: null, error: 'Konfigurace zatím nebyla načtena.', mtime: null, path: filePath, loadedAt: 0 };
+function createConfigLoader({ filePath = DEFAULT_CONFIG_PATH, interniPath = null, log = null } = {}) {
+  let state = { config: null, error: 'Konfigurace zatím nebyla načtena.', mtime: null, path: filePath, interniPath: null, interniMtime: null, interniError: null, loadedAt: 0 };
   let lastCheck = 0;
   let lastLoggedKey = null;
+  let lastLoggedInterni = null;
+
+  /** Cesta interního souboru: explicitní, jinak první existující kandidát (může se objevit i za běhu). */
+  function resolveInterni() {
+    if (interniPath) return interniPath;
+    for (const cand of defaultInterniCandidates()) if (fs.existsSync(cand)) return cand;
+    return null;
+  }
 
   function load(force = false) {
     const now = Date.now();
@@ -55,32 +66,65 @@ function createConfigLoader({ filePath = DEFAULT_CONFIG_PATH, log = null } = {})
       const key = 'missing';
       if (lastLoggedKey !== key && log) log.warn('Nabídka: konfigurace cen nenalezena – stránka zobrazí „nabídka se připravuje“', { file: path.relative(ROOT, filePath) });
       lastLoggedKey = key;
-      state = { config: null, error: `Soubor ${path.relative(ROOT, filePath)} neexistuje.`, mtime: null, path: filePath, loadedAt: now };
+      state = { ...state, config: null, error: `Soubor ${path.relative(ROOT, filePath)} neexistuje.`, mtime: null, path: filePath, loadedAt: now };
       return state;
     }
     const mtime = stat.mtimeMs;
-    if (!force && state.mtime === mtime && (state.config || state.error)) return state;
+    const ip = resolveInterni();
+    let interniMtime = null;
+    if (ip) {
+      try {
+        interniMtime = fs.statSync(ip).mtimeMs;
+      } catch {
+        interniMtime = null;
+      }
+    }
+    if (!force && state.mtime === mtime && state.interniPath === ip && state.interniMtime === interniMtime && (state.config || state.error)) return state;
     let parsed;
     try {
       parsed = JSON.parse(fs.readFileSync(filePath, 'utf8'));
     } catch (e) {
-      state = { config: null, error: `Soubor není platný JSON: ${e.message}`, mtime, path: filePath, loadedAt: now };
+      state = { ...state, config: null, error: `Soubor není platný JSON: ${e.message}`, mtime, path: filePath, loadedAt: now };
       const key = `json:${mtime}`;
       if (lastLoggedKey !== key && log) log.error('Nabídka: konfigurace cen není platný JSON', { file: path.relative(ROOT, filePath), error: e.message });
       lastLoggedKey = key;
       return state;
     }
-    const v = domain.validateConfig(parsed);
+    // interní soubor: chyba v něm NEshazuje konfigurátor – jen se ignoruje (odvozené ceny) a zaloguje (bez obsahu)
+    let interniRaw = null;
+    let interniError = null;
+    if (ip && interniMtime !== null) {
+      try {
+        interniRaw = JSON.parse(fs.readFileSync(ip, 'utf8'));
+      } catch (e) {
+        interniError = `Interní soubor cen není platný JSON: ${e.message}`;
+        interniRaw = null;
+      }
+    }
+    let v = domain.validateConfig(parsed, interniRaw);
+    if (!v.ok && interniRaw !== null) {
+      // zkusit bez interního souboru – je-li chyba jen v něm, běžíme s odvozenými cenami
+      const bez = domain.validateConfig(parsed, null);
+      if (bez.ok) {
+        interniError = `Interní soubor cen má chybnou strukturu: ${v.errors.filter((e) => /Interní soubor/.test(e)).join(' ') || v.errors.join(' ')}`;
+        v = bez;
+      }
+    }
+    if (interniError) {
+      const key = `${ip}:${interniMtime}:${interniError}`;
+      if (lastLoggedInterni !== key && log) log.error('Nabídka: interní soubor nákupních cen se nepodařilo načíst – počítá se s odvozenými cenami', { file: ip, error: interniError });
+      lastLoggedInterni = key;
+    } else lastLoggedInterni = null;
     if (!v.ok) {
-      state = { config: null, error: v.errors.join(' '), mtime, path: filePath, loadedAt: now };
-      const key = `struct:${mtime}`;
+      state = { ...state, config: null, error: v.errors.join(' '), mtime, path: filePath, interniPath: ip, interniMtime, interniError, loadedAt: now };
+      const key = `struct:${mtime}:${interniMtime}`;
       if (lastLoggedKey !== key && log) log.error('Nabídka: konfigurace cen má chybnou strukturu – stránka zobrazí „nabídka se připravuje“', { file: path.relative(ROOT, filePath), errors: v.errors });
       lastLoggedKey = key;
       return state;
     }
-    const changed = state.mtime !== mtime;
-    state = { config: v.config, error: null, mtime, path: filePath, loadedAt: now };
-    if (changed && log) log.info('Nabídka: konfigurace cen načtena', { file: path.relative(ROOT, filePath), verze: v.config.meta.verze, zastupneCeny: v.config.meta.zastupneCeny });
+    const changed = state.mtime !== mtime || state.interniPath !== ip || state.interniMtime !== interniMtime;
+    state = { config: v.config, error: null, mtime, path: filePath, interniPath: ip, interniMtime, interniError, loadedAt: now };
+    if (changed && log) log.info('Nabídka: konfigurace cen načtena', { file: path.relative(ROOT, filePath), verze: v.config.meta.verze, zastupneCeny: v.config.meta.zastupneCeny, interniSoubor: ip ? path.basename(ip) : null, nakupniCenyOdvozene: v.config.meta.nakupniCenyOdvozene });
     lastLoggedKey = null;
     return state;
   }
@@ -94,9 +138,15 @@ function createConfigLoader({ filePath = DEFAULT_CONFIG_PATH, log = null } = {})
     },
     setPath(p) {
       filePath = p;
-      state = { config: null, error: null, mtime: null, path: p, loadedAt: 0 };
+      state = { config: null, error: null, mtime: null, path: p, interniPath: null, interniMtime: null, interniError: null, loadedAt: 0 };
       lastCheck = 0;
       lastLoggedKey = null;
+      return load(true);
+    },
+    /** Cesta interního souboru (null = automaticky podle PK_NABIDKA_INTERNI / $PK_DATA / config). */
+    setInterniPath(p) {
+      interniPath = p || null;
+      lastCheck = 0;
       return load(true);
     },
     get path() {
@@ -105,7 +155,41 @@ function createConfigLoader({ filePath = DEFAULT_CONFIG_PATH, log = null } = {})
   };
 }
 
-const loader = createConfigLoader({ filePath: process.env.PK_NABIDKA_CONFIG ? path.resolve(process.env.PK_NABIDKA_CONFIG) : DEFAULT_CONFIG_PATH });
+/** Kandidáti na interní soubor, když PK_NABIDKA_INTERNI není nastaveno: $PK_DATA/nabidka.interni.json, config/nabidka.interni.json. */
+function defaultInterniCandidates() {
+  const dataDir = path.resolve(ROOT, process.env.PK_DATA || './data');
+  return [path.join(dataDir, 'nabidka.interni.json'), path.join(ROOT, 'config', 'nabidka.interni.json')];
+}
+
+const loader = createConfigLoader({
+  filePath: process.env.PK_NABIDKA_CONFIG ? path.resolve(process.env.PK_NABIDKA_CONFIG) : DEFAULT_CONFIG_PATH,
+  interniPath: process.env.PK_NABIDKA_INTERNI ? path.resolve(process.env.PK_NABIDKA_INTERNI) : null,
+});
+
+// ---------------------------------------------------------------------------------------------------------
+// Konkrétní modely kol (veřejný soubor config/kola-modely.json: názvy, veřejné ceny výrobce, odkazy; bez nákupních cen)
+
+const MODELY_PATH = path.join(ROOT, 'config', 'kola-modely.json');
+let modelyCache = { mtime: null, modely: [], meta: {} };
+
+/** Modely z config/kola-modely.json (cache podle mtime; chyba → prázdný seznam, stránka funguje dál). */
+function loadModely() {
+  let stat;
+  try {
+    stat = fs.statSync(MODELY_PATH);
+  } catch {
+    return (modelyCache = { mtime: null, modely: [], meta: {} });
+  }
+  if (modelyCache.mtime === stat.mtimeMs) return modelyCache;
+  try {
+    const j = JSON.parse(fs.readFileSync(MODELY_PATH, 'utf8'));
+    const modely = (Array.isArray(j.modely) ? j.modely : []).filter((m) => m && typeof m.slug === 'string' && typeof m.model === 'string');
+    modelyCache = { mtime: stat.mtimeMs, modely, meta: j.meta || {} };
+  } catch {
+    modelyCache = { mtime: stat.mtimeMs, modely: [], meta: {} };
+  }
+  return modelyCache;
+}
 
 /** Konfigurace pro požadavek (loguje přes ctx.log, aby záznam nesl request id). */
 function configFor(ctx) {
@@ -162,9 +246,11 @@ async function nabidkaGet(ctx) {
   const input = inputFromSearchParams(ctx.url.searchParams, st.config);
   const result = domain.compute(input, st.config);
   const internal = showInternal(ctx);
+  const modely = loadModely();
+  if (internal) result.interni.modely = domain.modelyInterni(modely.modely, st.config);
   return ctx.render(
     page.nabidka,
-    { tenant: ctx.tenant, config: st.config, input, result: internal ? result : domain.publicResult(result), internal, csrf: ctx.csrfToken(), values: {}, errors: {}, query: domain.inputToQuery(input) },
+    { tenant: ctx.tenant, config: st.config, input, result: internal ? result : domain.publicResult(result), internal, csrf: ctx.csrfToken(), values: {}, errors: {}, query: domain.inputToQuery(input), modely: modely.modely, modelyMeta: modely.meta },
     { title: 'Pro hotely a půjčovny', description: 'Sestavte si nabídku: kola pro hosty, rezervační web, správa a servis – koupě, pronájem nebo zkušební období bez dlouhého závazku.', feature: 'nabidka' }
   );
 }
@@ -175,6 +261,7 @@ async function spocitatApi(ctx) {
   const input = inputFromSearchParams(ctx.url.searchParams, st.config);
   const result = domain.compute(input, st.config);
   const internal = showInternal(ctx);
+  if (internal) result.interni.modely = domain.modelyInterni(loadModely().modely, st.config);
   const out = internal ? result : domain.publicResult(result);
   return ctx.json({ ok: true, ...out, html: page.summaryFragment({ result: out, internal, config: st.config }).toString() });
 }
@@ -392,7 +479,10 @@ module.exports = {
   loader,
   createConfigLoader,
   setConfigPath: (p) => loader.setPath(p),
+  setInterniPath: (p) => loader.setInterniPath(p),
+  loadModely,
   DEFAULT_CONFIG_PATH,
+  MODELY_PATH,
   OUTBOX_TYPE,
   validate,
   enqueueInquiry,

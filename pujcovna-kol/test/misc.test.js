@@ -167,10 +167,10 @@ test('demo-data: seed vytvoří admina idempotentně, --reset vyčistí tabulky'
   assert.equal(verifyPasswordSync('kolo-demo-2026', u.password_hash), true);
   db.prepare("INSERT INTO seasons(name, date_from, date_to) VALUES ('X', '2026-01-01', '2026-02-01')").run();
   await demoData.seed({ db, tenant, config, fieldCrypto, reset: true, log: silent });
-  // reset smazal ručně vloženou sezónu; demo data (SPEC kap. 14) sezónu „Hlavní sezóna“ a 6 typů kol založí znovu
+  // reset smazal ručně vloženou sezónu; demo data (SPEC kap. 14) sezónu „Hlavní sezóna“ a 12 typů kol (6 modelů z config/kola-modely.json + 6 ukázkových) založí znovu
   assert.equal(db.prepare("SELECT COUNT(*) AS n FROM seasons WHERE name = 'X'").get().n, 0);
   assert.ok(db.prepare("SELECT COUNT(*) AS n FROM seasons WHERE name = 'Hlavní sezóna'").get().n >= 1);
-  assert.equal(db.prepare('SELECT COUNT(*) AS n FROM bike_types').get().n, 6);
+  assert.equal(db.prepare('SELECT COUNT(*) AS n FROM bike_types').get().n, 12);
   assert.equal(db.prepare('SELECT COUNT(*) AS n FROM users').get().n, 1);
   assert.ok(db.prepare('SELECT COUNT(*) AS n FROM settings').get().n >= 15, 'settings zůstávají');
   const src = fs.readFileSync(path.join(ROOT, 'tools', 'demo-data.js'), 'utf8');
