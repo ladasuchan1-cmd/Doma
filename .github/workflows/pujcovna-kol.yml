@@ -25,6 +25,11 @@ on:
       - "pujcovna-kol/**"
       - ".github/workflows/pujcovna-kol.yml"
   workflow_dispatch:
+    inputs:
+      vedle_mapy:
+        description: "Nasadit TUTO větev na server vedle Cyklo & Ski mapy (deploy/vedle-mapy.sh aktualizace přes SSH)"
+        type: boolean
+        default: false
 
 concurrency:
   group: ${{ github.event_name == 'pull_request' && format('pk-pr-{0}', github.ref) || (github.ref_name == github.event.repository.default_branch && 'pk-deploy' || format('pk-{0}', github.ref)) }}
@@ -138,3 +143,57 @@ jobs:
             echo "→ Aplikace na serveru není – první instalace na doméně $DOMAIN."
             ssh_cmd "$SUDO env PK_DOMAIN='$DOMAIN' PK_ADMIN_PASSWORD=\"\$(printf %s '$PWD_B64' | base64 -d)\" PK_REPO_DIR='$REPO_DIR' PK_VETEV='$BRANCH' bash -s -- instalace '$DOMAIN'" < pujcovna-kol/deploy/hetzner.sh
           fi
+
+  # Server, kde půjčovna běží VEDLE Cyklo & Ski mapy (37.27.203.154, NASAZENI.md kap. 7b): ruční spuštění workflow
+  # s volbou „vedle_mapy“ nasadí právě tuto větev – pošle deploy/vedle-mapy.sh přes stdin a spustí „aktualizace“
+  # (fetch + ff-merge větve na serveru, build image, výměna kontejneru, reload Caddy mapy). Stejné SSH secrets jako
+  # u mapy (HETZNER_HOST, HETZNER_SSH_KEY, …). Volitelný secret PK_NABIDKA_INTERNI_JSON (obsah interního ceníku
+  # s nákupními cenami kol, NASAZENI.md kap. 6b) se zapíše do datového svazku jako /data/nabidka.interni.json –
+  # nikdy do repa ani do logu.
+  deploy-vedle-mapy:
+    needs: test
+    if: github.event_name == 'workflow_dispatch' && inputs.vedle_mapy
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    concurrency:
+      group: pk-deploy-vedle-mapy
+    steps:
+      - uses: actions/checkout@v5
+      - name: Nasazení přes SSH (vedle-mapy.sh aktualizace)
+        env:
+          HOST: ${{ secrets.PK_HETZNER_HOST || secrets.HETZNER_HOST }}
+          USER: ${{ secrets.PK_HETZNER_USER || secrets.HETZNER_USER }}
+          PORT: ${{ secrets.PK_HETZNER_PORT || secrets.HETZNER_PORT }}
+          KEY: ${{ secrets.PK_HETZNER_SSH_KEY || secrets.HETZNER_SSH_KEY }}
+          INTERNI_JSON: ${{ secrets.PK_NABIDKA_INTERNI_JSON }}
+          DOMAIN: ${{ vars.PK_HETZNER_DOMAIN || 'ksprehledy.cz' }}
+          BRANCH: ${{ github.ref_name }}
+        run: |
+          test -n "$HOST" || { echo "Chybí secret HETZNER_HOST (nebo PK_HETZNER_HOST)"; exit 1; }
+          test -n "$KEY" || { echo "Chybí secret HETZNER_SSH_KEY (nebo PK_HETZNER_SSH_KEY)"; exit 1; }
+          mkdir -p ~/.ssh
+          raw="$(printf '%s\n' "$KEY" | sed '1s/^\xEF\xBB\xBF//' | tr -d '\r')"
+          typ="$(printf '%s\n' "$raw" | grep -o -m1 'BEGIN [A-Z0-9 ]*PRIVATE KEY' | sed 's/^BEGIN //')"
+          test -n "$typ" || { echo "Secret HETZNER_SSH_KEY neobsahuje soukromý klíč."; exit 1; }
+          body="$(printf '%s\n' "$raw" | sed -e 's/-----BEGIN [A-Z0-9 ]*PRIVATE KEY-----//' -e 's/-----END [A-Z0-9 ]*PRIVATE KEY-----//' | tr -d '[:space:]')"
+          { echo "-----BEGIN $typ-----"; printf '%s\n' "$body" | fold -w 70; echo "-----END $typ-----"; } > ~/.ssh/id_deploy
+          chmod 600 ~/.ssh/id_deploy
+          ssh-keygen -y -P "" -f ~/.ssh/id_deploy >/dev/null || { echo "Secret HETZNER_SSH_KEY není použitelný klíč."; exit 1; }
+          ssh-keyscan -p "${PORT:-22}" -H "$HOST" >> ~/.ssh/known_hosts 2>/dev/null
+          SUDO=""; [ "${USER:-root}" != "root" ] && SUDO="sudo -n"
+          ssh_cmd() { ssh -i ~/.ssh/id_deploy -p "${PORT:-22}" -o StrictHostKeyChecking=yes "${USER:-root}@$HOST" "$@"; }
+          echo "→ Větev $BRANCH → server (vedle Cyklo & Ski mapy)"
+          ssh_cmd "$SUDO env PK_VETEV='$BRANCH' PK_DOMAIN='$DOMAIN' bash -s -- aktualizace" < pujcovna-kol/deploy/vedle-mapy.sh
+          if [ -n "$INTERNI_JSON" ]; then
+            echo "→ Zapisuji interní ceník (secret PK_NABIDKA_INTERNI_JSON) do svazku pujcovna-kol_data (obsah se neloguje)."
+            printf '%s' "$INTERNI_JSON" | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{JSON.parse(s);})' || { echo "PK_NABIDKA_INTERNI_JSON není platný JSON"; exit 1; }
+            B64="$(printf '%s' "$INTERNI_JSON" | base64 -w0)"
+            ssh_cmd "$SUDO docker run --rm -i -v pujcovna-kol_data:/data alpine sh -c 'base64 -d > /data/nabidka.interni.json.tmp && mv /data/nabidka.interni.json.tmp /data/nabidka.interni.json && chown 1000:1000 /data/nabidka.interni.json && chmod 600 /data/nabidka.interni.json'" <<< "$B64"
+          else
+            echo "→ Secret PK_NABIDKA_INTERNI_JSON není nastaven – interní ceník na serveru se nemění."
+          fi
+          ssh_cmd "$SUDO bash /opt/Doma/pujcovna-kol/deploy/vedle-mapy.sh stav" || true
+          for h in www outdoor sport family; do
+            code="$(curl -s -o /dev/null -w '%{http_code}' --max-time 20 "https://$h.$DOMAIN/nabidka" || true)"
+            echo "https://$h.$DOMAIN/nabidka → $code"
+          done
