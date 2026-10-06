@@ -20,3 +20,7 @@
 # (v kontejneru /etc/caddy/extra, viz docker-compose.yml). Prázdný adresář nevadí. Po změně:
 #   docker compose -f /opt/Doma/cyklo-ski-mapa/deploy/docker-compose.yml exec caddy caddy reload --config /etc/caddy/Caddyfile
 import /etc/caddy/extra/*.caddy
+
+# Weby projektu Kolomapa na témže serveru: soubory /config/sites/*.caddy (zapisuje kolomapa/deploy/docker/nasadit.sh
+# do svazku caddy_config). Tento řádek byl dřív jen ručně na serveru – teď je v repu, aby ho aktualizace nesmazala.
+import /config/sites/*.caddy
