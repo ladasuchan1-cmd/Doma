@@ -22,6 +22,7 @@ WORKDIR /app
 # Jen to, co server potřebuje za běhu (bez test/, docs/, data/, cache/). Pořadí od nejméně měněného kvůli cache vrstev.
 COPY package.json server.js ./
 COPY legal ./legal
+COPY config ./config
 COPY tenants ./tenants
 COPY public ./public
 COPY tools ./tools
