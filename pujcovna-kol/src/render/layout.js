@@ -91,6 +91,8 @@ function tenantLogoSvg(tenant) {
 
 /** Logo v hlavičce i patičce: inline SVG, nebo <img>. */
 function logoMarkup(tenant, logoUrl) {
+  // nahraný rastrový logotyp (průvodce pro nového klienta) má přednost před výchozím logo.svg
+  if (/\.(png|jpe?g|webp)$/i.test(String(logoUrl || ''))) return html`<img class="site-logo__img site-logo__img--raster" src="${logoUrl}" alt="" width="160" height="40">`;
   const svg = tenantLogoSvg(tenant);
   return svg ? raw(svg) : html`<img class="site-logo__img" src="${logoUrl}" alt="" width="160" height="40">`;
 }
@@ -172,7 +174,7 @@ function layout(ctx, page) {
 <meta name="description" content="${description}">
 ${page.noindex ? html`<meta name="robots" content="noindex">` : ''}
 <link rel="canonical" href="${canonical}">
-<link rel="icon" href="${logo}" type="image/svg+xml">
+<link rel="icon" href="${logo}" type="${/\.png$/i.test(logo) ? 'image/png' : /\.jpe?g$/i.test(logo) ? 'image/jpeg' : /\.webp$/i.test(logo) ? 'image/webp' : 'image/svg+xml'}">
 <meta name="theme-color" content="${THEME_COLORS[themeName] || '#2F5D3A'}">
 ${fontPreloads(config.publicDir, themeName).map((href) => html`<link rel="preload" href="${href}" as="font" type="font/woff2" crossorigin>`)}
 <link rel="stylesheet" href="${asset('/fonts/fonts.css')}">
@@ -184,6 +186,7 @@ ${page.jsonLd ? raw(`<script type="application/ld+json">${JSON.stringify(page.js
 </head>
 <body${attr({ class: page.bodyClass || null })}>
 <a class="skip-link" href="#obsah">Přejít k obsahu</a>
+${ctx.nahled ? html`<p class="preview-bar" role="note">Náhledový provoz: web se právě připravuje, rezervace jsou zkušební a platby se nepřevádějí.</p>` : ''}
 <header class="site-header">
   <div class="container site-header__inner">
     <a class="site-logo" href="/" aria-label="${tenant.name} – domů">${logoHtml}<span class="site-logo__text">${tenant.name}</span></a>
@@ -213,7 +216,7 @@ ${page.body}
     </div>
   </div>
   <div class="container site-footer__bottom">
-    <p class="site-footer__legal">© ${year} ${tenant.business.legalName || tenant.name}. Mapové podklady © <a href="https://www.openstreetmap.org/copyright" rel="noopener">přispěvatelé OpenStreetMap</a>, <a href="https://www.cyclosm.org/" rel="noopener">CyclOSM</a>. <a class="site-footer__credits" href="${PHOTO_CREDITS_PATH}">Fotografie: autoři a licence</a>.${config.demo ? html` <span class="site-footer__demo">Demo verze – fiktivní půjčovna, žádné peníze se nepřevádějí.</span>` : ''}</p>
+    <p class="site-footer__legal">© ${year} ${tenant.business.legalName || tenant.name}. Mapové podklady © <a href="https://www.openstreetmap.org/copyright" rel="noopener">přispěvatelé OpenStreetMap</a>, <a href="https://www.cyclosm.org/" rel="noopener">CyclOSM</a>. <a class="site-footer__credits" href="${PHOTO_CREDITS_PATH}">Fotografie: autoři a licence</a>.${config.demo ? html` <span class="site-footer__demo">Demo verze – fiktivní půjčovna, žádné peníze se nepřevádějí.</span>` : ''}${ctx.nahled ? html` <span class="site-footer__demo">Náhledový provoz – rezervace jsou zkušební, platby se nepřevádějí.</span>` : ''}</p>
     <p class="site-footer__version">Verze ${config.version}</p>
   </div>
 </footer>

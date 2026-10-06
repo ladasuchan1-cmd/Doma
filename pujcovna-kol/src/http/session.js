@@ -17,6 +17,8 @@ const HOUR = 60 * MINUTE;
 const PROFILES = Object.freeze({
   public: Object.freeze({ kind: 'public', cookie: '__Host-pk_sid', idleMs: 2 * HOUR, absoluteMs: 24 * HOUR, sameSite: 'Lax' }),
   admin: Object.freeze({ kind: 'admin', cookie: '__Host-pk_adm', idleMs: 30 * MINUTE, absoluteMs: 8 * HOUR, sameSite: 'Strict' }),
+  // správa platformy /platforma (pozvánky do průvodce, klienti) – heslo z PK_PLATFORMA_HESLO, nezávislé na adminu půjčovny
+  platform: Object.freeze({ kind: 'platform', cookie: '__Host-pk_plat', idleMs: 30 * MINUTE, absoluteMs: 8 * HOUR, sameSite: 'Strict' }),
 });
 
 const TOUCH_THROTTLE_MS = 60 * 1000;

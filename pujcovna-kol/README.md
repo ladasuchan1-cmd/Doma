@@ -37,6 +37,21 @@ Bez souboru se nákupní cena odvodí z prodejní a prahu marže a interní blok
 modely flotily s veřejnými cenami výrobce jsou v `config/kola-modely.json` – zobrazují se na `/nabidka` a demo seed z nich
 dělá typy kol (`/kola`, ilustrační fotky CC BY). Nasazení interního souboru na server: `NASAZENI.md` kap. 6b.
 
+### Weby klientů (průvodce) a správa platformy
+
+Nová půjčovna si web založí sama průvodcem `/zalozeni/<token>` (7 kroků, odkaz z pozvánky). Pozvánky a přehled klientů
+jsou ve správě platformy `/platforma` – zapíná ji `PK_PLATFORMA_HESLO` (min. 12 znaků; demo heslo administrace je
+veřejné, proto má platforma vlastní přihlášení). Weby klientů leží v `$PK_DATA/klienti/<slug>/` a běží na
+`<slug>.<PK_KLIENTI_DOMENA>` (výchozí `PK_DOMAIN`); nemají demo chování (veřejné demo heslo, přepínač designů, noční
+reset), v náhledovém provozu jen simulované platby a pruh „náhledový provoz“. Lokálně si průvodce vyzkoušíte:
+
+```sh
+PK_PLATFORMA_HESLO=heslo-platformy-123 npm start      # http://localhost:8092/platforma → pozvánka → odkaz
+curl -H 'Host: <slug>.ksprehledy.cz' http://localhost:8092/   # web klienta po dokončení průvodce
+```
+
+Nasazení na server (DNS wildcard, secret, synchronizace subdomén do Caddy): `NASAZENI.md` kap. 7c.
+
 ### Demo přístup do adminu
 
 Administrace běží na `http://localhost:8092/admin` (na ksprehledy.cz na kterékoli subdoméně). V demo režimu je

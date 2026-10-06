@@ -1485,3 +1485,19 @@ address {
     padding-block: var(--space-5);
   }
 }
+
+/* Pruh náhledového provozu (web klienta založený průvodcem, dokud není v ostrém provozu) */
+.preview-bar {
+  margin: 0;
+  padding: var(--space-2) var(--space-4);
+  background: var(--tint-warning);
+  color: var(--text);
+  border-bottom: 1px solid var(--border);
+  font-size: var(--step--1);
+  text-align: center;
+}
+.site-logo__img--raster {
+  max-width: 200px;
+  object-fit: contain;
+  filter: none;
+}

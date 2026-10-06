@@ -58,7 +58,7 @@ function verify(ctx, { sessionKind = 'public' } = {}) {
   if (!origin.ok) {
     throw new HttpError(403, 'Požadavek byl odeslán z jiné stránky nebo bez údaje o původu. Zkuste formulář odeslat znovu.', { reason: origin.reason });
   }
-  const session = sessionKind === 'admin' ? ctx.adminSession : ctx.session;
+  const session = sessionKind === 'admin' ? ctx.adminSession : sessionKind === 'platform' ? ctx.platformSession : ctx.session;
   const expected = session ? session.peekCsrf() : null;
   const provided = extractToken(ctx);
   if (!expected || !provided || !safeEqual(provided, expected)) {

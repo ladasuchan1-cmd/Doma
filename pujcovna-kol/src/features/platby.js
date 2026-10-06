@@ -152,14 +152,14 @@ async function dokladGet(ctx) {
     return ctx.send(200, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store' }, documents.wrapPrint(doc.html, { title: `${page.DOC_LABELS[doc.type] || 'Doklad'} ${doc.number}`, cssHref: assetUrl('/css/doklady.css', { publicDir: ctx.config.publicDir, version: ctx.config.version }) }));
   }
   const q = token ? `?t=${encodeURIComponent(token)}` : '';
-  return ctx.render(page.documentPage, { doc, reservation, printHref: `/doklady/${encodeURIComponent(doc.number)}.html${q}`, backHref: token ? `/rezervace/${encodeURIComponent(token)}` : isAdmin(ctx) ? `/admin/rezervace/${doc.reservation_id}` : null, demo: !!ctx.config.demo }, { feature: 'platby', noindex: true });
+  return ctx.render(page.documentPage, { doc, reservation, printHref: `/doklady/${encodeURIComponent(doc.number)}.html${q}`, backHref: token ? `/rezervace/${encodeURIComponent(token)}` : isAdmin(ctx) ? `/admin/rezervace/${doc.reservation_id}` : null, demo: !!ctx.simulacePlateb }, { feature: 'platby', noindex: true });
 }
 
 // ---------------------------------------------------------------------------------------------------------
 // Demo simulace banky
 
 function requireDemo(ctx) {
-  if (!ctx.config.demo) throw new HttpError(404, 'Stránka nenalezena.');
+  if (!ctx.simulacePlateb) throw new HttpError(404, 'Stránka nenalezena.');
 }
 
 function bankSimData(ctx) {

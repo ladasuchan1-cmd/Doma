@@ -1,0 +1,200 @@
+/* Styly feature „klienti“ – správa platformy (/platforma) a průvodce pro nového klienta (/zalozeni/…).
+   Jen přes tokeny z base.css, funguje ve všech 3 tématech. */
+
+.pr-muted {
+  color: var(--text-muted);
+  font-size: var(--step--1);
+}
+.pr-subtitle {
+  margin: 0 0 var(--space-2);
+  font-size: var(--step-1);
+}
+.pr-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+  margin: var(--space-4) 0;
+}
+.pr-inline {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  margin: 0;
+}
+.pr-logout {
+  margin-top: var(--space-3);
+}
+.pr-login {
+  max-width: 26rem;
+}
+
+/* Formuláře průvodce */
+.pr-step {
+  padding-bottom: var(--space-8);
+}
+.pr-form {
+  display: grid;
+  gap: var(--space-4);
+  max-width: 60rem;
+}
+.pr-grid {
+  display: grid;
+  gap: var(--space-4);
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 18rem), 1fr));
+}
+.pr-grid--4 {
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 9rem), 1fr));
+}
+.pr-fieldset {
+  margin: 0;
+  padding: 0;
+  border: 0;
+  display: grid;
+  gap: var(--space-2);
+}
+.pr-form__actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+/* Výběr designu */
+.pr-themes {
+  margin: 0;
+  padding: 0;
+  border: 0;
+  display: grid;
+  gap: var(--space-3);
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 14rem), 1fr));
+}
+.pr-themes legend {
+  margin-bottom: var(--space-2);
+}
+.pr-theme {
+  position: relative;
+  display: grid;
+  gap: var(--space-1);
+  padding: var(--space-4);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--card-radius);
+  cursor: pointer;
+}
+.pr-theme:has(.pr-theme__input:checked),
+.pr-theme.is-checked {
+  border: 2px solid var(--primary);
+}
+.pr-theme__input {
+  position: absolute;
+  top: var(--space-4);
+  right: var(--space-4);
+}
+.pr-theme__title {
+  font-weight: 700;
+  font-size: var(--step-1);
+}
+.pr-theme__hint {
+  color: var(--text-muted);
+  font-size: var(--step--1);
+}
+.pr-theme__preview {
+  font-size: var(--step--1);
+}
+
+/* Kola */
+.pr-bikes {
+  display: grid;
+  gap: var(--space-3);
+}
+.pr-bike {
+  display: grid;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--card-radius);
+}
+@media (min-width: 720px) {
+  .pr-bike {
+    grid-template-columns: minmax(0, 2fr) minmax(0, 1fr);
+    align-items: start;
+  }
+}
+.pr-bike__title {
+  margin: 0;
+  font-size: var(--step-1);
+}
+.pr-bike__body p {
+  margin: var(--space-1) 0 0;
+}
+.pr-bike__meta {
+  font-size: var(--step--1);
+}
+.pr-bike__fields {
+  display: grid;
+  gap: var(--space-2);
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+/* Úvod a výsledek */
+.pr-intro-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2) var(--space-5);
+  margin: var(--space-4) 0;
+  padding-left: 1.2em;
+}
+.pr-intro-need {
+  margin-top: var(--space-4);
+}
+.pr-done {
+  margin-top: var(--space-4);
+}
+
+/* Odkaz pozvánky */
+.pr-link {
+  display: grid;
+  gap: var(--space-2);
+  max-width: 48rem;
+}
+.pr-link__input {
+  font-family: var(--font-mono, monospace);
+  font-size: var(--step--1);
+}
+
+/* Kroky průvodce na mobilu: kompaktní řada čísel, název jen u aktuálního kroku (7 velkých karet by odsunulo formulář).
+   Selektor s [data-theme] přebíjí úpravy kroků v tématech. */
+@media (max-width: 719px) {
+  [data-theme] .pr-steps .steps {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-2);
+  }
+  [data-theme] .pr-steps .steps::before {
+    display: none;
+  }
+  [data-theme] .pr-steps .steps__item {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    padding: var(--space-1);
+    border-radius: var(--radius-pill);
+  }
+  [data-theme] .pr-steps .steps__num {
+    width: 36px;
+    height: 36px;
+  }
+  [data-theme] .pr-steps .steps__label {
+    padding: 0 var(--space-2) 0 0;
+  }
+  [data-theme] .pr-steps .steps__item:not(.is-active) .steps__label {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+  }
+}

@@ -49,25 +49,77 @@ function queryObject(searchParams) {
   return out;
 }
 
-/** Načte a rozparsuje tělo požadavku. */
-async function readBody(req, { limitBytes }) {
+function limitText(limitBytes) {
+  return limitBytes >= 1024 * 1024 ? `${Math.round((limitBytes / (1024 * 1024)) * 10) / 10} MB` : `${Math.round(limitBytes / 1024)} KB`;
+}
+
+const FORBIDDEN_KEYS = new Set(['__proto__', 'constructor', 'prototype']);
+
+/**
+ * multipart/form-data (jen u rout s opts.multipart, např. nahrání loga v průvodci). Textová pole → string, soubory →
+ * { filename, type, data: Buffer }; prázdné souborové pole → ''. Nejvýš 100 částí; poškozený formát → 400.
+ */
+function parseMultipart(buf, contentType) {
+  const m = /boundary=(?:"([^"]+)"|([^;\s]+))/i.exec(String(contentType || ''));
+  const bad = () => new HttpError(400, 'Formulář se nepodařilo přečíst. Zkuste ho odeslat znovu.');
+  if (!m) throw bad();
+  const boundary = Buffer.from(`--${m[1] || m[2]}`);
+  const delimiter = Buffer.concat([Buffer.from('\r\n'), boundary]);
+  const out = {};
+  let pos = buf.indexOf(boundary);
+  if (pos !== 0) throw bad();
+  for (let parts = 0; ; parts++) {
+    if (parts > 100) throw bad();
+    pos += boundary.length;
+    if (buf[pos] === 0x2d && buf[pos + 1] === 0x2d) break; // „--“ = konec
+    if (buf[pos] !== 0x0d || buf[pos + 1] !== 0x0a) throw bad();
+    pos += 2;
+    const headEnd = buf.indexOf('\r\n\r\n', pos);
+    if (headEnd < 0) throw bad();
+    const head = buf.toString('utf8', pos, headEnd);
+    const next = buf.indexOf(delimiter, headEnd + 4);
+    if (next < 0) throw bad();
+    const data = buf.subarray(headEnd + 4, next);
+    const disp = /content-disposition:\s*form-data;([^\r\n]*)/i.exec(head);
+    const name = disp && /\bname="([^"]*)"/i.exec(disp[1]);
+    if (name && !FORBIDDEN_KEYS.has(name[1])) {
+      const filename = /\bfilename="([^"]*)"/i.exec(disp[1]);
+      const ctype = /content-type:\s*([^\r\n;]+)/i.exec(head);
+      let value;
+      if (filename) value = filename[1] === '' && data.length === 0 ? '' : { filename: filename[1], type: ctype ? ctype[1].trim().toLowerCase() : 'application/octet-stream', data: Buffer.from(data) };
+      else value = data.toString('utf8');
+      const key = name[1];
+      if (Object.hasOwn(out, key)) out[key] = Array.isArray(out[key]) ? [...out[key], value] : [out[key], value];
+      else out[key] = value;
+    }
+    pos = next + 2;
+  }
+  return out;
+}
+
+/** Načte a rozparsuje tělo požadavku (urlencoded, JSON; multipart jen s opts.multipart). */
+async function readBody(req, { limitBytes, multipart = false }) {
   const method = req.method;
   if (method === 'GET' || method === 'HEAD' || method === 'OPTIONS') return {};
-  const type = String(req.headers['content-type'] || '').split(';')[0].trim().toLowerCase();
+  const rawType = String(req.headers['content-type'] || '');
+  const type = rawType.split(';')[0].trim().toLowerCase();
   const declared = Number(req.headers['content-length']);
-  if (Number.isFinite(declared) && declared > limitBytes) throw new HttpError(413, 'Odeslaná data jsou příliš velká (limit 256 KB).');
+  const tooBig = () => new HttpError(413, `Odeslaná data jsou příliš velká (limit ${limitText(limitBytes)}).`);
+  if (Number.isFinite(declared) && declared > limitBytes) throw tooBig();
   const chunks = [];
   let size = 0;
   for await (const chunk of req) {
     size += chunk.length;
-    if (size > limitBytes) throw new HttpError(413, 'Odeslaná data jsou příliš velká (limit 256 KB).');
+    if (size > limitBytes) throw tooBig();
     chunks.push(chunk);
   }
   if (!size) return {};
+  if (type === 'multipart/form-data' && multipart) return parseMultipart(Buffer.concat(chunks), rawType);
   const text = Buffer.concat(chunks).toString('utf8');
   if (type === 'application/x-www-form-urlencoded' || type === '') {
     const out = {};
     for (const [k, v] of new URLSearchParams(text)) {
+      if (FORBIDDEN_KEYS.has(k)) continue;
       if (Object.hasOwn(out, k)) out[k] = Array.isArray(out[k]) ? [...out[k], v] : [out[k], v];
       else out[k] = v;
     }
@@ -90,11 +142,13 @@ async function readBody(req, { limitBytes }) {
  */
 function createContext(init) {
   const { req, res, app, tenant, db, theme, log, requestId, secure, url } = init;
-  const config = app.config;
+  // init.config: konfigurace pro požadavek (u webu klienta s demo: false), jinak konfigurace aplikace
+  const config = init.config || app.config;
   const ip = clientIp(req, { trustProxy: config.trustProxy });
   const ipHashValue = ipHash(ip, app.secret);
   let publicSession = null;
   let adminSession = null;
+  let platformSession = null;
   let settingsCache = null;
   let finished = false;
 
@@ -117,6 +171,10 @@ function createContext(init) {
     requestId,
     log,
     routeOpts: init.opts || {},
+    // web klienta (průvodce) / náhledový provoz / povolená simulace plateb – server.js je nastaví podle tenanta
+    klient: false,
+    nahled: false,
+    simulacePlateb: !!config.demo,
     get finished() {
       return finished;
     },
@@ -133,14 +191,21 @@ function createContext(init) {
       if (!adminSession) adminSession = createSession({ db, req, res, kind: 'admin', secure, ipHash: ipHashValue });
       return adminSession;
     },
+    get platformSession() {
+      if (!platformSession) platformSession = createSession({ db, req, res, kind: 'platform', secure, ipHash: ipHashValue });
+      return platformSession;
+    },
     csrfToken() {
       return ctx.session.csrf();
+    },
+    platformCsrfToken() {
+      return ctx.platformSession.csrf();
     },
     adminCsrfToken() {
       return ctx.adminSession.csrf();
     },
     async readBody() {
-      ctx.body = await readBody(req, { limitBytes: config.bodyLimitBytes });
+      ctx.body = await readBody(req, { limitBytes: ctx.routeOpts.bodyLimitBytes || config.bodyLimitBytes, multipart: !!ctx.routeOpts.multipart });
       return ctx.body;
     },
     setCookie(name, value, opts = {}) {
@@ -215,4 +280,4 @@ function createContext(init) {
   return ctx;
 }
 
-module.exports = { createContext, readBody, clientIp, ipHash, queryObject, compressBody, COMPRESS_MIN_BYTES };
+module.exports = { createContext, readBody, parseMultipart, clientIp, ipHash, queryObject, compressBody, COMPRESS_MIN_BYTES };

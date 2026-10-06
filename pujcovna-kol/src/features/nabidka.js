@@ -224,7 +224,7 @@ function showInternal(ctx) {
 /** Vstup konfigurátoru z query (doplnky mohou být opakované i s čárkami). */
 function inputFromSearchParams(sp, config) {
   const q = {};
-  for (const k of ['zakladni', 'trek', 'ekolo', 'porizeni', 'web', 'dalsiDesign', 'sprava', 'servis']) if (sp.has(k)) q[k] = sp.get(k);
+  for (const k of ['zakladni', 'trek', 'ekolo', 'porizeni', 'web', 'dalsiDesign', 'sprava', 'servis', 'sezona', 'vytizenost', 'cena_zakladni', 'cena_trek', 'cena_ekolo', 'neplatce']) if (sp.has(k)) q[k] = sp.get(k);
   if (sp.has('doplnky')) q.doplnky = sp.getAll('doplnky');
   return domain.normalizeInput(q, config);
 }
@@ -314,6 +314,8 @@ function recapText(result) {
   if (result.souhrn.kauce) lines.push(`Vratná kauce: ${fmtKc(result.souhrn.kauce)}`);
   for (const h of result.souhrn.horizonty) lines.push(`${h.label}: ${fmtKc(h.castka)}`);
   if (result.zkouska) lines.push(`Při pokračování pronájmem se započte: ${fmtKc(result.zkouska.zapocet)}; odkup po zkoušce: ${fmtKc(result.zkouska.odkup)}`);
+  const nv = result.navratnost;
+  if (nv) lines.push(`Návratnost (odhad klienta: sezóna ${nv.vstupy.sezonaDni} dní, ceny ${['zakladni', 'trek', 'ekolo'].map((id) => nv.vstupy.cenaDen[id]).join(' / ')} Kč/den vč. DPH${nv.vstupy.platceDph ? '' : ', neplátce DPH'}): ${nv.veta.replace(/ /g, ' ')}`);
   return lines.join('\n');
 }
 
@@ -459,7 +461,7 @@ async function adminDetail(ctx) {
   ctx.db
     .prepare('INSERT INTO audit_log(at, user_id, action, entity, entity_id, meta, ip_hash) VALUES (?, ?, ?, ?, ?, ?, ?)')
     .run(nowIso(), ctx.user ? ctx.user.id : null, 'nabidka.view', 'outbox', String(row.id), JSON.stringify({ number: p.number || null, fields: ['nazev', 'osoba', 'email', 'telefon', 'poznamka'] }), ctx.ipHash);
-  adminRender(ctx, adminPage.detail({ row, payload: p, contact }), { title: `Poptávka ${p.number || `#${row.id}`}`, lead: contact.nazev ? `${contact.nazev}${contact.obec ? `, ${contact.obec}` : ''}` : '', actions: html`<a class="btn btn--ghost btn--sm" href="/admin/nabidky">← Seznam</a> <a class="btn btn--ghost btn--sm" href="/nabidka?${p.query || ''}">Otevřít v konfigurátoru</a>`, wide: true });
+  adminRender(ctx, adminPage.detail({ row, payload: p, contact }), { title: `Poptávka ${p.number || `#${row.id}`}`, lead: contact.nazev ? `${contact.nazev}${contact.obec ? `, ${contact.obec}` : ''}` : '', actions: html`<a class="btn btn--ghost btn--sm" href="/admin/nabidky">← Seznam</a> <a class="btn btn--ghost btn--sm" href="/nabidka?${p.query || ''}">Otevřít v konfigurátoru</a>${ctx.config.platformaHeslo ? html` <a class="btn btn--primary btn--sm" href="/platforma?poptavka=${row.id}#nova-pozvanka">Pozvat do průvodce</a>` : ''}`, wide: true });
 }
 
 module.exports = {

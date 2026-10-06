@@ -379,7 +379,7 @@ function renderPoplatek(ctx, draft, term, { notice = null, noticeTone = 'warning
   }
   ctx.render(
     page.poplatek,
-    { csrf: ctx.csrfToken(), term, summary, demo: !!ctx.config.demo, providerAvailable: !!loadProvider(), allowPayOnSite: !!ctx.settings.allowPayOnSite, notice: n, noticeTone: tone, reservation },
+    { csrf: ctx.csrfToken(), term, summary, demo: !!ctx.simulacePlateb, providerAvailable: !!loadProvider(), allowPayOnSite: !!ctx.settings.allowPayOnSite, notice: n, noticeTone: tone, reservation },
     { feature: 'rezervace', status, noindex: true }
   );
 }
@@ -446,11 +446,11 @@ async function handlePaymentChoice(ctx, { reservation, token, metoda, backRender
     } else {
       notice = 'QR kód a automatické párování platby se připravují. Údaje k převodu platí; po připsání platby obsluha rezervaci potvrdí ručně.';
     }
-    ctx.render(page.prevod, { reservation, payment, token, tenant: ctx.tenant, notice, demo: !!ctx.config.demo }, { feature: 'rezervace', noindex: true });
+    ctx.render(page.prevod, { reservation, payment, token, tenant: ctx.tenant, notice, demo: !!ctx.simulacePlateb }, { feature: 'rezervace', noindex: true });
     return undefined;
   }
   if (metoda === 'demo') {
-    if (!ctx.config.demo) throw new HttpError(403, 'Simulace platby je dostupná jen v demo režimu.');
+    if (!ctx.simulacePlateb) throw new HttpError(403, 'Simulace platby je dostupná jen v demo režimu nebo v náhledovém provozu.');
     const now = nowIso();
     const existing = ctx.db.prepare('SELECT * FROM payments WHERE idempotency_key = ?').get(`demo-fee:${reservation.id}`);
     const pay = existing || reservations.recordPayment(ctx.db, { reservationId: reservation.id, purpose: 'fee', method: 'card', provider: 'demo', providerRef: `DEMO-${reservation.number}`, amountMinor: amount, status: 'paid', idempotencyKey: `demo-fee:${reservation.id}`, vs: reservation.number, now });
@@ -475,7 +475,7 @@ async function poplatekPost(ctx) {
   const metoda = str(ctx.body.metoda);
   if (!['karta', 'prevod', 'demo', 'misto'].includes(metoda)) throw new HttpError(400, 'Neznámý způsob platby.');
   if (metoda === 'misto' && !ctx.settings.allowPayOnSite) throw new HttpError(403, 'Platba poplatku na místě není v této půjčovně povolena.');
-  if (metoda === 'demo' && !ctx.config.demo) throw new HttpError(403, 'Simulace platby je dostupná jen v demo režimu.');
+  if (metoda === 'demo' && !ctx.simulacePlateb) throw new HttpError(403, 'Simulace platby je dostupná jen v demo režimu nebo v náhledovém provozu.');
   let created;
   try {
     created = ensureReservation(ctx, draft, term);
@@ -528,7 +528,7 @@ function renderSprava(ctx, r, { notice = null, noticeTone = 'info', status = 200
   const quote = ['awaiting_fee', 'confirmed'].includes(r.status) ? cancellation.quote({ reservation: r, now: new Date(), settings: ctx.settings }) : null;
   ctx.render(
     page.sprava,
-    { reservation: r, detail, token: ctx.params.token, csrf: ctx.csrfToken(), quote, tenant: ctx.tenant, settings: ctx.settings, demo: !!ctx.config.demo, providerAvailable: !!loadProvider(), notice, noticeTone, pendingTransfer: pendingTransferOf(ctx, r), errors },
+    { reservation: r, detail, token: ctx.params.token, csrf: ctx.csrfToken(), quote, tenant: ctx.tenant, settings: ctx.settings, demo: !!ctx.simulacePlateb, providerAvailable: !!loadProvider(), notice, noticeTone, pendingTransfer: pendingTransferOf(ctx, r), errors },
     { feature: 'rezervace', status, noindex: true }
   );
 }

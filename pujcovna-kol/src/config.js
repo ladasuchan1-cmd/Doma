@@ -13,6 +13,10 @@
 //   PK_ADMIN_PASSWORD    heslo výchozího admina (v demu pevné kolo-demo-2026, jinak náhodné vytištěné do konzole)
 //   PK_RESET_DEMO_HOUR   hodina nočního resetu demo dat (3); prázdný řetězec = vypnuto
 //   PK_DEMO_AUTOSEED     1 = v demo režimu při startu naplnit demo data, je-li tabulka bike_types prázdná (1); 0 = ne
+//   PK_KLIENTI_DOMENA    doména, pod kterou průvodce zakládá weby klientů (<slug>.<doména>); výchozí PK_DOMAIN, jinak
+//                        ksprehledy.cz. Weby klientů leží v $PK_DATA/klienti/<slug>/ (tenant.json, logo) – přežijí nasazení.
+//   PK_PLATFORMA_HESLO   heslo do správy platformy /platforma (pozvánky do průvodce, přehled klientů); min. 12 znaků.
+//                        Bez něj je /platforma vypnutá (404) a pozvánky jdou jen nástrojem tools/pozvanka.js.
 //   APP_VERSION          verze aplikace do patičky a ?v= u statických souborů (výchozí z package.json)
 //   LOG_LEVEL            debug | info | warn | error | silent (info)
 
@@ -74,6 +78,9 @@ function loadConfig(env = process.env) {
     version: env.APP_VERSION || packageVersion(),
     logLevel: env.LOG_LEVEL || 'info',
     bodyLimitBytes: BODY_LIMIT_BYTES,
+    klientiDir: path.join(dataDir, 'klienti'),
+    klientiDomena: String(env.PK_KLIENTI_DOMENA || env.PK_DOMAIN || 'ksprehledy.cz').trim().toLowerCase().replace(/^\.+|\.+$/g, ''),
+    platformaHeslo: env.PK_PLATFORMA_HESLO && String(env.PK_PLATFORMA_HESLO).length >= 12 ? String(env.PK_PLATFORMA_HESLO) : null,
   });
 }
 

@@ -27,6 +27,7 @@ const csrf = require('./src/http/csrf');
 const { HttpError, sendErrorPage, serverError } = require('./src/http/errors');
 const { parseCookies, purgeExpired } = require('./src/http/session');
 const { createJobs } = require('./src/jobs');
+const klienti = require('./src/klienti');
 
 const DESIGN_COOKIE = '__Host-pk_design';
 const FEATURES_DIR = path.join(__dirname, 'src', 'features');
@@ -159,6 +160,7 @@ function sendPlain(res, status, text) {
 function createApp(deps) {
   const { config, log, tenants, dbs, router } = deps;
   const rateLimiter = createRateLimiter();
+  const clientConfig = Object.freeze({ ...config, demo: false });
 
   async function handle(req, res) {
     const requestId = crypto.randomBytes(6).toString('base64url');
@@ -176,15 +178,27 @@ function createApp(deps) {
     const tenant = resolveTenant(tenants, hostHeader, { demo: config.demo });
     if (!tenant) return sendPlain(res, 404, 'Půjčovna nenalezena.');
     const db = dbs.get(tenant.slug);
+    // Web klienta (založený průvodcem) nikdy nedostane demo chování ukázkové půjčovny (veřejné demo heslo,
+    // přepínač designů, noční reset); v náhledovém provozu má jen simulované platby a pruh „náhledový provoz“.
+    const isClient = klienti.isClientTenant(tenant);
+    const reqConfig = isClient && config.demo ? clientConfig : config;
+    if (isClient && tenant.stav === 'pozastaven' && url.pathname !== '/api/health') {
+      res.setHeader('Retry-After', '86400');
+      return sendPlain(res, 503, 'Web půjčovny je dočasně mimo provoz.');
+    }
 
     // statické soubory
     if (await serveStatic(req, res, { publicDir: config.publicDir, pathname: url.pathname })) return undefined;
-    if (url.pathname === '/tenant/logo.svg' && (req.method === 'GET' || req.method === 'HEAD')) return serveTenantFile(req, res, tenant, 'logo.svg');
+    const logoMatch = /^\/tenant\/(logo\.(?:svg|png|jpg|webp))$/.exec(url.pathname);
+    if (logoMatch && (req.method === 'GET' || req.method === 'HEAD')) return serveTenantFile(req, res, tenant, logoMatch[1]);
 
     const cookies = parseCookies(req.headers.cookie);
-    const theme = resolveTheme({ tenant, hostHeader, cookies, url, demo: config.demo });
+    const theme = resolveTheme({ tenant, hostHeader, cookies, url, demo: reqConfig.demo });
     const matched = router.match(req.method, url.pathname);
-    const ctx = createContext({ req, res, app, tenant, db, theme, url, params: matched.params || {}, opts: matched.opts || {}, log: reqLog, requestId, secure });
+    const ctx = createContext({ req, res, app, config: reqConfig, tenant, db, theme, url, params: matched.params || {}, opts: matched.opts || {}, log: reqLog, requestId, secure });
+    ctx.klient = isClient;
+    ctx.nahled = isClient && tenant.stav === 'nahled';
+    ctx.simulacePlateb = !!reqConfig.demo || ctx.nahled;
 
     try {
       if (matched.status === 404) throw new HttpError(404);
@@ -262,6 +276,18 @@ async function start(options = {}) {
   const fieldCrypto = createFieldCrypto(secret);
   const tenants = loadTenants(config.tenantsDir);
   const dbs = new Map();
+  const platformDb = klienti.openPlatformDb(config.dataDir);
+  const loadedClients = klienti.loadClientTenants(config.klientiDir);
+  for (const err of loadedClients.errors) log.error('Web klienta nelze načíst – přeskočen', err);
+  for (const t of loadedClients.tenants) {
+    if (tenants.some((x) => x.slug === t.slug || x.hosts.some((h) => t.hosts.includes(h)))) {
+      log.error('Web klienta koliduje se slugem nebo hostem jiného tenanta – přeskočen', { slug: t.slug });
+      continue;
+    }
+    const db = openTenantDb(t.slug, config.dataDir);
+    seedSettings(db, t);
+    dbs.set(t.slug, db);
+  }
   for (const tenant of tenants) {
     const db = openTenantDb(tenant.slug, config.dataDir);
     const seeded = seedSettings(db, tenant);
@@ -274,6 +300,14 @@ async function start(options = {}) {
     if (options.autoSeed !== false) await autoSeedDemo({ db, tenant, config, fieldCrypto, log });
     dbs.set(tenant.slug, db);
   }
+  // klienti až za tenanty z repa (ti mají při shodě hostu přednost); seznam hostů pro Caddy (deploy/vedle-mapy.sh)
+  for (const t of loadedClients.tenants) if (dbs.has(t.slug) && !tenants.includes(t)) tenants.push(t);
+  try {
+    klienti.writeCaddyHosts(config.dataDir, tenants);
+  } catch (e) {
+    log.error('Seznam hostů klientů pro Caddy nelze zapsat', { error: e.message });
+  }
+  if (loadedClients.tenants.length) log.info('Weby klientů načteny', { klienti: tenants.filter(klienti.isClientTenant).map((t) => t.slug) });
 
   const router = createRouter();
   router.add(
@@ -287,7 +321,7 @@ async function start(options = {}) {
   const { features, nav, jobs: featureJobs, loaded } = loadFeatures({ config, log, router, dir: options.featuresDir });
   log.info('Features načteny', { features: loaded });
 
-  const app = createApp({ config, log, tenants, dbs, secret, fieldCrypto, router, features, nav });
+  const app = createApp({ config, log, tenants, dbs, secret, fieldCrypto, router, features, nav, platformDb });
 
   const jobs = createJobs({ log });
   jobs.register('sessions-purge', 15 * 60 * 1000, ({ dbs: all }) => {
@@ -305,7 +339,7 @@ async function start(options = {}) {
       if (Number(get('hour')) % 24 !== config.resetDemoHour || lastResetDay === day) return;
       lastResetDay = day;
       const demoData = require('./tools/demo-data');
-      for (const tenant of d.tenants) await demoData.seed({ db: d.dbs.get(tenant.slug), tenant, config: d.config, fieldCrypto: d.fieldCrypto, reset: true, log });
+      for (const tenant of d.tenants.filter((t) => !klienti.isClientTenant(t))) await demoData.seed({ db: d.dbs.get(tenant.slug), tenant, config: d.config, fieldCrypto: d.fieldCrypto, reset: true, log });
       log.info('Noční reset demo dat proveden');
     });
   }
@@ -354,7 +388,7 @@ async function start(options = {}) {
         }, 5000);
         t.unref();
       });
-      for (const db of dbs.values()) {
+      for (const db of [...dbs.values(), platformDb]) {
         try {
           db.close();
         } catch {
@@ -365,7 +399,7 @@ async function start(options = {}) {
     return stopping;
   };
 
-  return { server, port, url, app, config, tenants, dbs, secret, fieldCrypto, jobs, stop };
+  return { server, port, url, app, config, tenants, dbs, secret, fieldCrypto, jobs, platformDb, stop };
 }
 
 async function main() {

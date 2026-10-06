@@ -137,7 +137,8 @@ ls -la /opt/zalohy-pujcovna-kol/                              # pujcovna-kol-202
 Archiv obsahuje: `data/db/*.db` – **konzistentní online kopie** všech `data/tenants/*.db` (uvnitř kontejneru přes
 `node:sqlite` `backup()`, ekvivalent `sqlite3 .backup`; u staršího Node `VACUUM INTO`), `data/secret` – obsah
 `/data/.secret` (klíč k šifrovaným polím a HMAC; **bez něj jsou údaje zákazníků nečitelné**), `data/nabidka.interni.json` –
-interní ceník s nákupními cenami kol (je-li, kap. 6b), `tenants/` – kopie
+interní ceník s nákupními cenami kol (je-li, kap. 6b), `data/platforma.db` a `data/klienti/` – pozvánky, evidence
+a konfigurace webů klientů z průvodce (kap. 7c), `tenants/` – kopie
 konfigurace tenantů z repa (tenant.json, logo, okoli.json, obrázky), `.env` serveru a `INFO.txt`. Archiv má práva
 600, složka 700. **Obsahuje klíč i osobní údaje** – mimo server ho ukládejte jen šifrovaně (plán: restic na Hetzner
 Storage Box + Litestream, PLAN kap. 12). V demu se data každou noc resetují, záloha je tedy hlavně kvůli `.secret`
@@ -149,7 +150,7 @@ a nastavení; v ostrém provozu (`PK_DEMO=0`) je to jediná záloha rezervací.
 cd /opt/Doma/pujcovna-kol/deploy && docker compose stop app
 mkdir -p /tmp/obnova && tar -xzf /opt/zalohy-pujcovna-kol/pujcovna-kol-2026-10-06-0230.tar.gz -C /tmp/obnova
 docker run --rm -v pujcovna-kol_data:/data -v /tmp/obnova/data:/obnova:ro alpine sh -c \
-  'rm -f /data/tenants/*.db-wal /data/tenants/*.db-shm && cp /obnova/db/*.db /data/tenants/ && cp /obnova/secret /data/.secret && { [ -f /obnova/nabidka.interni.json ] && cp /obnova/nabidka.interni.json /data/; true; } && chown -R 1000:1000 /data && chmod 600 /data/.secret; chmod 600 /data/nabidka.interni.json 2>/dev/null; true'
+  'rm -f /data/tenants/*.db-wal /data/tenants/*.db-shm && cp /obnova/db/*.db /data/tenants/ && cp /obnova/secret /data/.secret && { [ -f /obnova/nabidka.interni.json ] && cp /obnova/nabidka.interni.json /data/; true; } && { [ -f /obnova/platforma.db ] && cp /obnova/platforma.db /data/; true; } && { [ -d /obnova/klienti ] && cp -r /obnova/klienti /data/; true; } && chown -R 1000:1000 /data && chmod 600 /data/.secret; chmod 600 /data/nabidka.interni.json 2>/dev/null; true'
 docker compose start app && rm -rf /tmp/obnova
 ```
 
@@ -254,6 +255,49 @@ nasazení (Access lze zapnout zpět při oranžovém mraku a režimu SSL „Full
 
 Aktualizace a provoz: `vedle-mapy.sh aktualizace | stav | log | zaloha | zpet`. Logy Caddy pro půjčovnu jsou
 v kontejneru Caddy mapy (`/data/access-pujcovna-kol.log`).
+
+## 7c. Weby klientů – průvodce pro novou půjčovnu (od 7. 10. 2026)
+
+Nová půjčovna si web založí sama: provozovatel jí pošle **pozvánku** (jednorázový odkaz, platí 14 dní), klient projde
+**průvodcem** na `https://www.ksprehledy.cz/zalozeni/<token>` (provozovna a IČO, adresa webu a poloha výdeje, design
+a logo, kola z naší nabídky s cenou za den, otevírací doba a rezervační poplatek, účet správce a souhlas se smlouvami)
+a web se po potvrzení **hned spustí** na `<název>.ksprehledy.cz` v **náhledovém provozu**: rezervace i administrace
+fungují, platby jsou simulované a stránky nesou pruh „náhledový provoz“. Ostrý provoz se zapíná ve správě platformy
+po podpisu smlouvy a nastavení plateb.
+
+**Co nastavit jednou:**
+
+1. **DNS:** u Cloudflare záznam **A `*` → 37.27.203.154** (wildcard) v režimu **DNS only** (šedý mrak). Bez něj nové
+   subdomény nevedou na server.
+2. **Heslo správy platformy:** v GitHubu *Settings → Secrets and variables → Actions → New repository secret*
+   `PK_PLATFORMA_HESLO` (alespoň 12 znaků) a spustit nasazení (Actions → Půjčovna kol → Run workflow, zaškrtnout
+   „vedle_mapy“). Heslo se propíše do `deploy/.env`. Bez něj je `/platforma` vypnutá.
+3. Nasazení samo nastaví cron `/etc/cron.d/pujcovna-kol-caddy-sync` (každou minutu `vedle-mapy.sh caddy-sync`).
+
+**Běžná práce:** `https://www.ksprehledy.cz/platforma` → přihlásit heslem platformy → *Nová pozvánka* (název
+a e-mail klienta) → odkaz se zobrazí jednou, tlačítko otevře předvyplněný e-mail. Z poptávky v administraci
+(`/admin/nabidky/<id>`) vede tlačítko *Pozvat do průvodce* s předvyplněnými údaji. Na stejné stránce je přehled webů
+klientů a přepínání stavu *Náhledový provoz / Ostrý provoz / Pozastaveno* (pozastavený web vrací 503).
+Záloha bez webového rozhraní (na serveru):
+
+```bash
+docker exec pujcovna-kol node --disable-warning=ExperimentalWarning tools/pozvanka.js --email jana@hotel.cz --nazev "Hotel U Tří dubů"
+```
+
+**Kde co leží (datový svazek `pujcovna-kol_data`, přežije nasazení):** `/data/klienti/<slug>/tenant.json` a logo,
+`/data/tenants/<slug>.db` (DB klienta), `/data/platforma.db` (pozvánky – token jen jako otisk, e-mail a rozpracovaný
+průvodce šifrovaně – a evidence klientů), `/data/caddy-hosty.txt` (hosty klientů pro Caddy). Noční reset dema se
+klientů netýká; zálohu dělá `hetzner.sh zaloha` (DB klientů v `data/db/`, `data/platforma.db` a `data/klienti/`;
+obnova viz kap. 6).
+
+**Jak se nová subdoména dostane do Caddy:** aplikace po založení zapíše host do `/data/caddy-hosty.txt`; cron
+`caddy-sync` z něj složí `/opt/caddy-extra/pujcovna-kol-klienti.caddy` (stejné nastavení jako hlavní blok), ověří celou
+konfiguraci Caddy mapy (`caddy validate`) a teprve pak ji načte – při chybě vrátí předchozí stav a zapíše chybu do
+`/var/log/pujcovna-kol-caddy-sync.log`. Certifikát Let's Encrypt se vystaví při prvním požadavku, celkem do ~2 minut.
+Ručně: `bash /opt/Doma/pujcovna-kol/deploy/vedle-mapy.sh caddy-sync`.
+
+> Samostatné nasazení s vlastní Caddy (`deploy/docker-compose.yml`, kap. 3) průvodce zatím nesynchronizuje – weby
+> klientů tam fungují, ale jejich hosty je potřeba do `deploy/Caddyfile` doplnit ručně.
 
 ## 8. Když něco nejde
 

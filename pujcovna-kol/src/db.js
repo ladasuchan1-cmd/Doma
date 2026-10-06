@@ -259,6 +259,25 @@ const MIGRATIONS = [
     created_at TEXT NOT NULL
   );
   `,
+  // v2 (7. 10. 2026) – sessions.kind povoluje i „platform“ (správa platformy /platforma, src/features/klienti.js).
+  // SQLite neumí změnit CHECK, proto se tabulka přestaví; existující session zůstávají.
+  `
+  CREATE TABLE sessions_v2 (
+    id_hash TEXT PRIMARY KEY,
+    kind TEXT NOT NULL CHECK (kind IN ('public','admin','platform')),
+    user_id INTEGER REFERENCES users(id),
+    data TEXT NOT NULL DEFAULT '{}',
+    csrf TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    last_seen_at TEXT NOT NULL,
+    expires_at TEXT NOT NULL,
+    ip_hash TEXT
+  );
+  INSERT INTO sessions_v2(id_hash, kind, user_id, data, csrf, created_at, last_seen_at, expires_at, ip_hash)
+    SELECT id_hash, kind, user_id, data, csrf, created_at, last_seen_at, expires_at, ip_hash FROM sessions;
+  DROP TABLE sessions;
+  ALTER TABLE sessions_v2 RENAME TO sessions;
+  `,
 ];
 
 /** Aktuální čas jako ISO 8601 UTC. */

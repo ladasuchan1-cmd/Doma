@@ -147,7 +147,8 @@ jobs:
   # Server, kde půjčovna běží VEDLE Cyklo & Ski mapy (37.27.203.154, NASAZENI.md kap. 7b): ruční spuštění workflow
   # s volbou „vedle_mapy“ nasadí právě tuto větev – pošle deploy/vedle-mapy.sh přes stdin a spustí „aktualizace“
   # (fetch + ff-merge větve na serveru, build image, výměna kontejneru, reload Caddy mapy). Stejné SSH secrets jako
-  # u mapy (HETZNER_HOST, HETZNER_SSH_KEY, …). Volitelný secret PK_NABIDKA_INTERNI_JSON (obsah interního ceníku
+  # u mapy (HETZNER_HOST, HETZNER_SSH_KEY, …). Volitelný secret PK_PLATFORMA_HESLO (min. 12 znaků) zapne správu
+  # platformy /platforma (pozvánky do průvodce pro nové klienty). Volitelný secret PK_NABIDKA_INTERNI_JSON (obsah interního ceníku
   # s nákupními cenami kol, NASAZENI.md kap. 6b) se zapíše do datového svazku jako /data/nabidka.interni.json –
   # nikdy do repa ani do logu.
   deploy-vedle-mapy:
@@ -166,6 +167,7 @@ jobs:
           PORT: ${{ secrets.PK_HETZNER_PORT || secrets.HETZNER_PORT }}
           KEY: ${{ secrets.PK_HETZNER_SSH_KEY || secrets.HETZNER_SSH_KEY }}
           INTERNI_JSON: ${{ secrets.PK_NABIDKA_INTERNI_JSON }}
+          PLATFORMA_HESLO: ${{ secrets.PK_PLATFORMA_HESLO }}
           DOMAIN: ${{ vars.PK_HETZNER_DOMAIN || 'ksprehledy.cz' }}
           BRANCH: ${{ github.ref_name }}
         run: |
@@ -183,7 +185,9 @@ jobs:
           SUDO=""; [ "${USER:-root}" != "root" ] && SUDO="sudo -n"
           ssh_cmd() { ssh -i ~/.ssh/id_deploy -p "${PORT:-22}" -o StrictHostKeyChecking=yes "${USER:-root}@$HOST" "$@"; }
           echo "→ Větev $BRANCH → server (vedle Cyklo & Ski mapy)"
-          ssh_cmd "$SUDO env PK_VETEV='$BRANCH' PK_DOMAIN='$DOMAIN' bash -s -- aktualizace" < pujcovna-kol/deploy/vedle-mapy.sh
+          # heslo správy platformy (/platforma) jde na server v base64 (bez starostí s uvozovkami); prázdné = beze změny
+          PLAT_B64="$(printf %s "$PLATFORMA_HESLO" | base64 -w0)"
+          ssh_cmd "$SUDO env PK_VETEV='$BRANCH' PK_DOMAIN='$DOMAIN' PK_PLATFORMA_HESLO=\"\$(printf %s '$PLAT_B64' | base64 -d)\" bash -s -- aktualizace" < pujcovna-kol/deploy/vedle-mapy.sh
           if [ -n "$INTERNI_JSON" ]; then
             echo "→ Zapisuji interní ceník (secret PK_NABIDKA_INTERNI_JSON) do svazku pujcovna-kol_data (obsah se neloguje)."
             printf '%s' "$INTERNI_JSON" | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{JSON.parse(s);})' || { echo "PK_NABIDKA_INTERNI_JSON není platný JSON"; exit 1; }
