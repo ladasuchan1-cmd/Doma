@@ -1,0 +1,10 @@
+# běhová data a cache – nepatří do gitu
+data/
+cache/
+dist/
+node_modules/
+*.db
+*.db-wal
+*.db-shm
+.secret
+deploy/.env
