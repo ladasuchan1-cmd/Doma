@@ -1,0 +1,37 @@
+# Caddy pro docker-compose.yml (Caddy běží v kontejneru vedle aplikace) – demo Půjčovny kol na ksprehledy.cz.
+# Apex se bere z proměnné PK_DOMAIN (deploy/.env), subdomény www/outdoor/sport/family se z něj odvozují.
+# Certifikáty: Let's Encrypt, zvlášť pro každý host (HTTP-01, případně TLS-ALPN-01 – obě výzvy Caddy zvládá
+# bez DNS pluginu; A/AAAA záznamy všech pěti hostů musí mířit na server a porty 80/443 musí být otevřené).
+# Ostrá verze musteru přejde na wildcard *.domena přes DNS-01 (docs/vyzkum/07-domeny-a-tls.md, NASAZENI.md).
+#
+# HSTS v Caddy záměrně NENÍ – posílá ji aplikace (src/http/headers.js) podle X-Forwarded-Proto, s postupně rostoucím
+# max-age. Caddy jen komprimuje, skrývá hlavičku Server, loguje přístupy s rotací a předává požadavky aplikaci
+# s hlavičkami X-Forwarded-For / X-Forwarded-Proto / X-Forwarded-Host (reverse_proxy je přidává automaticky).
+{
+	email {$PK_ACME_EMAIL:info@ksprehledy.cz}
+}
+
+{$PK_DOMAIN}, www.{$PK_DOMAIN}, outdoor.{$PK_DOMAIN}, sport.{$PK_DOMAIN}, family.{$PK_DOMAIN} {
+	encode zstd gzip
+
+	header {
+		-Server
+	}
+
+	# Access log (obsahuje IP adresy = osobní údaj): rotace po 20 MB, nejvýše 5 souborů a 14 dní zpět.
+	log {
+		output file /data/access.log {
+			roll_size 20mb
+			roll_keep 5
+			roll_keep_for 336h
+		}
+	}
+
+	reverse_proxy app:8092 {
+		# aplikace odpovídá do 60 s (server.requestTimeout); health je rychlý
+		transport http {
+			dial_timeout 5s
+			response_header_timeout 65s
+		}
+	}
+}

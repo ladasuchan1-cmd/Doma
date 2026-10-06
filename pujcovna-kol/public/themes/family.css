@@ -1,13 +1,28 @@
 /* =====================================================================================================
-   Téma FAMILY – PLACEHOLDER kostry. // doplní agent tématu (tema-family)
-   Zatím jen semantické barvy a fonty palety ze SPEC kap. 7 / rešerše 05 B4, aby prošel tools/check-contrast.js.
-   Pravidla: přepisovat jen proměnné a layoutové varianty ([data-theme="family"] …), nikdy HTML.
+   Téma FAMILY / Clean – světlý, vzdušný, přátelský (SPEC kap. 7, PLAN kap. 10; inspirace woom, Swapfiets).
+   Paleta: bílá #FFFFFF, plocha #F3F7FB, mint #D9F2EC, text #1E2A3A, tlumený #5B6B7E, primární petrolej #0F766E
+   (bílá na ní), sekundární modrá #2563EB (odkazy, info, focus), žlutá #FFC940 jen jako pozadí štítků s tmavým textem,
+   CTA korál #C8392C (bílá) pro velká tlačítka „Rezervovat“. Fonty: Nunito (vše), Bricolage Grotesque (display titulky).
+   Layout: data-hero=split (text vlevo, fotka vpravo v měkkém oblém tvaru, na mobilu pod sebou), data-nav=centered
+   (logo nahoře uprostřed, odkazy pod ním), data-cards=soft (bez rámečku, měkký stín, poloměr 24 px).
+   Poloměry 16–24 px, pill tlačítka, velké mezery (--section-gap 6rem), kroky 1-2-3 s velkými číslicemi v kruzích,
+   spring animace 250 ms (jen transformace; prefers-reduced-motion je vypne v base.css).
+   Pravidla: přepisuje JEN proměnné a layoutové varianty přes [data-theme="family"] …; HTML se nemění.
+   Obrázky: public/img/demo/family/ (CC BY, viz ATTRIBUTION.md; ilustrace vlastní), hero fotka jen přes --hero-image.
    ===================================================================================================== */
+
+/* ---------- 1. Tokeny ---------- */
 [data-theme='family'] {
+  color-scheme: light;
   --bg: #ffffff;
   --bg-elevated: #ffffff;
   --surface: #f3f7fb;
   --surface-2: #d9f2ec;
+  --mint: #d9f2ec;
+  --mint-soft: #ecf8f4;
+  --yellow: #ffc940;
+  --coral: #c8392c;
+  --coral-hover: #ad2e22;
   --text: #1e2a3a;
   --text-muted: #5b6b7e;
   --border: #dbe4ee;
@@ -21,17 +36,1332 @@
   --danger: #c8392c;
   --info: #2563eb;
   --focus: #2563eb;
-  --link: #0f766e;
-  --font-display: 'Bricolage Grotesque', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  --link: #2563eb;
+  --font-display: 'Bricolage Grotesque', 'Nunito', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
   --font-body: 'Nunito', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  --hero-image: url('/img/demo/family/hero.jpg');
   --hero-overlay: none;
-  --shadow-1: 0 2px 6px rgba(30, 42, 58, 0.06);
-  --shadow-2: 0 8px 24px rgba(30, 42, 58, 0.08);
-  --shadow-3: 0 16px 40px rgba(30, 42, 58, 0.12);
-  --card-radius: 20px;
+  --section-gap: 6rem;
+  --container: 1200px;
+  --card-radius: 24px;
   --btn-radius: 999px;
-  --input-radius: 12px;
+  --input-radius: 14px;
+  --radius-lg: 20px;
+  --shadow-1: 0 2px 8px rgba(30, 42, 58, 0.06);
+  --shadow-2: 0 10px 30px rgba(30, 42, 58, 0.09);
+  --shadow-3: 0 24px 56px rgba(30, 42, 58, 0.14);
+  --ease: cubic-bezier(0.22, 1, 0.36, 1);
+  --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+  --motion: 250ms;
+  --header-height: 64px;
+  --tint-primary: #e8f5f2;
+  --tint-success: #e8f5f2;
+  --tint-warning: #fff3d6;
+  --tint-danger: #fbe9e7;
+  --tint-info: #e8efff;
+  --blob: 42% 58% 56% 44% / 50% 42% 58% 50%;
 }
 
-/* // doplní agent tématu: split hero s ilustrací/fotkou rodiny, centrovaná navigace, pill tlačítka, měkké stíny,
-   kroky 1-2-3 s barevnými kruhy, mintové plochy, žluté štítky (#ffc940 s tmavým textem). */
+/* ---------- 2. Základ: typografie, odkazy, focus ---------- */
+[data-theme='family'] body {
+  line-height: 1.6;
+  font-weight: 500;
+}
+[data-theme='family'] h1,
+[data-theme='family'] h2,
+[data-theme='family'] h3,
+[data-theme='family'] h4 {
+  font-weight: 800;
+  letter-spacing: -0.022em;
+  line-height: 1.1;
+}
+[data-theme='family'] h3,
+[data-theme='family'] h4 {
+  letter-spacing: -0.012em;
+  line-height: 1.2;
+}
+[data-theme='family'] p {
+  text-wrap: pretty;
+}
+[data-theme='family'] a {
+  text-decoration-thickness: 2px;
+  text-underline-offset: 0.18em;
+  text-decoration-color: color-mix(in srgb, var(--link) 40%, transparent);
+}
+[data-theme='family'] a:hover {
+  text-decoration-color: currentColor;
+}
+[data-theme='family'] :focus-visible {
+  outline: 3px solid var(--focus);
+  outline-offset: 3px;
+  border-radius: 12px;
+}
+[data-theme='family'] ::selection {
+  background: var(--yellow);
+  color: var(--text);
+}
+[data-theme='family'] code {
+  background: var(--surface);
+  border-radius: 6px;
+  padding: 0.1em 0.4em;
+}
+[data-theme='family'] .skip-link {
+  border-radius: var(--btn-radius);
+  font-weight: 700;
+}
+
+/* ---------- 3. Hlavička: logo nahoře uprostřed, odkazy pod ním ---------- */
+[data-theme='family'] .site-header {
+  background: var(--bg-elevated);
+  border-bottom: 0;
+  box-shadow: 0 1px 0 var(--border);
+}
+[data-theme='family'] .site-header__inner {
+  min-height: var(--header-height);
+  gap: var(--space-2) var(--space-4);
+}
+[data-theme='family'] .site-logo {
+  font-family: var(--font-display);
+  font-weight: 800;
+  color: var(--primary);
+  gap: var(--space-3);
+  padding: var(--space-1) var(--space-2);
+  border-radius: var(--btn-radius);
+}
+[data-theme='family'] .site-logo__img {
+  height: 44px;
+  /* logo je <img> s currentColor (černá) → obarvení do petrolejové přes filtr */
+  filter: brightness(0) saturate(100%) invert(31%) sepia(42%) saturate(1240%) hue-rotate(139deg) brightness(92%) contrast(94%);
+}
+[data-theme='family'] .site-nav__list {
+  gap: var(--space-1);
+}
+[data-theme='family'] .site-nav__link {
+  min-height: 44px;
+  padding: 0 var(--space-4);
+  border-bottom: 0;
+  border-radius: var(--btn-radius);
+  font-weight: 700;
+  color: var(--text);
+  transition: background var(--motion) var(--ease), color var(--motion) var(--ease);
+}
+[data-theme='family'] .site-nav__link:hover {
+  background: var(--surface);
+  color: var(--primary);
+}
+[data-theme='family'] .site-nav__link.is-active {
+  background: var(--mint);
+  color: var(--primary);
+  border-bottom: 0;
+}
+[data-theme='family'] .site-nav__cta {
+  --_bg: var(--coral);
+  --_fg: #fff;
+  border-color: var(--coral);
+  min-height: 44px;
+  padding-inline: var(--space-6);
+  box-shadow: 0 6px 16px rgba(200, 57, 44, 0.25);
+}
+[data-theme='family'] .site-nav__cta:hover {
+  --_bg: var(--coral-hover);
+  border-color: var(--coral-hover);
+}
+[data-theme='family'] .nav-toggle__label {
+  border: 2px solid var(--border);
+  border-radius: var(--btn-radius);
+  width: 48px;
+  height: 48px;
+  color: var(--primary);
+}
+[data-theme='family'] .nav-toggle__bar,
+[data-theme='family'] .nav-toggle__bar::before,
+[data-theme='family'] .nav-toggle__bar::after {
+  background: var(--primary);
+  border-radius: 2px;
+}
+[data-theme='family'] .nav-toggle:focus-visible + .nav-toggle__label {
+  outline-color: var(--focus);
+}
+
+@media (min-width: 860px) {
+  [data-theme='family'][data-nav='centered'] .site-header__inner {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: var(--space-1);
+    padding-block: var(--space-3) var(--space-3);
+  }
+  [data-theme='family'][data-nav='centered'] .site-logo {
+    justify-self: center;
+  }
+  [data-theme='family'][data-nav='centered'] .site-logo__img {
+    height: 52px;
+  }
+  [data-theme='family'][data-nav='centered'] .site-logo__text {
+    display: none;
+  }
+  [data-theme='family'][data-nav='centered'] .site-nav {
+    grid-column: auto;
+    justify-self: center;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: var(--space-3);
+  }
+}
+@media (max-width: 859px) {
+  [data-theme='family'] .site-header__inner {
+    justify-content: space-between;
+    padding-block: var(--space-2);
+  }
+  [data-theme='family'] .site-nav {
+    padding: var(--space-3) 0 var(--space-5);
+    gap: var(--space-4);
+  }
+  [data-theme='family'] .site-nav__list {
+    gap: var(--space-1);
+  }
+  [data-theme='family'] .site-nav__link {
+    display: flex;
+    width: 100%;
+    min-height: 52px;
+    justify-content: center;
+    font-size: var(--step-1);
+  }
+  [data-theme='family'] .site-nav__cta {
+    min-height: 52px;
+    justify-content: center;
+  }
+}
+
+/* ---------- 4. Hero: split, text vlevo, fotka vpravo v oblém tvaru ---------- */
+[data-theme='family'] .hero {
+  width: min(100%, calc(var(--container) + 2 * var(--space-10)));
+  margin-inline: auto;
+  color: var(--text);
+  background: transparent;
+  align-items: center;
+  gap: var(--space-6);
+}
+[data-theme='family'][data-hero='split'] .hero {
+  min-height: auto;
+}
+[data-theme='family'] .hero__body {
+  padding-block: var(--space-8) var(--space-6);
+  animation: family-rise 600ms var(--ease) both;
+}
+[data-theme='family'] .hero__eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-1) var(--space-4);
+  border-radius: var(--btn-radius);
+  background: var(--mint);
+  color: var(--primary);
+  font-size: var(--step--1);
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  opacity: 1;
+  margin-bottom: var(--space-5);
+}
+[data-theme='family'] .hero__title {
+  color: var(--text);
+  font-size: clamp(2.4rem, 1.6rem + 3.6vw, 4.25rem);
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  line-height: 1.02;
+  max-width: 16ch;
+  margin-bottom: var(--space-5);
+}
+[data-theme='family'] .hero__text {
+  color: var(--text-muted);
+  font-size: var(--step-1);
+  font-weight: 500;
+  max-width: 44ch;
+  margin-bottom: var(--space-6);
+}
+[data-theme='family'] .hero__accent {
+  display: inline-block;
+  font-family: var(--font-body);
+  font-size: var(--step-0);
+  font-weight: 800;
+  color: var(--text);
+  background: var(--yellow);
+  padding: var(--space-1) var(--space-4);
+  border-radius: var(--btn-radius);
+  transform: rotate(-1.5deg);
+  margin: 0 0 var(--space-6);
+  opacity: 1;
+}
+[data-theme='family'] .hero__actions {
+  gap: var(--space-3);
+}
+[data-theme='family'] .hero .btn--primary {
+  --_bg: var(--coral);
+  --_fg: #fff;
+  border-color: var(--coral);
+  box-shadow: 0 10px 24px rgba(200, 57, 44, 0.28);
+}
+[data-theme='family'] .hero .btn--primary:hover {
+  --_bg: var(--coral-hover);
+  border-color: var(--coral-hover);
+}
+[data-theme='family'] .hero .btn--ghost {
+  --_bg: var(--bg);
+  --_fg: var(--primary);
+  border-color: var(--border);
+}
+[data-theme='family'] .hero .btn--ghost:hover {
+  --_bg: var(--mint);
+  border-color: var(--mint);
+}
+
+/* média: oblý tvar + mintový „blob“ vzadu + žlutá tečka */
+[data-theme='family'] .hero__media {
+  position: relative;
+  inset: auto;
+  width: auto;
+  height: auto;
+  aspect-ratio: 5 / 4;
+  margin: var(--space-4) var(--space-4) 0;
+  isolation: isolate;
+  animation: family-rise 700ms 120ms var(--ease) both;
+}
+[data-theme='family'] .hero__media::before {
+  content: '';
+  position: absolute;
+  inset: -6% -4% 4% 6%;
+  background: var(--mint);
+  border-radius: 58% 42% 46% 54% / 44% 56% 44% 56%;
+  z-index: -1;
+}
+[data-theme='family'] .hero__media::after {
+  content: '';
+  display: block;
+  position: absolute;
+  inset: auto auto 6% 2%;
+  background-image: none;
+  width: clamp(40px, 7vw, 72px);
+  height: clamp(40px, 7vw, 72px);
+  background: var(--yellow);
+  border-radius: 50%;
+  box-shadow: var(--shadow-2);
+}
+[data-theme='family'] .hero__media img,
+[data-theme='family'] .hero__placeholder {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: var(--blob);
+  box-shadow: var(--shadow-3);
+}
+[data-theme='family'] .hero__placeholder {
+  background: var(--mint) var(--hero-image) center / cover no-repeat;
+}
+
+@media (min-width: 860px) {
+  [data-theme='family'][data-hero='split'] .hero {
+    grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr);
+    gap: var(--space-8);
+    padding-block: var(--space-6) var(--space-4);
+  }
+  [data-theme='family'][data-hero='split'] .hero__body {
+    padding-inline: clamp(var(--space-4), 4vw, var(--space-10)) 0;
+    padding-block: var(--space-9) var(--space-9);
+  }
+  [data-theme='family'] .hero__media {
+    margin: var(--space-6) clamp(var(--space-4), 4vw, var(--space-10)) var(--space-6) 0;
+  }
+}
+@media (max-width: 859px) {
+  [data-theme='family'][data-hero='split'] .hero {
+    grid-template-columns: 1fr;
+  }
+  [data-theme='family'] .hero__body {
+    order: -1;
+    padding-block: var(--space-7) var(--space-4);
+  }
+  [data-theme='family'] .hero__media {
+    margin: var(--space-4) var(--space-6) var(--space-7);
+    max-width: 520px;
+  }
+}
+
+@keyframes family-rise {
+  from {
+    opacity: 0;
+    transform: translateY(18px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* ---------- 5. Sekce: velké mezery, eyebrow pilulka, mintové pásy s oblými rohy ---------- */
+[data-theme='family'] .section__eyebrow {
+  display: inline-block;
+  padding: 2px var(--space-3);
+  border-radius: var(--btn-radius);
+  background: var(--mint);
+  color: var(--primary);
+  letter-spacing: 0.06em;
+  font-weight: 800;
+  margin-bottom: var(--space-3);
+}
+[data-theme='family'] .section__title {
+  font-size: var(--step-4);
+  margin-bottom: var(--space-3);
+}
+[data-theme='family'] .section--page-head .section__title {
+  font-size: clamp(2rem, 1.4rem + 2.6vw, 3.4rem);
+}
+[data-theme='family'] .section__lead {
+  font-size: var(--step-1);
+  font-weight: 500;
+  margin-bottom: var(--space-8);
+}
+[data-theme='family'] .section__more {
+  margin-top: var(--space-8);
+}
+
+/* domovská stránka: USP bez rámečků, „Jak to funguje“ jako mintový pás, kola na bílé */
+[data-theme='family'] .usp {
+  background: transparent;
+  padding: var(--space-2) 0;
+  gap: var(--space-4);
+}
+[data-theme='family'] .usp__icon {
+  width: 72px;
+  height: 72px;
+  background: var(--mint);
+  color: var(--primary);
+  transition: transform var(--motion) var(--ease-spring);
+}
+[data-theme='family'] .usp:hover .usp__icon {
+  transform: rotate(-6deg) scale(1.06);
+}
+[data-theme='family'] .usp__icon .icon {
+  width: 34px;
+  height: 34px;
+}
+[data-theme='family'] .usp__title {
+  font-size: var(--step-2);
+}
+[data-theme='family'] .section--bikes {
+  background: transparent;
+  padding-block: 0 var(--section-gap);
+}
+[data-theme='family'] .section--bikes + .section {
+  padding-top: 0;
+}
+[data-theme='family'] .section--how {
+  position: relative;
+  padding-block: var(--section-gap);
+  background: var(--mint-soft);
+}
+[data-theme='family'] .section--how::before,
+[data-theme='family'] .section--how::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 48px;
+  background: url('/img/demo/family/ilu-vlnka.svg') center / 100% 100% no-repeat;
+  pointer-events: none;
+}
+[data-theme='family'] .section--how::before {
+  top: 0;
+  transform: scaleY(-1);
+  filter: brightness(1.06);
+}
+[data-theme='family'] .section--how::after {
+  bottom: 0;
+  filter: brightness(1.06);
+}
+[data-theme='family'] .section--how > .container {
+  position: relative;
+  z-index: 1;
+}
+[data-theme='family'] .section--how + .section {
+  padding-top: var(--section-gap);
+}
+[data-theme='family'] .section--contact .contact-card {
+  background: var(--surface);
+  border-radius: var(--card-radius);
+  padding: var(--space-7);
+  overflow: hidden;
+}
+[data-theme='family'] .section--contact .contact-card::before,
+[data-theme='family'] .contact-note::before {
+  content: '';
+  display: block;
+  align-self: stretch;
+  height: 180px;
+  margin: calc(-1 * var(--space-7)) calc(-1 * var(--space-7)) var(--space-5);
+  background: var(--mint) url('/img/demo/family/rozmberk-hraz.jpg') center 40% / cover no-repeat;
+}
+[data-theme='family'] .contact-note {
+  padding: var(--space-7);
+  background: var(--mint-soft);
+  border-radius: var(--card-radius);
+  overflow: hidden;
+}
+[data-theme='family'] .contact-note::before {
+  background-image: url('/img/demo/family/deti-helmy.jpg');
+  background-position: center 28%;
+}
+[data-theme='family'] .gallery--empty .card__placeholder {
+  background: var(--mint) url('/img/demo/family/rodina-cesta.jpg') center / cover no-repeat;
+  color: var(--bg);
+}
+
+/* chybová stránka: střed, ilustrace kola nad nadpisem */
+[data-theme='family'] .section--error .container {
+  text-align: center;
+  max-width: 56ch;
+}
+[data-theme='family'] .section--error .container::before {
+  content: '';
+  display: block;
+  width: 140px;
+  height: 140px;
+  margin: 0 auto var(--space-6);
+  background: url('/img/demo/family/ilu-kolo.svg') center / contain no-repeat;
+}
+[data-theme='family'] .section--error .section__title {
+  font-size: clamp(2.2rem, 1.6rem + 3vw, 3.6rem);
+}
+[data-theme='family'] .section--error .section__lead {
+  margin-inline: auto;
+}
+[data-theme='family'] .error-page__actions {
+  justify-content: center;
+}
+
+/* ---------- 6. Karty: soft, bez rámečku, fotka vsazená, žlutý štítek ---------- */
+[data-theme='family'] .card {
+  border: 0;
+  border-radius: var(--card-radius);
+  box-shadow: var(--shadow-2);
+  transition: transform var(--motion) var(--ease-spring), box-shadow var(--motion) var(--ease);
+}
+[data-theme='family'] .card:hover {
+  transform: translateY(-4px);
+  box-shadow: var(--shadow-3);
+}
+[data-theme='family'] .card:focus-within {
+  box-shadow: var(--shadow-3);
+}
+[data-theme='family'] .card__media {
+  background: var(--surface);
+  color: var(--primary);
+  overflow: hidden;
+}
+[data-theme='family'] .card__media img {
+  transition: transform 600ms var(--ease);
+}
+[data-theme='family'] .card:hover .card__media img {
+  transform: scale(1.04);
+}
+[data-theme='family'] .card__body {
+  padding: var(--space-5) var(--space-6) var(--space-6);
+  gap: var(--space-2);
+}
+[data-theme='family'] .card__title {
+  font-size: var(--step-1);
+}
+[data-theme='family'] .card__title a {
+  color: inherit;
+}
+[data-theme='family'] .card__title a:hover {
+  color: var(--primary);
+  text-decoration-color: var(--mint);
+}
+[data-theme='family'] .card__body .btn {
+  margin-top: var(--space-3);
+}
+[data-theme='family'][data-cards='soft'] .card--bike .card__media {
+  margin: var(--space-3) var(--space-3) 0;
+  aspect-ratio: 4 / 3;
+  border-radius: 18px;
+  background: var(--mint-soft);
+}
+[data-theme='family'] .card--bike .card__placeholder {
+  background: var(--mint-soft) url('/img/demo/family/ilu-kolo.svg') center / 46% no-repeat;
+}
+[data-theme='family'] .card--bike .card__placeholder .icon {
+  display: none;
+}
+[data-theme='family'] .card--bike .card__meta {
+  font-weight: 600;
+}
+[data-theme='family'] .card--bike .card__availability .badge {
+  padding-block: 4px;
+}
+[data-theme='family'] .card--teaser .card__media {
+  aspect-ratio: 16 / 8;
+  display: grid;
+  place-items: center;
+  background: var(--mint) url('/img/demo/family/stezka-jezero.jpg') center / cover no-repeat;
+  color: var(--primary);
+}
+[data-theme='family'] .card--teaser:nth-child(2n) .card__media {
+  background-image: url('/img/demo/family/rybnik-trebon.jpg');
+}
+[data-theme='family'] .card--teaser .card__media .icon {
+  width: 72px;
+  height: 72px;
+  padding: 18px;
+  background: var(--bg);
+  border-radius: 50%;
+  box-shadow: var(--shadow-2);
+  opacity: 1;
+}
+[data-theme='family'] .card--poi .card__media {
+  margin: var(--space-3) var(--space-3) 0;
+  border-radius: 18px;
+}
+[data-theme='family'] .card--route {
+  background: var(--mint-soft);
+  box-shadow: none;
+}
+[data-theme='family'] .card--route .card__badges {
+  margin: 0;
+  display: flex;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+}
+[data-theme='family'] .card--design {
+  background: var(--surface);
+  box-shadow: none;
+}
+[data-theme='family'] .card--design.is-active {
+  background: var(--bg);
+  border: 0;
+  box-shadow: 0 0 0 3px var(--primary), var(--shadow-2);
+}
+[data-theme='family'] .card--design .summary {
+  background: transparent;
+  padding: 0;
+}
+
+/* ---------- 7. Tlačítka: pilulky, odskok při hoveru ---------- */
+[data-theme='family'] .btn {
+  min-height: 48px;
+  padding: var(--space-2) var(--space-6);
+  font-weight: 800;
+  letter-spacing: 0.005em;
+  transition: background var(--motion) var(--ease), color var(--motion) var(--ease), border-color var(--motion) var(--ease), transform var(--motion) var(--ease-spring), box-shadow var(--motion) var(--ease);
+}
+[data-theme='family'] .btn:hover {
+  transform: translateY(-2px);
+}
+[data-theme='family'] .btn:active {
+  transform: translateY(0) scale(0.98);
+}
+[data-theme='family'] .btn--primary {
+  box-shadow: 0 6px 16px rgba(15, 118, 110, 0.22);
+}
+[data-theme='family'] .btn--primary:hover {
+  box-shadow: 0 10px 22px rgba(15, 118, 110, 0.28);
+}
+[data-theme='family'] .btn--secondary {
+  --_bg: var(--mint);
+  --_fg: var(--primary);
+  border-color: var(--mint);
+}
+[data-theme='family'] .btn--secondary:hover {
+  --_bg: #c6ebe2;
+  --_fg: var(--primary-hover);
+  border-color: #c6ebe2;
+}
+[data-theme='family'] .btn--ghost {
+  --_bg: transparent;
+  --_fg: var(--text);
+  border-color: var(--border);
+}
+[data-theme='family'] .btn--ghost:hover {
+  --_bg: var(--surface);
+  border-color: var(--border);
+}
+[data-theme='family'] .btn--danger {
+  --_bg: var(--coral);
+  border-color: var(--coral);
+  box-shadow: 0 6px 16px rgba(200, 57, 44, 0.22);
+}
+[data-theme='family'] .btn--danger:hover {
+  --_bg: var(--coral-hover);
+  border-color: var(--coral-hover);
+}
+[data-theme='family'] .btn--lg {
+  min-height: 56px;
+  padding: var(--space-3) var(--space-8);
+  font-size: var(--step-1);
+}
+[data-theme='family'] .btn--sm {
+  min-height: 40px;
+  padding: var(--space-1) var(--space-4);
+}
+[data-theme='family'] .btn:disabled,
+[data-theme='family'] .btn[aria-disabled='true'] {
+  box-shadow: none;
+  transform: none;
+}
+/* velké primární CTA mimo hero (např. „Začít rezervaci“) v korálové */
+[data-theme='family'] .section--how .btn--primary.btn--lg,
+[data-theme='family'] .form__actions .btn--primary.btn--lg {
+  --_bg: var(--coral);
+  border-color: var(--coral);
+  box-shadow: 0 10px 24px rgba(200, 57, 44, 0.26);
+}
+[data-theme='family'] .section--how .btn--primary.btn--lg:hover,
+[data-theme='family'] .form__actions .btn--primary.btn--lg:hover {
+  --_bg: var(--coral-hover);
+  border-color: var(--coral-hover);
+}
+
+/* ---------- 8. Formuláře: zaoblená pole, mintový focus ring ---------- */
+[data-theme='family'] .form {
+  gap: var(--space-5);
+}
+[data-theme='family'] .field {
+  gap: var(--space-2);
+}
+[data-theme='family'] .field__label {
+  font-weight: 800;
+  font-size: var(--step--1);
+  letter-spacing: 0.01em;
+}
+[data-theme='family'] .field__input {
+  min-height: 52px;
+  padding: var(--space-3) var(--space-4);
+  border: 2px solid var(--border);
+  border-radius: var(--input-radius);
+  background: var(--bg);
+  font-weight: 600;
+  transition: border-color var(--motion) var(--ease), box-shadow var(--motion) var(--ease);
+}
+[data-theme='family'] .field__input::placeholder {
+  color: #8a97a8;
+  font-weight: 500;
+}
+[data-theme='family'] .field__input:hover {
+  border-color: #c3d0de;
+}
+[data-theme='family'] .field__input:focus {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 4px var(--mint);
+  outline: none;
+}
+[data-theme='family'] .field__input--select {
+  appearance: none;
+  padding-right: var(--space-9);
+  background: var(--bg) url("data:image/svg+xml;utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%230f766e' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E") right var(--space-4) center / 20px no-repeat;
+}
+[data-theme='family'] .field.has-error .field__input {
+  border-color: var(--danger);
+  box-shadow: 0 0 0 4px var(--tint-danger);
+}
+[data-theme='family'] .field__hint {
+  font-weight: 500;
+}
+[data-theme='family'] .field__error {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: 2px var(--space-3);
+  border-radius: var(--btn-radius);
+  background: var(--tint-danger);
+  align-self: flex-start;
+}
+[data-theme='family'] .field__check {
+  grid-template-columns: 28px 1fr;
+  padding: var(--space-3) var(--space-4);
+  border: 2px solid var(--border);
+  border-radius: var(--input-radius);
+  transition: border-color var(--motion) var(--ease), background var(--motion) var(--ease);
+}
+[data-theme='family'] .field__check:hover {
+  border-color: #c3d0de;
+}
+[data-theme='family'] .field__check:has(.field__checkbox:checked) {
+  border-color: var(--primary);
+  background: var(--mint-soft);
+}
+[data-theme='family'] .field__checkbox {
+  width: 26px;
+  height: 26px;
+  margin-top: 0;
+  accent-color: var(--primary);
+  border-radius: 8px;
+}
+[data-theme='family'] .field--checkbox .field__hint,
+[data-theme='family'] .field--checkbox .field__error {
+  margin-left: var(--space-4);
+}
+
+/* ---------- 9. Kroky 1-2-3: velké číslice v kruzích, spojovací čárkovaná linka ---------- */
+[data-theme='family'] .steps {
+  gap: var(--space-6);
+}
+[data-theme='family'] .steps__item {
+  position: relative;
+  grid-template-columns: 1fr;
+  gap: var(--space-3);
+  padding: var(--space-6) var(--space-6) var(--space-7);
+  background: var(--bg);
+  border: 0;
+  border-radius: var(--card-radius);
+  box-shadow: var(--shadow-2);
+  text-align: center;
+  justify-items: center;
+  transition: transform var(--motion) var(--ease-spring);
+}
+[data-theme='family'] .steps__item:hover {
+  transform: translateY(-3px);
+}
+[data-theme='family'] .steps__num {
+  width: 72px;
+  height: 72px;
+  font-size: var(--step-3);
+  font-weight: 800;
+  background: var(--mint);
+  color: var(--primary);
+  box-shadow: 0 0 0 6px var(--bg), 0 0 0 8px var(--mint);
+  margin-bottom: var(--space-2);
+  transition: transform var(--motion) var(--ease-spring);
+}
+[data-theme='family'] .steps__item:hover .steps__num {
+  transform: scale(1.08) rotate(-4deg);
+}
+[data-theme='family'] .steps__label {
+  padding-top: 0;
+  font-family: var(--font-display);
+  font-size: var(--step-1);
+  font-weight: 800;
+  letter-spacing: -0.012em;
+}
+[data-theme='family'] .steps__desc {
+  grid-column: auto;
+  font-size: var(--step-0);
+  font-weight: 500;
+}
+[data-theme='family'] .steps__item.is-active {
+  background: var(--bg);
+  box-shadow: 0 0 0 3px var(--primary), var(--shadow-2);
+}
+[data-theme='family'] .steps__item.is-active .steps__num {
+  background: var(--primary);
+  color: var(--on-primary);
+  box-shadow: 0 0 0 6px var(--bg), 0 0 0 8px var(--primary);
+}
+[data-theme='family'] .steps__item.is-done .steps__num {
+  background: var(--primary);
+  color: var(--on-primary);
+  box-shadow: 0 0 0 6px var(--bg), 0 0 0 8px var(--mint);
+}
+[data-theme='family'] .steps__item:not(.is-done):not(.is-active) .steps__num {
+  background: var(--mint);
+  color: var(--primary);
+}
+[data-theme='family'] .steps__item.is-done .steps__label {
+  color: var(--primary);
+}
+@media (min-width: 720px) {
+  [data-theme='family'] .steps__item:not(:last-child)::after {
+    content: '';
+    position: absolute;
+    top: calc(var(--space-6) + 36px);
+    left: calc(50% + 48px);
+    width: calc(100% + var(--space-6) - 96px);
+    border-top: 3px dashed var(--mint);
+    z-index: 1;
+  }
+}
+/* kroky v hlavičce rezervačního kroku (5 položek): kompaktnější */
+[data-theme='family'] .section--page-head .steps {
+  gap: var(--space-4);
+}
+[data-theme='family'] .section--page-head .steps__item {
+  padding: var(--space-5) var(--space-4) var(--space-5);
+  box-shadow: var(--shadow-1);
+}
+[data-theme='family'] .section--page-head .steps__num {
+  width: 56px;
+  height: 56px;
+  font-size: var(--step-2);
+}
+[data-theme='family'] .section--page-head .steps__item:not(:last-child)::after {
+  top: calc(var(--space-5) + 28px);
+  left: calc(50% + 40px);
+  width: calc(100% + var(--space-4) - 80px);
+}
+[data-theme='family'] .section--page-head .steps__label {
+  font-size: var(--step-0);
+}
+
+/* ---------- 10. Tabulky: oblý rámec, mintová hlavička, zebra ---------- */
+[data-theme='family'] .table-wrap {
+  border-radius: var(--radius-lg);
+  box-shadow: 0 0 0 1px var(--border);
+  background: var(--bg);
+}
+[data-theme='family'] .table th,
+[data-theme='family'] .table td {
+  padding: var(--space-3) var(--space-4);
+  border-bottom-color: var(--surface);
+}
+[data-theme='family'] .table thead th {
+  background: var(--mint);
+  color: var(--primary);
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  border-bottom: 0;
+}
+[data-theme='family'] .table thead th:first-child {
+  border-top-left-radius: var(--radius-lg);
+}
+[data-theme='family'] .table thead th:last-child {
+  border-top-right-radius: var(--radius-lg);
+}
+[data-theme='family'] .table tbody tr:nth-child(even) {
+  background: var(--surface);
+}
+[data-theme='family'] .table tbody tr:last-child td,
+[data-theme='family'] .table tbody tr:last-child th {
+  border-bottom: 0;
+}
+[data-theme='family'] .table tbody th[scope='row'] {
+  font-weight: 800;
+}
+[data-theme='family'] .table__caption {
+  padding: var(--space-3) var(--space-4) var(--space-2);
+  color: var(--text);
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: var(--step-0);
+}
+
+/* ---------- 11. Odznaky: žlutý štítek s tmavým textem; tónované varianty ---------- */
+[data-theme='family'] .badge {
+  padding: 3px var(--space-3);
+  background: var(--yellow);
+  color: var(--text);
+  font-weight: 800;
+  letter-spacing: 0.01em;
+}
+[data-theme='family'] .badge--success {
+  background: var(--tint-success);
+  color: var(--success);
+}
+[data-theme='family'] .badge--warning {
+  background: var(--tint-warning);
+  color: var(--warning);
+}
+[data-theme='family'] .badge--danger {
+  background: var(--tint-danger);
+  color: var(--danger);
+}
+[data-theme='family'] .badge--info {
+  background: var(--tint-info);
+  color: var(--info);
+}
+
+/* ---------- 12. Upozornění: měkké tónované bubliny s barevnou tečkou ---------- */
+[data-theme='family'] .notice {
+  position: relative;
+  padding: var(--space-4) var(--space-5) var(--space-4) var(--space-9);
+  border: 0;
+  border-radius: var(--radius-lg);
+  font-weight: 500;
+}
+[data-theme='family'] .notice::before {
+  content: '';
+  position: absolute;
+  left: var(--space-5);
+  top: calc(var(--space-4) + 0.45em);
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: var(--_c);
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--_c) 18%, transparent);
+}
+[data-theme='family'] .notice__title {
+  font-weight: 800;
+}
+
+/* ---------- 13. Cenovka ---------- */
+[data-theme='family'] .price__amount {
+  font-size: var(--step-3);
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  color: var(--primary);
+}
+[data-theme='family'] .price__prefix,
+[data-theme='family'] .price__unit {
+  font-weight: 600;
+}
+[data-theme='family'] .price-box .price__amount {
+  font-size: var(--step-4);
+}
+
+/* ---------- 14. Souhrn ---------- */
+[data-theme='family'] .summary {
+  padding: var(--space-2) var(--space-5);
+  background: var(--surface);
+  border-radius: var(--radius-lg);
+}
+[data-theme='family'] .summary__row {
+  padding: var(--space-3) 0;
+  border-bottom: 1px dashed var(--border);
+}
+[data-theme='family'] .summary__row dt {
+  font-weight: 600;
+}
+[data-theme='family'] .summary__row dd {
+  font-weight: 700;
+}
+[data-theme='family'] .summary__row--total {
+  border-top: 2px solid var(--primary);
+  border-bottom: 0;
+  margin-top: var(--space-1);
+}
+[data-theme='family'] .summary__row--total dt,
+[data-theme='family'] .summary__row--total dd {
+  color: var(--primary);
+  font-weight: 800;
+}
+
+/* ---------- 15. Kalendář ---------- */
+[data-theme='family'] .calendar__month {
+  font-weight: 800;
+}
+[data-theme='family'] .calendar__day {
+  border: 0;
+  border-radius: 12px;
+  background: var(--surface);
+  font-weight: 700;
+  transition: background var(--motion) var(--ease), transform var(--motion) var(--ease-spring);
+}
+[data-theme='family'] .calendar__day:hover:not(:disabled) {
+  background: var(--mint);
+  transform: scale(1.06);
+}
+[data-theme='family'] .calendar__day.is-in-range {
+  background: var(--mint);
+  color: var(--primary);
+}
+[data-theme='family'] .calendar__day.is-start,
+[data-theme='family'] .calendar__day.is-end {
+  background: var(--primary);
+  color: var(--on-primary);
+}
+[data-theme='family'] .calendar__day:disabled {
+  background: transparent;
+  color: #a3aebc;
+}
+[data-theme='family'] .calendar__weekdays li {
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  font-size: 0.75rem;
+}
+
+/* ---------- 16. Záložky: segmentovaný pill přepínač ---------- */
+[data-theme='family'] .tabs {
+  border-bottom: 0;
+  padding: var(--space-1);
+  background: var(--surface);
+  border-radius: var(--btn-radius);
+  width: fit-content;
+  max-width: 100%;
+}
+[data-theme='family'] .tabs__list {
+  gap: var(--space-1);
+}
+[data-theme='family'] .tabs__tab {
+  min-height: 44px;
+  padding: 0 var(--space-5);
+  border-bottom: 0;
+  margin-bottom: 0;
+  border-radius: var(--btn-radius);
+  font-weight: 700;
+  color: var(--text-muted);
+  transition: background var(--motion) var(--ease), color var(--motion) var(--ease), box-shadow var(--motion) var(--ease);
+}
+[data-theme='family'] .tabs__tab:hover {
+  color: var(--primary);
+}
+[data-theme='family'] .tabs__tab.is-active {
+  background: var(--bg);
+  color: var(--primary);
+  box-shadow: var(--shadow-1);
+}
+[data-theme='family'] .tabs__count {
+  background: var(--mint);
+  color: var(--primary);
+  font-weight: 800;
+}
+[data-theme='family'] .tabs__tab.is-active .tabs__count {
+  background: var(--primary);
+  color: var(--on-primary);
+}
+
+/* ---------- 17. Timeline (admin) ---------- */
+[data-theme='family'] .timeline {
+  border: 0;
+  box-shadow: 0 0 0 1px var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--bg);
+}
+[data-theme='family'] .timeline__head {
+  background: var(--mint);
+  color: var(--primary);
+  font-weight: 800;
+}
+[data-theme='family'] .timeline__day,
+[data-theme='family'] .timeline__label {
+  border-right-color: rgba(30, 42, 58, 0.06);
+}
+[data-theme='family'] .timeline__row {
+  border-bottom-color: var(--surface);
+}
+[data-theme='family'] .timeline__bar {
+  border-radius: var(--btn-radius);
+  font-weight: 700;
+  min-height: 30px;
+  margin: 0 3px;
+}
+[data-theme='family'] .timeline__bar.status-awaiting_fee {
+  background: var(--yellow);
+  color: var(--text);
+}
+[data-theme='family'] .timeline__bar.status-checked_out {
+  background: var(--info);
+}
+[data-theme='family'] .timeline__bar.status-cancelled_by_customer,
+[data-theme='family'] .timeline__bar.status-cancelled_by_operator,
+[data-theme='family'] .timeline__bar.status-expired,
+[data-theme='family'] .timeline__bar.status-no_show {
+  background: #c9d2dd;
+  color: var(--text);
+}
+
+/* ---------- 18. Kontaktní karta ---------- */
+[data-theme='family'] .contact-card__title {
+  font-size: var(--step-1);
+}
+[data-theme='family'] .contact-card__subtitle {
+  display: inline-block;
+  padding: 2px var(--space-3);
+  border-radius: var(--btn-radius);
+  background: var(--mint);
+  color: var(--primary);
+  font-size: var(--step--1);
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+[data-theme='family'] .contact-card__hours div {
+  grid-template-columns: 6rem 1fr;
+}
+[data-theme='family'] .contact-card__hours dt {
+  font-weight: 700;
+}
+[data-theme='family'] .contact-card__map a {
+  font-weight: 700;
+}
+
+/* ---------- 19. Patička: mintová s vlnkou nahoře ---------- */
+[data-theme='family'] .site-footer {
+  position: relative;
+  margin-top: calc(var(--section-gap) + 48px);
+  background: var(--mint);
+  border-top: 0;
+  color: var(--text);
+}
+[data-theme='family'] .site-footer::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: -47px;
+  height: 48px;
+  background: url('/img/demo/family/ilu-vlnka.svg') center / 100% 100% no-repeat;
+  pointer-events: none;
+}
+[data-theme='family'] .site-footer__grid {
+  padding-block: var(--space-9) var(--space-8);
+  gap: var(--space-8);
+}
+[data-theme='family'] .site-footer .site-logo {
+  color: var(--primary);
+  padding: 0;
+}
+[data-theme='family'] .site-footer .site-logo__text {
+  display: none;
+}
+[data-theme='family'] .site-footer__about-text {
+  color: var(--text);
+  font-weight: 500;
+  margin-top: var(--space-4);
+}
+[data-theme='family'] .site-footer__title {
+  font-size: var(--step-1);
+}
+[data-theme='family'] .site-footer__links a {
+  color: var(--text);
+  font-weight: 700;
+  text-decoration-color: transparent;
+  min-height: 40px;
+}
+[data-theme='family'] .site-footer__links a:hover {
+  color: var(--primary);
+  text-decoration-color: currentColor;
+}
+[data-theme='family'] .site-footer a {
+  color: var(--primary);
+}
+[data-theme='family'] .site-footer .contact-card__subtitle {
+  background: var(--bg);
+}
+[data-theme='family'] .site-footer__bottom {
+  border-top: 1px solid rgba(15, 118, 110, 0.18);
+  color: var(--text-muted);
+  padding-block: var(--space-5);
+}
+[data-theme='family'] .site-footer__bottom a {
+  color: var(--text-muted);
+}
+[data-theme='family'] .site-footer__demo {
+  margin-top: var(--space-1);
+  padding: 2px var(--space-3);
+  border-radius: var(--btn-radius);
+  background: var(--yellow);
+  color: var(--text);
+  font-weight: 700;
+}
+
+/* ---------- 20. Přepínač designů (demo) ---------- */
+[data-theme='family'] .design-switch {
+  padding: var(--space-2) var(--space-2) var(--space-2) var(--space-4);
+  border: 0;
+  box-shadow: var(--shadow-3), 0 0 0 1px var(--border);
+  gap: var(--space-3);
+}
+[data-theme='family'] .design-switch__label {
+  font-weight: 800;
+  color: var(--text);
+}
+[data-theme='family'] .design-switch__link {
+  font-weight: 700;
+  min-height: 40px;
+  transition: background var(--motion) var(--ease), color var(--motion) var(--ease);
+}
+[data-theme='family'] .design-switch__link:hover {
+  background: var(--surface);
+  color: var(--primary);
+}
+[data-theme='family'] .design-switch__link.is-active {
+  background: var(--primary);
+  color: var(--on-primary);
+}
+[data-theme='family'] .design-switch__more {
+  font-weight: 700;
+}
+
+/* ---------- 21. Galerie /design a feature boxy (jen tokeny; oblé plochy) ---------- */
+[data-theme='family'] .gallery__block {
+  border-top: 1px dashed var(--border);
+  padding-block: var(--space-8);
+}
+[data-theme='family'] .gallery__title {
+  font-size: var(--step-2);
+}
+[data-theme='family'] .filters,
+[data-theme='family'] .price-box,
+[data-theme='family'] .term-form,
+[data-theme='family'] .rule-card,
+[data-theme='family'] .info-card,
+[data-theme='family'] .bike-pick,
+[data-theme='family'] .accessories,
+[data-theme='family'] .pay-method,
+[data-theme='family'] .bank-box,
+[data-theme='family'] .map-panel,
+[data-theme='family'] .contact-form,
+[data-theme='family'] .legal-toc,
+[data-theme='family'] .legal-contact {
+  border: 0;
+  box-shadow: var(--shadow-1);
+  border-radius: var(--card-radius);
+}
+[data-theme='family'] .consents {
+  border-color: var(--mint);
+  background: var(--mint-soft);
+  border-radius: var(--card-radius);
+}
+[data-theme='family'] .term-line,
+[data-theme='family'] .pick-summary {
+  border-radius: var(--radius-lg);
+  font-weight: 600;
+}
+[data-theme='family'] .sizes__item {
+  border: 0;
+  background: var(--surface);
+  padding: var(--space-2) var(--space-4);
+  font-weight: 700;
+}
+[data-theme='family'] .gallery__main,
+[data-theme='family'] .gallery--empty .card__placeholder {
+  border-radius: var(--card-radius);
+}
+[data-theme='family'] .gallery__thumb {
+  border-radius: 12px;
+}
+[data-theme='family'] .legal h2 {
+  border-top: 0;
+  padding-top: 0;
+}
+[data-theme='family'] .legal blockquote {
+  border-left-color: var(--mint);
+  border-radius: 0 var(--radius-lg) var(--radius-lg) 0;
+}
+[data-theme='family'] .legal-demo {
+  border-radius: var(--radius-lg);
+  border-style: dashed;
+}
+[data-theme='family'] .pay-method--demo {
+  box-shadow: 0 0 0 2px var(--yellow);
+}
+[data-theme='family'] .manage__block--cancel {
+  border: 0;
+  box-shadow: 0 0 0 2px var(--tint-danger);
+  border-radius: var(--card-radius);
+}
+[data-theme='family'] .breadcrumbs {
+  font-weight: 600;
+}
+[data-theme='family'] .breadcrumbs a {
+  color: var(--text-muted);
+}
+
+/* ---------- 22. Pohyb: spring jen u transformací; reduced-motion řeší base.css ---------- */
+@media (prefers-reduced-motion: reduce) {
+  [data-theme='family'] .hero__body,
+  [data-theme='family'] .hero__media {
+    animation: none;
+  }
+  [data-theme='family'] .card:hover,
+  [data-theme='family'] .btn:hover,
+  [data-theme='family'] .steps__item:hover,
+  [data-theme='family'] .steps__item:hover .steps__num,
+  [data-theme='family'] .usp:hover .usp__icon,
+  [data-theme='family'] .calendar__day:hover:not(:disabled),
+  [data-theme='family'] .card:hover .card__media img {
+    transform: none;
+  }
+}

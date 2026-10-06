@@ -1,8 +1,16 @@
 /* =====================================================================================================
-   Téma SPORT – PLACEHOLDER kostry. // doplní agent tématu (tema-sport)
-   Zatím jen semantické barvy a fonty palety ze SPEC kap. 7 / rešerše 05 B4, aby prošel tools/check-contrast.js.
-   Pravidla: přepisovat jen proměnné a layoutové varianty ([data-theme="sport"] …), nikdy HTML.
+   Téma SPORT / Performance – tmavý, kontrastní, dynamický (SPEC kap. 7, PLAN kap. 10; inspirace Bike Time,
+   Star Bicycle, Rapha). Paleta: pozadí #0E0F12, plocha #1A1D23, text #F2F4F7, tlumený #8B93A1, primární limetka
+   #C9FF3D s černým textem, CTA červená #D92D20 (bílá na ní) / #FF4D3D jako text na tmavém. Fonty: Barlow Condensed
+   (verzálky, těsný prostrk, velké číslovky cen), Space Grotesk (tělo, tabulky). Layout: data-hero=video-or-duotone
+   (fotografie s limetkovým duotone přes mix-blend-mode, diagonální řez clip-path, běžící pruh kategorií),
+   data-nav=bar (plný tmavý pruh, na mobilu sticky rezervační lišta dole), data-cards=overlay (text přes fotku).
+   Poloměry 0–2 px, přechody 150 ms, hover posun 4 px, prefers-reduced-motion vypíná ticker i posuny.
+   Pravidla: přepisuje JEN proměnné a layoutové varianty přes [data-theme="sport"] …; HTML se nemění.
+   Fotky: public/img/demo/sport/ (CC BY, viz ATTRIBUTION.md), hero jen přes --hero-image.
    ===================================================================================================== */
+
+/* ---------- 1. Tokeny ---------- */
 [data-theme='sport'] {
   color-scheme: dark;
   --bg: #0e0f12;
@@ -10,29 +18,1393 @@
   --surface: #1a1d23;
   --surface-2: #262a33;
   --text: #f2f4f7;
-  --text-muted: #a3abb8;
+  --text-muted: #8b93a1;
   --border: #2f343f;
   --primary: #c9ff3d;
   --on-primary: #0e0f12;
-  --primary-hover: #b4ea2a;
+  --primary-hover: #dcff7a;
   --accent: #d92d20;
   --on-accent: #ffffff;
+  --accent-hover: #b8261b;
+  --accent-text: #ff4d3d;
   --success: #6fdc8c;
   --warning: #ffc940;
   --danger: #ff4d3d;
   --info: #7cc4ff;
   --focus: #c9ff3d;
   --link: #c9ff3d;
-  --font-display: 'Barlow Condensed', 'Arial Narrow', Impact, sans-serif;
+  --font-display: 'Barlow Condensed', 'Arial Narrow', 'Roboto Condensed', Impact, sans-serif;
   --font-body: 'Space Grotesk', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
-  --hero-overlay: linear-gradient(180deg, rgba(14, 15, 18, 0.35), rgba(14, 15, 18, 0.85));
-  --shadow-1: 0 1px 2px rgba(0, 0, 0, 0.5);
-  --shadow-2: 0 4px 12px rgba(0, 0, 0, 0.6);
-  --shadow-3: 0 12px 32px rgba(0, 0, 0, 0.7);
+  --hero-image: url('/img/demo/sport/hero.jpg');
+  --hero-overlay: linear-gradient(90deg, rgba(14, 15, 18, 0.9) 0%, rgba(14, 15, 18, 0.62) 42%, rgba(14, 15, 18, 0.18) 100%), linear-gradient(0deg, rgba(14, 15, 18, 0.92) 0%, rgba(14, 15, 18, 0.1) 55%);
+  --section-gap: clamp(var(--space-9), 7vw, var(--space-12));
   --card-radius: 2px;
-  --btn-radius: 2px;
-  --input-radius: 2px;
+  --btn-radius: 0;
+  --input-radius: 0;
+  --shadow-1: 0 1px 2px rgba(0, 0, 0, 0.5);
+  --shadow-2: 0 8px 20px rgba(0, 0, 0, 0.55);
+  --shadow-3: 0 16px 40px rgba(0, 0, 0, 0.7);
+  --ease: cubic-bezier(0.2, 0.8, 0.2, 1);
+  --motion: 150ms;
+  --header-height: 68px;
+  --bar-height: 60px;
+  --ticker-height: 48px;
+  --cut: clamp(18px, 3.5vw, 56px);
+  --tint-primary: rgba(201, 255, 61, 0.12);
+  --tint-success: rgba(111, 220, 140, 0.14);
+  --tint-warning: rgba(255, 201, 64, 0.14);
+  --tint-danger: rgba(255, 77, 61, 0.14);
+  --tint-info: rgba(124, 196, 255, 0.14);
+  --stripes: repeating-linear-gradient(135deg, transparent 0 18px, rgba(255, 255, 255, 0.022) 18px 19px);
 }
 
-/* // doplní agent tématu: duotone hero (mix-blend-mode), diagonální řezy, ticker, sticky rezervační lišta,
-   verzálky v nadpisech, velké číslovky cen, karty overlay. */
+/* ---------- 2. Základ: typografie, odkazy, focus ---------- */
+[data-theme='sport'] body {
+  line-height: 1.55;
+  background-color: var(--bg);
+  font-weight: 400;
+}
+
+[data-theme='sport'] h1,
+[data-theme='sport'] h2,
+[data-theme='sport'] h3,
+[data-theme='sport'] h4 {
+  font-family: var(--font-display);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: -0.01em;
+  line-height: 1;
+}
+[data-theme='sport'] h1 {
+  font-weight: 800;
+  letter-spacing: -0.015em;
+}
+[data-theme='sport'] h3 {
+  font-size: var(--step-2);
+}
+[data-theme='sport'] h4 {
+  font-size: var(--step-1);
+}
+
+[data-theme='sport'] a {
+  text-decoration-color: color-mix(in srgb, var(--link) 50%, transparent);
+  text-underline-offset: 0.2em;
+  transition: color var(--motion) var(--ease), text-decoration-color var(--motion) var(--ease);
+}
+[data-theme='sport'] a:hover {
+  text-decoration-color: var(--link);
+}
+[data-theme='sport'] ::selection {
+  background: var(--primary);
+  color: var(--on-primary);
+}
+[data-theme='sport'] :focus-visible {
+  outline: 3px solid var(--focus);
+  outline-offset: 2px;
+  border-radius: 0;
+}
+[data-theme='sport'] code {
+  background: var(--surface-2);
+  border-radius: 0;
+}
+
+/* ---------- 3. Hlavička: plný tmavý pruh, limetková horní linka, kondenzovaná navigace ---------- */
+[data-theme='sport'] .site-header {
+  position: sticky;
+  top: 0;
+  z-index: 30;
+  background: var(--bg);
+  border-top: 3px solid var(--primary);
+  border-bottom: 1px solid var(--border);
+}
+[data-theme='sport'] .site-header__inner {
+  min-height: var(--header-height);
+}
+[data-theme='sport'] .site-logo {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: var(--step-2);
+  text-transform: uppercase;
+  letter-spacing: 0.01em;
+  color: var(--text);
+}
+[data-theme='sport'] .site-logo__img {
+  height: 36px;
+  filter: invert(1) brightness(1.15);
+}
+[data-theme='sport'] .site-nav {
+  gap: var(--space-4);
+}
+[data-theme='sport'] .site-nav__list {
+  gap: 0;
+}
+[data-theme='sport'] .site-nav__link {
+  min-height: calc(var(--header-height) - 3px);
+  padding: 0 var(--space-3);
+  font-family: var(--font-display);
+  font-size: 1.2rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text);
+  border-radius: 0;
+  border-bottom: 3px solid transparent;
+  transition: color var(--motion) var(--ease), border-color var(--motion) var(--ease);
+}
+[data-theme='sport'] .site-nav__link:hover {
+  color: var(--primary);
+}
+[data-theme='sport'] .site-nav__link.is-active {
+  color: var(--primary);
+  border-bottom-color: var(--primary);
+}
+[data-theme='sport'] .site-nav__cta {
+  --_bg: var(--accent);
+  --_fg: var(--on-accent);
+  border-color: var(--accent);
+  margin-left: var(--space-2);
+}
+[data-theme='sport'] .nav-toggle__label {
+  border: 1px solid var(--border);
+  border-radius: 0;
+  color: var(--text);
+}
+[data-theme='sport'] .nav-toggle:checked + .nav-toggle__label {
+  background: var(--primary);
+  border-color: var(--primary);
+  color: var(--on-primary);
+}
+[data-theme='sport'] .nav-toggle__bar,
+[data-theme='sport'] .nav-toggle__bar::before,
+[data-theme='sport'] .nav-toggle__bar::after {
+  background: currentColor;
+}
+
+/* Mobil: navigace = sticky rezervační lišta dole (CTA stále viditelné), seznam odkazů se vysune nad ni */
+@media (max-width: 859px) {
+  [data-theme='sport'] body {
+    padding-bottom: var(--bar-height);
+  }
+  [data-theme='sport'] .site-nav {
+    display: flex;
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 40;
+    flex-direction: column;
+    gap: 0;
+    padding: 0;
+    background: var(--bg-elevated);
+    border-top: 1px solid var(--border);
+    box-shadow: 0 -12px 32px rgba(0, 0, 0, 0.6);
+  }
+  [data-theme='sport'] .site-nav__list {
+    display: none;
+    flex-direction: column;
+    gap: 0;
+    max-height: calc(100vh - var(--header-height) - var(--bar-height) - var(--space-6));
+    overflow: auto;
+    padding: var(--space-2) var(--space-4);
+    border-bottom: 1px solid var(--border);
+  }
+  [data-theme='sport'] .nav-toggle:checked ~ .site-nav .site-nav__list {
+    display: flex;
+  }
+  [data-theme='sport'] .site-nav__item + .site-nav__item {
+    border-top: 1px solid var(--border);
+  }
+  [data-theme='sport'] .site-nav__link {
+    min-height: 52px;
+    padding: 0 var(--space-2);
+    font-size: 1.35rem;
+    border-bottom: 0;
+    border-left: 3px solid transparent;
+  }
+  [data-theme='sport'] .site-nav__link.is-active {
+    border-left-color: var(--primary);
+    padding-left: var(--space-3);
+  }
+  [data-theme='sport'] .site-nav__cta {
+    margin: 0;
+    min-height: var(--bar-height);
+    border: 0;
+    font-size: 1.4rem;
+    letter-spacing: 0.1em;
+  }
+  [data-theme='sport'] .design-switch {
+    bottom: calc(var(--bar-height) + var(--space-3));
+  }
+}
+
+/* ---------- 4. Hero: duotone fotografie, diagonální řez, běžící pruh kategorií ---------- */
+[data-theme='sport'] .hero {
+  min-height: min(86svh, 820px);
+  padding-bottom: var(--ticker-height);
+  color: var(--text);
+  background: var(--bg);
+  overflow: hidden;
+  align-items: end;
+}
+[data-theme='sport'] .hero__media {
+  bottom: var(--ticker-height);
+  height: auto;
+  overflow: hidden;
+  isolation: isolate;
+  background: var(--hero-image) center 45% / cover no-repeat #15171c;
+  clip-path: polygon(0 0, 100% 0, 100% calc(100% - var(--cut)), 0 100%);
+}
+[data-theme='sport'] .hero__media img {
+  object-position: center 45%;
+  filter: grayscale(1) contrast(1.18) brightness(0.95);
+}
+[data-theme='sport'] .hero__placeholder {
+  background: transparent;
+}
+/* duotone: limetka přes černobílou fotku (multiply) + tmavý přechod pro čitelnost textu */
+[data-theme='sport'] .hero__media::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  background: linear-gradient(120deg, #c9ff3d 0%, #9fd42e 60%, #d9ff7a 100%);
+  mix-blend-mode: multiply;
+  pointer-events: none;
+}
+[data-theme='sport'] .hero__media::after {
+  z-index: 2;
+  background: var(--hero-overlay);
+}
+[data-theme='sport'] .hero__body {
+  padding-block: var(--space-10) calc(var(--cut) + var(--space-8));
+  animation: sport-rise 420ms var(--ease) both;
+}
+[data-theme='sport'] .hero__eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-3);
+  font-family: var(--font-display);
+  font-size: var(--step-1);
+  font-weight: 600;
+  letter-spacing: 0.16em;
+  color: var(--primary);
+  opacity: 1;
+  margin-bottom: var(--space-4);
+}
+[data-theme='sport'] .hero__eyebrow::before {
+  content: '';
+  width: 36px;
+  height: 3px;
+  background: var(--primary);
+}
+[data-theme='sport'] .hero__title {
+  font-size: clamp(3rem, 1.6rem + 6.4vw, 7rem);
+  line-height: 0.92;
+  max-width: 13ch;
+  margin-bottom: var(--space-5);
+  text-shadow: 0 2px 24px rgba(0, 0, 0, 0.35);
+}
+[data-theme='sport'] .hero__text {
+  font-size: var(--step-1);
+  line-height: 1.5;
+  max-width: 46ch;
+  color: rgba(242, 244, 247, 0.9);
+}
+[data-theme='sport'] .hero__accent {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-3);
+  margin-bottom: var(--space-6);
+  font-family: var(--font-display);
+  font-size: var(--step-1);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  color: var(--primary);
+  opacity: 1;
+}
+[data-theme='sport'] .hero__accent::before {
+  content: '';
+  width: 10px;
+  height: 10px;
+  background: var(--accent);
+  transform: rotate(45deg);
+}
+[data-theme='sport'] .hero .btn--ghost {
+  --_fg: #f2f4f7;
+  color: #f2f4f7;
+  border-color: rgba(242, 244, 247, 0.6);
+}
+[data-theme='sport'] .hero .btn--ghost:hover {
+  --_fg: var(--primary);
+  color: var(--primary);
+  border-color: var(--primary);
+  background: rgba(14, 15, 18, 0.35);
+}
+
+/* Běžící pruh: limetkový pás se seznamem kategorií (text jen v CSS, skrytý před čtečkami) */
+[data-theme='sport'] .hero::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: var(--ticker-height);
+  background: var(--primary);
+  z-index: 2;
+}
+[data-theme='sport'] .hero::after {
+  content: 'Horská kola \00a0\2022\00a0 Treková kola \00a0\2022\00a0 Elektrokola \00a0\2022\00a0 Gravel \00a0\2022\00a0 Dětská kola \00a0\2022\00a0 Městská kola \00a0\2022\00a0 Horská kola \00a0\2022\00a0 Treková kola \00a0\2022\00a0 Elektrokola \00a0\2022\00a0 Gravel \00a0\2022\00a0 Dětská kola \00a0\2022\00a0 Městská kola \00a0\2022\00a0 Horská kola \00a0\2022\00a0 Treková kola \00a0\2022\00a0 Elektrokola \00a0\2022\00a0 Gravel \00a0\2022\00a0 Dětská kola \00a0\2022\00a0 Městská kola \00a0\2022\00a0 Horská kola \00a0\2022\00a0 Treková kola \00a0\2022\00a0 Elektrokola \00a0\2022\00a0 Gravel \00a0\2022\00a0 Dětská kola \00a0\2022\00a0 Městská kola \00a0\2022\00a0 ' / '';
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  z-index: 3;
+  height: var(--ticker-height);
+  line-height: var(--ticker-height);
+  padding-left: var(--space-4);
+  white-space: nowrap;
+  font-family: var(--font-display);
+  font-size: 1.45rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  word-spacing: 0.3em;
+  color: var(--on-primary);
+  animation: sport-ticker 36s linear infinite;
+  will-change: transform;
+  pointer-events: none;
+}
+@keyframes sport-ticker {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(-25%);
+  }
+}
+@keyframes sport-rise {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* ---------- 5. Sekce: verzálkové nadpisy s limetkovou linkou, diagonální pásy ---------- */
+[data-theme='sport'] .section__eyebrow {
+  font-family: var(--font-display);
+  font-size: var(--step-0);
+  font-weight: 600;
+  letter-spacing: 0.16em;
+  color: var(--primary);
+  margin-bottom: var(--space-2);
+}
+[data-theme='sport'] .section__title {
+  font-size: clamp(2rem, 1.4rem + 2.6vw, 3.4rem);
+}
+[data-theme='sport'] .section__title::before {
+  content: '';
+  display: block;
+  width: 56px;
+  height: 4px;
+  margin-bottom: var(--space-3);
+  background: var(--primary);
+}
+[data-theme='sport'] .section--page-head .section__title {
+  font-size: clamp(2.6rem, 1.6rem + 4vw, 5rem);
+}
+[data-theme='sport'] .section__lead {
+  font-size: var(--step-1);
+  line-height: 1.5;
+  max-width: 60ch;
+}
+[data-theme='sport'] .section--page-head {
+  border-bottom: 1px solid var(--border);
+  background: var(--stripes) var(--bg-elevated);
+  margin-bottom: var(--section-gap);
+}
+[data-theme='sport'] .section--page-head + .section {
+  padding-top: 0;
+}
+
+/* Plocha s nabídkou kol: diagonálně seříznutý pás s jemnými pruhy */
+[data-theme='sport'] .section--bikes {
+  position: relative;
+  padding-block: calc(var(--section-gap) + var(--cut)) calc(var(--section-gap) + var(--cut));
+  background: var(--stripes) var(--surface);
+  clip-path: polygon(0 var(--cut), 100% 0, 100% calc(100% - var(--cut)), 0 100%);
+}
+[data-theme='sport'] .section--filters + .section--bikes {
+  padding-top: var(--space-6);
+  clip-path: none;
+  background: transparent;
+  padding-bottom: 0;
+}
+[data-theme='sport'] .section--bikes + .section {
+  padding-top: var(--section-gap);
+}
+
+/* „Kam vyrazit“: plný fotografický pás v duotone (background-blend-mode), karty zůstávají tmavé */
+[data-theme='sport'] .section--explore {
+  position: relative;
+  padding-block: var(--section-gap);
+  background: linear-gradient(90deg, rgba(14, 15, 18, 0.9), rgba(14, 15, 18, 0.72)), linear-gradient(120deg, #c9ff3d, #7fa826), url('/img/demo/sport/krajina.jpg') center / cover no-repeat #15171c;
+  background-blend-mode: normal, multiply, normal;
+}
+[data-theme='sport'] .section--explore + .section {
+  padding-top: var(--section-gap);
+}
+
+/* ---------- 6. Karty: overlay (text přes ztmavenou fotku), ostré rohy, posun 4 px ---------- */
+[data-theme='sport'] .card {
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  box-shadow: none;
+  transition: transform var(--motion) var(--ease), border-color var(--motion) var(--ease), box-shadow var(--motion) var(--ease);
+}
+[data-theme='sport'] .card:hover {
+  transform: translateY(-4px);
+  border-color: var(--primary);
+  box-shadow: var(--shadow-2);
+}
+[data-theme='sport'] .card__media {
+  position: relative;
+  overflow: hidden;
+  background: var(--surface-2);
+}
+[data-theme='sport'] .card__media img {
+  transition: transform 400ms var(--ease), filter var(--motion) var(--ease);
+}
+[data-theme='sport'] .card:hover .card__media img {
+  transform: scale(1.05);
+}
+[data-theme='sport'] .card__title {
+  font-size: var(--step-2);
+  line-height: 1;
+}
+[data-theme='sport'] .card__title a:hover {
+  color: var(--primary);
+  text-decoration: none;
+}
+[data-theme='sport'] .card__meta,
+[data-theme='sport'] .card__attribution,
+[data-theme='sport'] .card__links {
+  color: var(--text-muted);
+}
+[data-theme='sport'] .card__body .btn {
+  margin-top: var(--space-3);
+}
+
+/* Karta kola = overlay: fotka přes celou kartu, text ve spodním přechodu, štítek nahoře */
+[data-theme='sport'][data-cards='overlay'] .card--bike {
+  position: relative;
+  min-height: 460px;
+  justify-content: flex-end;
+  background: var(--surface);
+  color: var(--text);
+}
+@media (max-width: 639px) {
+  [data-theme='sport'][data-cards='overlay'] .card--bike {
+    min-height: 400px;
+  }
+}
+[data-theme='sport'][data-cards='overlay'] .card--bike .card__media {
+  position: absolute;
+  inset: 0;
+  aspect-ratio: auto;
+  background: var(--surface-2);
+}
+[data-theme='sport'][data-cards='overlay'] .card--bike .card__media img {
+  filter: contrast(1.08) saturate(0.85);
+}
+[data-theme='sport'][data-cards='overlay'] .card--bike .card__media::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(180deg, rgba(14, 15, 18, 0.15) 0%, rgba(14, 15, 18, 0.05) 35%, rgba(14, 15, 18, 0.82) 62%, rgba(14, 15, 18, 0.97) 100%);
+}
+[data-theme='sport'][data-cards='overlay'] .card--bike .card__body {
+  position: relative;
+  z-index: 1;
+  flex: 0 0 auto;
+  padding: var(--space-6) var(--space-5) var(--space-5);
+  gap: var(--space-2);
+}
+[data-theme='sport'][data-cards='overlay'] .card--bike .card__body > .badge {
+  position: absolute;
+  top: calc(-1 * (var(--space-6) + 16px));
+  left: var(--space-5);
+}
+[data-theme='sport'][data-cards='overlay'] .card--bike .card__title {
+  font-size: clamp(1.6rem, 1.3rem + 1vw, 2rem);
+  max-width: 14ch;
+}
+[data-theme='sport'][data-cards='overlay'] .card--bike .card__meta {
+  color: rgba(242, 244, 247, 0.72);
+}
+[data-theme='sport'][data-cards='overlay'] .card--bike .price {
+  margin-top: var(--space-1);
+}
+[data-theme='sport'][data-cards='overlay'] .card--bike .card__body .btn {
+  --_fg: var(--text);
+  border-color: rgba(242, 244, 247, 0.55);
+}
+[data-theme='sport'][data-cards='overlay'] .card--bike .card__body .btn:hover {
+  --_bg: var(--primary);
+  --_fg: var(--on-primary);
+  border-color: var(--primary);
+}
+[data-theme='sport'] .card--bike .card__placeholder {
+  color: #f2f4f7;
+  background: linear-gradient(180deg, rgba(14, 15, 18, 0.1), rgba(14, 15, 18, 0.4)), url('/img/demo/sport/trail.jpg') center / cover no-repeat;
+  filter: grayscale(0.6);
+}
+[data-theme='sport'] .card--bike .card__placeholder .icon {
+  width: 28%;
+  height: 28%;
+  opacity: 0.9;
+  color: var(--primary);
+  filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.5));
+}
+[data-theme='sport'] .card--bike .card__availability {
+  margin-top: var(--space-1);
+}
+
+/* Teaser karty (mapa, tipy) – duotone fotka v záhlaví */
+[data-theme='sport'] .card--teaser .card__media {
+  aspect-ratio: 16 / 7;
+  color: var(--primary);
+  background: linear-gradient(180deg, rgba(14, 15, 18, 0.2), rgba(14, 15, 18, 0.7)), linear-gradient(120deg, #c9ff3d, #7fa826), url('/img/demo/sport/trail.jpg') center / cover no-repeat;
+  background-blend-mode: normal, multiply, normal;
+}
+[data-theme='sport'] .card--teaser:nth-child(2n) .card__media {
+  background-image: linear-gradient(180deg, rgba(14, 15, 18, 0.2), rgba(14, 15, 18, 0.7)), linear-gradient(120deg, #c9ff3d, #7fa826), url('/img/demo/sport/bikepark.jpg');
+}
+[data-theme='sport'] .card--teaser .card__media .icon {
+  width: 48px;
+  height: 48px;
+  opacity: 1;
+  place-self: end start;
+  margin: 0 0 var(--space-4) var(--space-5);
+  filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.5));
+}
+
+/* Zajímavost, trasa, design */
+[data-theme='sport'] .card--poi .card__media {
+  aspect-ratio: 3 / 2;
+}
+[data-theme='sport'] .card--route {
+  border-left: 4px solid var(--primary);
+}
+[data-theme='sport'] .card--route .card__badges {
+  margin: 0;
+  display: flex;
+  gap: var(--space-2);
+}
+[data-theme='sport'] .card--route[data-network='mtb'] {
+  border-left-color: var(--accent);
+}
+[data-theme='sport'] .card--route[data-network='icn'],
+[data-theme='sport'] .card--route[data-network='ncn'] {
+  border-left-color: var(--info);
+}
+[data-theme='sport'] .card--design.is-active {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 2px var(--primary);
+}
+[data-theme='sport'] .card--design .summary {
+  font-family: var(--font-body);
+}
+
+/* ---------- 7. Tlačítka: verzálky, ostré rohy, červené CTA, limetková sekundární, wipe při hoveru ---------- */
+[data-theme='sport'] .btn {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  font-family: var(--font-display);
+  font-size: 1.2rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  border-width: 2px;
+  transition: background var(--motion) var(--ease), color var(--motion) var(--ease), border-color var(--motion) var(--ease), transform var(--motion) var(--ease);
+}
+[data-theme='sport'] .btn::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background: rgba(255, 255, 255, 0.14);
+  transform: translateX(-101%) skewX(-12deg);
+  transition: transform var(--motion) var(--ease);
+}
+[data-theme='sport'] .btn:hover::before {
+  transform: translateX(0) skewX(-12deg) scaleX(1.3);
+}
+[data-theme='sport'] .btn:hover {
+  transform: translateY(-2px);
+}
+[data-theme='sport'] .btn:active {
+  transform: translateY(1px);
+}
+[data-theme='sport'] .btn--primary {
+  --_bg: var(--accent);
+  --_fg: var(--on-accent);
+  border-color: var(--accent);
+}
+[data-theme='sport'] .btn--primary:hover {
+  --_bg: var(--accent-hover);
+  border-color: var(--accent-hover);
+}
+[data-theme='sport'] .btn--secondary {
+  --_bg: transparent;
+  --_fg: var(--primary);
+  border-color: var(--primary);
+}
+[data-theme='sport'] .btn--secondary:hover {
+  --_bg: var(--primary);
+  --_fg: var(--on-primary);
+  border-color: var(--primary);
+}
+[data-theme='sport'] .btn--secondary::before,
+[data-theme='sport'] .btn--ghost::before {
+  background: rgba(201, 255, 61, 0.12);
+}
+[data-theme='sport'] .btn--ghost {
+  --_bg: transparent;
+  --_fg: var(--text);
+  border-color: var(--border);
+}
+[data-theme='sport'] .btn--ghost:hover {
+  --_bg: transparent;
+  --_fg: var(--primary);
+  border-color: var(--primary);
+}
+[data-theme='sport'] .btn--danger {
+  --_bg: var(--accent);
+  --_fg: #fff;
+  border-color: var(--accent);
+}
+[data-theme='sport'] .btn--danger:hover {
+  --_bg: var(--accent-hover);
+  border-color: var(--accent-hover);
+}
+[data-theme='sport'] .btn--sm {
+  font-size: 1rem;
+  letter-spacing: 0.06em;
+}
+[data-theme='sport'] .btn--lg {
+  font-size: 1.45rem;
+  min-height: 56px;
+  padding-inline: var(--space-8);
+}
+[data-theme='sport'] .btn:disabled,
+[data-theme='sport'] .btn[aria-disabled='true'] {
+  transform: none;
+}
+[data-theme='sport'] .btn:disabled::before,
+[data-theme='sport'] .btn[aria-disabled='true']::before {
+  display: none;
+}
+
+/* ---------- 8. Formuláře: tmavá pole, limetkový focus ---------- */
+[data-theme='sport'] .field__label {
+  font-family: var(--font-display);
+  font-size: 1.05rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+[data-theme='sport'] .field__check .field__label {
+  font-family: var(--font-body);
+  font-size: var(--step-0);
+  font-weight: 400;
+  text-transform: none;
+  letter-spacing: 0;
+}
+[data-theme='sport'] .field__input {
+  background: var(--bg);
+  border: 1px solid #3a404c;
+  color: var(--text);
+  transition: border-color var(--motion) var(--ease), box-shadow var(--motion) var(--ease);
+}
+[data-theme='sport'] .field__input:hover {
+  border-color: #566070;
+}
+[data-theme='sport'] .field__input:focus {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px rgba(201, 255, 61, 0.22);
+}
+[data-theme='sport'] .field__input:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 0;
+}
+[data-theme='sport'] .field__input::placeholder {
+  color: #6b7380;
+}
+[data-theme='sport'] .field.has-error .field__input {
+  border-color: var(--danger);
+  box-shadow: 0 0 0 3px rgba(255, 77, 61, 0.2);
+}
+[data-theme='sport'] .field__error {
+  color: var(--danger);
+}
+[data-theme='sport'] .field__checkbox {
+  accent-color: var(--primary);
+}
+[data-theme='sport'] .form__actions {
+  padding-top: var(--space-3);
+  border-top: 1px solid var(--border);
+}
+
+/* ---------- 9. Kroky: velké číslice, limetková dráha ---------- */
+[data-theme='sport'] .steps {
+  gap: var(--space-3);
+}
+[data-theme='sport'] .steps__item {
+  grid-template-columns: auto 1fr;
+  gap: var(--space-4);
+  padding: var(--space-5) var(--space-4) var(--space-4) 0;
+  background: transparent;
+  border: 0;
+  border-top: 3px solid var(--border);
+  border-radius: 0;
+  transition: border-color var(--motion) var(--ease);
+}
+[data-theme='sport'] .steps__num {
+  width: auto;
+  height: auto;
+  min-width: 2ch;
+  background: transparent;
+  color: var(--text-muted);
+  border-radius: 0;
+  font-size: 3rem;
+  font-weight: 800;
+  line-height: 0.85;
+  letter-spacing: -0.03em;
+  font-variant-numeric: tabular-nums;
+}
+[data-theme='sport'] .steps__label {
+  font-family: var(--font-display);
+  font-size: var(--step-2);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.01em;
+  line-height: 1;
+  padding-top: var(--space-1);
+}
+[data-theme='sport'] .steps__desc {
+  padding-top: var(--space-1);
+}
+[data-theme='sport'] .steps__item.is-done {
+  border-top-color: var(--primary);
+}
+[data-theme='sport'] .steps__item.is-done .steps__num {
+  background: transparent;
+  color: var(--primary);
+}
+[data-theme='sport'] .steps__item.is-active {
+  background: transparent;
+  border-top-color: var(--accent);
+}
+[data-theme='sport'] .steps__item.is-active .steps__num {
+  color: var(--accent-text);
+}
+[data-theme='sport'] .steps__item:not(.is-done):not(.is-active) .steps__num {
+  background: transparent;
+  color: var(--text-muted);
+}
+[data-theme='sport'] .section--how .steps__item {
+  border-top-color: var(--primary);
+}
+[data-theme='sport'] .section--how .steps__num {
+  color: var(--primary);
+}
+
+/* ---------- 10. Tabulky, souhrn, cenovky ---------- */
+[data-theme='sport'] .table {
+  font-size: var(--step-0);
+}
+[data-theme='sport'] .table__caption {
+  font-family: var(--font-display);
+  font-size: var(--step-2);
+  font-weight: 700;
+  text-transform: uppercase;
+  color: var(--text);
+  padding-bottom: var(--space-3);
+}
+[data-theme='sport'] .table thead th {
+  background: transparent;
+  color: var(--text-muted);
+  font-family: var(--font-display);
+  font-size: 1rem;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  border-bottom: 2px solid var(--primary);
+}
+[data-theme='sport'] .table td,
+[data-theme='sport'] .table th {
+  border-bottom-color: var(--border);
+}
+[data-theme='sport'] .table tbody tr {
+  transition: background var(--motion) var(--ease);
+}
+[data-theme='sport'] .table tbody tr:hover {
+  background: var(--surface);
+}
+[data-theme='sport'] .table tbody th[scope='row'] {
+  font-weight: 600;
+}
+[data-theme='sport'] .table .is-right {
+  font-family: var(--font-display);
+  font-size: 1.2rem;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+}
+
+[data-theme='sport'] .summary__row {
+  padding: var(--space-3) 0;
+  border-bottom: 1px solid var(--border);
+}
+[data-theme='sport'] .summary__row dt {
+  font-family: var(--font-display);
+  font-size: 1.05rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+[data-theme='sport'] .summary__row dd {
+  font-weight: 500;
+}
+[data-theme='sport'] .summary__row--total {
+  margin-top: var(--space-2);
+  border-top: 2px solid var(--primary);
+  border-bottom: 0;
+}
+[data-theme='sport'] .summary__row--total dt {
+  color: var(--text);
+}
+[data-theme='sport'] .summary__row--total dd {
+  font-family: var(--font-display);
+  font-size: var(--step-3);
+  font-weight: 800;
+  line-height: 1;
+  color: var(--primary);
+}
+
+[data-theme='sport'] .price {
+  gap: 0.35em;
+  line-height: 1;
+}
+[data-theme='sport'] .price__prefix,
+[data-theme='sport'] .price__unit {
+  font-family: var(--font-display);
+  font-size: 1.05rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-muted);
+}
+[data-theme='sport'] .price__amount {
+  font-size: clamp(2rem, 1.6rem + 1.4vw, 2.7rem);
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  color: var(--primary);
+}
+[data-theme='sport'] .price-box .price__amount {
+  font-size: clamp(2.6rem, 2rem + 2vw, 3.6rem);
+}
+
+/* ---------- 11. Odznaky, upozornění, záložky ---------- */
+[data-theme='sport'] .badge {
+  padding: 3px 9px;
+  border-radius: 0;
+  font-family: var(--font-display);
+  font-size: 0.95rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  line-height: 1.3;
+  background: var(--primary);
+  color: var(--on-primary);
+  border: 1px solid var(--primary);
+}
+[data-theme='sport'] .badge--success {
+  background: var(--tint-success);
+  color: var(--success);
+  border-color: var(--success);
+}
+[data-theme='sport'] .badge--warning {
+  background: var(--tint-warning);
+  color: var(--warning);
+  border-color: var(--warning);
+}
+[data-theme='sport'] .badge--danger {
+  background: var(--tint-danger);
+  color: var(--danger);
+  border-color: var(--danger);
+}
+[data-theme='sport'] .badge--info {
+  background: var(--tint-info);
+  color: var(--info);
+  border-color: var(--info);
+}
+
+[data-theme='sport'] .notice {
+  border: 1px solid var(--border);
+  border-left: 4px solid var(--_c);
+  border-radius: 0;
+  background: var(--surface);
+  color: var(--text);
+}
+[data-theme='sport'] .notice--success {
+  background: linear-gradient(90deg, var(--tint-success), var(--surface) 60%);
+}
+[data-theme='sport'] .notice--warning {
+  background: linear-gradient(90deg, var(--tint-warning), var(--surface) 60%);
+}
+[data-theme='sport'] .notice--danger {
+  background: linear-gradient(90deg, var(--tint-danger), var(--surface) 60%);
+}
+[data-theme='sport'] .notice--info {
+  background: linear-gradient(90deg, var(--tint-info), var(--surface) 60%);
+}
+[data-theme='sport'] .notice__title {
+  font-family: var(--font-display);
+  font-size: 1.15rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+[data-theme='sport'] .tabs {
+  border-bottom-color: var(--border);
+}
+[data-theme='sport'] .tabs__tab {
+  font-family: var(--font-display);
+  font-size: 1.2rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-muted);
+  border-bottom-width: 3px;
+  transition: color var(--motion) var(--ease), border-color var(--motion) var(--ease);
+}
+[data-theme='sport'] .tabs__tab:hover {
+  color: var(--text);
+  border-bottom-color: var(--border);
+}
+[data-theme='sport'] .tabs__tab.is-active {
+  color: var(--primary);
+  border-bottom-color: var(--primary);
+}
+[data-theme='sport'] .tabs__count {
+  border-radius: 0;
+  background: var(--primary);
+  color: var(--on-primary);
+  font-size: 0.95rem;
+  font-weight: 700;
+}
+
+/* ---------- 12. Kalendář, timeline ---------- */
+[data-theme='sport'] .calendar {
+  padding: var(--space-4);
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+}
+[data-theme='sport'] .calendar__month {
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+[data-theme='sport'] .calendar__day {
+  border-radius: 0;
+  background: var(--surface);
+  border-color: var(--border);
+  font-family: var(--font-display);
+  font-size: 1.1rem;
+  transition: border-color var(--motion) var(--ease), background var(--motion) var(--ease);
+}
+[data-theme='sport'] .calendar__day:hover:not(:disabled) {
+  border-color: var(--primary);
+}
+[data-theme='sport'] .calendar__day.is-in-range {
+  background: var(--tint-primary);
+  color: var(--primary);
+}
+[data-theme='sport'] .calendar__day.is-start,
+[data-theme='sport'] .calendar__day.is-end {
+  background: var(--primary);
+  color: var(--on-primary);
+  border-color: var(--primary);
+  font-weight: 700;
+}
+[data-theme='sport'] .calendar__day:disabled {
+  background: var(--bg);
+  color: #5a6170;
+}
+
+[data-theme='sport'] .timeline {
+  background: var(--bg-elevated);
+  border-color: var(--border);
+  border-radius: 0;
+}
+[data-theme='sport'] .timeline__head {
+  background: var(--surface);
+  font-family: var(--font-display);
+  font-size: 1rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+[data-theme='sport'] .timeline__label {
+  font-weight: 500;
+}
+[data-theme='sport'] .timeline__bar {
+  border-radius: 0;
+  font-family: var(--font-display);
+  font-size: 1rem;
+  letter-spacing: 0.04em;
+  color: var(--on-primary);
+  box-shadow: inset 3px 0 0 rgba(0, 0, 0, 0.35);
+}
+[data-theme='sport'] .timeline__bar.status-confirmed {
+  background: var(--primary);
+}
+[data-theme='sport'] .timeline__bar.status-awaiting_fee {
+  background: var(--warning);
+  background-image: repeating-linear-gradient(135deg, rgba(0, 0, 0, 0.16) 0 6px, transparent 6px 12px);
+}
+[data-theme='sport'] .timeline__bar.status-checked_out {
+  background: var(--accent);
+  color: #fff;
+}
+[data-theme='sport'] .timeline__bar.status-returned,
+[data-theme='sport'] .timeline__bar.status-closed {
+  background: var(--success);
+}
+[data-theme='sport'] .timeline__bar.status-cancelled_by_customer,
+[data-theme='sport'] .timeline__bar.status-cancelled_by_operator,
+[data-theme='sport'] .timeline__bar.status-expired,
+[data-theme='sport'] .timeline__bar.status-no_show {
+  background: var(--surface-2);
+  color: var(--text-muted);
+  box-shadow: none;
+}
+
+/* ---------- 13. Kontaktní karta ---------- */
+[data-theme='sport'] .contact-card__title {
+  font-size: var(--step-2);
+}
+[data-theme='sport'] .contact-card__subtitle {
+  font-family: var(--font-display);
+  font-size: 1.15rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--primary);
+  margin: var(--space-4) 0 var(--space-2);
+}
+[data-theme='sport'] .contact-card__hours div {
+  grid-template-columns: 6rem 1fr;
+  padding: 3px 0;
+  border-bottom: 1px solid var(--border);
+}
+[data-theme='sport'] .contact-card__hours div:last-child {
+  border-bottom: 0;
+}
+[data-theme='sport'] .contact-card__hours dt {
+  color: var(--text-muted);
+}
+[data-theme='sport'] .contact-card__hours dd {
+  font-family: var(--font-display);
+  font-size: 1.1rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+}
+[data-theme='sport'] .contact-card__map a {
+  font-family: var(--font-display);
+  font-size: 1.1rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+/* ---------- 14. Patička: nejtmavší plocha s diagonálním horním řezem ---------- */
+[data-theme='sport'] .site-footer {
+  --surface: #0a0b0d;
+  position: relative;
+  margin-top: calc(var(--section-gap) + var(--cut));
+  padding-top: var(--cut);
+  background: #0a0b0d;
+  border-top: 0;
+  clip-path: polygon(0 var(--cut), 100% 0, 100% 100%, 0 100%);
+}
+[data-theme='sport'] .site-footer::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 0;
+  height: calc(var(--cut) + 4px);
+  background: var(--primary);
+  clip-path: polygon(0 var(--cut), 100% 0, 100% 4px, 0 calc(var(--cut) + 4px));
+  pointer-events: none;
+}
+[data-theme='sport'] .site-footer__grid {
+  padding-block: var(--space-9) var(--space-8);
+}
+[data-theme='sport'] .site-footer .site-logo__text {
+  display: inline;
+}
+[data-theme='sport'] .site-footer__about-text {
+  margin-top: var(--space-3);
+}
+[data-theme='sport'] .site-footer__title,
+[data-theme='sport'] .site-footer .contact-card__title {
+  font-size: var(--step-1);
+  letter-spacing: 0.04em;
+}
+[data-theme='sport'] .site-footer__links a {
+  font-family: var(--font-display);
+  font-size: 1.15rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  text-decoration: none;
+  transition: color var(--motion) var(--ease), transform var(--motion) var(--ease);
+}
+[data-theme='sport'] .site-footer__links a:hover {
+  color: var(--primary);
+  transform: translateX(4px);
+}
+[data-theme='sport'] .site-footer__bottom {
+  border-top-color: var(--border);
+  padding-block: var(--space-5);
+}
+[data-theme='sport'] .site-footer__demo {
+  color: var(--warning);
+}
+[data-theme='sport'] .site-footer__version {
+  font-family: var(--font-mono);
+  font-size: 0.8rem;
+}
+
+/* ---------- 15. Přepínač designů (demo) ---------- */
+[data-theme='sport'] .design-switch {
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: 0;
+  box-shadow: var(--shadow-2);
+}
+[data-theme='sport'] .design-switch__label {
+  font-family: var(--font-display);
+  font-size: 1rem;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+}
+[data-theme='sport'] .design-switch__link,
+[data-theme='sport'] .design-switch__more {
+  border-radius: 0;
+  font-family: var(--font-display);
+  font-size: 1.05rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  transition: background var(--motion) var(--ease), color var(--motion) var(--ease);
+}
+[data-theme='sport'] .design-switch__link:hover {
+  background: var(--surface-2);
+}
+[data-theme='sport'] .design-switch__link.is-active {
+  background: var(--primary);
+  color: var(--on-primary);
+}
+
+/* ---------- 16. Chybová stránka (404 / 500): obří titulek přes duotone fotku ---------- */
+[data-theme='sport'] .section--error {
+  position: relative;
+  min-height: 62vh;
+  display: flex;
+  align-items: center;
+  margin-bottom: 0;
+  border-bottom: 0;
+  background: linear-gradient(90deg, rgba(14, 15, 18, 0.95) 0%, rgba(14, 15, 18, 0.8) 50%, rgba(14, 15, 18, 0.45) 100%), linear-gradient(120deg, #c9ff3d, #7fa826), url('/img/demo/sport/akce.jpg') center / cover no-repeat #0e0f12;
+  background-blend-mode: normal, multiply, normal;
+  clip-path: polygon(0 0, 100% 0, 100% calc(100% - var(--cut)), 0 100%);
+  padding-bottom: calc(var(--space-10) + var(--cut));
+}
+[data-theme='sport'] .section--error .section__title {
+  font-size: clamp(3rem, 2rem + 6vw, 7rem);
+  line-height: 0.92;
+}
+[data-theme='sport'] .section--error .section__lead {
+  max-width: 44ch;
+}
+[data-theme='sport'] .error-page__id {
+  font-family: var(--font-mono);
+  font-size: var(--step--1);
+}
+
+/* ---------- 17. Doplňky pro stránky features (jen přes tokeny; HTML se nemění) ---------- */
+[data-theme='sport'] .usp {
+  position: relative;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-top: 3px solid var(--primary);
+  border-radius: 0;
+  padding: var(--space-6);
+  transition: transform var(--motion) var(--ease), border-color var(--motion) var(--ease);
+}
+[data-theme='sport'] .usp:hover {
+  transform: translateY(-4px);
+  border-color: var(--primary);
+}
+[data-theme='sport'] .usp__icon {
+  border-radius: 0;
+  background: var(--primary);
+  color: var(--on-primary);
+}
+[data-theme='sport'] .usp__title {
+  font-size: var(--step-2);
+}
+[data-theme='sport'] .section--contact .contact-card,
+[data-theme='sport'] .contact-form,
+[data-theme='sport'] .filters,
+[data-theme='sport'] .legal-toc,
+[data-theme='sport'] .legal-contact,
+[data-theme='sport'] .summary-card,
+[data-theme='sport'] .price-box,
+[data-theme='sport'] .term-form,
+[data-theme='sport'] .info-card,
+[data-theme='sport'] .rule-card,
+[data-theme='sport'] .bike-pick,
+[data-theme='sport'] .pay-method,
+[data-theme='sport'] .bank-box,
+[data-theme='sport'] .accessories,
+[data-theme='sport'] .map-panel {
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: 0;
+}
+[data-theme='sport'] .section--contact .contact-card {
+  padding: var(--space-6);
+  border-left: 4px solid var(--primary);
+}
+[data-theme='sport'] .price-box,
+[data-theme='sport'] .summary-card {
+  border-top: 3px solid var(--primary);
+}
+[data-theme='sport'] .price-box__label {
+  font-family: var(--font-display);
+  font-size: 1rem;
+  letter-spacing: 0.12em;
+  color: var(--primary);
+}
+[data-theme='sport'] .consents {
+  border: 2px solid var(--primary);
+  border-radius: 0;
+  background: var(--bg-elevated);
+}
+[data-theme='sport'] .pay-method--demo {
+  border-color: var(--warning);
+}
+[data-theme='sport'] .term-line,
+[data-theme='sport'] .pick-summary {
+  border-radius: 0;
+  border-left: 4px solid var(--primary);
+}
+[data-theme='sport'] .sizes__item {
+  border-radius: 0;
+  background: var(--bg-elevated);
+}
+[data-theme='sport'] .sizes__size,
+[data-theme='sport'] .bike-pick__size-label {
+  font-size: 1.2rem;
+  letter-spacing: 0.04em;
+}
+[data-theme='sport'] .bike-pick__media img,
+[data-theme='sport'] .bike-pick__media .card__placeholder,
+[data-theme='sport'] .gallery__main,
+[data-theme='sport'] .gallery__thumb {
+  border-radius: 0;
+}
+[data-theme='sport'] .gallery__thumb.is-active {
+  border-color: var(--primary);
+}
+[data-theme='sport'] .route-list__item {
+  border-radius: 0;
+}
+[data-theme='sport'] .route-list__ref {
+  color: var(--primary);
+}
+[data-theme='sport'] .contact-form__title,
+[data-theme='sport'] .term-form__title,
+[data-theme='sport'] .rule-card__title,
+[data-theme='sport'] .info-card__title,
+[data-theme='sport'] .pay-method__title,
+[data-theme='sport'] .bike-pick__title,
+[data-theme='sport'] .legal-toc__title,
+[data-theme='sport'] .map-filter__legend,
+[data-theme='sport'] .accessories__title,
+[data-theme='sport'] .consents__title {
+  font-family: var(--font-display);
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+  font-weight: 700;
+}
+[data-theme='sport'] .contact-form__title {
+  font-size: var(--step-3);
+}
+[data-theme='sport'] .legal h2 {
+  border-top-color: var(--border);
+}
+[data-theme='sport'] .legal blockquote {
+  border-left-color: var(--primary);
+  border-radius: 0;
+}
+[data-theme='sport'] .legal-demo {
+  background: var(--surface);
+  color: var(--text-muted);
+  border: 1px dashed var(--border);
+  border-radius: 0;
+}
+[data-theme='sport'] .legal-toc__list a:hover {
+  color: var(--primary);
+}
+[data-theme='sport'] .breadcrumbs,
+[data-theme='sport'] .legal-meta {
+  font-family: var(--font-display);
+  font-size: 1rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+[data-theme='sport'] .gallery__block {
+  border-top-color: var(--border);
+}
+[data-theme='sport'] .gallery__title {
+  font-size: var(--step-2);
+  color: var(--primary);
+}
+
+/* ---------- 18. Pohyb: 150 ms; při prefers-reduced-motion žádný ticker, posuny ani zoom ---------- */
+@media (prefers-reduced-motion: reduce) {
+  [data-theme='sport'] .hero::after {
+    animation: none;
+  }
+  [data-theme='sport'] .hero__body {
+    animation: none;
+  }
+  [data-theme='sport'] .card:hover,
+  [data-theme='sport'] .usp:hover,
+  [data-theme='sport'] .btn:hover,
+  [data-theme='sport'] .site-footer__links a:hover {
+    transform: none;
+  }
+  [data-theme='sport'] .card:hover .card__media img {
+    transform: none;
+  }
+  [data-theme='sport'] .btn::before {
+    display: none;
+  }
+}

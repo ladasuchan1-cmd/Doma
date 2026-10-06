@@ -1,0 +1,4 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1440 48" width="1440" height="48" preserveAspectRatio="none" aria-hidden="true">
+  <!-- Vlastní dekorace tématu Family – měkká vlnka pro předěl sekcí (mint #D9F2EC). -->
+  <path d="M0 24C180 0 360 0 540 24s360 24 540 0 240-24 360 0V48H0z" fill="#D9F2EC"/>
+</svg>

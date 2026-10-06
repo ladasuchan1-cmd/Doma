@@ -1,7 +1,7 @@
 # Attribution – fotografie tématu Outdoor (demo)
 
 Fotografie z Wikimedia Commons, pouze licence CC0 / CC BY (ověřeno přes API `imageinfo&iiprop=extmetadata`,
-pole `LicenseShortName`). Staženy jako náhledy Commons a zmenšeny na šířku max. 1600 px (ImageMagick, bez dalších
+pole `LicenseShortName`). Staženy jako náhledy Commons a zmenšeny na šířku max. 1600 px (hero a krajina) resp. 1280 px (podklady karet a patičky) (ImageMagick, bez dalších
 úprav obsahu; overlay a barevné ladění dělá až CSS tématu). Používá je jen `public/themes/outdoor.css`
 (hero přes `--hero-image`, pozadí sekcí, teaser karty, zástupný obrázek karet kol a patička).
 

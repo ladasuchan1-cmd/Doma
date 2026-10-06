@@ -1,0 +1,71 @@
+# Půjčovna kol na samostatném serveru (Hetzner): aplikace + Caddy (HTTPS z Let's Encrypt automaticky, HTTP-01 per host).
+# Použití (ve složce deploy/):  cp .env.example .env  (vyplnit PK_DOMAIN)  →  docker compose up -d --build
+# Běžně to dělá deploy/hetzner.sh (instalace, aktualizace, zpet, zaloha, stav, log). Postup: NASAZENI.md.
+# Kontrola syntaxe bez spuštění:  docker compose -f deploy/docker-compose.yml config
+# Název projektu (a tedy svazků pujcovna-kol_data, …) je pevný – složka deploy/ by jinak kolidovala s Cyklo & Ski mapou.
+name: pujcovna-kol
+
+services:
+  app:
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile
+      args:
+        APP_VERSION: ${APP_VERSION:-compose}
+    image: pujcovna-kol:latest
+    restart: unless-stopped
+    # .env vytváří hetzner.sh instalace (vzor .env.example); bez něj projde aspoň `docker compose config`
+    # a chybějící PK_DOMAIN ohlásí Caddy služba níže.
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      PK_DATA: /data
+      PK_TENANTS: /app/tenants
+      # Za Caddy: IP klienta z X-Forwarded-For, Secure cookies a HSTS podle X-Forwarded-Proto.
+      PK_TRUST_PROXY: "1"
+      PORT: "8092"
+    volumes:
+      - data:/data
+    expose:
+      - "8092"
+    # Souborový systém kontejneru jen ke čtení (PLAN kap. 12); zapisuje se pouze do /data a /tmp.
+    read_only: true
+    tmpfs:
+      - /tmp
+    security_opt:
+      - no-new-privileges:true
+    logging:
+      driver: json-file
+      options:
+        max-size: "20m"
+        max-file: "5"
+
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    environment:
+      # Apex doména dema; Caddyfile z ní odvozuje www., outdoor., sport. a family. subdomény.
+      PK_DOMAIN: ${PK_DOMAIN:?Nastavte PK_DOMAIN=ksprehledy.cz v deploy/.env}
+      # E-mail k účtu Let's Encrypt (upozornění na problémy s obnovou certifikátů).
+      PK_ACME_EMAIL: ${PK_ACME_EMAIL:-info@ksprehledy.cz}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - app
+    logging:
+      driver: json-file
+      options:
+        max-size: "20m"
+        max-file: "5"
+
+volumes:
+  data:
+  caddy_data:
+  caddy_config:

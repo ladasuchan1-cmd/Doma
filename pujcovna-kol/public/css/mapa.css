@@ -1,0 +1,464 @@
+/* Styly feature „mapa“ (/mapa, /okoli) – jen přes tokeny z base.css; barvy sítí tras odpovídají ../cyklo-ski-mapa/app.js
+   (cyklotrasa #d9480f, cyklostezka #c2410c, MTB #7c3aed) a jsou shodné s public/js/mapa.js. */
+
+/* Rozložení: panel + mapa */
+.map-layout {
+  display: grid;
+  gap: var(--space-5);
+  grid-template-columns: minmax(0, 1fr);
+}
+@media (min-width: 960px) {
+  .map-layout {
+    grid-template-columns: minmax(260px, 340px) minmax(0, 1fr);
+    align-items: start;
+  }
+}
+.map-panel {
+  display: grid;
+  gap: var(--space-4);
+  align-content: start;
+  padding: var(--space-4);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--card-radius);
+  max-height: min(78vh, 760px);
+  overflow: auto;
+}
+@media (max-width: 959px) {
+  .map-panel {
+    order: 2;
+    max-height: 420px;
+  }
+}
+
+/* Filtr sítí */
+.map-filter__set {
+  margin: 0;
+  padding: 0;
+  border: 0;
+  display: grid;
+  gap: var(--space-1);
+}
+.map-filter__legend {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: var(--step-0);
+  padding: 0;
+  margin-bottom: var(--space-2);
+}
+.map-filter__option {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: 32px;
+  cursor: pointer;
+}
+.map-filter__option input {
+  width: 20px;
+  height: 20px;
+  margin: 0;
+  accent-color: var(--primary);
+}
+.map-filter__count,
+.map-panel__summary {
+  color: var(--text-muted);
+  font-size: var(--step--1);
+}
+.map-panel__summary {
+  margin: 0;
+}
+
+/* Seznam tras */
+.route-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: var(--space-2);
+}
+.route-list__item {
+  display: grid;
+  gap: var(--space-1);
+  padding: var(--space-3);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--bg-elevated);
+}
+.route-list__item.is-active {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 2px var(--primary);
+}
+.route-list__item[hidden] {
+  display: none;
+}
+.route-list__name {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-weight: 600;
+  color: var(--text);
+  text-decoration: none;
+  min-height: 28px;
+}
+.route-list__name:hover {
+  color: var(--primary);
+  text-decoration: underline;
+}
+.route-list__ref {
+  font-family: var(--font-display);
+  color: var(--primary);
+}
+.route-list__meta {
+  color: var(--text-muted);
+  font-size: var(--step--1);
+}
+.route-list__gpx {
+  font-size: var(--step--1);
+  justify-self: start;
+  min-height: 28px;
+  display: inline-flex;
+  align-items: center;
+}
+
+/* Vzorník sítí (legenda i seznam) */
+.map-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2) var(--space-4);
+  margin: var(--space-3) 0 0;
+  padding: 0;
+  list-style: none;
+  color: var(--text-muted);
+  font-size: var(--step--1);
+}
+.map-legend__item {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+.map-legend__swatch {
+  display: inline-block;
+  width: 18px;
+  height: 4px;
+  border-radius: 2px;
+  background: #d9480f;
+  flex: 0 0 auto;
+}
+.map-legend__swatch--icn {
+  height: 6px;
+}
+.map-legend__swatch--lcn {
+  height: 3px;
+}
+.map-legend__swatch--cyklostezka {
+  background: #c2410c;
+  background-image: repeating-linear-gradient(90deg, #c2410c 0 6px, transparent 6px 9px);
+}
+.map-legend__swatch--mtb {
+  background: #7c3aed;
+}
+.map-legend__swatch--poi {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: #1f5fbf;
+  border: 2px solid #fff;
+  box-shadow: 0 0 0 1px #1f5fbf;
+}
+.map-legend__swatch--rental {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: var(--primary);
+  box-shadow: 0 0 0 3px var(--tint-primary, rgba(0, 0, 0, 0.1));
+}
+
+/* Scéna mapy: náhled + Leaflet */
+.map-stage {
+  display: grid;
+  gap: var(--space-2);
+  min-width: 0;
+}
+.map-preview {
+  position: relative;
+  aspect-ratio: 4 / 3;
+  min-height: 320px;
+  overflow: hidden;
+  border-radius: var(--card-radius);
+  border: 1px solid var(--border);
+  background: var(--surface-2);
+}
+.map-preview[hidden] {
+  display: none;
+}
+.map-preview__svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+.map-preview__bg {
+  fill: var(--surface-2);
+}
+.map-preview__radius {
+  stroke: var(--border);
+  stroke-width: 2;
+}
+.map-preview__route {
+  stroke: #d9480f;
+  stroke-width: 2;
+  opacity: 0.85;
+}
+.map-preview__route--icn {
+  stroke-width: 4;
+}
+.map-preview__route--ncn {
+  stroke-width: 3;
+}
+.map-preview__route--lcn {
+  stroke-width: 1.5;
+  opacity: 0.7;
+}
+.map-preview__route--cyklostezka {
+  stroke: #c2410c;
+  stroke-width: 3;
+  stroke-dasharray: 8 5;
+}
+.map-preview__route--mtb {
+  stroke: #7c3aed;
+  stroke-width: 2.5;
+}
+.map-preview__poi {
+  fill: #1f5fbf;
+  stroke: #fff;
+  stroke-width: 2;
+}
+.map-preview__rental-ring {
+  fill: var(--primary);
+  opacity: 0.35;
+}
+.map-preview__rental-dot {
+  fill: var(--primary);
+  stroke: #fff;
+  stroke-width: 2;
+}
+.map-preview__empty {
+  display: grid;
+  place-items: center;
+  height: 100%;
+  color: var(--text-muted);
+}
+.map-preview__empty .icon {
+  width: 96px;
+  height: 96px;
+  opacity: 0.4;
+}
+.map-preview__overlay {
+  position: absolute;
+  inset: auto 0 0 0;
+  display: grid;
+  gap: var(--space-3);
+  justify-items: center;
+  padding: var(--space-5);
+  background: linear-gradient(to top, var(--bg-elevated) 70%, transparent);
+  text-align: center;
+}
+.map-preview__hint,
+.map-preview__noscript {
+  margin: 0;
+  max-width: 48ch;
+  color: var(--text-muted);
+  font-size: var(--step--1);
+}
+.map-canvas {
+  height: min(72vh, 720px);
+  min-height: 360px;
+  border-radius: var(--card-radius);
+  border: 1px solid var(--border);
+  background: var(--surface-2);
+  z-index: 0;
+}
+.map-canvas[hidden] {
+  display: none;
+}
+.map-canvas:focus-visible {
+  outline: 3px solid var(--focus);
+  outline-offset: 2px;
+}
+.map-attribution {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: var(--step--1);
+}
+.map-notice {
+  margin: 0;
+}
+
+/* Leaflet – přizpůsobení tématu (font, zaoblení); barvy popupu z tokenů */
+.leaflet-container {
+  font-family: var(--font-body);
+  font-size: var(--step--1);
+}
+.leaflet-container a {
+  color: var(--link);
+}
+.leaflet-popup-content-wrapper,
+.leaflet-popup-tip {
+  background: var(--bg-elevated);
+  color: var(--text);
+  box-shadow: var(--shadow-2);
+}
+.leaflet-popup-content-wrapper {
+  border-radius: var(--radius-md);
+}
+.leaflet-popup-content {
+  margin: var(--space-3) var(--space-4);
+  line-height: 1.45;
+}
+.leaflet-control-attribution {
+  background: rgba(255, 255, 255, 0.85);
+  color: #333;
+}
+.leaflet-control-attribution a {
+  color: #0b57d0;
+}
+.leaflet-bar a {
+  color: #222;
+}
+
+/* Vlastní značky (bez obrázků – vendor nemá images/) */
+.poi-marker {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: #1f5fbf;
+  border: 2px solid #fff;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.4);
+  box-sizing: border-box;
+}
+.poi-marker.is-active {
+  background: #d92d20;
+  transform: scale(1.3);
+}
+.rental-marker {
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  background: var(--primary);
+  color: var(--on-primary);
+  border: 3px solid #fff;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.4);
+  display: grid;
+  place-items: center;
+  font-weight: 700;
+  font-family: var(--font-display);
+  box-sizing: border-box;
+}
+.rental-marker .icon {
+  width: 18px;
+  height: 18px;
+}
+.mapy-logo {
+  display: block;
+  margin: 0 0 var(--space-2) var(--space-2);
+}
+.mapy-logo img {
+  display: block;
+  height: 28px;
+}
+
+/* Popup zajímavosti */
+.poi-popup {
+  display: grid;
+  gap: var(--space-2);
+  width: min(280px, 72vw);
+}
+.poi-popup__img {
+  display: block;
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  object-fit: cover;
+  border-radius: var(--radius-sm);
+  background: var(--surface-2);
+}
+.poi-popup__title {
+  margin: 0;
+  font-size: var(--step-0);
+  font-family: var(--font-display);
+}
+.poi-popup__meta,
+.poi-popup__attribution {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 0.8rem;
+}
+.poi-popup__text {
+  margin: 0;
+}
+.poi-popup__links {
+  margin: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+.route-tooltip {
+  font-weight: 600;
+}
+
+/* /okoli */
+.okoli-filter {
+  display: grid;
+  gap: var(--space-3);
+  margin-bottom: var(--space-5);
+}
+.okoli-filter__types {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+.okoli-filter__type {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  min-height: 36px;
+  padding: 0 var(--space-3);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-pill);
+  background: var(--surface);
+  color: var(--text);
+  text-decoration: none;
+  font-size: var(--step--1);
+}
+.okoli-filter__type:hover {
+  border-color: var(--primary);
+}
+.okoli-filter__type.is-active {
+  background: var(--primary);
+  border-color: var(--primary);
+  color: var(--on-primary);
+}
+.okoli-filter__count {
+  opacity: 0.75;
+}
+.okoli-filter__map {
+  margin: 0;
+}
+.okoli-sources {
+  margin: var(--space-6) 0 0;
+  color: var(--text-muted);
+  font-size: var(--step--1);
+}
+.card--poi .card__media {
+  aspect-ratio: 4 / 3;
+}
+.card--poi .card__text {
+  color: var(--text);
+}
+.section--tips .section__more {
+  margin: var(--space-5) 0 0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .poi-marker.is-active {
+    transform: none;
+  }
+}

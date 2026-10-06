@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 160 160" width="160" height="160" role="img" aria-label="Ilustrace: hodiny">
+  <!-- Vlastní ilustrace tématu Family – hodiny / otevírací doba (2 barvy: petrolej #0F766E, mint #D9F2EC). -->
+  <circle cx="80" cy="80" r="76" fill="#D9F2EC"/>
+  <circle cx="80" cy="84" r="46" fill="#0F766E"/>
+  <circle cx="80" cy="84" r="36" fill="#D9F2EC"/>
+  <path d="M80 56v6M108 84h-6M80 112v-6M52 84h6" stroke="#0F766E" stroke-width="5" stroke-linecap="round"/>
+  <path d="M80 84V66M80 84l14 10" fill="none" stroke="#0F766E" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/>
+  <circle cx="80" cy="84" r="5" fill="#0F766E"/>
+  <path d="M58 34l-8 8M102 34l8 8" stroke="#0F766E" stroke-width="6" stroke-linecap="round"/>
+  <path d="M66 30h28" stroke="#0F766E" stroke-width="6" stroke-linecap="round"/>
+</svg>

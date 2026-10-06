@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 160 160" width="160" height="160" role="img" aria-label="Ilustrace: jízdní kolo">
+  <!-- Vlastní ilustrace tématu Family – jízdní kolo (2 barvy: petrolej #0F766E, mint #D9F2EC). -->
+  <circle cx="80" cy="80" r="76" fill="#D9F2EC"/>
+  <circle cx="46" cy="100" r="24" fill="none" stroke="#0F766E" stroke-width="7"/>
+  <circle cx="114" cy="100" r="24" fill="none" stroke="#0F766E" stroke-width="7"/>
+  <circle cx="46" cy="100" r="5" fill="#0F766E"/>
+  <circle cx="114" cy="100" r="5" fill="#0F766E"/>
+  <path d="M46 100l22-38h34l12 38M68 62l12 38 34 0M80 100l-34 0" fill="none" stroke="#0F766E" stroke-width="7" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M60 52h16M96 50l10 12" stroke="#0F766E" stroke-width="7" stroke-linecap="round"/>
+  <circle cx="80" cy="100" r="7" fill="#D9F2EC" stroke="#0F766E" stroke-width="5"/>
+</svg>

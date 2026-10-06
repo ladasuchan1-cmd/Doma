@@ -1,35 +1,1168 @@
 /* =====================================================================================================
-   Téma OUTDOOR – PLACEHOLDER kostry. // doplní agent tématu (tema-outdoor)
-   Zatím jen semantické barvy a fonty palety ze SPEC kap. 7 / rešerše 05 B4, aby prošel tools/check-contrast.js.
-   Pravidla: přepisovat jen proměnné a layoutové varianty ([data-theme="outdoor"] …), nikdy HTML.
+   Téma OUTDOOR / Nature – zemitý, fotografický, osobní (SPEC kap. 7, PLAN kap. 10; inspirace Komoot).
+   Paleta: krém #F5F0E6, plocha #EAE2D3, text #1F2A1E, lesní #2F5D3A, terakota #B4581B (tlačítka) / #9A4A14 (text),
+   tlumený #5C6355, patička #1F2A1E s krémovým textem. Fonty: Fraunces (display, osy opsz/wght), Caveat (ručně psané
+   akcenty: ceny, šipky, podtitul hera), Inter (tělo). Layout: data-hero=fullbleed, data-nav=transparent (průhledná
+   navigace přes hero, po scrollu plná – jen CSS přes scroll-driven animaci, bez JS), data-cards=photo-top.
+   Pravidla: přepisuje JEN proměnné a layoutové varianty přes [data-theme="outdoor"] …; HTML se nemění.
+   Fotky: public/img/demo/outdoor/ (CC0 / CC BY, viz ATTRIBUTION.md), hero jen přes --hero-image.
    ===================================================================================================== */
+
+/* ---------- 1. Tokeny ---------- */
 [data-theme='outdoor'] {
+  color-scheme: light;
   --bg: #f5f0e6;
   --bg-elevated: #fbf8f1;
   --surface: #eae2d3;
   --surface-2: #ddd2bd;
   --text: #1f2a1e;
   --text-muted: #5c6355;
-  --border: #d4c9b2;
+  --border: #d2c7ae;
   --primary: #2f5d3a;
   --on-primary: #ffffff;
   --primary-hover: #254a2e;
   --accent: #b4581b;
   --on-accent: #ffffff;
+  --accent-hover: #9a4a14;
+  --accent-text: #9a4a14;
   --success: #2f6b3a;
   --warning: #8a5a00;
   --danger: #a63a1f;
-  --info: #2f5d3a;
-  --focus: #b4581b;
+  --info: #2b5f7a;
+  --focus: #9a4a14;
   --link: #9a4a14;
   --font-display: 'Fraunces', Georgia, 'Times New Roman', serif;
   --font-body: 'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
-  --font-accent: 'Caveat', cursive;
-  --hero-overlay: linear-gradient(180deg, rgba(31, 42, 30, 0.15), rgba(31, 42, 30, 0.6));
+  --font-accent: 'Caveat', 'Segoe Print', 'Bradley Hand', cursive;
+  --hero-image: url('/img/demo/outdoor/hero.jpg');
+  --hero-overlay: linear-gradient(180deg, rgba(31, 42, 30, 0.3) 0%, rgba(31, 42, 30, 0.14) 35%, rgba(31, 42, 30, 0.58) 68%, rgba(31, 42, 30, 0.84) 100%);
+  --section-gap: clamp(var(--space-9), 8vw, var(--space-12));
   --card-radius: 8px;
   --btn-radius: 6px;
   --input-radius: 6px;
+  --shadow-1: 0 1px 2px rgba(31, 42, 30, 0.08), 0 0 0 1px rgba(31, 42, 30, 0.03);
+  --shadow-2: 0 8px 22px rgba(31, 42, 30, 0.13);
+  --shadow-3: 0 20px 44px rgba(31, 42, 30, 0.2);
+  --ease: cubic-bezier(0.33, 0, 0.2, 1);
+  --motion: 300ms;
+  --header-height: 76px;
+  --footer-bg: #1f2a1e;
+  --footer-text: #f5f0e6;
+  --footer-muted: #c3cab9;
+  --footer-link: #f0c9a0;
+  --paper-ink: rgba(31, 42, 30, 0.045);
+  --arrow: url("data:image/svg+xml;utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 20'%3E%3Cpath d='M2 13.5C8.5 5.5 17.5 6 27.5 9.2' fill='none' stroke='black' stroke-width='2.4' stroke-linecap='round'/%3E%3Cpath d='M21.5 3.8l6.4 5.4-6.2 5.4' fill='none' stroke='black' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
 }
 
-/* // doplní agent tématu: full-bleed hero s fotografií, papírová textura, Caveat akcenty (.hero__accent, .price__prefix),
-   pomalé fade, varianta karet photo-top, tmavá patička (#1f2a1e s krémovým textem). */
+/* ---------- 2. Základ: papír, typografie, odkazy ---------- */
+[data-theme='outdoor'] body {
+  line-height: 1.6;
+  background-color: var(--bg);
+  background-image: radial-gradient(var(--paper-ink) 0.6px, transparent 0.8px), radial-gradient(rgba(255, 255, 255, 0.55) 0.5px, transparent 0.7px);
+  background-size: 5px 5px, 9px 9px;
+  background-position: 0 0, 3px 4px;
+}
+
+[data-theme='outdoor'] h1,
+[data-theme='outdoor'] h2,
+[data-theme='outdoor'] h3,
+[data-theme='outdoor'] h4 {
+  font-weight: 600;
+  letter-spacing: -0.012em;
+  font-optical-sizing: auto;
+  font-variation-settings: 'opsz' 72, 'SOFT' 40;
+}
+[data-theme='outdoor'] h1 {
+  font-weight: 500;
+  font-variation-settings: 'opsz' 144, 'SOFT' 60;
+}
+[data-theme='outdoor'] h3,
+[data-theme='outdoor'] h4 {
+  font-variation-settings: 'opsz' 24, 'SOFT' 20;
+}
+
+[data-theme='outdoor'] a {
+  text-decoration-color: color-mix(in srgb, var(--link) 45%, transparent);
+  text-underline-offset: 0.2em;
+  transition: color var(--motion) var(--ease), text-decoration-color var(--motion) var(--ease);
+}
+[data-theme='outdoor'] a:hover {
+  text-decoration-color: var(--link);
+}
+
+[data-theme='outdoor'] ::selection {
+  background: var(--accent);
+  color: #fff;
+}
+
+[data-theme='outdoor'] :focus-visible {
+  outline: 3px solid var(--focus);
+  outline-offset: 3px;
+  border-radius: 4px;
+}
+
+/* Ručně kreslená šipka (Caveat nemá →): maska z inline SVG, barva přes currentColor */
+[data-theme='outdoor'] .btn--ghost .btn__label::after,
+[data-theme='outdoor'] .section__more .btn--secondary .btn__label::after,
+[data-theme='outdoor'] .card--teaser .btn .btn__label::after {
+  content: '';
+  display: inline-block;
+  width: 1.15em;
+  height: 0.8em;
+  margin-left: 0.4em;
+  vertical-align: -0.08em;
+  background: currentColor;
+  -webkit-mask: var(--arrow) center / contain no-repeat;
+  mask: var(--arrow) center / contain no-repeat;
+  transition: transform var(--motion) var(--ease);
+}
+[data-theme='outdoor'] .btn:hover .btn__label::after {
+  transform: translateX(3px);
+}
+
+/* ---------- 3. Hlavička a navigace ---------- */
+[data-theme='outdoor'] .site-header {
+  position: sticky;
+  top: 0;
+  z-index: 30;
+  color: var(--text);
+  background-color: rgba(245, 240, 230, 0.94);
+  border-bottom: 1px solid var(--border);
+  -webkit-backdrop-filter: blur(12px);
+  backdrop-filter: blur(12px);
+}
+[data-theme='outdoor'] .site-header__inner {
+  min-height: var(--header-height);
+}
+[data-theme='outdoor'] .site-logo {
+  color: inherit;
+  font-weight: 600;
+  font-size: var(--step-1);
+  font-variation-settings: 'opsz' 20, 'SOFT' 40;
+  transition: color var(--motion) var(--ease);
+}
+[data-theme='outdoor'] .site-logo__img {
+  height: 38px;
+  transition: filter var(--motion) var(--ease);
+}
+[data-theme='outdoor'] .site-nav__link {
+  position: relative;
+  padding: 0 var(--space-2);
+  color: inherit;
+  font-weight: 500;
+  border-bottom: 0;
+  border-radius: 0;
+}
+[data-theme='outdoor'] .site-nav__link::after {
+  content: '';
+  position: absolute;
+  left: var(--space-2);
+  right: var(--space-2);
+  bottom: 9px;
+  height: 2px;
+  border-radius: 1px;
+  background: var(--accent);
+  transform: scaleX(0);
+  transform-origin: left center;
+  transition: transform var(--motion) var(--ease);
+}
+[data-theme='outdoor'] .site-nav__link:hover,
+[data-theme='outdoor'] .site-nav__link.is-active {
+  color: inherit;
+}
+[data-theme='outdoor'] .site-nav__link:hover::after,
+[data-theme='outdoor'] .site-nav__link.is-active::after {
+  transform: scaleX(1);
+}
+[data-theme='outdoor'] .site-nav__cta {
+  margin-left: var(--space-2);
+}
+[data-theme='outdoor'] .nav-toggle__label {
+  border-color: color-mix(in srgb, currentColor 35%, transparent);
+  color: inherit;
+}
+[data-theme='outdoor'] .nav-toggle__bar,
+[data-theme='outdoor'] .nav-toggle__bar::before,
+[data-theme='outdoor'] .nav-toggle__bar::after {
+  background: currentColor;
+}
+[data-theme='outdoor'] .site-header :focus-visible {
+  outline-color: currentColor;
+}
+
+/* Průhledná navigace přes hero (jen stránky, které hero začínají) – po scrollu plná, čistě CSS. */
+@keyframes outdoor-header {
+  from {
+    color: #f5f0e6;
+    background-color: rgba(31, 42, 30, 0);
+    border-bottom-color: rgba(245, 240, 230, 0);
+    text-shadow: 0 1px 3px rgba(0, 0, 0, 0.45);
+    -webkit-backdrop-filter: blur(0);
+    backdrop-filter: blur(0);
+  }
+  to {
+    color: #1f2a1e;
+    background-color: rgba(245, 240, 230, 0.94);
+    border-bottom-color: #d2c7ae;
+    text-shadow: 0 1px 3px rgba(0, 0, 0, 0);
+    -webkit-backdrop-filter: blur(12px);
+    backdrop-filter: blur(12px);
+  }
+}
+@keyframes outdoor-logo {
+  from {
+    filter: invert(1) drop-shadow(0 1px 2px rgba(0, 0, 0, 0.35));
+  }
+  to {
+    filter: invert(0) drop-shadow(0 1px 2px rgba(0, 0, 0, 0));
+  }
+}
+@supports (animation-timeline: scroll()) {
+  [data-theme='outdoor'] body:has(.site-main > .hero:first-child) .site-header {
+    animation: outdoor-header linear both;
+    animation-timeline: scroll(root);
+    animation-range: 40px 300px;
+  }
+  [data-theme='outdoor'] body:has(.site-main > .hero:first-child) .site-logo__img {
+    animation: outdoor-logo linear both;
+    animation-timeline: scroll(root);
+    animation-range: 40px 300px;
+  }
+  [data-theme='outdoor'] body:has(.site-main > .hero:first-child) .site-main {
+    margin-top: calc(-1 * var(--header-height));
+  }
+}
+@supports not (animation-timeline: scroll()) {
+  /* Fallback: navigace leží přes hero, při scrollu odjede (není sticky). */
+  [data-theme='outdoor'] body:has(.site-main > .hero:first-child) .site-header {
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: 0;
+    color: #f5f0e6;
+    background-color: transparent;
+    border-bottom-color: transparent;
+    text-shadow: 0 1px 3px rgba(0, 0, 0, 0.45);
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+  }
+  [data-theme='outdoor'] body:has(.site-main > .hero:first-child) .site-logo__img {
+    filter: invert(1) drop-shadow(0 1px 2px rgba(0, 0, 0, 0.35));
+  }
+}
+/* Otevřené mobilní menu musí být vždy čitelné (přebije i animaci) */
+[data-theme='outdoor'] .site-header:has(.nav-toggle:checked) {
+  color: var(--text) !important;
+  background-color: var(--bg) !important;
+  border-bottom-color: var(--border) !important;
+  text-shadow: none !important;
+}
+[data-theme='outdoor'] .site-header:has(.nav-toggle:checked) .site-logo__img {
+  filter: invert(0) !important;
+}
+@media (max-width: 859px) {
+  [data-theme='outdoor'] .site-nav {
+    gap: var(--space-4);
+    padding-top: var(--space-2);
+  }
+  [data-theme='outdoor'] .site-nav__list {
+    gap: 0;
+  }
+  [data-theme='outdoor'] .site-nav__item {
+    border-bottom: 1px dashed var(--border);
+  }
+  [data-theme='outdoor'] .site-nav__link {
+    padding: 0 var(--space-1);
+    font-family: var(--font-display);
+    font-size: var(--step-1);
+    font-weight: 500;
+  }
+  [data-theme='outdoor'] .site-nav__link::after {
+    display: none;
+  }
+  [data-theme='outdoor'] .site-nav__link.is-active {
+    color: var(--accent-text);
+  }
+  [data-theme='outdoor'] .site-nav__cta {
+    margin-left: 0;
+    align-self: stretch;
+  }
+}
+
+/* ---------- 4. Hero (full-bleed fotografie, nadpis přes fotku) ---------- */
+[data-theme='outdoor'] .hero {
+  min-height: min(92svh, 880px);
+  color: #f5f0e6;
+  background: #1f2a1e;
+  align-items: end;
+}
+[data-theme='outdoor'] .hero__media {
+  overflow: hidden;
+  background: var(--hero-image) center 60% / cover no-repeat #1f2a1e;
+}
+[data-theme='outdoor'] .hero__media img {
+  object-position: center 60%;
+  filter: saturate(1.05) contrast(1.02);
+}
+[data-theme='outdoor'] .hero__placeholder {
+  background: transparent;
+}
+[data-theme='outdoor'] .hero__media::after {
+  background: var(--hero-overlay);
+}
+[data-theme='outdoor'] .hero__body {
+  padding-block: calc(var(--header-height) + var(--space-9)) clamp(var(--space-8), 7vw, var(--space-11));
+  animation: outdoor-rise 700ms var(--ease) both;
+}
+[data-theme='outdoor'] .hero__eyebrow,
+[data-theme='outdoor'] .hero__accent {
+  font-family: var(--font-accent);
+  font-weight: 500;
+  text-transform: none;
+  letter-spacing: 0;
+  color: #f2c69b;
+  opacity: 1;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.35);
+}
+[data-theme='outdoor'] .hero__eyebrow {
+  font-size: var(--step-2);
+  margin-bottom: var(--space-2);
+}
+[data-theme='outdoor'] .hero__title {
+  font-size: clamp(2.4rem, 1.7rem + 3.8vw, 4.9rem);
+  line-height: 1.02;
+  max-width: 16ch;
+  text-shadow: 0 2px 14px rgba(0, 0, 0, 0.28);
+  font-variation-settings: 'opsz' 144, 'SOFT' 60;
+}
+[data-theme='outdoor'] .hero__text {
+  font-size: var(--step-1);
+  max-width: 50ch;
+  color: rgba(245, 240, 230, 0.92);
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.35);
+}
+[data-theme='outdoor'] .hero__accent {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: clamp(1.5rem, 1.2rem + 1.2vw, 2.1rem);
+  line-height: 1.1;
+  margin-bottom: var(--space-6);
+  transform: rotate(-1.5deg);
+  transform-origin: left center;
+}
+[data-theme='outdoor'] .hero__accent::after {
+  content: '';
+  width: 1.3em;
+  height: 0.9em;
+  background: currentColor;
+  -webkit-mask: var(--arrow) center / contain no-repeat;
+  mask: var(--arrow) center / contain no-repeat;
+  transform: rotate(118deg) translateX(-0.1em);
+}
+[data-theme='outdoor'] .hero .btn--ghost {
+  --_fg: #f5f0e6;
+  color: #f5f0e6;
+  border-color: rgba(245, 240, 230, 0.75);
+  -webkit-backdrop-filter: blur(6px);
+  backdrop-filter: blur(6px);
+}
+[data-theme='outdoor'] .hero .btn--ghost:hover {
+  background: rgba(245, 240, 230, 0.16);
+  border-color: #f5f0e6;
+}
+[data-theme='outdoor'] .hero :focus-visible {
+  outline-color: #f5f0e6;
+}
+@keyframes outdoor-rise {
+  from {
+    opacity: 0;
+    transform: translateY(16px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+/* Parallax jen na desktopu, jen CSS (scroll-driven animace / fixní pozadí), vypnuto při reduced motion */
+@media (min-width: 1024px) and (prefers-reduced-motion: no-preference) {
+  @supports (animation-timeline: scroll()) {
+    [data-theme='outdoor'] .hero__media img {
+      scale: 1.14;
+      transform-origin: center top;
+      animation: outdoor-parallax linear both;
+      animation-timeline: scroll(root);
+      animation-range: 0 100vh;
+    }
+  }
+  [data-theme='outdoor'] .hero__media:has(> .hero__placeholder) {
+    background-attachment: fixed;
+  }
+  [data-theme='outdoor'] .section--explore {
+    background-attachment: fixed;
+  }
+}
+@keyframes outdoor-parallax {
+  from {
+    translate: 0 0;
+  }
+  to {
+    translate: 0 22%;
+  }
+}
+
+/* ---------- 5. Sekce (rytmus, Caveat eyebrow, terakotová linka pod nadpisem) ---------- */
+[data-theme='outdoor'] .section__eyebrow {
+  font-family: var(--font-accent);
+  font-size: var(--step-2);
+  font-weight: 500;
+  text-transform: none;
+  letter-spacing: 0;
+  color: var(--accent-text);
+  margin-bottom: 0;
+}
+[data-theme='outdoor'] .section__title {
+  font-size: clamp(1.75rem, 1.35rem + 1.8vw, 2.6rem);
+  font-variation-settings: 'opsz' 96, 'SOFT' 40;
+}
+[data-theme='outdoor'] .section__title::after {
+  content: '';
+  display: block;
+  width: 56px;
+  height: 3px;
+  margin-top: var(--space-3);
+  border-radius: 2px;
+  background: var(--accent);
+}
+[data-theme='outdoor'] .section--page-head .section__title {
+  font-size: clamp(2.1rem, 1.5rem + 2.6vw, 3.4rem);
+}
+[data-theme='outdoor'] .section__lead {
+  font-size: var(--step-1);
+  line-height: 1.55;
+  max-width: 60ch;
+}
+
+/* Plocha s „utrženým“ papírovým okrajem (jen gradienty a maska, žádné obrázky) */
+[data-theme='outdoor'] .section--bikes {
+  position: relative;
+  background: var(--surface);
+  background-image: radial-gradient(var(--paper-ink) 0.6px, transparent 0.8px);
+  background-size: 6px 6px;
+}
+[data-theme='outdoor'] .section--bikes::before,
+[data-theme='outdoor'] .section--bikes::after,
+[data-theme='outdoor'] .site-footer::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 9px;
+  background: var(--surface);
+  pointer-events: none;
+  -webkit-mask: radial-gradient(5.5px at 50% 100%, #000 96%, transparent) 0 0 / 13px 100% repeat-x, radial-gradient(3.5px at 50% 100%, #000 96%, transparent) 5px 0 / 9px 100% repeat-x, radial-gradient(4.5px at 50% 100%, #000 96%, transparent) 2px 0 / 19px 100% repeat-x;
+  mask: radial-gradient(5.5px at 50% 100%, #000 96%, transparent) 0 0 / 13px 100% repeat-x, radial-gradient(3.5px at 50% 100%, #000 96%, transparent) 5px 0 / 9px 100% repeat-x, radial-gradient(4.5px at 50% 100%, #000 96%, transparent) 2px 0 / 19px 100% repeat-x;
+}
+[data-theme='outdoor'] .section--bikes::before {
+  top: -8px;
+}
+[data-theme='outdoor'] .section--bikes::after {
+  bottom: -8px;
+  transform: scaleY(-1);
+}
+[data-theme='outdoor'] .section--bikes + .section {
+  padding-top: calc(var(--section-gap) + 8px);
+}
+
+/* Plná fotografická sekce „Kam vyrazit“ (krémový text, karty zůstávají světlé) */
+[data-theme='outdoor'] .section--explore {
+  --text: #f5f0e6;
+  --text-muted: #d8ddcf;
+  position: relative;
+  padding-block: var(--section-gap);
+  color: var(--text);
+  background: linear-gradient(180deg, rgba(31, 42, 30, 0.82), rgba(31, 42, 30, 0.88)), url('/img/demo/outdoor/krajina.jpg') center / cover no-repeat #1f2a1e;
+}
+[data-theme='outdoor'] .section--explore .section__title {
+  color: #f5f0e6;
+}
+[data-theme='outdoor'] .section--explore .section__title::after {
+  background: #f2c69b;
+}
+[data-theme='outdoor'] .section--explore + .section {
+  padding-top: var(--section-gap);
+}
+[data-theme='outdoor'] .section--explore .card {
+  --text: #1f2a1e;
+  --text-muted: #5c6355;
+  color: var(--text);
+}
+[data-theme='outdoor'] .section--explore :focus-visible {
+  outline-color: #f5f0e6;
+}
+
+/* ---------- 6. Karty (photo-top, štítek přes fotku, pomalý zoom) ---------- */
+[data-theme='outdoor'] .card {
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow-1);
+  transition: transform var(--motion) var(--ease), box-shadow var(--motion) var(--ease), border-color var(--motion) var(--ease);
+}
+[data-theme='outdoor'] .card:hover {
+  transform: translateY(-3px);
+  box-shadow: var(--shadow-2);
+  border-color: color-mix(in srgb, var(--primary) 30%, var(--border));
+}
+[data-theme='outdoor'] .card__media {
+  position: relative;
+  overflow: hidden;
+  background: var(--surface-2);
+}
+[data-theme='outdoor'] .card__media img {
+  transition: transform 700ms var(--ease);
+}
+[data-theme='outdoor'] .card:hover .card__media img {
+  transform: scale(1.045);
+}
+[data-theme='outdoor'] .card__body {
+  padding: var(--space-5) var(--space-5) var(--space-6);
+}
+[data-theme='outdoor'] .card__title {
+  font-size: var(--step-1);
+  line-height: 1.2;
+}
+[data-theme='outdoor'] .card__body .btn {
+  margin-top: var(--space-3);
+}
+
+[data-theme='outdoor'][data-cards='photo-top'] .card--bike .card__media {
+  aspect-ratio: 3 / 2;
+}
+[data-theme='outdoor'][data-cards='photo-top'] .card--bike .card__body {
+  position: relative;
+  padding-top: var(--space-6);
+}
+[data-theme='outdoor'][data-cards='photo-top'] .card--bike .card__body > .badge {
+  position: absolute;
+  top: calc(-1 * var(--space-4));
+  left: var(--space-5);
+  z-index: 1;
+  transform: rotate(-1.5deg);
+  box-shadow: var(--shadow-1), 0 2px 6px rgba(31, 42, 30, 0.12);
+}
+[data-theme='outdoor'] .card--bike .card__placeholder {
+  color: #f5f0e6;
+  background: linear-gradient(180deg, rgba(47, 93, 58, 0.25), rgba(31, 42, 30, 0.55)), url('/img/demo/outdoor/ebike-cesta.jpg') center / cover no-repeat;
+}
+[data-theme='outdoor'] .card--bike .card__placeholder .icon {
+  width: 30%;
+  height: 30%;
+  opacity: 0.85;
+  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.3));
+}
+[data-theme='outdoor'] .card--bike .card__availability {
+  margin-top: var(--space-1);
+}
+
+/* Teaser karty (mapa, tipy) s fotkou v záhlaví */
+[data-theme='outdoor'] .card--teaser .card__media {
+  aspect-ratio: 16 / 8;
+  color: #f5f0e6;
+  background: linear-gradient(180deg, rgba(31, 42, 30, 0.05), rgba(31, 42, 30, 0.55)), url('/img/demo/outdoor/kolo-u-vody.jpg') center / cover no-repeat;
+  transition: background-size 700ms var(--ease);
+}
+[data-theme='outdoor'] .card--teaser:nth-child(2n) .card__media {
+  background-image: linear-gradient(180deg, rgba(31, 42, 30, 0.05), rgba(31, 42, 30, 0.55)), url('/img/demo/outdoor/zamek-trebon.jpg');
+  background-position: center 30%;
+}
+[data-theme='outdoor'] .card--teaser .card__media .icon {
+  width: 48px;
+  height: 48px;
+  opacity: 1;
+  place-self: end start;
+  margin: 0 0 var(--space-4) var(--space-5);
+  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.35));
+}
+
+/* Zajímavost, trasa */
+[data-theme='outdoor'] .card--poi .card__media {
+  aspect-ratio: 3 / 2;
+}
+[data-theme='outdoor'] .card--route {
+  border-left: 5px solid var(--primary);
+}
+[data-theme='outdoor'] .card--route .card__badges {
+  margin: 0;
+  display: flex;
+  gap: var(--space-2);
+}
+[data-theme='outdoor'] .card--route[data-network='mtb'] {
+  border-left-color: var(--accent);
+}
+[data-theme='outdoor'] .card--route[data-network='icn'],
+[data-theme='outdoor'] .card--route[data-network='ncn'] {
+  border-left-color: var(--info);
+}
+[data-theme='outdoor'] .card--design.is-active {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 2px var(--primary), var(--shadow-2);
+}
+
+/* ---------- 7. Tlačítka (terakota primární, lesní sekundární) ---------- */
+[data-theme='outdoor'] .btn {
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  transition: background var(--motion) var(--ease), color var(--motion) var(--ease), border-color var(--motion) var(--ease), transform var(--motion) var(--ease), box-shadow var(--motion) var(--ease);
+}
+[data-theme='outdoor'] .btn--primary {
+  --_bg: var(--accent);
+  --_fg: var(--on-accent);
+  border-color: var(--accent);
+  box-shadow: 0 1px 2px rgba(31, 42, 30, 0.15), inset 0 -2px 0 rgba(0, 0, 0, 0.12);
+}
+[data-theme='outdoor'] .btn--primary:hover {
+  --_bg: var(--accent-hover);
+  border-color: var(--accent-hover);
+  transform: translateY(-1px);
+  box-shadow: 0 6px 16px rgba(154, 74, 20, 0.28), inset 0 -2px 0 rgba(0, 0, 0, 0.12);
+}
+[data-theme='outdoor'] .btn--secondary {
+  --_bg: transparent;
+  --_fg: var(--primary);
+  border-color: var(--primary);
+}
+[data-theme='outdoor'] .btn--secondary:hover {
+  --_bg: var(--primary);
+  --_fg: var(--on-primary);
+  border-color: var(--primary);
+  transform: translateY(-1px);
+}
+[data-theme='outdoor'] .btn--ghost {
+  --_bg: transparent;
+  --_fg: var(--text);
+  border-color: color-mix(in srgb, var(--text) 28%, transparent);
+}
+[data-theme='outdoor'] .btn--ghost:hover {
+  --_bg: color-mix(in srgb, var(--text) 7%, transparent);
+  border-color: color-mix(in srgb, var(--text) 55%, transparent);
+}
+[data-theme='outdoor'] .btn--danger {
+  --_bg: var(--danger);
+  border-color: var(--danger);
+}
+[data-theme='outdoor'] .btn--danger:hover {
+  --_bg: #8c2f17;
+  border-color: #8c2f17;
+}
+[data-theme='outdoor'] .btn:active {
+  transform: translateY(1px);
+  box-shadow: none;
+}
+[data-theme='outdoor'] .btn:disabled,
+[data-theme='outdoor'] .btn[aria-disabled='true'] {
+  transform: none;
+  box-shadow: none;
+}
+[data-theme='outdoor'] .btn--lg {
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-variation-settings: 'opsz' 24, 'SOFT' 40;
+  letter-spacing: 0;
+}
+
+/* ---------- 8. Formuláře ---------- */
+[data-theme='outdoor'] .field__label {
+  font-size: var(--step--1);
+  font-weight: 600;
+  letter-spacing: 0.01em;
+}
+[data-theme='outdoor'] .field__input {
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  box-shadow: inset 0 1px 2px rgba(31, 42, 30, 0.05);
+  transition: border-color var(--motion) var(--ease), box-shadow var(--motion) var(--ease);
+}
+[data-theme='outdoor'] .field__input:hover {
+  border-color: color-mix(in srgb, var(--primary) 45%, var(--border));
+}
+[data-theme='outdoor'] .field__input:focus {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--primary) 18%, transparent);
+}
+[data-theme='outdoor'] .field__input:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 0;
+}
+[data-theme='outdoor'] .field__input--select {
+  cursor: pointer;
+}
+[data-theme='outdoor'] .field.has-error .field__input {
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--danger) 16%, transparent);
+}
+[data-theme='outdoor'] .field__hint {
+  font-family: var(--font-accent);
+  font-size: 1.1rem;
+  line-height: 1.25;
+}
+[data-theme='outdoor'] .field__checkbox {
+  accent-color: var(--primary);
+}
+[data-theme='outdoor'] .field__check {
+  padding: var(--space-2) 0;
+}
+[data-theme='outdoor'] .form__actions {
+  padding-top: var(--space-2);
+  border-top: 1px dashed var(--border);
+}
+
+/* ---------- 9. Kroky (trasa s přerušovanou čarou, ručně psané číslice) ---------- */
+[data-theme='outdoor'] .steps {
+  position: relative;
+}
+[data-theme='outdoor'] .steps__item {
+  position: relative;
+  z-index: 1;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow-1);
+  padding: var(--space-5);
+  transition: border-color var(--motion) var(--ease), box-shadow var(--motion) var(--ease);
+}
+[data-theme='outdoor'] .steps__num {
+  background: transparent;
+  color: var(--primary);
+  border: 2px solid var(--primary);
+  font-family: var(--font-accent);
+  font-size: 1.7rem;
+  font-weight: 700;
+  line-height: 1;
+  padding-top: 2px;
+}
+[data-theme='outdoor'] .steps__label {
+  font-family: var(--font-display);
+  font-size: var(--step-1);
+  font-weight: 600;
+  font-variation-settings: 'opsz' 24, 'SOFT' 20;
+  padding-top: var(--space-1);
+}
+[data-theme='outdoor'] .steps__item.is-active {
+  background: var(--bg-elevated);
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 35%, transparent), var(--shadow-2);
+}
+[data-theme='outdoor'] .steps__item.is-active .steps__num {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+}
+[data-theme='outdoor'] .steps__item.is-done .steps__num {
+  background: var(--primary);
+  border-color: var(--primary);
+  color: #fff;
+}
+[data-theme='outdoor'] .steps__item:not(.is-done):not(.is-active) .steps__num {
+  background: transparent;
+  color: var(--primary);
+}
+@media (min-width: 720px) {
+  [data-theme='outdoor'] .steps::before {
+    content: '';
+    position: absolute;
+    top: 42px;
+    left: 12%;
+    right: 12%;
+    border-top: 2px dashed color-mix(in srgb, var(--primary) 45%, var(--border));
+  }
+}
+
+/* ---------- 10. Tabulky, souhrn, cenovky ---------- */
+[data-theme='outdoor'] .table__caption {
+  font-family: var(--font-display);
+  font-size: var(--step-1);
+  font-weight: 600;
+  color: var(--text);
+  padding-bottom: var(--space-3);
+}
+[data-theme='outdoor'] .table thead th {
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 0.74rem;
+  letter-spacing: 0.08em;
+  border-bottom: 2px solid var(--text);
+}
+[data-theme='outdoor'] .table td,
+[data-theme='outdoor'] .table th {
+  border-bottom-color: var(--border);
+}
+[data-theme='outdoor'] .table tbody tr {
+  transition: background var(--motion) var(--ease);
+}
+[data-theme='outdoor'] .table tbody tr:hover {
+  background: color-mix(in srgb, var(--surface) 55%, transparent);
+}
+[data-theme='outdoor'] .table tbody th[scope='row'] {
+  font-weight: 600;
+}
+
+[data-theme='outdoor'] .summary__row {
+  padding: var(--space-3) 0;
+  border-bottom: 1px dashed var(--border);
+}
+[data-theme='outdoor'] .summary__row dd {
+  font-weight: 500;
+}
+[data-theme='outdoor'] .summary__row--total {
+  margin-top: var(--space-1);
+  border-top: 2px solid var(--primary);
+  border-bottom: 0;
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-variation-settings: 'opsz' 24, 'SOFT' 20;
+}
+[data-theme='outdoor'] .summary__row--total dd {
+  color: var(--accent-text);
+}
+
+/* Cenovka ručně psaná: „od 290 Kč / den“ v Caveat, terakota */
+[data-theme='outdoor'] .price {
+  gap: 0.3em;
+  color: var(--accent-text);
+  font-family: var(--font-accent);
+  line-height: 1;
+}
+[data-theme='outdoor'] .price__prefix,
+[data-theme='outdoor'] .price__unit {
+  color: var(--accent-text);
+  font-size: 1.4rem;
+  font-weight: 500;
+}
+[data-theme='outdoor'] .price__amount {
+  font-family: var(--font-accent);
+  font-size: clamp(1.75rem, 1.4rem + 1vw, 2.2rem);
+  font-weight: 700;
+  color: var(--accent-text);
+  letter-spacing: 0;
+}
+
+/* ---------- 11. Odznaky, upozornění, záložky ---------- */
+[data-theme='outdoor'] .badge {
+  padding: 3px 10px;
+  border-radius: 4px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  background: var(--bg-elevated);
+  color: var(--primary);
+  border: 1px solid var(--border);
+}
+[data-theme='outdoor'] .badge--success {
+  background: var(--tint-success);
+  color: var(--success);
+  border-color: color-mix(in srgb, var(--success) 35%, transparent);
+}
+[data-theme='outdoor'] .badge--warning {
+  background: var(--tint-warning);
+  color: var(--warning);
+  border-color: color-mix(in srgb, var(--warning) 35%, transparent);
+}
+[data-theme='outdoor'] .badge--danger {
+  background: var(--tint-danger);
+  color: var(--danger);
+  border-color: color-mix(in srgb, var(--danger) 35%, transparent);
+}
+[data-theme='outdoor'] .badge--info {
+  background: var(--tint-info);
+  color: var(--info);
+  border-color: color-mix(in srgb, var(--info) 35%, transparent);
+}
+
+[data-theme='outdoor'] .notice {
+  border: 1px solid var(--border);
+  border-left: 5px solid var(--_c);
+  background: linear-gradient(90deg, color-mix(in srgb, var(--_c) 10%, var(--bg-elevated)), var(--bg-elevated));
+  box-shadow: var(--shadow-1);
+}
+[data-theme='outdoor'] .notice__title {
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-variation-settings: 'opsz' 24, 'SOFT' 20;
+}
+
+[data-theme='outdoor'] .tabs {
+  border-bottom-color: var(--border);
+}
+[data-theme='outdoor'] .tabs__tab {
+  font-weight: 500;
+  color: var(--text-muted);
+  border-bottom-width: 3px;
+  transition: color var(--motion) var(--ease), border-color var(--motion) var(--ease);
+}
+[data-theme='outdoor'] .tabs__tab:hover {
+  color: var(--text);
+  border-bottom-color: var(--border);
+}
+[data-theme='outdoor'] .tabs__tab.is-active {
+  color: var(--text);
+  border-bottom-color: var(--accent);
+}
+[data-theme='outdoor'] .tabs__count {
+  background: var(--surface);
+  font-family: var(--font-accent);
+  font-size: 1rem;
+  font-weight: 700;
+}
+
+/* ---------- 12. Kalendář, timeline ---------- */
+[data-theme='outdoor'] .calendar {
+  padding: var(--space-4);
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: var(--card-radius);
+  box-shadow: var(--shadow-1);
+}
+[data-theme='outdoor'] .calendar__day.is-selected,
+[data-theme='outdoor'] .calendar__day.is-in-range {
+  background: var(--tint-primary);
+}
+[data-theme='outdoor'] .calendar__day.is-start,
+[data-theme='outdoor'] .calendar__day.is-end {
+  background: var(--primary);
+  color: var(--on-primary);
+}
+
+[data-theme='outdoor'] .timeline {
+  background: var(--bg-elevated);
+  border-color: var(--border);
+}
+[data-theme='outdoor'] .timeline__head {
+  background: var(--surface);
+  font-family: var(--font-body);
+  font-size: 0.74rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+[data-theme='outdoor'] .timeline__label {
+  font-weight: 500;
+}
+[data-theme='outdoor'] .timeline__bar {
+  border-radius: 4px;
+  font-size: 0.78rem;
+  font-variant-numeric: tabular-nums;
+  box-shadow: inset 0 -2px 0 rgba(0, 0, 0, 0.15);
+}
+[data-theme='outdoor'] .timeline__bar.status-awaiting_fee {
+  background: var(--warning);
+  background-image: repeating-linear-gradient(135deg, rgba(255, 255, 255, 0.18) 0 6px, transparent 6px 12px);
+}
+[data-theme='outdoor'] .timeline__bar.status-checked_out {
+  background: var(--accent);
+}
+[data-theme='outdoor'] .timeline__bar.status-returned,
+[data-theme='outdoor'] .timeline__bar.status-closed {
+  background: var(--success);
+  opacity: 0.8;
+}
+[data-theme='outdoor'] .timeline__bar.status-cancelled_by_customer,
+[data-theme='outdoor'] .timeline__bar.status-cancelled_by_operator,
+[data-theme='outdoor'] .timeline__bar.status-expired,
+[data-theme='outdoor'] .timeline__bar.status-no_show {
+  background: var(--surface-2);
+  color: var(--text-muted);
+  box-shadow: none;
+}
+
+/* ---------- 13. Kontaktní karta ---------- */
+[data-theme='outdoor'] .contact-card__title {
+  font-size: var(--step-1);
+}
+[data-theme='outdoor'] .contact-card__subtitle {
+  font-family: var(--font-accent);
+  font-size: 1.45rem;
+  font-weight: 500;
+  color: var(--accent-text);
+  margin: var(--space-4) 0 var(--space-1);
+}
+[data-theme='outdoor'] .contact-card__hours div {
+  grid-template-columns: 6rem 1fr;
+  padding: 2px 0;
+  border-bottom: 1px dashed var(--border);
+}
+[data-theme='outdoor'] .contact-card__hours div:last-child {
+  border-bottom: 0;
+}
+[data-theme='outdoor'] .contact-card__map a {
+  font-weight: 600;
+}
+
+/* ---------- 14. Patička (tmavá, krémový text, dub na hrázi za jemným překryvem) ---------- */
+[data-theme='outdoor'] .site-footer {
+  --text: var(--footer-text);
+  --text-muted: var(--footer-muted);
+  --border: rgba(245, 240, 230, 0.16);
+  --link: var(--footer-link);
+  --accent-text: var(--footer-link);
+  --surface: var(--footer-bg);
+  position: relative;
+  margin-top: calc(var(--section-gap) + 8px);
+  color: var(--text);
+  border-top: 0;
+  background: linear-gradient(180deg, rgba(31, 42, 30, 0.93) 0%, rgba(31, 42, 30, 0.97) 70%, #1f2a1e 100%), url('/img/demo/outdoor/rozmberk-dub.jpg') center 40% / cover no-repeat var(--footer-bg);
+}
+[data-theme='outdoor'] .site-footer::before {
+  top: -8px;
+  background: var(--footer-bg);
+}
+[data-theme='outdoor'] .site-footer__grid {
+  padding-block: var(--space-10) var(--space-8);
+}
+[data-theme='outdoor'] .site-footer .site-logo {
+  color: var(--text);
+}
+[data-theme='outdoor'] .site-footer .site-logo__img {
+  filter: invert(1);
+}
+[data-theme='outdoor'] .site-footer .site-logo__text {
+  display: inline;
+}
+[data-theme='outdoor'] .site-footer__about-text {
+  font-family: var(--font-accent);
+  font-size: 1.35rem;
+  line-height: 1.3;
+  color: var(--footer-link);
+  margin-top: var(--space-3);
+}
+[data-theme='outdoor'] .site-footer__title,
+[data-theme='outdoor'] .site-footer .contact-card__title {
+  font-size: var(--step-1);
+  color: var(--text);
+}
+[data-theme='outdoor'] .site-footer a {
+  color: var(--link);
+}
+[data-theme='outdoor'] .site-footer__links a {
+  color: var(--text);
+  text-decoration: none;
+}
+[data-theme='outdoor'] .site-footer__links a:hover {
+  color: var(--link);
+  text-decoration: underline;
+}
+[data-theme='outdoor'] .site-footer__bottom {
+  border-top-color: var(--border);
+  padding-block: var(--space-5);
+}
+[data-theme='outdoor'] .site-footer__demo {
+  color: var(--footer-link);
+}
+[data-theme='outdoor'] .site-footer :focus-visible {
+  outline-color: var(--footer-link);
+}
+
+/* ---------- 15. Přepínač designů (demo) ---------- */
+[data-theme='outdoor'] .design-switch {
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow-2);
+}
+[data-theme='outdoor'] .design-switch__label {
+  font-family: var(--font-accent);
+  font-size: 1.15rem;
+  color: var(--accent-text);
+}
+[data-theme='outdoor'] .design-switch__link {
+  transition: background var(--motion) var(--ease), color var(--motion) var(--ease);
+}
+[data-theme='outdoor'] .design-switch__link:hover {
+  background: var(--surface);
+}
+[data-theme='outdoor'] .design-switch__link.is-active {
+  background: var(--primary);
+  color: var(--on-primary);
+}
+
+/* ---------- 16. Chybová stránka (404 / 500) ---------- */
+[data-theme='outdoor'] .section--error {
+  position: relative;
+  min-height: 60vh;
+  display: flex;
+  align-items: center;
+  background: linear-gradient(90deg, rgba(245, 240, 230, 0.98) 0%, rgba(245, 240, 230, 0.96) 45%, rgba(245, 240, 230, 0.6) 100%), url('/img/demo/outdoor/krajina.jpg') right center / cover no-repeat;
+}
+[data-theme='outdoor'] .section--error .section__title {
+  font-size: clamp(2.2rem, 1.6rem + 3vw, 4rem);
+  font-style: italic;
+  font-weight: 500;
+}
+[data-theme='outdoor'] .section--error .section__lead {
+  max-width: 46ch;
+}
+[data-theme='outdoor'] .error-page__id {
+  font-family: var(--font-mono);
+  font-size: var(--step--1);
+}
+
+/* ---------- 17. Doplňky pro stránky features (jen přes tokeny; HTML se nemění) ---------- */
+[data-theme='outdoor'] .usp {
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow-1);
+  padding: var(--space-6);
+}
+[data-theme='outdoor'] .usp__icon {
+  background: var(--tint-primary);
+  color: var(--primary);
+  border: 2px solid var(--primary);
+}
+[data-theme='outdoor'] .section--contact .contact-card,
+[data-theme='outdoor'] .contact-form,
+[data-theme='outdoor'] .filters,
+[data-theme='outdoor'] .legal-toc,
+[data-theme='outdoor'] .summary-card,
+[data-theme='outdoor'] .price-box,
+[data-theme='outdoor'] .info-card,
+[data-theme='outdoor'] .rule-card {
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: var(--card-radius);
+  box-shadow: var(--shadow-1);
+}
+[data-theme='outdoor'] .filters {
+  padding: var(--space-5);
+}
+[data-theme='outdoor'] .contact-form__title,
+[data-theme='outdoor'] .term-form__title {
+  font-variation-settings: 'opsz' 48, 'SOFT' 40;
+}
+[data-theme='outdoor'] .contact-hint,
+[data-theme='outdoor'] .manage__hint {
+  font-family: var(--font-accent);
+  font-size: 1.2rem;
+  line-height: 1.3;
+}
+[data-theme='outdoor'] .legal h2 {
+  font-variation-settings: 'opsz' 48, 'SOFT' 40;
+}
+[data-theme='outdoor'] .legal-demo {
+  background: var(--surface);
+  border: 1px dashed var(--border);
+  border-radius: var(--card-radius);
+}
+
+/* ---------- 18. Pohyb: pomalé fade 300 ms; reduced motion řeší base.css (vypne i scroll-driven efekty níže) ---------- */
+@media (prefers-reduced-motion: reduce) {
+  [data-theme='outdoor'] .hero__body {
+    animation: none;
+  }
+  [data-theme='outdoor'] .hero__media img {
+    animation: none;
+    scale: 1;
+  }
+  [data-theme='outdoor'] .card:hover,
+  [data-theme='outdoor'] .btn:hover {
+    transform: none;
+  }
+  [data-theme='outdoor'] .card:hover .card__media img {
+    transform: none;
+  }
+}
