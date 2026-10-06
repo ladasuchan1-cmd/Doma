@@ -1,0 +1,403 @@
+'use strict';
+// Feature „nabídka“: veřejný nabídkový konfigurátor pro hotely, penziony a půjčovny (kola + rezervační web + správa +
+// servis) nad jediným zdrojem cen config/nabidka.json (načte se při startu a znovu při změně mtime; chyba struktury →
+// srozumitelná chyba v logu a stránka s notice „nabídka se připravuje“; cesta přepsatelná PK_NABIDKA_CONFIG / setConfigPath()).
+//   GET  /nabidka[?zakladni&trek&ekolo&porizeni&web&dalsiDesign&sprava&servis&doplnky]   SSR konfigurátor (funguje bez JS)
+//   GET  /api/v1/nabidka/spocitat?…        JSON výsledek (+ `html` souhrnu pro živý přepočet); interní čísla jen s admin session
+//   POST /nabidka/poptavka                 odeslání poptávky (CSRF, honeypot „web“, rate limit reservation) → outbox typ
+//                                          'nabidka' (payload = konfigurace + výsledek + interní čísla; kontaktní údaje šifrované
+//                                          fieldCrypto jako v kontakt.js; e-mail provozovateli) → /nabidka/dekujeme/:token
+//   GET  /nabidka/dekujeme/:token          rekapitulace s číslem poptávky NAB-RRRR-NNNNNN
+//   GET  /admin/nabidky, /admin/nabidky/:id  interní seznam a detail poptávek (admin session přes admin.guard; zobrazení
+//                                          kontaktních údajů se audituje jako nabidka.view)
+// Interní blok (marže, náklady, podíl partnera, varování) se na /nabidka a v API zobrazí jen s platnou admin session
+// (admin.currentUser); ?interni=0 ho skryje. Log nikdy neobsahuje název, osobu, e-mail ani telefon – jen id/číslo.
+
+const fs = require('node:fs');
+const path = require('node:path');
+const crypto = require('node:crypto');
+const { nowIso, parseJson, transaction } = require('../db');
+const { HttpError } = require('../http/errors');
+const { html } = require('../render/html');
+const domain = require('../domain/nabidka');
+const page = require('../render/pages/nabidka');
+const adminPage = require('../render/pages/admin/nabidky');
+const admin = require('./admin');
+
+const ROOT = path.join(__dirname, '..', '..');
+const DEFAULT_CONFIG_PATH = path.join(ROOT, 'config', 'nabidka.json');
+const MTIME_CHECK_MS = 2000;
+const OUTBOX_TYPE = 'nabidka';
+const LIMITS = { nazev: [2, 120], obec: [2, 80], osoba: [2, 100], email: [5, 200], telefon: [0, 40], poznamka: [0, 2000] };
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
+const PAGE_SIZE = 50;
+
+// ---------------------------------------------------------------------------------------------------------
+// Konfigurace cen
+
+/**
+ * Načítání config/nabidka.json s kontrolou mtime (každé 2 s) – změna souboru se projeví bez restartu.
+ * get() vrací { config|null, error|null, mtime, path }.
+ */
+function createConfigLoader({ filePath = DEFAULT_CONFIG_PATH, log = null } = {}) {
+  let state = { config: null, error: 'Konfigurace zatím nebyla načtena.', mtime: null, path: filePath, loadedAt: 0 };
+  let lastCheck = 0;
+  let lastLoggedKey = null;
+
+  function load(force = false) {
+    const now = Date.now();
+    if (!force && now - lastCheck < MTIME_CHECK_MS) return state;
+    lastCheck = now;
+    let stat;
+    try {
+      stat = fs.statSync(filePath);
+    } catch {
+      const key = 'missing';
+      if (lastLoggedKey !== key && log) log.warn('Nabídka: konfigurace cen nenalezena – stránka zobrazí „nabídka se připravuje“', { file: path.relative(ROOT, filePath) });
+      lastLoggedKey = key;
+      state = { config: null, error: `Soubor ${path.relative(ROOT, filePath)} neexistuje.`, mtime: null, path: filePath, loadedAt: now };
+      return state;
+    }
+    const mtime = stat.mtimeMs;
+    if (!force && state.mtime === mtime && (state.config || state.error)) return state;
+    let parsed;
+    try {
+      parsed = JSON.parse(fs.readFileSync(filePath, 'utf8'));
+    } catch (e) {
+      state = { config: null, error: `Soubor není platný JSON: ${e.message}`, mtime, path: filePath, loadedAt: now };
+      const key = `json:${mtime}`;
+      if (lastLoggedKey !== key && log) log.error('Nabídka: konfigurace cen není platný JSON', { file: path.relative(ROOT, filePath), error: e.message });
+      lastLoggedKey = key;
+      return state;
+    }
+    const v = domain.validateConfig(parsed);
+    if (!v.ok) {
+      state = { config: null, error: v.errors.join(' '), mtime, path: filePath, loadedAt: now };
+      const key = `struct:${mtime}`;
+      if (lastLoggedKey !== key && log) log.error('Nabídka: konfigurace cen má chybnou strukturu – stránka zobrazí „nabídka se připravuje“', { file: path.relative(ROOT, filePath), errors: v.errors });
+      lastLoggedKey = key;
+      return state;
+    }
+    const changed = state.mtime !== mtime;
+    state = { config: v.config, error: null, mtime, path: filePath, loadedAt: now };
+    if (changed && log) log.info('Nabídka: konfigurace cen načtena', { file: path.relative(ROOT, filePath), verze: v.config.meta.verze, zastupneCeny: v.config.meta.zastupneCeny });
+    lastLoggedKey = null;
+    return state;
+  }
+
+  return {
+    get: () => load(false),
+    reload: () => load(true),
+    /** Logger serveru (modulový loader vzniká před startem serveru bez loggeru). */
+    setLog(l) {
+      log = l || log;
+    },
+    setPath(p) {
+      filePath = p;
+      state = { config: null, error: null, mtime: null, path: p, loadedAt: 0 };
+      lastCheck = 0;
+      lastLoggedKey = null;
+      return load(true);
+    },
+    get path() {
+      return filePath;
+    },
+  };
+}
+
+const loader = createConfigLoader({ filePath: process.env.PK_NABIDKA_CONFIG ? path.resolve(process.env.PK_NABIDKA_CONFIG) : DEFAULT_CONFIG_PATH });
+
+/** Konfigurace pro požadavek (loguje přes ctx.log, aby záznam nesl request id). */
+function configFor(ctx) {
+  if (ctx && ctx.app && ctx.app.log) loader.setLog(ctx.app.log);
+  const st = loader.get();
+  if (!st.config && ctx && ctx.log && st.error) ctx.log.warn('Nabídka: konfigurace cen není k dispozici', { error: st.error });
+  return st;
+}
+
+// ---------------------------------------------------------------------------------------------------------
+// Pomocníci
+
+function str(v) {
+  return typeof v === 'string' ? v.trim() : Array.isArray(v) ? str(v[0]) : '';
+}
+
+/** Je požadavek od přihlášeného správce (platná admin session, aktivní uživatel)? */
+function isAdmin(ctx) {
+  try {
+    return !!admin.currentUser(ctx);
+  } catch {
+    return false;
+  }
+}
+
+/** Zobrazit interní blok? Jen s admin session; ?interni=0 skryje. Bez admin session nikdy. */
+function showInternal(ctx) {
+  if (!isAdmin(ctx)) return false;
+  return ctx.query.interni !== '0';
+}
+
+/** Vstup konfigurátoru z query (doplnky mohou být opakované i s čárkami). */
+function inputFromSearchParams(sp, config) {
+  const q = {};
+  for (const k of ['zakladni', 'trek', 'ekolo', 'porizeni', 'web', 'dalsiDesign', 'sprava', 'servis']) if (sp.has(k)) q[k] = sp.get(k);
+  if (sp.has('doplnky')) q.doplnky = sp.getAll('doplnky');
+  return domain.normalizeInput(q, config);
+}
+
+function operatorEmail(tenant) {
+  return (tenant.legal && tenant.legal.operatorEmail) || (tenant.business && tenant.business.email) || null;
+}
+
+// ---------------------------------------------------------------------------------------------------------
+// Veřejné stránky
+
+function renderUnavailable(ctx, status = 200) {
+  ctx.render(page.unavailable, { tenant: ctx.tenant }, { title: 'Pro hotely a půjčovny', description: 'Nabídka kol, rezervačního webu, správy a servisu pro hotely, penziony a půjčovny.', feature: 'nabidka', status });
+}
+
+async function nabidkaGet(ctx) {
+  const st = configFor(ctx);
+  if (!st.config) return renderUnavailable(ctx);
+  const input = inputFromSearchParams(ctx.url.searchParams, st.config);
+  const result = domain.compute(input, st.config);
+  const internal = showInternal(ctx);
+  return ctx.render(
+    page.nabidka,
+    { tenant: ctx.tenant, config: st.config, input, result: internal ? result : domain.publicResult(result), internal, csrf: ctx.csrfToken(), values: {}, errors: {}, query: domain.inputToQuery(input) },
+    { title: 'Pro hotely a půjčovny', description: 'Sestavte si nabídku: kola pro hosty, rezervační web, správa a servis – koupě, pronájem nebo zkušební období bez dlouhého závazku.', feature: 'nabidka' }
+  );
+}
+
+async function spocitatApi(ctx) {
+  const st = configFor(ctx);
+  if (!st.config) return ctx.json({ ok: false, error: 'Nabídka se připravuje – ceník zatím není k dispozici.' }, 503);
+  const input = inputFromSearchParams(ctx.url.searchParams, st.config);
+  const result = domain.compute(input, st.config);
+  const internal = showInternal(ctx);
+  const out = internal ? result : domain.publicResult(result);
+  return ctx.json({ ok: true, ...out, html: page.summaryFragment({ result: out, internal, config: st.config }).toString() });
+}
+
+// ---------------------------------------------------------------------------------------------------------
+// Poptávka
+
+/** Validace kontaktního formuláře. Vrací { values, errors }. */
+function validate(body) {
+  const values = { nazev: str(body.nazev), obec: str(body.obec), osoba: str(body.osoba), email: str(body.email), telefon: str(body.telefon), poznamka: str(body.poznamka), souhlas: body.souhlas === '1' || body.souhlas === 'on' };
+  const errors = {};
+  const len = (k, msg) => {
+    const [min, max] = LIMITS[k];
+    if (values[k].length < min || values[k].length > max) errors[k] = msg;
+  };
+  len('nazev', 'Zadejte prosím název ubytování nebo půjčovny (2–120 znaků).');
+  len('obec', 'Zadejte prosím obec (2–80 znaků).');
+  len('osoba', 'Zadejte prosím kontaktní osobu (2–100 znaků).');
+  if (!EMAIL_RE.test(values.email) || values.email.length > LIMITS.email[1]) errors.email = 'Zadejte prosím platný e-mail, abychom mohli odpovědět.';
+  len('telefon', 'Telefon je příliš dlouhý.');
+  len('poznamka', 'Poznámka je příliš dlouhá (max. 2000 znaků).');
+  if (!values.souhlas) errors.souhlas = 'Bez potvrzení nemůžeme poptávku zpracovat.';
+  return { values, errors };
+}
+
+/** Číslo poptávky NAB-RRRR-NNNNNN (pořadí v roce podle řádků outboxu typu nabidka). */
+function nextNumber(db, now) {
+  const year = now.slice(0, 4);
+  const n = db.prepare("SELECT COUNT(*) AS n FROM outbox WHERE type = ? AND created_at LIKE ?").get(OUTBOX_TYPE, `${year}%`).n;
+  return `NAB-${year}-${String(Number(n) + 1).padStart(6, '0')}`;
+}
+
+function fmtKc(n) {
+  return `${new Intl.NumberFormat('cs-CZ', { maximumFractionDigits: 0 }).format(Number(n) || 0)} Kč`;
+}
+
+/** Textová rekapitulace pro e-mail provozovateli (bez interních čísel – ty jsou v payloadu). */
+function recapText(result) {
+  const lines = [];
+  lines.push(`Kola: ${result.kola.length ? result.kola.map((k) => `${k.pocet}× ${k.nazev}`).join(', ') : 'žádná'}`);
+  lines.push(`Způsob pořízení: ${result.porizeni.label}`);
+  lines.push(`Web: ${result.web.label}${result.web.dalsiDesign ? ' + další design' : ''}`);
+  lines.push(`Správa: ${result.sprava.label}`);
+  lines.push(`Servis: ${result.servis.label}`);
+  lines.push(`Doplňky: ${result.doplnky.length ? result.doplnky.map((d) => d.nazev).join(', ') : 'žádné'}`);
+  lines.push('');
+  lines.push(`Jednorázově: ${fmtKc(result.souhrn.jednorazove)}`);
+  lines.push(`Měsíčně: ${fmtKc(result.souhrn.mesicne)}`);
+  if (result.souhrn.rocne) lines.push(`Ročně: ${fmtKc(result.souhrn.rocne)}`);
+  if (result.souhrn.kauce) lines.push(`Vratná kauce: ${fmtKc(result.souhrn.kauce)}`);
+  for (const h of result.souhrn.horizonty) lines.push(`${h.label}: ${fmtKc(h.castka)}`);
+  if (result.zkouska) lines.push(`Při pokračování pronájmem se započte: ${fmtKc(result.zkouska.zapocet)}; odkup po zkoušce: ${fmtKc(result.zkouska.odkup)}`);
+  return lines.join('\n');
+}
+
+/**
+ * Uloží poptávku do outboxu (typ nabidka, e-mail provozovateli). Kontaktní údaje šifrované; konfigurace a výsledek
+ * v payloadu v čitelné podobě (nejsou osobní). Vrací { id, number, token }.
+ */
+function enqueueInquiry(db, { tenant, fieldCrypto, values, input, result, ipHash, config }) {
+  const now = nowIso();
+  const to = operatorEmail(tenant);
+  const token = crypto.randomBytes(18).toString('base64url');
+  return transaction(db, () => {
+    const number = nextNumber(db, now);
+    const subject = `Poptávka ${number}: ${result.souhrn.pocetKol} kol, ${result.porizeni.label.toLowerCase()}`;
+    const bodyText = [
+      `Nová poptávka z konfigurátoru (${tenant.name}) – číslo ${number}.`,
+      '',
+      `Ubytování / půjčovna: ${values.nazev}`,
+      `Obec: ${values.obec}`,
+      `Kontaktní osoba: ${values.osoba}`,
+      `E-mail: ${values.email}`,
+      values.telefon ? `Telefon: ${values.telefon}` : null,
+      values.poznamka ? `Poznámka: ${values.poznamka}` : null,
+      '',
+      'Konfigurace:',
+      recapText(result),
+      '',
+      `Ceník verze ${config.meta.verze}${config.meta.zastupneCeny ? ' (ukázkové ceny)' : ''}, platnost od ${config.meta.platnostOd}.`,
+      `Odesláno: ${now}`,
+    ]
+      .filter((l) => l !== null)
+      .join('\n');
+    const payload = {
+      kind: OUTBOX_TYPE,
+      number,
+      token,
+      to,
+      obec: values.obec,
+      nazev_enc: fieldCrypto.enc(values.nazev),
+      osoba_enc: fieldCrypto.enc(values.osoba),
+      reply_to_enc: fieldCrypto.enc(values.email),
+      phone_enc: values.telefon ? fieldCrypto.enc(values.telefon) : null,
+      note_enc: values.poznamka ? fieldCrypto.enc(values.poznamka) : null,
+      konfigurace: input,
+      query: domain.inputToQuery(input),
+      vysledek: domain.publicResult(result),
+      interni: result.interni,
+      cenik: { verze: config.meta.verze, platnostOd: config.meta.platnostOd, zastupneCeny: config.meta.zastupneCeny },
+      ip_hash: ipHash,
+    };
+    const r = db
+      .prepare('INSERT INTO outbox(type, to_hmac, subject, body_text, body_html, payload, run_at, created_at) VALUES (?, ?, ?, ?, NULL, ?, ?, ?)')
+      .run(OUTBOX_TYPE, to ? fieldCrypto.hmacEmail(to) : null, subject, bodyText, JSON.stringify(payload), now, now);
+    return { id: Number(r.lastInsertRowid), number, token };
+  });
+}
+
+async function poptavkaPost(ctx) {
+  const st = configFor(ctx);
+  if (!st.config) return renderUnavailable(ctx, 503);
+  if (str(ctx.body.web_hp)) {
+    ctx.log.info('Poptávka nabídky: honeypot – zahozeno');
+    return ctx.redirect('/nabidka?odeslano=hp');
+  }
+  const sp = new URLSearchParams(str(ctx.body.konfigurace));
+  const input = inputFromSearchParams(sp, st.config);
+  const result = domain.compute(input, st.config);
+  const { values, errors } = validate(ctx.body);
+  if (result.souhrn.pocetKol === 0) errors.konfigurace = 'Vyberte prosím alespoň jedno kolo.';
+  if (Object.keys(errors).length) {
+    const internal = showInternal(ctx);
+    return ctx.render(
+      page.nabidka,
+      { tenant: ctx.tenant, config: st.config, input, result: internal ? result : domain.publicResult(result), internal, csrf: ctx.csrfToken(), values, errors, query: domain.inputToQuery(input) },
+      { title: 'Pro hotely a půjčovny', feature: 'nabidka', status: 422 }
+    );
+  }
+  const saved = enqueueInquiry(ctx.db, { tenant: ctx.tenant, fieldCrypto: ctx.app.fieldCrypto, values, input, result, ipHash: ctx.ipHash, config: st.config });
+  ctx.log.info('Poptávka nabídky uložena do outboxu', { outboxId: saved.id, number: saved.number, pocetKol: result.souhrn.pocetKol, porizeni: input.porizeni });
+  return ctx.redirect(`/nabidka/dekujeme/${saved.token}`);
+}
+
+function loadInquiryByToken(db, token) {
+  if (!/^[A-Za-z0-9_-]{16,64}$/.test(String(token || ''))) return null;
+  const row = db.prepare("SELECT * FROM outbox WHERE type = ? AND json_extract(payload, '$.token') = ?").get(OUTBOX_TYPE, token);
+  if (!row) return null;
+  return { row, payload: parseJson(row.payload, {}) || {} };
+}
+
+async function dekujemeGet(ctx) {
+  const found = loadInquiryByToken(ctx.db, ctx.params.token);
+  if (!found) throw new HttpError(404, 'Poptávka nebyla nalezena.');
+  const { row, payload } = found;
+  const dec = (v) => {
+    try {
+      return v ? ctx.app.fieldCrypto.dec(v) : '';
+    } catch {
+      return '';
+    }
+  };
+  return ctx.render(
+    page.dekujeme,
+    { tenant: ctx.tenant, number: payload.number, createdAt: row.created_at, nazev: dec(payload.nazev_enc), obec: payload.obec || '', result: payload.vysledek || null, query: payload.query || '', cenik: payload.cenik || {} },
+    { title: 'Děkujeme za poptávku', feature: 'nabidka', noindex: true }
+  );
+}
+
+// ---------------------------------------------------------------------------------------------------------
+// Admin: /admin/nabidky
+
+function adminRender(ctx, body, { title, lead, actions, wide }) {
+  const shared = require('../render/pages/admin/shared');
+  const shellHtml = shared.shell({ title, body, user: ctx.user || null, path: ctx.url.pathname, flash: null, demo: !!ctx.config.demo, csrf: ctx.adminCsrfToken(), tenant: ctx.tenant, lead, actions, wide });
+  ctx.render(() => ({ title: `${title} · Administrace`, body: shellHtml, noindex: true, bodyClass: 'admin' }), {}, { feature: 'admin', status: 200 });
+}
+
+function decField(ctx, value) {
+  try {
+    return value ? ctx.app.fieldCrypto.dec(value) : '';
+  } catch {
+    return '';
+  }
+}
+
+async function adminList(ctx) {
+  const total = ctx.db.prepare('SELECT COUNT(*) AS n FROM outbox WHERE type = ?').get(OUTBOX_TYPE).n;
+  const pages = Math.max(1, Math.ceil(total / PAGE_SIZE));
+  const pg = Math.min(pages, Math.max(1, Number.parseInt(str(ctx.query.strana), 10) || 1));
+  const rows = ctx.db.prepare('SELECT id, created_at, sent_at, payload FROM outbox WHERE type = ? ORDER BY id DESC LIMIT ? OFFSET ?').all(OUTBOX_TYPE, PAGE_SIZE, (pg - 1) * PAGE_SIZE).map((r) => {
+    const p = parseJson(r.payload, {}) || {};
+    return { id: r.id, createdAt: r.created_at, sentAt: r.sent_at, number: p.number || `#${r.id}`, nazev: decField(ctx, p.nazev_enc), obec: p.obec || '', payload: p };
+  });
+  const st = loader.get();
+  adminRender(ctx, adminPage.list({ rows, total, page: pg, pages, config: st.config, configError: st.error }), { title: 'Poptávky nabídek', lead: `${total} přijatých poptávek z konfigurátoru /nabidka`, actions: html`<a class="btn btn--secondary btn--sm" href="/nabidka">Otevřít konfigurátor</a>` });
+}
+
+async function adminDetail(ctx) {
+  const id = Number(ctx.params.id);
+  const row = Number.isInteger(id) ? ctx.db.prepare('SELECT * FROM outbox WHERE id = ? AND type = ?').get(id, OUTBOX_TYPE) : null;
+  if (!row) throw new HttpError(404, 'Poptávka nebyla nalezena.');
+  const p = parseJson(row.payload, {}) || {};
+  const contact = { nazev: decField(ctx, p.nazev_enc), obec: p.obec || '', osoba: decField(ctx, p.osoba_enc), email: decField(ctx, p.reply_to_enc), telefon: decField(ctx, p.phone_enc), poznamka: decField(ctx, p.note_enc) };
+  ctx.db
+    .prepare('INSERT INTO audit_log(at, user_id, action, entity, entity_id, meta, ip_hash) VALUES (?, ?, ?, ?, ?, ?, ?)')
+    .run(nowIso(), ctx.user ? ctx.user.id : null, 'nabidka.view', 'outbox', String(row.id), JSON.stringify({ number: p.number || null, fields: ['nazev', 'osoba', 'email', 'telefon', 'poznamka'] }), ctx.ipHash);
+  adminRender(ctx, adminPage.detail({ row, payload: p, contact }), { title: `Poptávka ${p.number || `#${row.id}`}`, lead: contact.nazev ? `${contact.nazev}${contact.obec ? `, ${contact.obec}` : ''}` : '', actions: html`<a class="btn btn--ghost btn--sm" href="/admin/nabidky">← Seznam</a> <a class="btn btn--ghost btn--sm" href="/nabidka?${p.query || ''}">Otevřít v konfigurátoru</a>`, wide: true });
+}
+
+module.exports = {
+  name: 'nabidka',
+  routes: [
+    ['GET', '/nabidka', nabidkaGet, { rateLimit: 'public' }],
+    ['GET', '/api/v1/nabidka/spocitat', spocitatApi, { rateLimit: 'api' }],
+    ['POST', '/nabidka/poptavka', poptavkaPost, { csrf: true, rateLimit: 'reservation' }],
+    ['GET', '/nabidka/dekujeme/:token', dekujemeGet, { rateLimit: 'public' }],
+    ['GET', '/admin/nabidky', admin.guard(adminList), { rateLimit: 'public' }],
+    ['GET', '/admin/nabidky/:id', admin.guard(adminDetail), { rateLimit: 'public' }],
+  ],
+  nav: [{ label: 'Pro hotely a půjčovny', href: '/nabidka', order: 60 }],
+  css: ['/css/nabidka.css'],
+  js: ['/js/nabidka.js'],
+  // pro testy a nástroje
+  loader,
+  createConfigLoader,
+  setConfigPath: (p) => loader.setPath(p),
+  DEFAULT_CONFIG_PATH,
+  OUTBOX_TYPE,
+  validate,
+  enqueueInquiry,
+  recapText,
+  isAdmin,
+  showInternal,
+  LIMITS,
+};

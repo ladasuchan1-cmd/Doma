@@ -1,0 +1,333 @@
+/* Styly feature „nabídka“ (konfigurátor pro hotely a půjčovny) – jen přes tokeny z base.css, funguje ve všech 3 tématech. */
+
+/* Rozložení: formulář s kroky + sticky souhrn (desktop vpravo, mobil dole) */
+.nab-layout {
+  display: grid;
+  gap: var(--space-6);
+  align-items: start;
+}
+@media (min-width: 960px) {
+  .nab-layout {
+    grid-template-columns: minmax(0, 7fr) minmax(300px, 4fr);
+  }
+  .nab-summary {
+    position: sticky;
+    top: calc(var(--header-height, 72px) + var(--space-4));
+  }
+}
+.nab-form {
+  min-width: 0;
+}
+.nab-form .section--nab-step {
+  padding-top: var(--space-6);
+  padding-bottom: var(--space-6);
+}
+.nab-form .section--nab-step .container {
+  padding-left: 0;
+  padding-right: 0;
+}
+.nab-form .section--nab-step + .section--nab-step {
+  border-top: 1px solid var(--border);
+}
+.nab-form__actions {
+  display: grid;
+  gap: var(--space-2);
+  justify-items: start;
+  padding: var(--space-4) 0;
+}
+.nab-form__actions[hidden] {
+  display: none;
+}
+.nab-subtitle {
+  margin: var(--space-5) 0 var(--space-3);
+  font-size: var(--step-1);
+}
+.nab-muted {
+  color: var(--text-muted);
+}
+
+/* Krok 1: karty tříd kol */
+.nab-class {
+  display: grid;
+  gap: var(--space-3);
+  padding: var(--space-5);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--card-radius);
+}
+.nab-class__title {
+  margin: 0;
+  font-size: var(--step-1);
+}
+.nab-class__text {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: var(--step--1);
+}
+.nab-class__price {
+  margin: 0;
+  font-weight: 600;
+}
+.nab-class .field {
+  margin: 0;
+}
+.nab-class .field__input {
+  max-width: 10rem;
+  font-size: var(--step-1);
+  font-variant-numeric: tabular-nums;
+}
+
+/* Volby (radio karty) */
+.nab-choices {
+  display: grid;
+  gap: var(--space-3);
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+.nab-choice {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: var(--space-3);
+  align-items: start;
+  padding: var(--space-4) var(--space-5);
+  background: var(--surface);
+  border: 2px solid var(--border);
+  border-radius: var(--card-radius);
+  cursor: pointer;
+  transition: border-color var(--motion) var(--ease), background var(--motion) var(--ease);
+}
+.nab-choice:hover {
+  border-color: var(--primary);
+}
+.nab-choice.is-checked,
+.nab-choice:has(.nab-choice__input:checked) {
+  border-color: var(--primary);
+  background: var(--tint-primary);
+}
+.nab-choice:has(.nab-choice__input:focus-visible) {
+  outline: 3px solid var(--focus);
+  outline-offset: 2px;
+}
+.nab-choice__input {
+  margin: 0.35em 0 0;
+  width: 1.25rem;
+  height: 1.25rem;
+  accent-color: var(--primary);
+}
+.nab-choice__body {
+  display: grid;
+  gap: var(--space-1);
+}
+.nab-choice__head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+}
+.nab-choice__title {
+  font-size: var(--step-0);
+}
+.nab-choice__text {
+  color: var(--text-muted);
+  font-size: var(--step--1);
+}
+.nab-choice__meta {
+  font-weight: 600;
+  font-size: var(--step--1);
+}
+
+/* Krok 5: doplňky */
+.nab-addons {
+  display: grid;
+  gap: var(--space-2);
+}
+.nab-addons .field--checkbox {
+  margin: 0;
+  padding: var(--space-3) var(--space-4);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+}
+.nab-addons .field__checkbox:disabled + .field__label {
+  color: var(--text-muted);
+}
+
+/* Souhrn */
+.nab-summary__inner {
+  display: grid;
+  gap: var(--space-4);
+  padding: var(--space-5);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--card-radius);
+  box-shadow: var(--shadow-1);
+}
+.nab-summary__title {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  margin: 0;
+  font-size: var(--step-2);
+}
+.nab-summary__subtitle {
+  margin: 0 0 var(--space-2);
+  font-size: var(--step-0);
+}
+.nab-summary .summary__row dd {
+  max-width: 60%;
+}
+.nab-summary .summary__row dd small {
+  display: block;
+  font-weight: 400;
+}
+.nab-summary__next {
+  padding: var(--space-4);
+  background: var(--tint-success);
+  border-radius: var(--radius-md);
+}
+.nab-summary__note {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: var(--step--1);
+}
+.nab-summary__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+.nab-summary.is-loading .nab-summary__inner {
+  opacity: 0.6;
+}
+.nab-summary--static {
+  position: static;
+}
+.nab-summary__details {
+  border-top: 1px solid var(--border);
+  padding-top: var(--space-2);
+}
+.nab-summary__details summary {
+  cursor: pointer;
+  font-weight: 600;
+  padding: var(--space-2) 0;
+}
+.nab-summary__details .summary {
+  margin-top: var(--space-2);
+}
+.nab-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: var(--space-1);
+  text-align: inherit;
+}
+.nab-list--bullets {
+  padding-left: 1.2em;
+  list-style: disc;
+}
+.nab-list--numbered {
+  padding-left: 1.4em;
+  list-style: decimal;
+  gap: var(--space-2);
+}
+
+/* Interní blok (jen admin) */
+.nab-internal {
+  display: grid;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  border: 2px dashed var(--warning);
+  border-radius: var(--radius-md);
+}
+.nab-internal__title {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  margin: 0;
+  font-size: var(--step-0);
+}
+.nab-internal__note {
+  color: var(--text-muted);
+  font-weight: 400;
+  font-size: var(--step--1);
+}
+.nab-internal__meta {
+  margin: 0;
+  font-size: var(--step--1);
+}
+.nab-internal .table {
+  font-size: var(--step--1);
+}
+
+/* Poptávka */
+.section--nab-inquiry .container {
+  max-width: 56rem;
+}
+.nab-inquiry__form {
+  padding: var(--space-6);
+  background: var(--surface);
+  border-radius: var(--card-radius);
+}
+.nab-inquiry__grid {
+  display: grid;
+  gap: var(--space-4);
+}
+@media (min-width: 640px) {
+  .nab-inquiry__grid {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+/* Děkujeme */
+.nab-thanks {
+  display: grid;
+  gap: var(--space-6);
+  align-items: start;
+}
+@media (min-width: 900px) {
+  .nab-thanks {
+    grid-template-columns: minmax(0, 1fr) minmax(300px, 24rem);
+  }
+}
+.nab-thanks__main {
+  display: grid;
+  gap: var(--space-4);
+}
+.nab-number {
+  font-family: var(--font-mono);
+  font-size: var(--step-1);
+}
+
+/* Tisk: jen hlavička a souhrn, formuláře skryté */
+@media print {
+  .nab-form,
+  .section--nab-inquiry,
+  .nab-summary__actions,
+  .section--page-head .steps,
+  .section--page-head .notice {
+    display: none !important;
+  }
+  .nab-layout {
+    display: block;
+  }
+  .nab-summary {
+    position: static;
+  }
+  .nab-summary__details summary {
+    list-style: none;
+  }
+  .nab-summary__inner {
+    border: 1px solid #000;
+    box-shadow: none;
+    background: #fff;
+  }
+  .nab-summary__next {
+    background: #f3f3f3;
+  }
+  .nab-internal {
+    border-color: #000;
+  }
+}

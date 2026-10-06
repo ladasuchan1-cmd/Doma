@@ -18,6 +18,7 @@ const NAV = Object.freeze([
   { label: 'Ceník', href: '/admin/cenik', icon: 'card' },
   { label: 'Platby', href: '/admin/platby', icon: 'card' },
   { label: 'E-maily', href: '/admin/emaily', icon: 'mail' },
+  { label: 'Poptávky', href: '/admin/nabidky', icon: 'card' },
   { label: 'Zákazníci', href: '/admin/zakaznici', icon: 'shield' },
   { label: 'Obsah', href: '/admin/obsah', icon: 'map' },
   { label: 'Nastavení', href: '/admin/nastaveni', icon: 'wrench', owner: true },
@@ -42,7 +43,7 @@ const PAYMENT_STATUS = Object.freeze({
 const LEDGER_LABELS = Object.freeze({ fee_paid: 'Poplatek zaplacen', balance_paid: 'Doplatek zaplacen', deposit_held: 'Kauce složena', deposit_captured: 'Stržení z kauce', deposit_released: 'Kauce uvolněna', refund: 'Vratka', fee_forfeited: 'Poplatek propadl', damage: 'Poškození' });
 const LEDGER_SIGN = Object.freeze({ fee_paid: 1, balance_paid: 1, deposit_held: 0, deposit_captured: 1, deposit_released: 0, refund: -1, fee_forfeited: 0, damage: 0 });
 const DOC_LABELS = Object.freeze({ receipt: 'Doklad o přijaté platbě', simplified_tax_doc: 'Zjednodušený daňový doklad', tax_doc: 'Daňový doklad', final_doc: 'Konečný doklad', credit_note: 'Opravný doklad', contract: 'Smlouva o nájmu', handover: 'Předávací protokol', return_protocol: 'Protokol o vrácení' });
-const MAIL_LABELS = Object.freeze({ reservation_created: 'Potvrzení rezervace', payment_received: 'Platba přijata', reminder: 'Připomínka', reservation_cancelled: 'Zrušení rezervace', balance_qr: 'Doplatek – QR', contact: 'Dotaz z webu', internal_preauth_warning: 'Interní: preautorizace vyprší', internal_preauth_released: 'Interní: preautorizace uvolněna' });
+const MAIL_LABELS = Object.freeze({ reservation_created: 'Potvrzení rezervace', payment_received: 'Platba přijata', reminder: 'Připomínka', reservation_cancelled: 'Zrušení rezervace', balance_qr: 'Doplatek – QR', contact: 'Dotaz z webu', nabidka: 'Poptávka nabídky (hotely a půjčovny)', internal_preauth_warning: 'Interní: preautorizace vyprší', internal_preauth_released: 'Interní: preautorizace uvolněna' });
 const ROLE_LABELS = Object.freeze({ owner: 'majitel', staff: 'obsluha' });
 const BIKE_STATUS = Object.freeze({ available: ['k dispozici', 'success'], maintenance: ['v servisu', 'warning'], retired: ['vyřazeno', 'neutral'] });
 const CATEGORY_LABELS = c.CATEGORY_LABELS;

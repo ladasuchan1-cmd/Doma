@@ -1,0 +1,131 @@
+{
+  "meta": {
+    "verze": "test-0.1",
+    "platnostOd": "2026-10-06",
+    "zastupneCeny": true,
+    "poznamka": "Testovací fixtura – zmrazená kopie config/nabidka.json (verze 0.1, 6. 10. 2026), aby testy nezávisely na změnách ceníku."
+  },
+  "tridyKol": [
+    {
+      "id": "zakladni",
+      "nazev": "Trekové/městské kolo",
+      "nakupniCena": 20000,
+      "prodejniCena": 25000,
+      "zustatkova36m": 8000,
+      "popis": "Hliníkový rám, 24–27 převodů nebo náboj Nexus, kotoučové brzdy, nosič, blatníky, osvětlení. Nákupní cena = vstup zadavatele; prodejní cena = návrh (marže 20 % z prodejní ceny), zůstatková po 36 m = návrh 32 % prodejní ceny."
+    },
+    {
+      "id": "trek",
+      "nazev": "Trekové/horské kolo vyšší třídy",
+      "nakupniCena": 40000,
+      "prodejniCena": 50000,
+      "zustatkova36m": 16000,
+      "popis": "Odpružená vidlice, hydraulické brzdy, 1x11/1x12, odolné pláště; pro terén okolo horských penzionů. Nákupní cena = vstup zadavatele; prodejní cena = návrh (marže 20 %), zůstatková po 36 m = návrh 32 %."
+    },
+    {
+      "id": "ekolo",
+      "nazev": "Trekové e-kolo (středový motor)",
+      "nakupniCena": 70000,
+      "prodejniCena": 88000,
+      "zustatkova36m": 26500,
+      "popis": "Středový motor Bosch/Shimano/Yamaha, baterie 500–750 Wh, hydraulické brzdy, nosič, osvětlení. Nákupní cena = vstup zadavatele; prodejní cena = návrh (marže 20,5 %), zůstatková po 36 m = návrh 30 % (degradace baterie)."
+    }
+  ],
+  "pronajem": {
+    "mesice": [
+      24,
+      36
+    ],
+    "rocniUrok": 0.07,
+    "marzeRocni": 0.12,
+    "kauceProcent": 0.1,
+    "minKol": 5,
+    "servisVCene": false
+  },
+  "zkouska": {
+    "mesice": 4,
+    "nasobekSazby36m": 2.0,
+    "zalohaProcent": 0.5,
+    "kauceProcent": 0.1,
+    "minKol": 5,
+    "startNejpozdeji": "06-15",
+    "zapocetPriPokracovaniProcent": 0.35,
+    "odkupPoZkousceProcentProdejni": 0.8,
+    "vCene": [
+      "web 1 design",
+      "zaškolení",
+      "1 konzultace/měsíc",
+      "1 sezónní prohlídka",
+      "přilby a zámky"
+    ]
+  },
+  "web": {
+    "sablona": {
+      "jednorazove": 15000,
+      "mesicne": 990
+    },
+    "naMiru": {
+      "jednorazoveOd": 60000,
+      "mesicne": 1490
+    },
+    "dalsiDesignJednorazove": 5000
+  },
+  "sprava": {
+    "sami": {
+      "mesicne": 0
+    },
+    "predplacena": {
+      "mesicne": 3900,
+      "konzultaceZdarmaMesicne": 1,
+      "dalsiKonzultaceHodina": 900
+    }
+  },
+  "servis": {
+    "vlastni": {
+      "slevaNaDilyProcent": 0.15,
+      "mesicne": 0
+    },
+    "partner": {
+      "mesicneZaKolo": 180,
+      "sezonniProhlidkaZaKolo": 900,
+      "provizeProNasProcent": 0.15,
+      "slaHodin": 48
+    }
+  },
+  "doplnky": [
+    {
+      "id": "pojisteni",
+      "nazev": "Pojištění flotily",
+      "mesicneZaKolo": 120
+    },
+    {
+      "id": "gps",
+      "nazev": "GPS lokátor",
+      "jednorazoveZaKolo": 1500,
+      "mesicneZaKolo": 60
+    },
+    {
+      "id": "prilby",
+      "nazev": "Přilby a zámky (sada ke kolu)",
+      "jednorazoveZaKolo": 1200
+    },
+    {
+      "id": "nabijecky",
+      "nazev": "Nabíjecí stanice pro e-kola",
+      "jednorazove": 25000,
+      "jenEkolo": true
+    }
+  ],
+  "interni": {
+    "prahMarzeProcent": 0.2,
+    "nakladyHostingMesicne": 150,
+    "nakladyKonzultaceHodina": 600,
+    "nakladyNasazeniWebu": 6000,
+    "nakladyZaskoleniHodin": 4,
+    "nakladyPrilbyProcentCeny": 0.7,
+    "nakladyGpsProcentCeny": 0.75,
+    "nakladyPojisteniProcentCeny": 0.8,
+    "nakladySpravyHodinMesicne": 3,
+    "nakladyNabijeckyProcentCeny": 0.8
+  }
+}
