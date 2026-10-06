@@ -4,7 +4,8 @@
 // JSON-LD LocalBusiness. Cena „od … Kč/den“ = nejnižší price_rules.unit='day' mimo sezónu (season_id IS NULL).
 // Vstup: ctx. Výstup: vyrenderovaná stránka. Fotky: hero použije /img/demo/<tema>/hero.jpg, pokud soubor existuje;
 // alt text fotky je per téma (THEMES.<tema>.heroAlt v src/themes.js). Texty (heroTitle, heroText, about) = tenant.texts
-// přepsané settings.texts z adminu (layout.siteTexts).
+// přepsané settings.texts z adminu (layout.siteTexts). Otevírací doba (karta „Kde nás najdete“ i JSON-LD) = efektivní
+// doba z adminu (layout.siteOpeningHours; null = zavřeno), stejná jako v kalendáři rezervací.
 // Dále GET /fotografie – stránka „Fotografie: autoři a licence“: licence CC BY vyžaduje uvedení autora a licence na
 // dostupném místě, proto se tabulky z public/img/demo/*/ATTRIBUTION.md (témata, kola) parsují a vypisují s náhledy;
 // odkaz je v patičce každé stránky (layout.PHOTO_CREDITS_PATH). Výsledek se cachuje podle mtime souborů.
@@ -14,7 +15,7 @@ const path = require('node:path');
 const { parseJson } = require('../db');
 const { publicBaseUrl } = require('../tenants');
 const { getTheme, THEMES } = require('../themes');
-const { localBusinessJsonLd, siteTexts, PHOTO_CREDITS_PATH } = require('../render/layout');
+const { localBusinessJsonLd, siteTexts, siteOpeningHours, PHOTO_CREDITS_PATH } = require('../render/layout');
 const page = require('../render/pages/home');
 
 const heroImageCache = new Map();
@@ -182,13 +183,14 @@ async function homeHandler(ctx) {
   const types = listBikeTypes(ctx.db);
   const baseUrl = publicBaseUrl(ctx.tenant, { host: ctx.req.headers.host, secure: ctx.secure });
   const texts = siteTexts(ctx);
+  const openingHours = siteOpeningHours(ctx);
   ctx.render(
     page.home,
-    { tenant: ctx.tenant, texts, types, settings: ctx.settings, heroImage: heroImage(ctx.config.publicDir, ctx.theme), heroAlt: getTheme(ctx.theme).heroAlt || '', theme: ctx.theme },
+    { tenant: ctx.tenant, texts, openingHours, types, settings: ctx.settings, heroImage: heroImage(ctx.config.publicDir, ctx.theme), heroAlt: getTheme(ctx.theme).heroAlt || '', theme: ctx.theme },
     {
       title: '',
       description: texts.heroText,
-      jsonLd: localBusinessJsonLd(ctx.tenant, baseUrl),
+      jsonLd: localBusinessJsonLd(ctx.tenant, baseUrl, openingHours),
       canonicalPath: '/',
       feature: 'home',
       bodyClass: 'page-home',

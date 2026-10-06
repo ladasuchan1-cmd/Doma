@@ -5,6 +5,9 @@
 // features, CTA „Rezervovat“), <main id="obsah">, <footer class="site-footer"> (kontakt, otevírací doba, odkazy,
 // attribution map, odkaz „Fotografie: autoři a licence“ na /fotografie, verze), v demo režimu <aside class="design-switch">.
 // Texty (description, „o půjčovně“ v patičce) = tenant.texts přepsané settings.texts z adminu (siteTexts).
+// Otevírací doba v patičce i JSON-LD = efektivní doba (tenant.openingHours přepsaná settings.openingHours z adminu,
+// null = zavřeno) přes domain/availability.effectiveOpeningHours – sdílený pomocník siteOpeningHours(ctx) používají
+// i features home, kontakt a pravni, aby se změna z adminu propsala všude stejně jako do kalendáře.
 // Logo: tenants/<slug>/logo.svg se vkládá jako inline SVG (soubor je náš, načte se jednou a cachuje; root <svg> dostane
 // class="site-logo__img" aria-hidden="true", odkaz nese aria-label), aby ho téma mohlo obarvit přes CSS `color`
 // (fill="currentColor" v SVG; base.css nastavuje výchozí černou jako u dřívějšího <img>, filtry témat tedy dál fungují).
@@ -17,6 +20,7 @@ const { html, raw, attr, joinHtml } = require('./html');
 const { contactCard } = require('./components');
 const { THEMES, getTheme } = require('../themes');
 const { publicBaseUrl, getTexts } = require('../tenants');
+const { effectiveOpeningHours } = require('../domain/availability');
 const { assetUrl } = require('../http/static');
 
 const FONT_SLUGS = {
@@ -96,13 +100,25 @@ function logoMarkup(tenant, logoUrl) {
  * selže-li (např. ctx bez DB v testech komponent), platí jen výchozí texty z tenant.json.
  */
 function siteTexts(ctx) {
-  let settings = null;
+  return getTexts(ctx.tenant, ctxSettings(ctx));
+}
+
+/** ctx.settings (líné čtení tabulky settings), nebo null, když DB není k dispozici (testy komponent bez serveru). */
+function ctxSettings(ctx) {
   try {
-    settings = ctx.settings || null;
+    return (ctx && ctx.settings) || null;
   } catch {
-    settings = null;
+    return null;
   }
-  return getTexts(ctx.tenant, settings);
+}
+
+/**
+ * Efektivní otevírací doba pro ctx: tenant.openingHours přepsaná settings.openingHours z adminu (null = zavřeno).
+ * Vrací vždy všech 7 klíčů mon…sun – stejný zdroj pravdy jako kalendář a validace termínu (domain/availability).
+ * Pro patičku, JSON-LD, kartu „Kde nás najdete“, /kontakt a parametr OTEVIRACI_DOBA právních textů.
+ */
+function siteOpeningHours(ctx) {
+  return effectiveOpeningHours(ctx.tenant, ctxSettings(ctx));
 }
 
 function navItems(ctx) {
@@ -136,6 +152,7 @@ function layout(ctx, page) {
   const feature = page.feature && ctx.app && ctx.app.features ? ctx.app.features[page.feature] : null;
   const asset = (p) => assetUrl(p, { publicDir: config.publicDir, version: config.version });
   const texts = siteTexts(ctx);
+  const openingHours = siteOpeningHours(ctx);
   const fullTitle = page.title ? `${page.title} · ${tenant.name}` : `${tenant.name} – ${tenant.brand.claim || 'půjčovna kol'}`;
   const description = page.description || texts.heroText || texts.about || tenant.name;
   const canonical = publicBaseUrl(tenant, { host: ctx.req.headers.host, secure: ctx.secure }) + (page.canonicalPath || ctx.url.pathname);
@@ -189,7 +206,7 @@ ${page.body}
       <a class="site-logo site-logo--footer" href="/" aria-label="${tenant.name} – domů">${logoHtml}<span class="site-logo__text">${tenant.name}</span></a>
       ${texts.about ? html`<p class="site-footer__about-text">${texts.about}</p>` : ''}
     </div>
-    <div class="site-footer__col">${contactCard(tenant.business, tenant.openingHours, { title: 'Kontakt a otevírací doba' })}</div>
+    <div class="site-footer__col">${contactCard(tenant.business, openingHours, { title: 'Kontakt a otevírací doba' })}</div>
     <div class="site-footer__col">
       <h3 class="site-footer__title">Informace</h3>
       <ul class="site-footer__links">${FOOTER_LINKS.map((l) => html`<li><a href="${l.href}">${l.label}</a></li>`)}</ul>
@@ -210,12 +227,16 @@ const THEME_COLORS = { outdoor: '#2F5D3A', sport: '#0E0F12', family: '#0F766E' }
 /** Stránka s autory a licencemi fotografií (CC BY vyžaduje attribution na dostupném místě) – servíruje feature home. */
 const PHOTO_CREDITS_PATH = '/fotografie';
 
-/** Veřejný pomocník: JSON-LD LocalBusiness z tenant.json (pro domovskou stránku). */
-function localBusinessJsonLd(tenant, baseUrl) {
+/**
+ * Veřejný pomocník: JSON-LD LocalBusiness z tenant.json (pro domovskou stránku). Otevírací doba: `openingHours`
+ * (zpravidla siteOpeningHours(ctx)); bez ní výchozí z tenant.json. Zavřené dny (null) se v openingHoursSpecification
+ * neuvádějí – schema.org den bez záznamu = zavřeno.
+ */
+function localBusinessJsonLd(tenant, baseUrl, openingHours) {
   const b = tenant.business || {};
   const days = { mon: 'Monday', tue: 'Tuesday', wed: 'Wednesday', thu: 'Thursday', fri: 'Friday', sat: 'Saturday', sun: 'Sunday' };
-  const hours = Object.entries(tenant.openingHours || {})
-    .filter(([, v]) => Array.isArray(v) && v.length === 2)
+  const hours = Object.entries(openingHours || effectiveOpeningHours(tenant))
+    .filter(([d, v]) => days[d] && Array.isArray(v) && v.length === 2 && v[0] && v[1])
     .map(([d, v]) => ({ '@type': 'OpeningHoursSpecification', dayOfWeek: days[d], opens: v[0], closes: v[1] }));
   const out = {
     '@context': 'https://schema.org',
@@ -233,4 +254,4 @@ function localBusinessJsonLd(tenant, baseUrl) {
   return JSON.parse(JSON.stringify(out));
 }
 
-module.exports = { layout, localBusinessJsonLd, siteTexts, FOOTER_LINKS, PHOTO_CREDITS_PATH, fontPreloads, FONT_SLUGS, tenantLogoSvg, logoMarkup, joinHtml };
+module.exports = { layout, localBusinessJsonLd, siteTexts, siteOpeningHours, FOOTER_LINKS, PHOTO_CREDITS_PATH, fontPreloads, FONT_SLUGS, tenantLogoSvg, logoMarkup, joinHtml };

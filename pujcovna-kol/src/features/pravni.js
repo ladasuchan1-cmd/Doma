@@ -21,12 +21,16 @@
 //   renderLegal(docName, params, { only, omitHeadings, legalDir }) → { html, title, headings, missing }
 //   LEGAL_DOCS – názvy šablon (bez .md)
 // Vstup: tenant (tenant.json), settings (tabulka settings + výchozí z tenant.json). Výstup: stránky v layoutu.
+// OTEVIRACI_DOBA (a kontaktní karta na /reklamace) = efektivní otevírací doba domain/availability.effectiveOpeningHours
+// (tenant.openingHours přepsaná settings.openingHours z adminu, null = „zavřeno“) – stejná jako kalendář a patička.
 // V demo režimu se pod textem zobrazí šedý box „Demo: tento text je návrh k advokátní kontrole, verze X“.
 
 const fs = require('node:fs');
 const path = require('node:path');
 const md = require('../render/markdown');
 const format = require('../render/format');
+const { effectiveOpeningHours } = require('../domain/availability');
+const { siteOpeningHours } = require('../render/layout');
 const page = require('../render/pages/pravni');
 
 const LEGAL_DIR = path.join(__dirname, '..', '..', 'legal');
@@ -75,7 +79,7 @@ function yearsText(n) {
   return Number.isFinite(y) ? format.plural(y, 'rok', 'roky', 'let') : '';
 }
 
-/** Otevírací doba jako věta: „Po–Pá 9:00–18:00, So–Ne 8:00–19:00“. */
+/** Otevírací doba jako věta: „Po–Pá 9:00–18:00, So–Ne 8:00–19:00“ (zavřený den → „Po zavřeno“). */
 function openingHoursText(openingHours) {
   const rows = format.openingHoursRows(openingHours || {});
   return rows.map((r) => `${r.days} ${r.hours}`).join(', ');
@@ -146,7 +150,7 @@ function legalParams(tenant, settings = {}) {
     PUJCOVNA_DPO: b.dpo || '',
     PUJCOVNA_ODPOVEDNA_OSOBA: b.privacyContact || 'majitel / jednatel',
     PUJCOVNA_POCET_OSOB: b.staffCount !== undefined ? String(b.staffCount) : 'méně než 250',
-    OTEVIRACI_DOBA: openingHoursText(tenant.openingHours),
+    OTEVIRACI_DOBA: openingHoursText(effectiveOpeningHours(tenant, s)),
     WEB_SUBDOMENA: host,
     DOMENA_MUSTERU: l.platformDomain || host.split('.').slice(-2).join('.'),
     PODMINKY_URL: `${base}/podminky`,
@@ -435,7 +439,7 @@ async function reklamace(ctx) {
       demo: !!ctx.config.demo,
       toc: false,
       excerptOf: { label: 'Obchodní podmínky', href: '/podminky' },
-      contact: { business: ctx.tenant.business, openingHours: ctx.tenant.openingHours },
+      contact: { business: ctx.tenant.business, openingHours: siteOpeningHours(ctx) },
     },
     { title: 'Reklamace', description: `Jak reklamovat závadu kola nebo vyúčtování u půjčovny ${ctx.tenant.name} a kde řešit spor mimosoudně (ČOI).`, feature: 'pravni' }
   );

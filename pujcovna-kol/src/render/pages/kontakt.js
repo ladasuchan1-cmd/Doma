@@ -1,13 +1,15 @@
 'use strict';
-// Stránka: kontakt (feature kontakt). Vstup: { tenant, texts, csrf, values, errors, sent } (texts = efektivní texty
-// z layout.siteTexts; texts.contactNote = poznámka z adminu pod kontaktní kartou). Výstup: Html tělo.
+// Stránka: kontakt (feature kontakt). Vstup: { tenant, texts, openingHours, csrf, values, errors, sent } (texts =
+// efektivní texty z layout.siteTexts; texts.contactNote = poznámka z adminu pod kontaktní kartou; openingHours =
+// efektivní otevírací doba z layout.siteOpeningHours, null = zavřeno; bez ní tenant.openingHours). Výstup: Html tělo.
 
 const { html } = require('../html');
 const c = require('../components');
 
-function kontakt({ tenant, texts, csrf, values, errors, sent }) {
+function kontakt({ tenant, texts, openingHours, csrf, values, errors, sent }) {
   const business = tenant.business || {};
   const t = texts || tenant.texts || {};
+  const hours = openingHours || tenant.openingHours || {};
   const loc = tenant.location;
   const mapHref = loc ? `https://mapy.cz/zakladni?x=${loc.lon}&y=${loc.lat}&z=16&source=coor&id=${loc.lon}%2C${loc.lat}` : null;
   return html`
@@ -21,7 +23,7 @@ ${c.section({
   variant: 'contact',
   children: html`<div class="grid grid--2">
     <div>
-      ${c.contactCard(business, tenant.openingHours, { title: tenant.name, mapHref })}
+      ${c.contactCard(business, hours, { title: tenant.name, mapHref })}
       ${t.contactNote ? html`<p class="contact-note-text">${t.contactNote}</p>` : ''}
       ${loc
         ? html`<p class="contact-coords">GPS: ${loc.lat}, ${loc.lon} · <a href="${mapHref}" rel="noopener" target="_blank">Navigovat v Mapy.cz</a> · <a href="https://www.openstreetmap.org/?mlat=${loc.lat}&amp;mlon=${loc.lon}#map=16/${loc.lat}/${loc.lon}" rel="noopener" target="_blank">OpenStreetMap</a></p>`

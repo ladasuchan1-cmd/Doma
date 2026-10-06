@@ -48,6 +48,10 @@ test('legalParams zná každý placeholder všech pěti šablon (po odstranění
   assert.equal(params.UCINNOST_OD, '5. 10. 2026');
   assert.equal(params.VERZE, '1.0');
   assert.match(params.OTEVIRACI_DOBA, /Po–Pá 9:00–18:00, So–Ne 8:00–19:00/);
+  // otevírací doba z adminu (settings.openingHours, null = zavřeno) přepisuje tenant.json
+  const closedMon = pravni.legalParams(tenant, { ...tenant.settings, openingHours: { mon: null, sat: ['10:00', '16:00'] } });
+  assert.equal(closedMon.OTEVIRACI_DOBA, 'Po zavřeno, Út–Pá 9:00–18:00, So 10:00–16:00, Ne 8:00–19:00');
+  assert.equal(pravni.openingHoursText({ mon: ['09:00', '18:00'] }), 'Po 9:00–18:00, Út–Ne zavřeno');
   assert.match(params.BANKOVNI_UCET, /19-2000145399\/0800, IBAN CZ6508000000192000145399/);
   assert.match(params.PLATEBNI_BRANA, /simulační/);
   // přepis přes tenant.legal.params
@@ -280,6 +284,24 @@ test('/podminky, /soukromi, /reklamace: 200 v layoutu, bez {{, bez interních č
   assert.equal(css.status, 200);
   assert.match(css.headers.get('content-type'), /text\/css/);
   assert.match(await css.text(), /\.legal-demo/);
+});
+
+test('otevírací doba z adminu (pondělí zavřeno) se propíše do /podminky (OTEVIRACI_DOBA) i kontaktní karty na /reklamace', async () => {
+  const { setSetting } = require('../src/tenants');
+  const nb = (s) => s.replace(/ /g, ' ');
+  const before = nb(await (await srv.fetch('/podminky')).text());
+  assert.match(before, /otevírací doba Po–Pá 9:00–18:00, So–Ne 8:00–19:00/);
+  setSetting(srv.db, 'openingHours', { ...tenant.openingHours, mon: null });
+  try {
+    const op = nb(await (await srv.fetch('/podminky')).text());
+    assert.match(op, /otevírací doba Po zavřeno, Út–Pá 9:00–18:00, So–Ne 8:00–19:00/, 'čl. 1.2 s dobou z adminu');
+    assert.ok(!/Po–Pá 9:00–18:00, So–Ne 8:00–19:00/.test(op), 'stará doba nikde (ani v patičce)');
+    const rek = nb(await (await srv.fetch('/reklamace')).text());
+    assert.match(rek, /<dt>Po<\/dt><dd>zavřeno<\/dd>/, 'kontaktní karta „Kde reklamaci uplatnit“');
+  } finally {
+    srv.db.prepare("DELETE FROM settings WHERE key = 'openingHours'").run();
+  }
+  assert.match(nb(await (await srv.fetch('/podminky')).text()), /otevírací doba Po–Pá 9:00–18:00, So–Ne 8:00–19:00/, 'po obnovení výchozí');
 });
 
 test('mimo demo režim se demo box nezobrazí, stránky dál fungují', async () => {

@@ -4,7 +4,9 @@
 //   – řazení a filtr tabulek (table[data-sortable], input[data-table-filter]),
 //   – rozbalování kusů v kalendáři (řádky data-parent, tlačítko „Rozbalit vše“),
 //   – automatické odeslání select[data-autosubmit] (skryje tlačítko Uložit),
-//   – automatický přepočet polí s data-money (čárka → tečka).
+//   – automatický přepočet polí s data-money (čárka → tečka),
+//   – vypořádání při uzavření rezervace (form[data-settlement]): částka doplatku se snižuje o stržení z kauce, aby se
+//     škoda neinkasovala dvakrát (server totéž hlídá a kombinaci s přeplatkem odmítá 422).
 // Načítá se po dom.js, toast.js, modal.js, table.js (všechny <script defer> v pořadí).
 (function () {
   'use strict';
@@ -91,6 +93,42 @@
     inp.addEventListener('blur', () => {
       if (inp.value.includes(',')) inp.value = inp.value.replace(/\s+/g, '').replace(',', '.');
     });
+  });
+
+  // --- uzavření rezervace: doplatek = dlužná částka − stržení z kauce (nikdy obojí) -----------------------
+  document.querySelectorAll('form[data-settlement]').forEach((form) => {
+    const due = Number(form.dataset.due) || 0;
+    const maxCapture = Number(form.dataset.maxCapture) || 0;
+    const el = form.elements;
+    const action = el.kauce_akce;
+    const capture = el.strhnout_castka;
+    const method = el.doplatek_metoda;
+    const amount = el.doplatek_castka;
+    if (!action || !capture || !method || !amount) return;
+    const toMinor = (v) => {
+      const n = Number(String(v || '').replace(/\s+/g, '').replace(',', '.'));
+      return Number.isFinite(n) && n > 0 ? Math.round(n * 100) : 0;
+    };
+    const toKc = (minor) => (minor / 100).toFixed(minor % 100 === 0 ? 0 : 2);
+    const remainingLabel = form.querySelector('[data-settlement-remaining]');
+    const update = () => {
+      const captured = action.value === 'strhnout' ? Math.min(toMinor(capture.value), maxCapture) : 0;
+      const remaining = Math.max(0, due - captured);
+      amount.value = toKc(remaining);
+      amount.max = toKc(remaining);
+      if (remainingLabel) remainingLabel.textContent = `${toKc(remaining).replace('.', ',')} Kč`;
+      const nothingLeft = remaining === 0;
+      if (nothingLeft) method.value = '';
+      method.disabled = nothingLeft;
+      amount.disabled = nothingLeft;
+      method.closest('.field').classList.toggle('is-disabled', nothingLeft);
+      amount.closest('.field').classList.toggle('is-disabled', nothingLeft);
+    };
+    action.addEventListener('change', update);
+    capture.addEventListener('input', update);
+    capture.addEventListener('change', update);
+    // odeslání: vypnutá pole se neodesílají – server bere chybějící doplatek jako „Neuhrazen“
+    update();
   });
 
   // --- kalendář: rozbalování kusů -----------------------------------------------------------------------

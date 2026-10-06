@@ -1,6 +1,7 @@
 'use strict';
-// Stránky feature home: domovská – vstup { tenant, texts, types, settings, heroImage, heroAlt, theme } (texts = efektivní
-// texty z layout.siteTexts; bez nich tenant.texts); /fotografie – vstup { tenant, groups } z home.loadPhotoCredits
+// Stránky feature home: domovská – vstup { tenant, texts, openingHours, types, settings, heroImage, heroAlt, theme }
+// (texts = efektivní texty z layout.siteTexts, bez nich tenant.texts; openingHours = efektivní otevírací doba
+// z layout.siteOpeningHours – změny z adminu, null = zavřeno; bez ní tenant.openingHours); /fotografie – vstup { tenant, groups } z home.loadPhotoCredits
 // (skupiny podle složek public/img/demo/* s položkami { file, title, author, license, source }). Výstup: Html tělo.
 
 const { html } = require('../html');
@@ -19,8 +20,9 @@ const STEPS = [
   { label: 'Vyzvedněte s dokladem', description: 'Při převzetí předložíte platný doklad totožnosti – zapíšeme jeho typ a číslo.' },
 ];
 
-function home({ tenant, texts: effectiveTexts, types, settings, heroImage, heroAlt }) {
+function home({ tenant, texts: effectiveTexts, openingHours: effectiveHours, types, settings, heroImage, heroAlt }) {
   const texts = effectiveTexts || tenant.texts || {};
+  const openingHours = effectiveHours || tenant.openingHours || {};
   const fee = settings && settings.feeMinor ? settings.feeMinor.default : null;
   const freeHours = settings && settings.cancellation ? settings.cancellation.freeHoursBefore : null;
   return html`
@@ -111,7 +113,7 @@ ${c.section({
   variant: 'contact',
   title: 'Kde nás najdete',
   children: html`<div class="grid grid--2">
-    ${c.contactCard(tenant.business, tenant.openingHours, { title: tenant.name })}
+    ${c.contactCard(tenant.business, openingHours, { title: tenant.name })}
     <div class="contact-note">
       ${texts.about ? html`<p>${texts.about}</p>` : ''}
       <p>Máte dotaz k výběru kola, vozíku pro děti nebo k delšímu pronájmu? Napište nám přes <a href="/kontakt">kontaktní formulář</a>, odpovíme obvykle do druhého dne.</p>

@@ -177,11 +177,27 @@ function friendlyError(e) {
   return null;
 }
 
-/** Spustí akci; doménové chyby → flash danger + redirect zpět, ostatní propadnou (500). */
+/**
+ * Chyba vstupu formuláře akce rezervace (nekonzistentní kombinace polí): odpověď 422 s detailem rezervace a
+ * vysvětlením v hlášce, bez přesměrování – obsluha vidí formulář i chybu zároveň. Nic se nezapisuje.
+ */
+class ActionInputError extends Error {
+  constructor(message) {
+    super(message);
+    this.name = 'ActionInputError';
+    this.status = 422;
+  }
+}
+
+/** Spustí akci; doménové chyby → flash danger + redirect zpět, chyby vstupu → 422 s detailem, ostatní propadnou (500). */
 async function tryAction(ctx, r, fn) {
   try {
     return await fn();
   } catch (e) {
+    if (e instanceof ActionInputError && r) {
+      ctx.log.warn('Admin akce odmítnuta (422)', { reservationId: r.id, path: ctx.url.pathname, error: e.message });
+      return renderDetail(ctx, reservations.get(ctx.db, r.id) || r, { status: 422, flash: { tone: 'danger', html: html`${e.message}`.toString() } });
+    }
     const msg = friendlyError(e) || (e && e.code === 'SQLITE_CONSTRAINT' ? 'Operaci nelze provést (porušení integrity dat).' : null);
     if (!msg) throw e;
     ctx.log.warn('Admin akce odmítnuta', { reservationId: r ? r.id : null, path: ctx.url.pathname, error: e.message });
@@ -429,11 +445,14 @@ function detailData(ctx, r) {
   if (['awaiting_fee', 'confirmed'].includes(r.status)) for (const row of detail.itemRows) candidates[row.id] = candidateBikes(ctx, r, row);
   const handovers = ctx.db.prepare('SELECT h.*, u.name AS by_name FROM handovers h LEFT JOIN users u ON u.id = h.by_user_id WHERE h.reservation_id = ? ORDER BY h.at').all(r.id);
   const now = new Date();
+  const balance = balanceOf(ctx.db, r, detail.ledger);
   const d = {
     r,
     detail,
     customer,
-    balance: balanceOf(ctx.db, r, detail.ledger),
+    balance,
+    // dlužná částka po odečtení doplatků už zapsaných (hotově / terminálem), ale do ledgeru promítnutých až při výdeji / uzavření
+    outstandingMinor: Math.max(0, balance.dueMinor - unledgeredBalance(ctx.db, r).sumMinor),
     hold: activeHold(ctx.db, r),
     candidates,
     bikesById,
@@ -450,15 +469,20 @@ function detailData(ctx, r) {
   return d;
 }
 
+/** Vyrenderuje detail rezervace (GET i odpověď 422 z akce). flash: explicitní hláška místo session flash. */
+function renderDetail(ctx, r, { status = 200, flash: explicitFlash } = {}) {
+  const d = detailData(ctx, r);
+  return render(ctx, pages.rezervace.detail(d), { title: `Rezervace ${r.number}`, status, lead: `${s.format.dateTime(r.from_at)} – ${s.format.dateTime(r.to_at)}`, actions: html`<a class="btn btn--ghost btn--sm" href="/admin/rezervace">← Seznam</a> <a class="btn btn--ghost btn--sm" href="/admin/kalendar?od=${availability.utcToLocal(r.from_at).date}">Kalendář</a>`, wide: true, flash: explicitFlash || undefined });
+}
+
 async function rezervaceDetail(ctx) {
   const r = reservationOr404(ctx);
-  const d = detailData(ctx, r);
   let extra = null;
   if (ctx.query.kauce === '1') {
-    const hold = d.hold;
+    const hold = activeHold(ctx.db, r);
     extra = hold ? { tone: 'success', html: html`Preautorizace kauce ${format.money(hold.amount_minor)} proběhla (ref. ${hold.provider_ref || hold.id}).`.toString() } : { tone: 'warning', html: html`Preautorizace kauce zatím není potvrzená – zkontrolujte stav platby níže.`.toString() };
   }
-  render(ctx, pages.rezervace.detail(d), { title: `Rezervace ${r.number}`, lead: `${s.format.dateTime(r.from_at)} – ${s.format.dateTime(r.to_at)}`, actions: html`<a class="btn btn--ghost btn--sm" href="/admin/rezervace">← Seznam</a> <a class="btn btn--ghost btn--sm" href="/admin/kalendar?od=${availability.utcToLocal(r.from_at).date}">Kalendář</a>`, wide: true, flash: extra || undefined });
+  renderDetail(ctx, r, { flash: extra });
 }
 
 // ---------------------------------------------------------------------------------------------------------
@@ -771,8 +795,16 @@ async function uzavritPost(ctx) {
     if (captured > maxCapture) throw new reservations.TransitionError(`Strhnout lze nejvýše ${format.money(maxCapture)}.`);
     if (action === 'strhnout' && !(captured > 0)) throw new reservations.TransitionError('Zadejte částku ke stržení, nebo zvolte uvolnění kauce.');
     const dMethod = str(ctx.body.doplatek_metoda);
-    const dAmount = parseKc(ctx.body.doplatek_castka);
-    if (['cash', 'terminal'].includes(dMethod) && dAmount > 0) recordManualBalance(ctx, r, { method: dMethod, amount: dAmount });
+    const dAmount = ['cash', 'terminal'].includes(dMethod) ? (parseKc(ctx.body.doplatek_castka) ?? 0) : 0;
+    // Ochrana před dvojím inkasem škody (nález QA): dlužná částka (nájemné + škoda − zaplaceno − doplatky zapsané,
+    // ale ještě nezaúčtované) se smí uhradit stržením z kauce a doplatkem jen dohromady nejvýše jednou.
+    const outstanding = Math.max(0, balanceOf(ctx.db, r, reservations.loadDetail(ctx.db, r).ledger).dueMinor - unledgeredBalance(ctx.db, r).sumMinor);
+    if (captured + dAmount > outstanding) {
+      const parts = [captured > 0 ? `stržení z kauce ${format.money(captured)}` : null, dAmount > 0 ? `doplatek ${format.money(dAmount)} (${s.METHOD_LABELS[dMethod]})` : null].filter(Boolean);
+      const fix = outstanding === 0 ? 'Vše je už uhrazeno – kauci uvolněte a doplatek nechte „Neuhrazen“.' : dAmount > 0 ? `Škodu zapište jen jednou: buď ji strhněte z kauce, nebo ji zákazník doplatí. Snižte doplatek na ${format.money(Math.max(0, outstanding - captured))}, nebo zvolte „Neuhrazen“.` : `Strhnout lze nejvýše ${format.money(outstanding)}.`;
+      throw new ActionInputError(`Vypořádání by vedlo k přeplatku: zbývá uhradit ${format.money(outstanding)}, ale ${parts.join(' a ')} dávají dohromady ${format.money(captured + dAmount)}. ${fix}`);
+    }
+    if (dAmount > 0) recordManualBalance(ctx, r, { method: dMethod, amount: dAmount });
     const now = nowIso();
     const mods = modules();
     if (hold) {

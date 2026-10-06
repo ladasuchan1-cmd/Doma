@@ -111,6 +111,54 @@ test('domovská stránka: hero, USP, notice bez kol, kroky, teasery, kontakt, JS
   assert.match(html, /<title>Půjčovna kol U Tří dubů – Kola, která vás vezmou dál<\/title>/);
 });
 
+test('otevírací doba z adminu (settings.openingHours, pondělí zavřeno) se propíše do patičky, JSON-LD, karty na / i na /kontakt', async () => {
+  const { setSetting } = require('../src/tenants');
+  const { localBusinessJsonLd, siteOpeningHours } = require('../src/render/layout');
+  const tenant = srv.tenant;
+  const before = await (await srv.fetch('/kontakt')).text();
+  assert.match(before, /<dt>Po–Pá<\/dt><dd>9:00–18:00<\/dd>/, 'výchozí doba z tenant.json');
+  setSetting(srv.db, 'openingHours', { ...tenant.openingHours, mon: null, sat: ['10:00', '16:00'] });
+  try {
+    for (const p of ['/', '/kontakt', '/design']) {
+      const html = await (await srv.fetch(p)).text();
+      let cards = html.match(/<div class="contact-card">[\s\S]*?<\/dl>/g) || [];
+      // /design je vzorník komponent s ukázkovými daty – tam se kontroluje jen patička (poslední karta)
+      if (p === '/design') cards = cards.slice(-1);
+      assert.ok(cards.length >= 1, `${p}: kontaktní karta`);
+      for (const card of cards) {
+        assert.match(card, /<dt>Po<\/dt><dd>zavřeno<\/dd>/, `${p}: zavřené pondělí`);
+        assert.match(card, /<dt>Út–Pá<\/dt><dd>9:00–18:00<\/dd>/, `${p}: úterý–pátek beze změny`);
+        assert.match(card, /<dt>So<\/dt><dd>10:00–16:00<\/dd>/, `${p}: nová sobota`);
+        assert.match(card, /<dt>Ne<\/dt><dd>8:00–19:00<\/dd>/, `${p}: neděle výchozí`);
+      }
+    }
+    const home = await (await srv.fetch('/')).text();
+    assert.equal((home.match(/<dt>Po<\/dt><dd>zavřeno<\/dd>/g) || []).length, 2, 'karta „Kde nás najdete“ i patička');
+    const ld = JSON.parse(/<script type="application\/ld\+json">([\s\S]*?)<\/script>/.exec(home)[1]);
+    assert.equal(ld.openingHoursSpecification.length, 6, 'JSON-LD bez zavřeného pondělí');
+    assert.ok(!ld.openingHoursSpecification.some((h) => h.dayOfWeek === 'Monday'));
+    assert.deepEqual(ld.openingHoursSpecification.find((h) => h.dayOfWeek === 'Saturday'), { '@type': 'OpeningHoursSpecification', dayOfWeek: 'Saturday', opens: '10:00', closes: '16:00' });
+  } finally {
+    srv.db.prepare("DELETE FROM settings WHERE key = 'openingHours'").run();
+  }
+  const after = await (await srv.fetch('/')).text();
+  assert.ok(!/<dd>zavřeno<\/dd>/.test(after), 'po obnovení nastavení opět výchozí doba');
+  // čisté pomocníky: siteOpeningHours bez DB → tenant.json; JSON-LD přeskočí null i prázdné dny
+  assert.deepEqual(siteOpeningHours({ tenant }), tenant.openingHours);
+  assert.deepEqual(
+    siteOpeningHours({
+      tenant,
+      get settings() {
+        throw new Error('bez DB');
+      },
+    }),
+    tenant.openingHours
+  );
+  const closed = localBusinessJsonLd(tenant, 'https://x.cz', { ...tenant.openingHours, mon: null, tue: [] });
+  assert.equal(closed.openingHoursSpecification.length, 5);
+  assert.equal(localBusinessJsonLd({ ...tenant, openingHours: {} }, 'https://x.cz').openingHoursSpecification, undefined);
+});
+
 test('domovská stránka zobrazí karty kol z bike_types s cenou od', async () => {
   srv.db.prepare("INSERT INTO bike_types(slug, name, category, sizes, deposit_minor, fee_minor, value_minor, sort) VALUES ('trek-fx-2', 'Trekové kolo Trek FX 2', 'trek', '[\"S\",\"M\",\"L\",\"XL\"]', 500000, 30000, 2500000, 1)").run();
   const id = srv.db.prepare("SELECT id FROM bike_types WHERE slug = 'trek-fx-2'").get().id;

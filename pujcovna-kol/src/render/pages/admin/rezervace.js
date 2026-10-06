@@ -174,8 +174,27 @@ function bikeSelects(d, { required }) {
   });
 }
 
-function actionsForm(d, { title, action, children, submit, variant = 'primary', confirm, hint, tone }) {
-  return s.card({ title, tone, compact: true, children: html`${hint ? html`<p class="small muted">${hint}</p>` : ''}${s.form({ action, csrf: d.csrf, children, submit, submitVariant: variant, confirm })}` });
+function actionsForm(d, { title, action, children, submit, variant = 'primary', confirm, hint, tone, attrs }) {
+  return s.card({ title, tone, compact: true, children: html`${hint ? html`<p class="small muted">${hint}</p>` : ''}${s.form({ action, csrf: d.csrf, children, submit, submitVariant: variant, confirm, attrs })}` });
+}
+
+/**
+ * Vypořádání při uzavření (nález QA „dvojí inkaso škody“): dlužná částka (nájemné + škoda − zaplaceno) se hradí buď
+ * stržením z kauce, nebo doplatkem – nikdy obojím. Výchozí stržení = evidovaná škoda (max. výše kauce); doplatek je
+ * výchozí „Neuhrazen“ a jeho částka je už serverově snížená o výchozí stržení. Totéž přepočítává JS (form[data-settlement])
+ * při změně polí a server kombinaci vedoucí k přeplatku odmítne (422).
+ */
+/** Dlužná částka pro akce: saldo ledgeru snížené o doplatky už zapsané, ale do ledgeru promítané až přechodem. */
+function outstanding(d) {
+  return d.outstandingMinor === undefined || d.outstandingMinor === null ? d.balance.dueMinor : d.outstandingMinor;
+}
+
+function settlementDefaults(d) {
+  const maxCapture = d.hold ? Number(d.hold.amount_minor) : Number(d.r.deposit_minor);
+  const damage = d.balance.damageMinor || 0;
+  const due = outstanding(d);
+  const capture = damage > 0 ? Math.min(maxCapture, damage, due) : 0;
+  return { maxCapture, damage, due, capture, remaining: Math.max(0, due - capture) };
 }
 
 function actions(d) {
@@ -240,13 +259,13 @@ function actions(d) {
     );
   }
 
-  if (['confirmed', 'checked_out', 'returned'].includes(st) && d.balance.dueMinor > 0) {
+  if (['confirmed', 'checked_out', 'returned'].includes(st) && outstanding(d) > 0) {
     out.push(
       actionsForm(d, {
         title: 'Doplatek nájemného',
         action: `${base}/doplatek`,
-        hint: html`Zbývá uhradit ${format.money(d.balance.dueMinor)}. Hotově / terminál se zapíše ihned; karta otevře simulační bránu, převod vygeneruje QR s VS ${r.number}.${d.modules.provider ? '' : ' (Karta a převod vyžadují modul plateb.)'}`,
-        children: html`<div class="admin-grid admin-grid--2">${c.field({ label: 'Forma', name: 'metoda', type: 'select', value: 'terminal', options: [...cash, { value: 'card', label: 'Karta (simulační brána)', disabled: !d.modules.provider }, { value: 'bank_transfer', label: 'Převod / QR', disabled: !d.modules.provider }] })}${kcInput('castka', 'Částka (Kč)', d.balance.dueMinor, { required: true })}</div>`,
+        hint: html`Zbývá uhradit ${format.money(outstanding(d))}. Hotově / terminál se zapíše ihned; karta otevře simulační bránu, převod vygeneruje QR s VS ${r.number}.${d.modules.provider ? '' : ' (Karta a převod vyžadují modul plateb.)'}`,
+        children: html`<div class="admin-grid admin-grid--2">${c.field({ label: 'Forma', name: 'metoda', type: 'select', value: 'terminal', options: [...cash, { value: 'card', label: 'Karta (simulační brána)', disabled: !d.modules.provider }, { value: 'bank_transfer', label: 'Převod / QR', disabled: !d.modules.provider }] })}${kcInput('castka', 'Částka (Kč)', outstanding(d), { required: true })}</div>`,
         submit: 'Zapsat doplatek',
         variant: 'secondary',
       })
@@ -265,7 +284,7 @@ function actions(d) {
         hint: html`Přechod do stavu „Vydaná“: zapíše kauci (${d.hold ? html`složena ${format.money(d.hold.amount_minor)} – ${s.METHOD_LABELS[d.hold.method]}` : 'zvolte formu níže'}), doplatek a vystaví smlouvu s předávacím protokolem k tisku.${missing.length ? html` <strong>Chybí: ${missing.join(' a ')}.</strong>` : ''}`,
         children: html`${d.detail.itemRows.some((row) => !row.bike_id) ? html`<div class="admin-grid admin-grid--2">${bikeSelects(d, { required: true })}</div>` : ''}
         ${!d.hold ? html`<div class="admin-grid admin-grid--2">${c.field({ label: 'Kauce složena', name: 'kauce_metoda', type: 'select', value: 'cash', options: cash })}${kcInput('kauce_castka', 'Výše kauce (Kč)', r.deposit_minor, { required: true })}</div>` : ''}
-        ${d.balance.dueMinor > 0 ? html`<div class="admin-grid admin-grid--2">${c.field({ label: 'Doplatek při převzetí', name: 'doplatek_metoda', type: 'select', value: 'terminal', options: [{ value: '', label: 'Nezapisovat (doplatí při vrácení)' }, ...cash] })}${kcInput('doplatek_castka', 'Částka doplatku (Kč)', d.balance.dueMinor)}</div>` : ''}
+        ${outstanding(d) > 0 ? html`<div class="admin-grid admin-grid--2">${c.field({ label: 'Doplatek při převzetí', name: 'doplatek_metoda', type: 'select', value: 'terminal', options: [{ value: '', label: 'Nezapisovat (doplatí při vrácení)' }, ...cash] })}${kcInput('doplatek_castka', 'Částka doplatku (Kč)', outstanding(d))}</div>` : ''}
         ${c.field({ label: 'Poznámka k předání (stav kol, baterie, příslušenství)', name: 'poznamka', type: 'textarea', rows: 2 })}
         ${c.field({ label: 'Zákazník předložil doklad, převzal kola a podepsal předávací protokol', name: 'potvrzeni', type: 'checkbox', required: true })}`,
         submit: 'Vydat kola a vystavit smlouvu',
@@ -291,15 +310,16 @@ function actions(d) {
   }
 
   if (st === 'returned') {
-    const maxCapture = d.hold ? d.hold.amount_minor : r.deposit_minor;
+    const sd = settlementDefaults(d);
     out.push(
       actionsForm(d, {
         title: 'Uzavřít rezervaci',
         tone: 'primary',
         action: `${base}/uzavrit`,
-        hint: html`Vypořádání kauce ${format.money(maxCapture)} (${d.hold ? s.METHOD_LABELS[d.hold.method] : 'bez záznamu platby'}) a konečný doklad.${d.balance.damageMinor ? html` Evidované poškození: <strong>${format.money(d.balance.damageMinor)}</strong>.` : ''}`,
-        children: html`<div class="admin-grid admin-grid--2">${c.field({ label: 'Kauce', name: 'kauce_akce', type: 'select', value: d.balance.damageMinor > 0 ? 'strhnout' : 'uvolnit', options: [{ value: 'uvolnit', label: 'Uvolnit celou' }, { value: 'strhnout', label: 'Strhnout část / celou' }] })}${kcInput('strhnout_castka', 'Strhnout (Kč)', Math.min(maxCapture, d.balance.damageMinor || 0))}</div>
-        ${d.balance.dueMinor > 0 ? html`<div class="admin-grid admin-grid--2">${c.field({ label: 'Zbývající doplatek', name: 'doplatek_metoda', type: 'select', value: 'terminal', options: [{ value: '', label: 'Neuhrazen (vyúčtovat zvlášť)' }, ...cash] })}${kcInput('doplatek_castka', 'Částka (Kč)', d.balance.dueMinor)}</div>` : ''}
+        attrs: { 'data-settlement': true, 'data-due': sd.due, 'data-max-capture': sd.maxCapture },
+        hint: html`Vypořádání kauce ${format.money(sd.maxCapture)} (${d.hold ? s.METHOD_LABELS[d.hold.method] : 'bez záznamu platby'}) a konečný doklad.${sd.damage ? html` Evidované poškození: <strong>${format.money(sd.damage)}</strong>.` : ''}${sd.due > 0 ? html` Zbývá uhradit <strong>${format.money(sd.due)}</strong> – buď stržením z kauce, nebo doplatkem; obojí dohromady nesmí dlužnou částku přesáhnout (vznikl by přeplatek).` : ' Vše je uhrazeno.'}`,
+        children: html`<div class="admin-grid admin-grid--2">${c.field({ label: 'Kauce', name: 'kauce_akce', type: 'select', value: sd.capture > 0 ? 'strhnout' : 'uvolnit', options: [{ value: 'uvolnit', label: 'Uvolnit celou' }, { value: 'strhnout', label: 'Strhnout část / celou' }] })}${kcInput('strhnout_castka', 'Strhnout (Kč)', sd.capture, { hint: sd.capture > 0 ? `Předvyplněna evidovaná škoda (nejvýše ${format.money(sd.maxCapture)}).` : null })}</div>
+        ${sd.due > 0 ? html`<div class="admin-grid admin-grid--2">${c.field({ label: 'Zbývající doplatek', name: 'doplatek_metoda', type: 'select', value: '', options: [{ value: '', label: 'Neuhrazen (vyúčtovat zvlášť)' }, ...cash] })}${kcInput('doplatek_castka', 'Částka doplatku (Kč)', sd.remaining, { hint: html`Po stržení z kauce zbývá <span data-settlement-remaining>${format.money(sd.remaining)}</span>.` })}</div>` : ''}
         ${c.field({ label: 'Poznámka k vyúčtování', name: 'poznamka', type: 'textarea', rows: 2 })}`,
         submit: 'Uzavřít a vystavit konečný doklad',
         confirm: 'Uzavřít rezervaci a vypořádat kauci?',

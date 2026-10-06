@@ -4,10 +4,11 @@
 // adresát = e-mail půjčovny; kontaktní údaje tazatele v payload šifrované, otisk e-mailu v to_hmac není – jde o
 // příchozí dotaz) → redirect /kontakt?odeslano=1. Honeypot pole „web“ (skryté CSS) – vyplněné → tiché zahození.
 // Texty: `contactNote` ze settings.texts (admin → Obsah) se zobrazí pod kontaktní kartou (layout.siteTexts).
+// Otevírací doba na kartě = efektivní doba z adminu (layout.siteOpeningHours; null = zavřeno), ne jen tenant.json.
 // Vstup: ctx (body: jmeno, email, telefon, zprava, souhlas, web). Výstup: stránka / redirect.
 
 const { nowIso } = require('../db');
-const { siteTexts } = require('../render/layout');
+const { siteTexts, siteOpeningHours } = require('../render/layout');
 const page = require('../render/pages/kontakt');
 
 const LIMITS = { name: [2, 100], email: [5, 200], phone: [0, 40], message: [10, 2000] };
@@ -66,7 +67,7 @@ function enqueueInquiry(db, { tenant, fieldCrypto, values, ipHash }) {
 function renderPage(ctx, { values = {}, errors = {}, sent = false } = {}) {
   ctx.render(
     page.kontakt,
-    { tenant: ctx.tenant, texts: siteTexts(ctx), csrf: ctx.csrfToken(), values, errors, sent },
+    { tenant: ctx.tenant, texts: siteTexts(ctx), openingHours: siteOpeningHours(ctx), csrf: ctx.csrfToken(), values, errors, sent },
     { title: 'Kontakt', description: `Kontakt a otevírací doba – ${ctx.tenant.name}. Napište nám dotaz k půjčení kola.`, feature: 'kontakt', status: Object.keys(errors).length ? 422 : 200 }
   );
 }

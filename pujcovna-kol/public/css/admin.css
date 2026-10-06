@@ -460,6 +460,13 @@ body.admin .site-main {
 .admin .form .field--checkbox .field__check {
   min-height: 36px;
 }
+/* Uzavření rezervace: doplatek vypnutý JS přepočtem (dlužná částka plně kryta stržením z kauce) */
+.admin .form .field.is-disabled {
+  opacity: 0.6;
+}
+.admin .form .field.is-disabled .field__input {
+  cursor: not-allowed;
+}
 .admin-details summary {
   cursor: pointer;
   color: var(--link);

@@ -286,18 +286,56 @@ test('průchod přes HTTP: výdej bez dokladu odmítnut → doklad → kola → 
   assert.ok(db.prepare("SELECT 1 FROM documents WHERE reservation_id = ? AND type = 'return_protocol'").get(r6.id), 'protokol o vrácení');
   html = await detailHtml();
   assert.match(html, /Uzavřít rezervaci/);
+  // karta Uzavřít (nález QA „dvojí inkaso škody“): stržení předvyplněno škodou, doplatek výchozí „Neuhrazen“ a jeho
+  // částka už snížená o stržení (200 − 200 = 0), formulář nese data pro JS přepočet
+  const closeForm = html.match(/<form[^>]*data-settlement[^>]*>[\s\S]*?<\/form>/);
+  assert.ok(closeForm, 'formulář Uzavřít s data-settlement');
+  assert.match(closeForm[0], /data-due="20000"/);
+  assert.match(closeForm[0], /data-max-capture="1000000"/);
+  assert.match(closeForm[0], /name="strhnout_castka"[^>]*value="200"/);
+  assert.match(closeForm[0], /<select[^>]*name="doplatek_metoda"[^>]*>\s*<option value="" selected>/);
+  assert.match(closeForm[0], /name="doplatek_castka"[^>]*value="0"/);
+  assert.match(closeForm[0], /Po stržení z kauce zbývá <span data-settlement-remaining>0 Kč<\/span>/);
+  assert.match(html, /obojí dohromady nesmí dlužnou částku přesáhnout/);
 
-  // 7) uzavření – strhnout 200 Kč z kauce
-  r = await post(`${base}/uzavrit`, { _csrf: token, kauce_akce: 'strhnout', strhnout_castka: '200' });
+  // 7a) nekonzistentní kombinace (škoda stržena z kauce i zaplacena terminálem) → 422 s vysvětlením, nic se nezapsalo
+  const balancePaymentsBefore = db.prepare("SELECT COUNT(*) AS n FROM payments WHERE reservation_id = ? AND purpose = 'balance'").get(r6.id).n;
+  r = await post(`${base}/uzavrit`, { _csrf: token, kauce_akce: 'strhnout', strhnout_castka: '200', doplatek_metoda: 'terminal', doplatek_castka: '200' });
+  assert.equal(r.status, 422);
+  html = nb(await r.text());
+  assert.match(html, /Vypořádání by vedlo k přeplatku: zbývá uhradit 200 Kč, ale stržení z kauce 200 Kč a doplatek 200 Kč \(Terminál\) dávají dohromady 400 Kč/);
+  assert.match(html, /Škodu zapište jen jednou/);
+  assert.match(html, /Uzavřít rezervaci/, 'odpověď 422 obsahuje detail s formulářem');
+  assert.equal(db.prepare('SELECT status FROM reservations WHERE id = ?').get(r6.id).status, 'returned');
+  assert.equal(db.prepare("SELECT COUNT(*) AS n FROM payments WHERE reservation_id = ? AND purpose = 'balance'").get(r6.id).n, balancePaymentsBefore, 'doplatek se při 422 nezapsal');
+  assert.ok(!ledger().some((l) => l.type === 'deposit_captured'), 'kauce se při 422 nestrhla');
+  assert.equal(db.prepare('SELECT status FROM payments WHERE id = ?').get(hold.id).status, 'authorized');
+  // samotné stržení nad dlužnou částku → také 422
+  r = await post(`${base}/uzavrit`, { _csrf: token, kauce_akce: 'strhnout', strhnout_castka: '300' });
+  assert.equal(r.status, 422);
+  assert.match(nb(await r.text()), /Strhnout lze nejvýše 200 Kč/);
+  assert.equal(db.prepare('SELECT status FROM reservations WHERE id = ?').get(r6.id).status, 'returned');
+
+  // 7) uzavření – strhnout 200 Kč z kauce (doplatek „Neuhrazen“ – výchozí stav formuláře)
+  r = await post(`${base}/uzavrit`, { _csrf: token, kauce_akce: 'strhnout', strhnout_castka: '200', doplatek_metoda: '', doplatek_castka: '0' });
   assert.equal(r.status, 303);
   fresh = db.prepare('SELECT * FROM reservations WHERE id = ?').get(r6.id);
   assert.equal(fresh.status, 'closed');
   assert.ok(ledger().some((l) => l.type === 'deposit_captured' && l.amount_minor === 20000));
   assert.ok(ledger().some((l) => l.type === 'deposit_released' && l.amount_minor === 980000));
+  const balancePaid = ledger().filter((l) => l.type === 'balance_paid');
+  assert.equal(balancePaid.length, 1, 'jediný doplatek (z výdeje) – škoda stržená z kauce nevytvoří balance_paid navíc');
+  assert.equal(balancePaid[0].amount_minor, due);
+  assert.equal(fresh.paid_minor, r6.total_minor, 'paid_minor bez škody inkasované dvakrát');
   const holdAfter = db.prepare('SELECT * FROM payments WHERE id = ?').get(hold.id);
   assert.equal(holdAfter.status, 'partially_captured');
   assert.equal(holdAfter.captured_minor, 20000);
-  if (admin.modules().documents) assert.ok(db.prepare("SELECT 1 FROM documents WHERE reservation_id = ? AND type = 'final_doc'").get(r6.id), 'konečný doklad');
+  if (admin.modules().documents) {
+    const finalDoc = db.prepare("SELECT * FROM documents WHERE reservation_id = ? AND type = 'final_doc'").get(r6.id);
+    assert.ok(finalDoc, 'konečný doklad');
+    assert.ok(!/Přeplatek k vrácení/.test(finalDoc.html), 'konečný doklad bez přeplatku');
+    assert.match(finalDoc.html, /Uhrazeno v plné výši/);
+  }
   assert.ok(db.prepare("SELECT 1 FROM audit_log WHERE action = 'reservation.close' AND entity_id = ?").get(String(r6.id)));
   html = await detailHtml();
   assert.match(html, /Uzavřená/);
