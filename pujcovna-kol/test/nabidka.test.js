@@ -567,3 +567,236 @@ test('mobil: rezervační karta detailu kola není sticky pod 900 px, přepína�
   const base = fs.readFileSync(path.join(__dirname, '..', 'public', 'base.css'), 'utf8');
   assert.match(base, /@media \(max-width: 719px\) \{\s*\.design-switch \{\s*position: static;/);
 });
+
+// ---------------------------------------------------------------------------------------------------------
+// Kalkulačka návratnosti „Vyplatí se to?“ (od 7. 10. 2026)
+
+const PENZION = { trek: 2, ekolo: 3, web: 'sablona', sprava: 'sami', servis: 'partner', doplnky: 'prilby,nabijecky' };
+
+test('návratnost: výchozí hodnoty bez bloku navratnost v konfiguraci, validace bloku, ořez a normalizace vstupů', () => {
+  assert.equal(raw.navratnost, undefined, 'fixtura blok nemá');
+  assert.deepEqual(config.navratnost, { sezonaDni: 150, vytizenost: 0.35, cenaDen: { zakladni: 390, trek: 450, ekolo: 890 }, dph: 0.21 });
+  const vychozi = domain.normalizeInput({}, config).navratnost;
+  assert.deepEqual(vychozi, { sezonaDni: 150, vytizenost: 0.35, cenaDen: { zakladni: 390, trek: 450, ekolo: 890 }, platceDph: true });
+  // vlastní blok v konfiguraci: procenta i podíl, výchozí vstupy z něj
+  const vlastni = domain.validateConfig({ ...raw, navratnost: { sezonaDni: 200, vytizenostProcent: 40, cenaDen: { zakladni: 300, trek: 400, ekolo: 800 }, dph: 21 } }, rawInterni);
+  assert.ok(vlastni.ok, vlastni.errors.join(' '));
+  assert.deepEqual(vlastni.config.navratnost, { sezonaDni: 200, vytizenost: 0.4, cenaDen: { zakladni: 300, trek: 400, ekolo: 800 }, dph: 0.21 });
+  assert.equal(domain.normalizeInput({}, vlastni.config).navratnost.sezonaDni, 200);
+  assert.equal(domain.normalizeInput({}, vlastni.config).navratnost.vytizenost, 0.4);
+  const castecny = domain.validateConfig({ ...raw, navratnost: { sezonaDni: 120 } }, rawInterni);
+  assert.ok(castecny.ok);
+  assert.deepEqual(castecny.config.navratnost.cenaDen, { zakladni: 390, trek: 450, ekolo: 890 }, 'chybějící klíče z výchozích');
+  const spatny = domain.validateConfig({ ...raw, navratnost: { sezonaDni: 10, vytizenostProcent: 150, cenaDen: { ekolo: -1, kolobezka: 100 }, dph: 150 } }, rawInterni);
+  assert.equal(spatny.ok, false);
+  for (const re of [/sezonaDni/, /vytizenostProcent/, /cenaDen\.ekolo/, /kolobezka/, /dph/]) assert.ok(spatny.errors.some((e) => re.test(e)), String(re));
+  assert.equal(domain.validateConfig({ ...raw, navratnost: [] }, rawInterni).ok, false);
+
+  const n = (q) => domain.normalizeInput(q, config).navratnost;
+  assert.equal(n({ sezona: '10' }).sezonaDni, 30, 'pod rozsahem → minimum');
+  assert.equal(n({ sezona: '999' }).sezonaDni, 365, 'nad rozsahem → maximum');
+  assert.equal(n({ sezona: 'abc' }).sezonaDni, 150, 'nečíselné → výchozí');
+  assert.equal(n({ sezona: '' }).sezonaDni, 150, 'prázdné → výchozí');
+  assert.equal(n({ sezona: '180.6' }).sezonaDni, 181);
+  assert.equal(n({ vytizenost: '0' }).vytizenost, 0.05);
+  assert.equal(n({ vytizenost: '120' }).vytizenost, 1);
+  assert.equal(n({ vytizenost: '42,4' }).vytizenost, 0.42, 'desetinná čárka, celá procenta');
+  assert.equal(n({ vytizenost: 'x' }).vytizenost, 0.35);
+  assert.deepEqual(n({ cena_zakladni: '-5', cena_trek: '99999', cena_ekolo: 'nic' }).cenaDen, { zakladni: 0, trek: 5000, ekolo: 890 });
+  assert.equal(n({ neplatce: '1' }).platceDph, false);
+  assert.equal(n({ neplatce: 'on' }).platceDph, false);
+  assert.equal(n({ neplatce: '0' }).platceDph, true);
+});
+
+test('návratnost: inputToQuery round-trip a parametry kalkulačky před doplnky', () => {
+  const i = domain.normalizeInput({ ...PENZION, porizeni: 'koupe', sezona: '200', vytizenost: '41', cena_zakladni: '350', cena_trek: '500', cena_ekolo: '990', neplatce: '1' }, config);
+  const q = domain.inputToQuery(i);
+  assert.deepEqual(domain.normalizeInput(Object.fromEntries(new URLSearchParams(q)), config), i);
+  assert.match(q, /servis=partner&sezona=200&vytizenost=41&cena_zakladni=350&cena_trek=500&cena_ekolo=990&neplatce=1&doplnky=prilby%2Cnabijecky$/);
+  const plat = domain.normalizeInput({ trek: 2 }, config);
+  const q2 = domain.inputToQuery(plat);
+  assert.ok(!/neplatce/.test(q2), 'plátce bez parametru neplatce');
+  assert.deepEqual(domain.normalizeInput(Object.fromEntries(new URLSearchParams(q2)), config), plat);
+});
+
+test('návratnost: koupě penzionu (2 trek + 3 e-kola) – tržby, náklady 1. roku, další roky, bod zvratu, návratnost v sezónách', () => {
+  const r = run({ ...PENZION, porizeni: 'koupe' });
+  const n = r.navratnost;
+  // dílčí hodnoty
+  const trzbaTrek = Math.round(450 / 1.21); // 372
+  const trzbaEkolo = Math.round(890 / 1.21); // 736
+  const dnyTrek = Math.round(2 * 150 * 0.35);
+  const dnyEkolo = Math.round(3 * 150 * 0.35);
+  const trzby = dnyTrek * trzbaTrek + dnyEkolo * trzbaEkolo;
+  const jednorazove = 2 * 50000 + 3 * 88000 + 15000 + 5 * 1200 + 25000; // kola + web + přilby + nabíječka
+  const mesicne = 990 + 5 * 180; // web + servis partnera
+  const rocne = 5 * 900; // sezónní prohlídka
+  const prvniRok = jednorazove + 12 * mesicne + rocne;
+  const provoz = 12 * mesicne + rocne;
+  assert.equal(trzbaTrek, 372);
+  assert.equal(trzbaEkolo, 736);
+  assert.equal(n.vypujcniDny, dnyTrek + dnyEkolo);
+  assert.equal(n.trzby, trzby);
+  assert.equal(n.vydajePrvniRok, prvniRok);
+  assert.equal(n.vydajePrvniRok, r.souhrn.horizonty[0].castka, 'koupě: náklady 1. roku = „Celkem za 1 rok“');
+  assert.equal(n.vysledekPrvniRok, trzby - prvniRok);
+  assert.ok(n.vysledekPrvniRok < 0, 'první rok koupě je při 35 % ve ztrátě');
+  assert.equal(n.vydajeDalsiRoky, provoz);
+  assert.equal(n.vysledekDalsiRoky, trzby - provoz);
+  assert.equal(n.navratnostSezon, Math.round((jednorazove / (trzby - provoz)) * 10) / 10);
+  assert.match(n.navratnostText, /se vrátí za 3,2\u00a0sezóny/);
+  // bod zvratu: průměrná tržba za den vážená počty kol
+  const prumer = (2 * trzbaTrek + 3 * trzbaEkolo) / 5;
+  const bz = Math.ceil(prvniRok / prumer);
+  assert.equal(n.bodZvratu.vypujcniDny, bz);
+  assert.equal(n.bodZvratu.vytizenost, bz / (5 * 150));
+  assert.equal(n.bodZvratu.dosazitelny, true);
+  assert.match(n.veta, new RegExp(`ztrátou ${(prvniRok - trzby).toLocaleString('cs-CZ').replace(/\s/g, '\\s')}\u00a0Kč; zisk začíná od ${Math.ceil((bz / 750) * 100)} % vytíženosti`));
+  // za kolo: koupě = cena kola
+  const trek = n.tridy.find((t) => t.id === 'trek');
+  assert.equal(trek.vydajNaKolo, 50000);
+  assert.equal(trek.vypujcekNaZaplaceni, Math.ceil(50000 / trzbaTrek));
+  assert.equal(trek.vydelaNaKolo, Math.round(150 * 0.35) * trzbaTrek - 50000);
+  const ekolo = n.tridy.find((t) => t.id === 'ekolo');
+  assert.equal(ekolo.vypujcekNaZaplaceni, Math.ceil(88000 / trzbaEkolo));
+  assert.deepEqual(n.vstupy, { sezonaDni: 150, vytizenost: 0.35, cenaDen: { zakladni: 390, trek: 450, ekolo: 890 }, platceDph: true, dph: 0.21, dnyPokryte: 150 });
+  // kalkulačka nemění dosavadní výpočty
+  assert.equal(r.souhrn.jednorazove, 410000);
+  assert.equal(r.interni.marze, 152925);
+});
+
+test('návratnost: pronájem 36 m penzionu – přesné hodnoty, kolo se zaplatí za N výpůjček, pak vydělá', () => {
+  const n = run({ ...PENZION, porizeni: 'pronajem36' }).navratnost;
+  const trzby = Math.round(2 * 150 * 0.35) * 372 + Math.round(3 * 150 * 0.35) * 736;
+  const mesicne = 2 * 1071 + 3 * 1952 + 990 + 5 * 180; // splátky (sazby 36 m) + web + servis
+  const jednorazove = 15000 + 5 * 1200 + 25000;
+  const prvniRok = jednorazove + 12 * mesicne + 4500;
+  const dalsi = 12 * mesicne + 4500;
+  assert.equal(n.trzby, trzby);
+  assert.equal(n.vydajePrvniRok, prvniRok);
+  assert.equal(n.vysledekPrvniRok, trzby - prvniRok);
+  assert.equal(n.vydajeDalsiRoky, dalsi);
+  assert.equal(n.vysledekDalsiRoky, trzby - dalsi);
+  const bz = Math.ceil(prvniRok / ((2 * 372 + 3 * 736) / 5));
+  assert.equal(n.bodZvratu.vypujcniDny, bz);
+  assert.equal(n.bodZvratu.vytizenost, bz / 750);
+  const ekolo = n.tridy.find((t) => t.id === 'ekolo');
+  assert.equal(ekolo.vydajNaKolo, 1952 * 12, 'pronájem: splátka × 12');
+  assert.equal(ekolo.vypujcekNaZaplaceni, Math.ceil((1952 * 12) / 736));
+  assert.equal(ekolo.vydelaNaKolo, Math.round(150 * 0.35) * 736 - 1952 * 12);
+  assert.equal(n.navratnostSezon, null, 'návratnost v sezónách jen u koupě');
+  const sign = n.vysledekPrvniRok >= 0 ? /vyděláte za první rok/ : /ztrátou/;
+  assert.match(n.veta, sign);
+  assert.match(n.veta, /^Při 35 % vytíženosti/);
+});
+
+test('návratnost: neplátce DPH (náklady × 1,21, tržby celé), zkouška (jen pokryté dny, další roky null), bez kol null, publicResult', () => {
+  const plat = run({ ...PENZION, porizeni: 'pronajem36' }).navratnost;
+  const nepl = run({ ...PENZION, porizeni: 'pronajem36', neplatce: '1' }).navratnost;
+  assert.equal(nepl.cenyVcetneDph, true);
+  assert.deepEqual(nepl.tridy.map((t) => t.trzbaDen), [450, 890], 'neplátce: tržba = celá cena');
+  assert.equal(nepl.trzby, Math.round(2 * 150 * 0.35) * 450 + Math.round(3 * 150 * 0.35) * 890);
+  assert.equal(nepl.vydajePrvniRok, Math.round(plat.vydajePrvniRok * 1.21));
+  assert.equal(nepl.vydajeDalsiRoky, Math.round(plat.vydajeDalsiRoky * 1.21));
+  assert.equal(nepl.tridy[1].vydajNaKolo, Math.round(1952 * 12 * 1.21));
+
+  const z = run({ ...PENZION, porizeni: 'zkouska' });
+  const n = z.navratnost;
+  assert.equal(n.vstupy.dnyPokryte, 120, 'min(150, 4 × 30)');
+  assert.equal(n.trzby, Math.round(2 * 120 * 0.35) * 372 + Math.round(3 * 120 * 0.35) * 736);
+  assert.equal(n.vydajePrvniRok, 25000 + 4 * 16896, 'celá cena zkoušky');
+  assert.equal(n.vysledekPrvniRok, n.trzby - n.vydajePrvniRok);
+  assert.equal(n.vysledekDalsiRoky, null);
+  assert.equal(n.vydajeDalsiRoky, null);
+  assert.match(n.poznamkaDalsiRoky, /podle skutečné vytíženosti/);
+  assert.equal(n.tridy[1].vydajNaKolo, 3904 * 4, 'zkouška: měsíční sazba × 4');
+  assert.equal(n.bodZvratu.vytizenost, Math.ceil(n.vydajePrvniRok / ((2 * 372 + 3 * 736) / 5)) / (5 * 120));
+  const kratka = run({ ...PENZION, porizeni: 'zkouska', sezona: '90' }).navratnost;
+  assert.equal(kratka.vstupy.dnyPokryte, 90, 'kratší sezóna než zkouška');
+
+  // ztráta: nízká vytíženost → poctivá věta s prahem zisku
+  const ztrata = run({ ...PENZION, porizeni: 'pronajem36', vytizenost: '10' }).navratnost;
+  assert.ok(ztrata.vysledekPrvniRok < 0);
+  assert.match(ztrata.veta, new RegExp(`^Při 10 % vytíženosti vychází první rok se ztrátou .*; zisk začíná od ${domain.procentNahoru(ztrata.bodZvratu.vytizenost)} % vytíženosti`));
+  // nedosažitelný bod zvratu
+  const nikdy = run({ ...PENZION, porizeni: 'koupe', cena_trek: '0', cena_ekolo: '10' }).navratnost;
+  assert.equal(nikdy.bodZvratu.dosazitelny, false);
+  assert.match(nikdy.veta, /nepokryje ani plná vytíženost/);
+  assert.match(nikdy.navratnostText, /se nevrátí/);
+
+  assert.equal(run({}).navratnost, null, 'bez kol null');
+  assert.equal(run({ porizeni: 'koupe', sezona: '200' }).navratnost, null);
+
+  const pub = domain.publicResult(run({ ...PENZION, porizeni: 'koupe' }));
+  assert.ok(pub.navratnost && pub.navratnost.veta);
+  const json = JSON.stringify(pub.navratnost);
+  assert.ok(!/nakupni/i.test(JSON.stringify(pub)), 'bez nákupních údajů');
+  assert.ok(!/marže|marze|naklady|provize|interni/i.test(json), 'bez interních slov (API je kontroluje)');
+  assert.ok(!/NaN|undefined|Infinity/.test(json));
+  assert.match(feature.recapText(pub), /^Návratnost \(odhad klienta: sezóna 150 dní, ceny 390 \/ 450 \/ 890 Kč\/den vč\. DPH\): Při 35 % vytíženosti/m);
+  assert.ok(!/Návratnost/.test(feature.recapText(domain.publicResult(run({})))), 'bez kol bez řádku');
+});
+
+test('návratnost: stránka má krok 6 ve formuláři a blok „Vyplatí se to?“ v souhrnu (bez inline stylů a skriptů)', async () => {
+  const render = (q) => {
+    const input = domain.normalizeInput(q, config);
+    return String(page.nabidka({ config, input, result: domain.publicResult(domain.compute(input, config)), internal: false, csrf: 'x', values: {}, errors: {}, query: domain.inputToQuery(input) }));
+  };
+  const h = render({ ...PENZION, porizeni: 'pronajem36', sezona: '180', vytizenost: '40', neplatce: '1' });
+  const form = /<form class="nab-form"[^>]*data-nabidka-form>[\s\S]*?<\/form>/.exec(h)[0];
+  assert.match(form, /id="krok-navratnost"/);
+  assert.match(form, /Krok 6/);
+  for (const name of ['sezona', 'vytizenost', 'cena_zakladni', 'cena_trek', 'cena_ekolo']) assert.match(form, new RegExp(`type="number"[^>]*name="${name}"|name="${name}"[^>]*type="number"`), name);
+  assert.match(form, /name="sezona"[^>]*value="180"|value="180"[^>]*name="sezona"/);
+  assert.match(form, /name="neplatce"[^>]*checked|checked[^>]*name="neplatce"/);
+  assert.match(form, /tuto třídu zatím nemáte \(0 kusů\)/, 'pole třídy s 0 kusy je jasně označené');
+  assert.match(form, /Cena pro hosta za den – Trekové e-kolo/);
+  assert.match(h, /<section class="nab-roi" aria-label="Vyplatí se to\?" data-nabidka-navratnost>/);
+  assert.match(h, /Bod zvratu prvního roku/);
+  assert.match(h, /se zaplatí za \d+\u00a0výpůjč/);
+  assert.match(h, /Neplátce DPH: tržby celé, naše ceny včetně DPH/);
+  assert.match(h, /bez provize platební brány/);
+  assert.match(h, /v šesti krocích/);
+  assert.ok(!BAD_TOKENS.test(h), 'bez undefined / NaN');
+  assert.ok(!/ style="/.test(h), 'bez inline stylů');
+  assert.ok(!/<script(?![^>]*\bsrc=)/.test(h), 'bez inline skriptů');
+  assert.ok(!/marže/i.test(h));
+  const koupe = render({ ...PENZION, porizeni: 'koupe' });
+  assert.match(koupe, /Návratnost koupě/);
+  assert.match(koupe, /nab-roi__lead is-loss/);
+  assert.match(koupe, /Částky bez DPH/);
+  const zk = render({ ...PENZION, porizeni: 'zkouska' });
+  assert.match(zk, /Tržby za zkoušku \(120 dní sezóny\)/);
+  assert.match(zk, /Další roky u zkoušky nepočítáme/);
+  assert.ok(!/Další roky \(ročně\)/.test(zk));
+  assert.ok(!BAD_TOKENS.test(zk));
+  const prazdna = render({});
+  assert.match(prazdna, /id="krok-navratnost"/, 'krok 6 i bez kol');
+  assert.ok(!/data-nabidka-navratnost/.test(prazdna), 'bez kol bez bloku');
+  // přes server (výchozí vstupy kalkulačky) ve všech tématech
+  for (const theme of ['outdoor', 'sport', 'family']) {
+    const html = await (await srv.fetch(`/nabidka?design=${theme}&trek=2&ekolo=3&porizeni=pronajem36`)).text();
+    assert.match(html, /Vyplatí se to\?/);
+    assert.match(html, /name="vytizenost"/);
+    assert.ok(!BAD_TOKENS.test(html));
+    assert.ok(!/ style="/.test(html));
+  }
+  const api = await (await srv.fetch('/api/v1/nabidka/spocitat?trek=2&ekolo=3&porizeni=pronajem36')).json();
+  assert.ok(api.navratnost && api.navratnost.trzby > 0);
+  assert.match(api.html, /data-nabidka-navratnost/);
+});
+
+test('kalkulačka návratnosti přes server: vlastní sezóna, vytíženost, ceny a neplátce DPH se promítnou do stránky i API', async () => {
+  srv.jar.clear();
+  const q = 'trek=2&ekolo=3&porizeni=pronajem36&sezona=120&vytizenost=50&cena_trek=500&cena_ekolo=1000&neplatce=1';
+  const api = await (await srv.fetch(`/api/v1/nabidka/spocitat?${q}`)).json();
+  assert.equal(api.ok, true);
+  assert.equal(api.vstup.navratnost.sezonaDni, 120);
+  assert.equal(api.vstup.navratnost.platceDph, false);
+  assert.equal(api.vstup.navratnost.cenaDen.ekolo, 1000);
+  assert.ok(api.navratnost, 'API vrací návratnost');
+  const html = await (await srv.fetch(`/nabidka?${q}`)).text();
+  assert.match(html, /Vyplatí se to\?/);
+  assert.match(html, /name="sezona"[^>]*value="120"|value="120"[^>]*name="sezona"/);
+  assert.match(html, /name="konfigurace" value="[^"]*sezona=120[^"]*neplatce=1/);
+});

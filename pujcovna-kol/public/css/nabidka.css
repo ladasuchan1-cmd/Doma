@@ -396,3 +396,46 @@
   border: 1px dashed var(--primary);
   font-size: var(--step--1);
 }
+
+/* Krok 6 a souhrn: kalkulačka návratnosti „Vyplatí se to?“ */
+.nab-roi-inputs {
+  display: grid;
+  gap: var(--space-3);
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 14rem), 1fr));
+}
+.nab-roi-inputs .field {
+  margin: 0;
+}
+.nab-roi-inputs .field__input {
+  max-width: 10rem;
+}
+.nab-roi {
+  display: grid;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  background: var(--tint-info);
+  border-radius: var(--radius-md);
+}
+.nab-roi .nab-summary__subtitle {
+  margin: 0;
+}
+.nab-roi__lead {
+  margin: 0;
+  padding-left: var(--space-3);
+  border-left: 4px solid var(--success);
+  font-weight: 600;
+}
+.nab-roi__lead.is-loss {
+  border-left-color: var(--warning);
+}
+.nab-roi__note {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: var(--step--1);
+}
+@media print {
+  .nab-roi {
+    background: #fff;
+    border: 1px solid #000;
+  }
+}

@@ -173,6 +173,16 @@
       "jenEkolo": true
     }
   ],
+  "navratnost": {
+    "sezonaDni": 150,
+    "vytizenostProcent": 35,
+    "cenaDen": {
+      "zakladni": 390,
+      "trek": 450,
+      "ekolo": 890
+    },
+    "dph": 0.21
+  },
   "interni": {
     "prahMarzeProcent": 0.2,
     "nakladyHostingMesicne": 150,

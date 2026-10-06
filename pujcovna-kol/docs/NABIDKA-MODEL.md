@@ -354,3 +354,72 @@ námi schválené díly, sezónní prohlídka do 15. 4. a po 15. 10., servisní 
 9. Hranice pro povinné GPS lokátory (návrh od 20 kol / u všech e-kol).
 10. Pojištění: v ceně pronájmu (jako KoloNaOperák) nebo doplněk.
 11. Sladění prodejních cen tříd se skutečnou flotilou: veřejná cena konkrétních e-kol bez DPH (≈ 44–63 tis. Kč, viz 2b) je výrazně pod prodejní cenou třídy „ekolo“ (88 000 Kč); rozhodnout, zda snížit prodejní ceny tříd, nebo flotilu složit z dražších modelů, a pak přepočítat scénáře.
+
+---
+
+## 9. Kalkulačka návratnosti „Vyplatí se to?“ (od 7. 10. 2026)
+
+Hotel nezajímá splátka, ale kolik vydělá. Krok 6 konfigurátoru z odhadu sezóny spočítá tržby z půjčovného, výsledek prvního
+a dalších let, bod zvratu a za kolik výpůjček se zaplatí jedno kolo. Je to **odhad pro rozhodnutí, ne slib** – výsledek stojí
+na vytíženosti, kterou zadává klient. Kalkulačka **nemění žádný dosavadní výpočet** (souhrn, horizonty, marže); jen z nich čte.
+Je veřejná: pracuje s cenami pro klienta (`souhrn`, `porizeni.radky[].zaKolo`), nikdy s nákupními cenami ani blokem `interni`.
+
+**Vstupy** (GET parametry, výchozí hodnoty v `config/nabidka.json` → `navratnost`; blok je volitelný – chybí-li, platí stejné
+výchozí hodnoty z kódu `NAVRATNOST_VYCHOZI`; mimo rozsah se ořízne, nečíselné → výchozí):
+
+| Parametr | Význam | Výchozí | Rozsah |
+|---|---|---|---|
+| `sezona` | délka sezóny ve dnech (`navratnost.sezonaDni`) | 150 | 30–365 |
+| `vytizenost` | průměrná vytíženost kol v celých % (`navratnost.vytizenostProcent`; v doméně podíl 0,35) | 35 | 5–100 |
+| `cena_zakladni`, `cena_trek`, `cena_ekolo` | cena půjčovného pro hosta za den v Kč **vč. DPH** (`navratnost.cenaDen`) | 390 / 450 / 890 | 0–5 000 |
+| `neplatce=1` | „Nejsme plátci DPH“ | plátce | – |
+| (jen config) `navratnost.dph` | sazba DPH | 0,21 | 0–99 % |
+
+V odkazu (`inputToQuery`) jdou parametry kalkulačky vždy za `servis` a před `doplnky` (doplnky zůstávají poslední).
+
+**Vzorce** (R = zaokrouhlení na celé Kč; `D` = dny sezóny, které období pokryje; `v` = vytíženost; `f` = 1 pro plátce, 1 + dph pro neplátce):
+
+```
+D                   = koupě, pronájem: sezonaDni;  zkouška: min(sezonaDni, zkouska.mesice × 30)
+tržbaDen(třída)     = plátce: R(cenaDen / (1 + dph));  neplátce: cenaDen          // tržba bez DPH, kterou hotel skutečně má
+výpůjčníDny(třída)  = R(počet kol třídy × D × v)
+tržby               = Σ výpůjčníDny × tržbaDen
+nákladyPrvníRok     = koupě, pronájem: R((souhrn.jednorazove + 12 × souhrn.mesicne + souhrn.rocne) × f)
+                      zkouška: R(souhrn.horizonty[0].castka × f)                     // celá cena zkoušky
+nákladyDalšíRoky    = koupě, pronájem: R((12 × souhrn.mesicne + souhrn.rocne) × f)   // u koupě jen provoz (web, servis, doplňky)
+                      zkouška: null – po zkoušce se rozhoduje podle skutečné vytíženosti
+výsledek            = tržby − náklady (první rok; další roky ročně)
+průměrnáTržbaDen    = Σ (počet × tržbaDen) / počet kol                               // vážená počty kol
+bodZvratu           = ceil(nákladyPrvníRok / průměrnáTržbaDen) výpůjčních dní
+                      vytíženost bodu zvratu = bodZvratu / (počet kol × D)          // > 100 % = nedosažitelné
+nákladNaKolo        = koupě: zaKolo (cena po slevě);  pronájem: zaKolo × 12;  zkouška: zaKolo × zkouska.mesice;  vše × f
+kolo se zaplatí za  = ceil(nákladNaKolo / tržbaDen) výpůjček
+pak kolo vydělá     = R(D × v) × tržbaDen − nákladNaKolo   (za sezónu; záporné → ukážeme ≈ počet sezón do zaplacení)
+návratnost koupě    = R(souhrn.jednorazove × f) / (tržby − nákladyDalšíRoky)  sezón, jen když je jmenovatel kladný;
+                      jinak „při zadané vytíženosti se investice nevrátí“
+```
+
+Bez kol je `navratnost = null`. Výsledek nese i použité vstupy (`navratnost.vstupy`: sezóna, vytíženost, ceny, plátce/neplátce,
+sazba DPH, pokryté dny), aby šlo číslo doložit; e-mail poptávky má řádek se shrnutím a vstupy.
+
+**Hlavní věta** v souhrnu: „Při 35 % vytíženosti vyděláte za první rok X Kč, od druhého roku Y Kč ročně.“ Při ztrátě poctivě
+„…vychází první rok se ztrátou X Kč; zisk začíná od N % vytíženosti“ (N = vytíženost bodu zvratu zaokrouhlená nahoru). U zkoušky
+„…vyděláte za zkoušku (4 měsíce, 120 dní sezóny) X Kč“ a místo dalších let věta, že po zkoušce se rozhodne podle skutečné vytíženosti.
+
+Příklad (veřejný `config/nabidka.json`, penzion 2 trek + 3 e-kola, pronájem 36 m, web šablona, správa sami, vlastní servis, bez
+doplňků, výchozí vstupy, plátce DPH): tržby 155 348 Kč (263 výpůjčních dní), náklady 1. roku 131 820 Kč → **+23 528 Kč**, další roky
+**+38 528 Kč** ročně, bod zvratu 224 výpůjčních dní (30 % vytíženosti); trek se zaplatí za 39 výpůjček a pak vydělá 5 496 Kč za sezónu,
+e-kolo za 35 výpůjček a pak 13 508 Kč.
+
+**Co se nezapočítává:** náklady na vlastní obsluhu (recepce, výdej, mytí kol), provize platební brány a rezervačního poplatku,
+spotřební díly u vlastního servisu, pojištění mimo doplněk, vratná kauce (není náklad), odkup kol na konci pronájmu ani prodejní
+hodnota kol po koupi či zkoušce, sezónní výkyvy poptávky (vytíženost je průměr), zdanění zisku. U pronájmu jsou „další roky“
+roky v rámci smlouvy (24 / 36 m); po skončení se náklady mění podle volby (odkup / vrácení / nová kola).
+
+**DPH:** naše ceny jsou bez DPH. Plátce si DPH z našich faktur odečte a z půjčovného ji odvádí – počítáme proto obojí bez DPH
+(tržba = cena pro hosta / 1,21). Neplátce si DPH odečíst nemůže a z půjčovného ji neodvádí – tržba je celá cena pro hosta a naše
+náklady se násobí 1 + dph (× 1,21). Souhrn to uvádí v poznámce pod blokem („Částky bez DPH“ / „Neplátce DPH: tržby celé, naše ceny
+včetně DPH“). Sazba DPH 21 % u půjčovného je předpoklad – ověřit s daňovým poradcem (viz kap. 4).
+
+Novinka bez zlomu v historii: dosavadní čísla nabídky (souhrn, horizonty, interní marže, scénáře v kap. 3) se nemění; starší
+uložené poptávky blok `navratnost` ve výsledku nemají.

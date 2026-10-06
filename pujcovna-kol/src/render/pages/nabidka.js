@@ -3,8 +3,9 @@
 // (config = validovaná konfigurace cen, input = normalizovaný vstup, result = výsledek compute() – bez `interni`, pokud
 // internal=false). Výstup: Html těla stránek. Vlastní pomocné komponenty (volby s radio, karty tříd) používají jen
 // třídy nab-* stylované v public/css/nabidka.css přes tokeny base.css; ostatní z components.js.
-//   nabidka(data)          konfigurátor: 5 kroků v GET formuláři + sticky souhrn + formulář poptávky
-//   summaryFragment(data)  souhrn (SSR i pro živý přepočet přes /api/v1/nabidka/spocitat → `html`)
+//   nabidka(data)          konfigurátor: 6 kroků v GET formuláři (6. = kalkulačka „Vyplatí se to?“) + sticky souhrn
+//                          + formulář poptávky
+//   summaryFragment(data)  souhrn (SSR i pro živý přepočet přes /api/v1/nabidka/spocitat → `html`), vč. bloku návratnosti
 //   dekujeme(data)         rekapitulace odeslané poptávky s číslem
 //   unavailable(data)      „nabídka se připravuje“ (chybí / chybná konfigurace cen)
 
@@ -13,7 +14,7 @@ const c = require('../components');
 const format = require('../format');
 const domain = require('../../domain/nabidka');
 
-const STEPS = ['Kola', 'Způsob pořízení', 'Web', 'Správa a servis', 'Doplňky'];
+const STEPS = ['Kola', 'Způsob pořízení', 'Web', 'Správa a servis', 'Doplňky', 'Vyplatí se to?'];
 
 /** Částka v Kč (celé) → „12 900 Kč“. */
 function kc(n) {
@@ -204,8 +205,81 @@ function stepDoplnky({ config, input }) {
   return c.section({ id: 'krok-doplnky', eyebrow: 'Krok 5', title: 'Doplňky', lead: n ? `Ceny za kolo se počítají pro ${format.plural(n, 'kolo', 'kola', 'kol')} z kroku 1.` : 'Ceny za kolo se počítají podle počtu kol z kroku 1.', children: html`<div class="nab-addons">${items}</div>`, variant: 'nab-step' });
 }
 
+/** Krok 6: kalkulačka návratnosti – odhad sezóny, vytíženosti a cen pro hosta (GET parametry sezona, vytizenost, cena_*, neplatce). */
+function stepNavratnost({ config, input }) {
+  const R = domain.NAVRATNOST_ROZSAHY;
+  const vychozi = config.navratnost || domain.NAVRATNOST_VYCHOZI;
+  const nv = input.navratnost || { sezonaDni: vychozi.sezonaDni, vytizenost: vychozi.vytizenost, cenaDen: vychozi.cenaDen, platceDph: true };
+  const ceny = config.tridyKol.map((t) => {
+    const pocet = input.kola[t.id] || 0;
+    return c.field({
+      label: html`Cena pro hosta za den – ${t.nazev}`,
+      name: `cena_${t.id}`,
+      type: 'number',
+      value: nv.cenaDen[t.id],
+      min: R.cenaDen[0],
+      max: R.cenaDen[1],
+      step: 10,
+      inputmode: 'numeric',
+      hint: pocet ? `Kč vč. DPH · ve flotile ${format.plural(pocet, 'kolo', 'kola', 'kol')} této třídy` : 'Kč vč. DPH · tuto třídu zatím nemáte (0 kusů), do výpočtu nevstupuje',
+      attrs: { 'data-nabidka-cena': t.id },
+    });
+  });
+  return c.section({
+    id: 'krok-navratnost',
+    eyebrow: 'Krok 6',
+    title: 'Vyplatí se to?',
+    lead: 'Odhadněte sezónu, vytíženost a ceny půjčovného – souhrn ukáže, za kolik výpůjček se kola zaplatí a kolik vyděláte. Je to odhad pro rozhodnutí, ne slib: skutečnost záleží na počasí, hostech a cenách.',
+    children: html`<div class="nab-roi-inputs">
+  ${c.field({ label: 'Délka sezóny (dní)', name: 'sezona', type: 'number', value: nv.sezonaDni, min: R.sezonaDni[0], max: R.sezonaDni[1], step: 1, inputmode: 'numeric', hint: `Kolik dní v roce kola půjčujete (${R.sezonaDni[0]}–${R.sezonaDni[1]}); typicky duben–říjen ≈ 150–210.` })}
+  ${c.field({ label: 'Průměrná vytíženost kol (%)', name: 'vytizenost', type: 'number', value: Math.round(nv.vytizenost * 100), min: R.vytizenostProcent[0], max: R.vytizenostProcent[1], step: 1, inputmode: 'numeric', hint: 'Kolik procent dní sezóny je průměrné kolo půjčené; 30–40 % je u ubytování běžný začátek.' })}
+</div>
+<h3 class="nab-subtitle">Cena půjčovného pro hosta</h3>
+<div class="nab-roi-inputs">${ceny}</div>
+${c.field({ label: 'Nejsme plátci DPH', name: 'neplatce', type: 'checkbox', value: '1', checked: !nv.platceDph, hint: 'Plátce: počítáme tržby bez DPH a naše ceny bez DPH. Neplátce: tržby celé, naše ceny včetně 21 % DPH (nemůžete si ji odečíst).' })}`,
+    variant: 'nab-step',
+  });
+}
+
 // ---------------------------------------------------------------------------------------------------------
 // Souhrn
+
+/** Kč se znaménkem pro výsledek (zisk „+12 000 Kč“, ztráta „−12 000 Kč“). */
+function kcVysledek(n) {
+  return n > 0 ? `+${kc(n)}` : kc(n);
+}
+
+/** Blok „Vyplatí se to?“ v souhrnu (result.navratnost z compute; bez kol nic). */
+function navratnostBlock(result) {
+  const n = result.navratnost;
+  if (!n) return '';
+  const zk = n.typ === 'zkouska';
+  const rows = [];
+  rows.push([zk ? `Tržby za zkoušku (${n.vstupy.dnyPokryte} dní sezóny)` : 'Tržby za sezónu', html`${kc(n.trzby)}<small class="nab-muted">${format.plural(n.vypujcniDny, 'výpůjční den', 'výpůjční dny', 'výpůjčních dní')}</small>`]);
+  rows.push([zk ? 'Náklady zkoušky (celá cena)' : 'Náklady prvního roku', kc(n.vydajePrvniRok)]);
+  rows.push({ label: zk ? 'Výsledek zkoušky' : 'Výsledek prvního roku', value: kcVysledek(n.vysledekPrvniRok), strong: true });
+  if (!zk && n.vysledekDalsiRoky !== null) rows.push(['Další roky (ročně)', html`${kcVysledek(n.vysledekDalsiRoky)}<small class="nab-muted">tržby ${kc(n.trzbyDalsiRoky)} − náklady ${kc(n.vydajeDalsiRoky)}</small>`]);
+  if (n.bodZvratu) {
+    rows.push([zk ? 'Bod zvratu zkoušky' : 'Bod zvratu prvního roku', n.bodZvratu.dosazitelny
+      ? html`${format.plural(n.bodZvratu.vypujcniDny, 'výpůjční den', 'výpůjční dny', 'výpůjčních dní')}<small class="nab-muted">${domain.procentNahoru(n.bodZvratu.vytizenost)} % vytíženosti</small>`
+      : html`${format.plural(n.bodZvratu.vypujcniDny, 'výpůjční den', 'výpůjční dny', 'výpůjčních dní')}<small class="nab-muted">víc, než sezóna dovolí (${format.plural(n.bodZvratu.kapacitaDni, 'den', 'dny', 'dní')})</small>`]);
+  }
+  for (const t of n.tridy) {
+    let text;
+    if (t.vypujcekNaZaplaceni === null) text = 'cena pro hosta je 0 Kč – nezaplatí se';
+    else if (t.vydelaNaKolo >= 0) text = `se zaplatí za ${format.plural(t.vypujcekNaZaplaceni, 'výpůjčku', 'výpůjčky', 'výpůjček')}, pak vydělá ${kc(t.vydelaNaKolo)} za ${zk ? 'zkoušku' : 'sezónu'}`;
+    else text = `se zaplatí za ${format.plural(t.vypujcekNaZaplaceni, 'výpůjčku', 'výpůjčky', 'výpůjček')}${t.sezonNaZaplaceni !== null ? ` (≈ ${domain.sezonyText(t.sezonNaZaplaceni)})` : ''}; za ${zk ? 'zkoušku' : 'sezónu'} utrží ${kc(t.dnyNaKolo * t.trzbaDen)}`;
+    rows.push([`1 kolo – ${t.nazev}`, text]);
+  }
+  if (n.navratnostText) rows.push(['Návratnost koupě', n.navratnostText]);
+  return html`<section class="nab-roi" aria-label="Vyplatí se to?" data-nabidka-navratnost>
+  <h3 class="nab-summary__subtitle">Vyplatí se to?</h3>
+  <p class="${n.vysledekPrvniRok >= 0 ? 'nab-roi__lead' : 'nab-roi__lead is-loss'}">${n.veta}</p>
+  ${c.summary(rows)}
+  ${n.poznamkaDalsiRoky ? html`<p class="nab-muted nab-roi__note">${n.poznamkaDalsiRoky}</p>` : ''}
+  <p class="nab-roi__note">Odhad pro rozhodnutí, ne slib (${n.vstupy.sezonaDni} dní sezóny, vytíženost ${Math.round(n.vstupy.vytizenost * 100)} %, ceny z kroku 6). ${n.cenyVcetneDph ? 'Neplátce DPH: tržby celé, naše ceny včetně DPH.' : 'Částky bez DPH.'} Bez nákladů na vlastní obsluhu a bez provize platební brány.</p>
+</section>`;
+}
 
 function internalBlock(result, config) {
   const i = result.interni;
@@ -273,6 +347,7 @@ function summaryFragment({ result, internal, config, actions = true, detailsOpen
     </ul>
   </div>`
     : ''}
+  ${navratnostBlock(result)}
   <p class="nab-summary__note">Ceny jsou orientační, bez DPH${meta.platnostOd ? html`, platnost od ${format.date(meta.platnostOd)}` : ''}. Závaznou nabídku připravíme po konzultaci.</p>
   ${actions
     ? html`<div class="nab-summary__actions">
@@ -331,7 +406,7 @@ ${c.section({
     eyebrow: 'Pro hotely, penziony a půjčovny',
     title: 'Kola pro vaše hosty – s rezervačním webem, správou a servisem',
     titleTag: 'h1',
-    lead: 'Sestavte si nabídku v pěti krocích. Souhrn se přepočítává průběžně; na konci pošlete poptávku a my se ozveme se závaznou nabídkou.',
+    lead: 'Sestavte si nabídku v šesti krocích. Souhrn se přepočítává průběžně; na konci pošlete poptávku a my se ozveme se závaznou nabídkou.',
     children: html`${config.meta.zastupneCeny ? c.notice('Konfigurátor zatím počítá s ukázkovými cenami – slouží k představě o struktuře nabídky, ne jako závazný ceník.', 'warning') : ''}${c.steps(STEPS, -1, { links: false })}`,
   })}
 <div class="container nab-layout">
@@ -341,6 +416,7 @@ ${c.section({
     ${stepWeb({ config, input })}
     ${stepSprava({ config, input })}
     ${stepDoplnky({ config, input })}
+    ${stepNavratnost({ config, input })}
     <div class="nab-form__actions" data-nabidka-nojs>${c.button({ label: 'Přepočítat nabídku', type: 'submit', variant: 'secondary' })}<p class="nab-muted">Bez JavaScriptu se souhrn přepočítá tímto tlačítkem.</p></div>
   </form>
   <aside class="nab-summary" data-nabidka-summary aria-live="polite" aria-label="Souhrn nabídky">${summaryFragment({ result, internal, config })}</aside>

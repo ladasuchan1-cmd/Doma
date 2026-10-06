@@ -2,6 +2,8 @@
 // Progresivní JS feature „nabídka“: (1) při změně formuláře konfigurátoru načte /api/v1/nabidka/spocitat?… a vymění obsah
 // souhrnu (pole `html` z odpovědi = stejný SSR fragment), (2) aktualizuje hidden pole konfigurace v poptávce a adresu
 // stránky (history.replaceState), (3) doplňky „jen e-kola“ povoluje podle počtu e-kol, (4) tlačítko Vytisknout nabídku.
+// Pole kalkulačky návratnosti (krok 6: sezona, vytizenost, cena_* = type=number, neplatce = checkbox) jdou na API stejnou
+// cestou – číselná pole přes `input`, checkbox přes `change`.
 // Bez JS funguje tlačítko „Přepočítat nabídku“ (GET formulář). Žádné knihovny, žádný inline kód.
 (function () {
   var form = document.querySelector('[data-nabidka-form]');

@@ -8,9 +8,11 @@
 //                                    modely: {slug: {nakupniCena}} }); bez něj se odvodí z prodejní ceny a prahu marže
 //                                    (meta.nakupniCenyOdvozene = true). Nákupní ceny nikdy nejdou do publicResult.
 //   normalizeInput(query, config) → vstup konfigurátoru { kola: {zakladni, trek, ekolo}, porizeni, web, dalsiDesign,
-//                                    sprava, servis, doplnky[] } (neznámé hodnoty → výchozí; počty 0–MAX_KOL)
+//                                    sprava, servis, navratnost{sezonaDni, vytizenost, cenaDen{}, platceDph}, doplnky[] }
+//                                    (neznámé hodnoty → výchozí; počty 0–MAX_KOL; kalkulačka ořez na rozsahy NAVRATNOST_ROZSAHY)
 //   compute(input, config)        → výsledek: kola[], porizeni{}, web{}, sprava{}, servis{}, doplnky[], souhrn{},
 //                                    mnozstevni{} (stupeň, sleva, úspora, kolik kol chybí do dalšího stupně),
+//                                    navratnost{} (kalkulačka „Vyplatí se to?“ – veřejná, bez nákupních cen; null bez kol),
 //                                    upozorneni[], interni{} (marže, náklady, podíl partnera, varování)
 //   publicResult(result)          → výsledek bez interních čísel (pro veřejnost a API bez admin session)
 //   monthlyRate(trida, mesice, pronajem) → měsíční sazba pronájmu za 1 kolo (anuita + úrok ze zůstatku + marže)
@@ -33,6 +35,11 @@ const SPRAVA_LABELS = Object.freeze({ sami: 'Správu si zajistíte sami', predpl
 const SERVIS_LABELS = Object.freeze({ vlastni: 'Vlastní servis se slevou na díly', partner: 'Partnerský servis v okolí' });
 
 const r0 = (n) => Math.round(Number(n) || 0);
+
+// Kalkulačka návratnosti (docs/NABIDKA-MODEL.md, kap. „Kalkulačka návratnosti“): výchozí hodnoty, když config/nabidka.json
+// blok `navratnost` nemá, a povolené rozsahy vstupů (mimo rozsah → ořez, nečíselné → výchozí).
+const NAVRATNOST_VYCHOZI = Object.freeze({ sezonaDni: 150, vytizenost: 0.35, cenaDen: Object.freeze({ zakladni: 390, trek: 450, ekolo: 890 }), dph: 0.21 });
+const NAVRATNOST_ROZSAHY = Object.freeze({ sezonaDni: [30, 365], vytizenostProcent: [5, 100], cenaDen: [0, 5000] });
 
 // ---------------------------------------------------------------------------------------------------------
 // Validace konfigurace
@@ -189,6 +196,31 @@ function validateConfig(raw, interniRaw = null) {
   }
   if (!stupne.length) stupne.push({ odKol: 1, sleva: 0, slevaKoupe: 0, poplatekZkousky: 0, kauceProcent: null, zalohaZkouskyProcent: null, nazev: '', vyhody: [] });
 
+  // kalkulačka návratnosti (volitelné): výchozí vstupy pro hosta a sazba DPH; chybí-li, platí NAVRATNOST_VYCHOZI
+  let navratnost = { sezonaDni: NAVRATNOST_VYCHOZI.sezonaDni, vytizenost: NAVRATNOST_VYCHOZI.vytizenost, cenaDen: { ...NAVRATNOST_VYCHOZI.cenaDen }, dph: NAVRATNOST_VYCHOZI.dph };
+  if (raw.navratnost !== undefined) {
+    const nv = raw.navratnost;
+    const R = NAVRATNOST_ROZSAHY;
+    if (!nv || typeof nv !== 'object' || Array.isArray(nv)) errors.push('„navratnost“ musí být objekt.');
+    else {
+      if (nv.sezonaDni !== undefined) need(Number.isInteger(nv.sezonaDni) && nv.sezonaDni >= R.sezonaDni[0] && nv.sezonaDni <= R.sezonaDni[1], `navratnost.sezonaDni musí být celé číslo ${R.sezonaDni[0]}–${R.sezonaDni[1]}.`);
+      const vyt = nv.vytizenostProcent === undefined ? NAVRATNOST_VYCHOZI.vytizenost : pct(nv.vytizenostProcent);
+      if (nv.vytizenostProcent !== undefined) need(isNum(nv.vytizenostProcent) && vyt >= R.vytizenostProcent[0] / 100 && vyt <= R.vytizenostProcent[1] / 100, `navratnost.vytizenostProcent musí být ${R.vytizenostProcent[0]}–${R.vytizenostProcent[1]} %.`);
+      if (nv.cenaDen !== undefined) need(nv.cenaDen && typeof nv.cenaDen === 'object' && !Array.isArray(nv.cenaDen), 'navratnost.cenaDen musí být objekt {zakladni, trek, ekolo}.');
+      const cd = nv.cenaDen && typeof nv.cenaDen === 'object' ? nv.cenaDen : {};
+      for (const k of Object.keys(cd)) if (!TRIDY.includes(k)) errors.push(`navratnost.cenaDen: neznámá třída kol „${k}“.`);
+      for (const id of TRIDY) if (cd[id] !== undefined) need(isNum(cd[id]) && cd[id] <= R.cenaDen[1], `navratnost.cenaDen.${id} musí být číslo ${R.cenaDen[0]}–${R.cenaDen[1]} Kč.`);
+      const dph = nv.dph === undefined ? NAVRATNOST_VYCHOZI.dph : pct(nv.dph);
+      if (nv.dph !== undefined) need(isNum(nv.dph) && dph < 1, 'navratnost.dph musí být sazba 0–99 % (např. 0.21).');
+      navratnost = {
+        sezonaDni: Number.isInteger(nv.sezonaDni) ? nv.sezonaDni : NAVRATNOST_VYCHOZI.sezonaDni,
+        vytizenost: Number.isFinite(vyt) ? Math.round(vyt * 100) / 100 : NAVRATNOST_VYCHOZI.vytizenost,
+        cenaDen: Object.fromEntries(TRIDY.map((id) => [id, isNum(cd[id]) ? r0(cd[id]) : NAVRATNOST_VYCHOZI.cenaDen[id]])),
+        dph: Number.isFinite(dph) ? dph : NAVRATNOST_VYCHOZI.dph,
+      };
+    }
+  }
+
   need(interni && typeof interni === 'object', 'Chybí „interni“.');
   const i = interni || {};
   for (const k of ['prahMarzeProcent', 'nakladyHostingMesicne', 'nakladyKonzultaceHodina', 'nakladyNasazeniWebu']) need(isNum(i[k]), `interni.${k} musí být číslo.`);
@@ -218,6 +250,7 @@ function validateConfig(raw, interniRaw = null) {
     servis: { vlastni: { slevaNaDilyProcent: pct(sv.vlastni.slevaNaDilyProcent), mesicne: r0(sv.vlastni.mesicne) }, partner: { mesicneZaKolo: r0(sv.partner.mesicneZaKolo), sezonniProhlidkaZaKolo: r0(sv.partner.sezonniProhlidkaZaKolo), provizeProNasProcent: pct(sv.partner.provizeProNasProcent), slaHodin: Number(sv.partner.slaHodin) } },
     doplnky: dop,
     mnozstevniSlevy: stupne,
+    navratnost,
     interni: {
       prahMarzeProcent: pct(i.prahMarzeProcent),
       nakladyHostingMesicne: r0(i.nakladyHostingMesicne),
@@ -249,6 +282,19 @@ function pick(v, allowed, fallback) {
   return allowed.includes(s) ? s : fallback;
 }
 
+/** Číslo z formuláře (i s desetinnou čárkou) zaokrouhlené na celé a ořezané na [min, max]; prázdné / nečíselné → fallback. */
+function numberIn(v, [min, max], fallback) {
+  const s = String((Array.isArray(v) ? v[v.length - 1] : v) ?? '').trim().replace(',', '.');
+  const n = s === '' ? NaN : Number(s);
+  if (!Number.isFinite(n)) return fallback;
+  return Math.min(max, Math.max(min, Math.round(n)));
+}
+
+/** Výchozí vstupy kalkulačky návratnosti z konfigurace (bez bloku `navratnost` z NAVRATNOST_VYCHOZI). */
+function navratnostVychozi(config) {
+  return (config && config.navratnost) || NAVRATNOST_VYCHOZI;
+}
+
 /**
  * Normalizuje vstup z query / formuláře. doplnky: pole hodnot nebo řetězec „pojisteni,gps“ (i opakovaně).
  * @param {object} query  { zakladni, trek, ekolo, porizeni, web, dalsiDesign, sprava, servis, doplnky }
@@ -263,6 +309,15 @@ function normalizeInput(query = {}, config) {
     if (known.has(t) && !doplnky.includes(t)) doplnky.push(t);
   }
   const dd = Array.isArray(query.dalsiDesign) ? query.dalsiDesign[0] : query.dalsiDesign;
+  const nv = navratnostVychozi(config);
+  const R = NAVRATNOST_ROZSAHY;
+  const np = Array.isArray(query.neplatce) ? query.neplatce[query.neplatce.length - 1] : query.neplatce;
+  const navratnost = {
+    sezonaDni: numberIn(query.sezona, R.sezonaDni, nv.sezonaDni),
+    vytizenost: numberIn(query.vytizenost, R.vytizenostProcent, Math.round(nv.vytizenost * 100)) / 100,
+    cenaDen: Object.fromEntries(TRIDY.map((id) => [id, numberIn(query[`cena_${id}`], R.cenaDen, nv.cenaDen[id])])),
+    platceDph: !(np === '1' || np === 'on' || np === true),
+  };
   return {
     kola: { zakladni: countOf(query.zakladni), trek: countOf(query.trek), ekolo: countOf(query.ekolo) },
     porizeni: pick(query.porizeni, PORIZENI, 'zkouska'),
@@ -270,6 +325,7 @@ function normalizeInput(query = {}, config) {
     dalsiDesign: dd === '1' || dd === 'on' || dd === true,
     sprava: pick(query.sprava, SPRAVA, 'sami'),
     servis: pick(query.servis, SERVIS, 'vlastni'),
+    navratnost,
     doplnky,
   };
 }
@@ -283,6 +339,14 @@ function inputToQuery(input) {
   if (input.dalsiDesign) q.set('dalsiDesign', '1');
   q.set('sprava', input.sprava);
   q.set('servis', input.servis);
+  // kalkulačka návratnosti – vždy před doplnky (doplnky zůstávají poslední)
+  const nv = input.navratnost;
+  if (nv) {
+    q.set('sezona', String(nv.sezonaDni));
+    q.set('vytizenost', String(Math.round(nv.vytizenost * 100)));
+    for (const id of TRIDY) q.set(`cena_${id}`, String(nv.cenaDen[id]));
+    if (!nv.platceDph) q.set('neplatce', '1');
+  }
   if (input.doplnky.length) q.set('doplnky', input.doplnky.join(','));
   return q.toString();
 }
@@ -528,6 +592,7 @@ function compute(input, config) {
   else if (input.porizeni === 'pronajem24') horizonty.push({ id: 'rok', label: 'Celkem za 1 rok', mesice: 12, castka: total(12) }, { id: 'doba', label: 'Celkem za 24 měsíců', mesice: 24, castka: total(24) });
   else horizonty.push({ id: 'rok', label: 'Celkem za 1 rok', mesice: 12, castka: total(12) }, { id: 'tri', label: 'Celkem za 3 roky', mesice: 36, castka: total(36) });
   const souhrn = { pocetKol, pocetEkol, prodejniCelkem, jednorazove, mesicne, rocne, kauce: porizeni.kauce, odkupNaKonci: porizeni.odkupNaKonci, horizonty };
+  const navratnost = computeNavratnost({ input, config, kola, porizeni, zkouska, souhrn });
 
   // interní za horizont
   let trzby = 0;
@@ -552,7 +617,132 @@ function compute(input, config) {
   if (config.meta.nakupniCenyOdvozene && pocetKol > 0) varovani.push('Nákupní ceny kol nejsou nastaveny (chybí interní soubor cen) – počítá se s odhadem prodejní cena × (1 − práh marže).');
   const interni = { horizontMesice: horizon, trzby, naklady, marze, marzeProcent, prahMarzeProcent: config.interni.prahMarzeProcent, podilPartnera: partner, polozky, varovani, kola: kolaInterni, nakupniCelkem, nakupniCenyOdvozene: !!config.meta.nakupniCenyOdvozene, nakladyZkousky: zkouska ? ip.find((p) => p.id === 'kola').naklady : null };
 
-  return { vstup: input, meta: config.meta, kola, porizeni, zkouska, mnozstevni, web: webOut, sprava: spravaOut, servis: servisOut, doplnky, souhrn, upozorneni, interni };
+  return { vstup: input, meta: config.meta, kola, porizeni, zkouska, mnozstevni, web: webOut, sprava: spravaOut, servis: servisOut, doplnky, souhrn, navratnost, upozorneni, interni };
+}
+
+const kcFmt = new Intl.NumberFormat('cs-CZ', { maximumFractionDigits: 0 });
+/** „48 300 Kč“ (nezlomitelné mezery jako format.money). */
+function kcText(n) {
+  return `${kcFmt.format(Math.round(Number(n) || 0))}\u00a0Kč`;
+}
+
+/** Podíl → celá procenta zaokrouhlená nahoru (bez chyby plovoucí čárky: 0,21 → 21, ne 22). */
+function procentNahoru(podil) {
+  return Math.ceil(Math.round(podil * 1e6) / 1e4);
+}
+
+/** „1 sezónu“, „2,4 sezóny“, „3 sezóny“, „6 sezón“ (desetinná čísla genitivem jednotného čísla). */
+function sezonyText(n) {
+  const txt = String(n).replace('.', ',');
+  if (!Number.isInteger(n)) return `${txt}\u00a0sezóny`;
+  return `${txt}\u00a0${n === 1 ? 'sezónu' : n >= 2 && n <= 4 ? 'sezóny' : 'sezón'}`;
+}
+
+/**
+ * Kalkulačka návratnosti „Vyplatí se to?“ (docs/NABIDKA-MODEL.md, kap. 9). Veřejná: pracuje jen s cenami pro klienta
+ * (souhrn, porizeni.radky[].zaKolo) a odhadem sezóny – žádné nákupní ceny ani interní čísla. Bez kol null.
+ * Částky celé Kč; tržba za den se zaokrouhlí na celé Kč, výpůjční dny třídy na celé dny.
+ */
+function computeNavratnost({ input, config, kola, porizeni, zkouska, souhrn }) {
+  if (!souhrn.pocetKol) return null;
+  const vychozi = navratnostVychozi(config);
+  const nv = input.navratnost || { sezonaDni: vychozi.sezonaDni, vytizenost: vychozi.vytizenost, cenaDen: { ...vychozi.cenaDen }, platceDph: true };
+  const dph = Number.isFinite(vychozi.dph) ? vychozi.dph : NAVRATNOST_VYCHOZI.dph;
+  const platce = nv.platceDph !== false;
+  const faktorVydaju = platce ? 1 : 1 + dph; // neplátce si DPH z našich cen neodečte
+  const isZkouska = !!zkouska;
+  const isKoupe = porizeni.typ === 'koupe';
+  const dny = isZkouska ? Math.min(nv.sezonaDni, zkouska.mesice * 30) : nv.sezonaDni;
+  const vyt = nv.vytizenost;
+  const vytText = `${Math.round(vyt * 100)} %`;
+
+  const tridy = kola.map((k, idx) => {
+    const cenaDen = nv.cenaDen[k.id];
+    const trzbaDen = r0(platce ? cenaDen / (1 + dph) : cenaDen);
+    const vypujcniDny = r0(k.pocet * dny * vyt);
+    const radek = porizeni.radky[idx] || { zaKolo: 0 };
+    const zaObdobi = isKoupe ? radek.zaKolo : isZkouska ? radek.zaKolo * zkouska.mesice : radek.zaKolo * 12;
+    const vydajNaKolo = r0(zaObdobi * faktorVydaju);
+    const dnyNaKolo = r0(dny * vyt);
+    const vypujcekNaZaplaceni = trzbaDen > 0 ? Math.ceil(vydajNaKolo / trzbaDen) : null;
+    return {
+      id: k.id,
+      nazev: k.nazev,
+      pocet: k.pocet,
+      cenaDen,
+      trzbaDen,
+      vypujcniDny,
+      trzby: vypujcniDny * trzbaDen,
+      vydajNaKolo,
+      dnyNaKolo,
+      vypujcekNaZaplaceni,
+      vydelaNaKolo: dnyNaKolo * trzbaDen - vydajNaKolo,
+      sezonNaZaplaceni: vypujcekNaZaplaceni !== null && dnyNaKolo > 0 ? Math.round((vypujcekNaZaplaceni / dnyNaKolo) * 10) / 10 : null,
+    };
+  });
+  const vypujcniDny = tridy.reduce((a, t) => a + t.vypujcniDny, 0);
+  const trzby = tridy.reduce((a, t) => a + t.trzby, 0);
+  const provozRok = r0((12 * souhrn.mesicne + souhrn.rocne) * faktorVydaju);
+  const vydajePrvniRok = isZkouska ? r0(souhrn.horizonty[0].castka * faktorVydaju) : r0((souhrn.jednorazove + 12 * souhrn.mesicne + souhrn.rocne) * faktorVydaju);
+  const vysledekPrvniRok = trzby - vydajePrvniRok;
+  const vydajeDalsiRoky = isZkouska ? null : provozRok;
+  const trzbyDalsiRoky = isZkouska ? null : trzby;
+  const vysledekDalsiRoky = isZkouska ? null : trzby - provozRok;
+
+  // bod zvratu: výpůjční dny celkem, které při průměrné tržbě za den (vážené počty kol) pokryjí výdaje prvního roku / zkoušky
+  const prumernaTrzbaDen = tridy.reduce((a, t) => a + t.pocet * t.trzbaDen, 0) / souhrn.pocetKol;
+  const kapacita = souhrn.pocetKol * dny;
+  let bodZvratu = null;
+  if (prumernaTrzbaDen > 0 && kapacita > 0) {
+    const bzDny = Math.ceil(vydajePrvniRok / prumernaTrzbaDen);
+    bodZvratu = { vypujcniDny: bzDny, vytizenost: bzDny / kapacita, kapacitaDni: kapacita, dosazitelny: bzDny <= kapacita };
+  }
+
+  // koupě: za kolik sezón se vrátí jednorázová investice z ročního výsledku provozu
+  let navratnostSezon = null;
+  let navratnostText = null;
+  if (isKoupe) {
+    const jednorazove = r0(souhrn.jednorazove * faktorVydaju);
+    const rocniPrebytek = trzby - provozRok;
+    if (rocniPrebytek > 0) {
+      navratnostSezon = Math.round((jednorazove / rocniPrebytek) * 10) / 10;
+      navratnostText = `Investice ${kcText(jednorazove)} se vrátí za ${sezonyText(navratnostSezon)}.`;
+    } else navratnostText = `Při ${vytText} vytíženosti tržby nepokryjí ani roční provoz – investice ${kcText(jednorazove)} se nevrátí.`;
+  }
+
+  const zisk = (bz) => (bz && bz.dosazitelny ? `zisk začíná od ${procentNahoru(bz.vytizenost)} % vytíženosti` : 'výdaje nepokryje ani plná vytíženost');
+  let veta;
+  let poznamkaDalsiRoky = null;
+  if (isZkouska) {
+    const obdobi = `za zkoušku (${zkouska.mesice} měsíce, ${dny} dní sezóny)`;
+    veta = vysledekPrvniRok >= 0 ? `Při ${vytText} vytíženosti vyděláte ${obdobi} ${kcText(vysledekPrvniRok)}.` : `Při ${vytText} vytíženosti vychází zkouška se ztrátou ${kcText(-vysledekPrvniRok)} ${obdobi.replace('za zkoušku ', '')}; ${zisk(bodZvratu)}.`;
+    poznamkaDalsiRoky = 'Další roky u zkoušky nepočítáme – po zkoušce se rozhodnete podle skutečné vytíženosti (pronájem, odkup, nebo vrácení kol).';
+  } else {
+    const dalsi = vysledekDalsiRoky >= 0 ? `od druhého roku ${kcText(vysledekDalsiRoky)} ročně` : `od druhého roku ztráta ${kcText(-vysledekDalsiRoky)} ročně`;
+    veta = vysledekPrvniRok >= 0
+      ? `Při ${vytText} vytíženosti vyděláte za první rok ${kcText(vysledekPrvniRok)}, ${dalsi}.`
+      : `Při ${vytText} vytíženosti vychází první rok se ztrátou ${kcText(-vysledekPrvniRok)}; ${zisk(bodZvratu)}${vysledekDalsiRoky >= 0 ? `. Od druhého roku vyděláte ${kcText(vysledekDalsiRoky)} ročně` : `, ${dalsi}`}.`;
+  }
+
+  return {
+    typ: porizeni.typ,
+    vstupy: { sezonaDni: nv.sezonaDni, vytizenost: vyt, cenaDen: { ...nv.cenaDen }, platceDph: platce, dph, dnyPokryte: dny },
+    cenyVcetneDph: !platce,
+    tridy,
+    vypujcniDny,
+    trzby,
+    vydajePrvniRok,
+    vysledekPrvniRok,
+    trzbyDalsiRoky,
+    vydajeDalsiRoky,
+    vysledekDalsiRoky,
+    prumernaTrzbaDen: Math.round(prumernaTrzbaDen * 100) / 100,
+    bodZvratu,
+    navratnostSezon,
+    navratnostText,
+    veta,
+    poznamkaDalsiRoky,
+  };
 }
 
 /** Výsledek bez interních čísel. */
@@ -606,6 +796,8 @@ module.exports = {
   SERVIS,
   TRIDY,
   MAX_KOL,
+  NAVRATNOST_VYCHOZI,
+  NAVRATNOST_ROZSAHY,
   PORIZENI_LABELS,
   WEB_LABELS,
   SPRAVA_LABELS,
@@ -617,6 +809,8 @@ module.exports = {
   monthlyRate,
   compute,
   publicResult,
+  sezonyText,
+  procentNahoru,
   modelyInterni,
   stupenPro,
   availableDoplnky,
