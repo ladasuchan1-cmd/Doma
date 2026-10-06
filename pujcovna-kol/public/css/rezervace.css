@@ -1,0 +1,503 @@
+/* Styly feature „rezervace“ (kroky 1–5, správa rezervace, kalendář) – jen přes tokeny z base.css. */
+
+/* Rozložení kroku: hlavní sloupec + boční karta */
+.step-layout,
+.manage {
+  display: grid;
+  gap: var(--space-6);
+  align-items: start;
+}
+@media (min-width: 900px) {
+  .step-layout,
+  .manage {
+    grid-template-columns: minmax(0, 2fr) minmax(280px, 1fr);
+  }
+}
+.step-main,
+.manage__main {
+  min-width: 0;
+  display: grid;
+  gap: var(--space-5);
+}
+.step-side,
+.manage__side {
+  display: grid;
+  gap: var(--space-4);
+}
+.section--page-head .steps {
+  margin-top: var(--space-5);
+}
+.term-line {
+  margin: 0;
+  padding: var(--space-3) var(--space-4);
+  background: var(--tint-primary);
+  border-radius: var(--radius-md);
+}
+.term-line__days {
+  color: var(--text-muted);
+}
+.term-line__change {
+  margin-left: var(--space-2);
+}
+.step-back,
+.step-actions {
+  margin: 0;
+}
+
+/* Boční karty */
+.info-card {
+  display: grid;
+  gap: var(--space-3);
+  padding: var(--space-5);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--card-radius);
+}
+.info-card__title {
+  margin: 0;
+  font-size: var(--step-1);
+}
+.info-card__text {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: var(--step--1);
+}
+.info-card__actions {
+  margin: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+.summary-card__items {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: var(--space-1);
+}
+.summary-card__items li {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+.summary-card__items small {
+  color: var(--text-muted);
+}
+.summary-card__amount {
+  white-space: nowrap;
+}
+.summary-card .summary {
+  margin: 0;
+}
+
+/* Krok 1: časy a kalendář */
+.time-grid {
+  display: grid;
+  gap: var(--space-4);
+}
+@media (min-width: 560px) {
+  .time-grid {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+.calendar__status {
+  margin: 0;
+  min-height: 1.5em;
+  color: var(--text-muted);
+  font-size: var(--step--1);
+}
+.calendar__grid[hidden] {
+  display: none;
+}
+.calendar__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  margin-bottom: var(--space-3);
+}
+.calendar__month {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: var(--step-1);
+  font-weight: 700;
+  text-transform: capitalize;
+}
+.calendar__nav {
+  min-width: 44px;
+  min-height: 44px;
+}
+.calendar__weekdays,
+.calendar__days {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 4px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.calendar__weekdays li {
+  text-align: center;
+  font-size: var(--step--1);
+  color: var(--text-muted);
+  padding: var(--space-1) 0;
+}
+.calendar__day {
+  width: 100%;
+  min-height: 44px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+  cursor: pointer;
+}
+.calendar__day:hover:not(:disabled) {
+  border-color: var(--primary);
+}
+.calendar__day:focus-visible {
+  outline: 3px solid var(--focus);
+  outline-offset: 1px;
+}
+.calendar__day:disabled {
+  cursor: not-allowed;
+  color: var(--text-muted);
+  background: var(--surface-2);
+  text-decoration: line-through;
+}
+.calendar__day.is-today {
+  font-weight: 700;
+}
+.calendar__day.is-in-range {
+  background: var(--tint-primary);
+  border-color: transparent;
+}
+.calendar__day.is-start,
+.calendar__day.is-end {
+  background: var(--primary);
+  color: var(--on-primary);
+  border-color: var(--primary);
+}
+.calendar__day.is-empty {
+  visibility: hidden;
+}
+.calendar__selection {
+  margin: var(--space-3) 0 0;
+  font-size: var(--step--1);
+}
+.calendar.is-enhanced .calendar__fallback {
+  display: none;
+}
+
+/* Krok 2: výběr kol */
+.bike-pick-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: var(--space-4);
+}
+.bike-pick {
+  display: grid;
+  gap: var(--space-4);
+  padding: var(--space-4);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--card-radius);
+}
+@media (min-width: 640px) {
+  .bike-pick {
+    grid-template-columns: 180px minmax(0, 1fr);
+  }
+}
+.bike-pick.is-unavailable {
+  opacity: 0.75;
+}
+.bike-pick__media img,
+.bike-pick__media .card__placeholder {
+  width: 100%;
+  aspect-ratio: 3 / 2;
+  object-fit: cover;
+  border-radius: var(--radius-md);
+  background: var(--surface-2);
+  display: grid;
+  place-items: center;
+}
+.bike-pick__body {
+  display: grid;
+  gap: var(--space-2);
+  min-width: 0;
+}
+.bike-pick__badges {
+  margin: 0;
+  display: flex;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+}
+.bike-pick__title {
+  margin: 0;
+  font-size: var(--step-1);
+}
+.bike-pick__price {
+  margin: 0;
+  color: var(--text-muted);
+}
+.bike-pick__price strong {
+  color: var(--text);
+  font-size: var(--step-1);
+}
+.bike-pick__sizes {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: var(--space-2);
+}
+.bike-pick__size {
+  display: grid;
+  grid-template-columns: 3.5rem minmax(0, 1fr) 6rem;
+  align-items: center;
+  gap: var(--space-3);
+}
+.bike-pick__size-label {
+  font-weight: 700;
+  font-family: var(--font-display);
+}
+.bike-pick__qty,
+.accessories__qty {
+  width: 6rem;
+  text-align: center;
+}
+.accessories {
+  margin: 0;
+  padding: var(--space-4);
+  border: 1px solid var(--border);
+  border-radius: var(--card-radius);
+  background: var(--surface);
+}
+.accessories__title {
+  font-weight: 700;
+  padding: 0 var(--space-2);
+}
+.accessories__title small {
+  font-weight: 400;
+  color: var(--text-muted);
+}
+.accessories__list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: var(--space-2);
+}
+.accessories__item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: var(--space-3);
+}
+.accessories__price {
+  color: var(--text-muted);
+  font-size: var(--step--1);
+}
+.pick-summary {
+  padding: var(--space-3) var(--space-4);
+  background: var(--tint-primary);
+  border-radius: var(--radius-md);
+}
+.pick-summary__line {
+  margin: 0;
+}
+
+/* Krok 3: souhlasy */
+.consents {
+  margin: 0;
+  padding: var(--space-4);
+  border: 2px solid var(--primary);
+  border-radius: var(--card-radius);
+  display: grid;
+  gap: var(--space-4);
+}
+.consents__title {
+  font-weight: 700;
+  padding: 0 var(--space-2);
+}
+.consent-details {
+  margin-top: var(--space-2);
+}
+.consent-details summary {
+  cursor: pointer;
+  color: var(--link);
+  font-weight: 600;
+}
+.consent-details ul {
+  margin: var(--space-2) 0 0;
+  padding-left: var(--space-5);
+  display: grid;
+  gap: var(--space-2);
+}
+
+/* Krok 4: metody platby */
+.pay-methods {
+  display: grid;
+  gap: var(--space-4);
+}
+@media (min-width: 720px) {
+  .pay-methods {
+    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  }
+}
+.pay-method {
+  display: grid;
+  gap: var(--space-3);
+  align-content: space-between;
+  padding: var(--space-4);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--card-radius);
+}
+.pay-method.is-disabled {
+  opacity: 0.7;
+  background: var(--surface-2);
+}
+.pay-method--demo {
+  border-style: dashed;
+  border-color: var(--warning);
+}
+.pay-method__body {
+  display: grid;
+  gap: var(--space-2);
+  justify-items: start;
+}
+.pay-method__body .icon {
+  width: 32px;
+  height: 32px;
+  color: var(--primary);
+}
+.pay-method__title {
+  margin: 0;
+  font-size: var(--step-1);
+}
+.pay-method__text {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: var(--step--1);
+}
+.pay-method .form__actions {
+  margin: 0;
+}
+.pay-methods--inline .pay-method {
+  padding: var(--space-3);
+}
+
+/* Převod / QR */
+.bank-box {
+  display: grid;
+  gap: var(--space-4);
+  padding: var(--space-4);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--card-radius);
+}
+@media (min-width: 720px) {
+  .bank-box {
+    grid-template-columns: minmax(0, 1fr) 240px;
+  }
+}
+.bank-box__data .summary {
+  margin: 0;
+}
+.bank-box__data code {
+  font-family: var(--font-mono);
+  word-break: break-all;
+}
+.bank-box__qr {
+  display: grid;
+  gap: var(--space-2);
+  justify-items: center;
+  align-content: start;
+}
+.bank-box__qr-img svg {
+  width: 220px;
+  height: 220px;
+  background: #fff;
+  padding: 8px;
+  border-radius: var(--radius-sm);
+}
+.bank-box__qr-hint,
+.bank-box__spayd {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: var(--step--1);
+  text-align: center;
+}
+.bank-box__qr-placeholder {
+  display: grid;
+  place-items: center;
+  gap: var(--space-2);
+  width: 220px;
+  aspect-ratio: 1;
+  border: 1px dashed var(--border);
+  border-radius: var(--radius-md);
+  color: var(--text-muted);
+  font-size: var(--step--1);
+  text-align: center;
+  padding: var(--space-3);
+}
+.bank-box__qr-placeholder p {
+  margin: 0;
+}
+
+/* Krok 5 */
+.done-grid {
+  display: grid;
+  gap: var(--space-4);
+}
+@media (min-width: 720px) {
+  .done-grid {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+.checklist {
+  margin: 0;
+  padding-left: var(--space-5);
+  display: grid;
+  gap: var(--space-2);
+}
+
+/* Správa rezervace */
+.manage__block {
+  display: grid;
+  gap: var(--space-3);
+}
+.manage__block h2 {
+  margin: 0;
+  font-size: var(--step-2);
+}
+.manage__block .table-wrap,
+.manage__block .summary {
+  margin: 0;
+}
+.manage__block--cancel {
+  padding: var(--space-4);
+  border: 1px solid var(--danger);
+  border-radius: var(--card-radius);
+}
+.manage__empty,
+.manage__hint {
+  margin: 0;
+  color: var(--text-muted);
+}
+.doc-list,
+.mail-list {
+  margin: 0;
+  padding-left: var(--space-5);
+  display: grid;
+  gap: var(--space-1);
+}
+.mail-list small {
+  color: var(--text-muted);
+}
+.cancel-form .form__actions {
+  margin-top: var(--space-2);
+}

@@ -1,0 +1,35 @@
+/* =====================================================================================================
+   Téma OUTDOOR – PLACEHOLDER kostry. // doplní agent tématu (tema-outdoor)
+   Zatím jen semantické barvy a fonty palety ze SPEC kap. 7 / rešerše 05 B4, aby prošel tools/check-contrast.js.
+   Pravidla: přepisovat jen proměnné a layoutové varianty ([data-theme="outdoor"] …), nikdy HTML.
+   ===================================================================================================== */
+[data-theme='outdoor'] {
+  --bg: #f5f0e6;
+  --bg-elevated: #fbf8f1;
+  --surface: #eae2d3;
+  --surface-2: #ddd2bd;
+  --text: #1f2a1e;
+  --text-muted: #5c6355;
+  --border: #d4c9b2;
+  --primary: #2f5d3a;
+  --on-primary: #ffffff;
+  --primary-hover: #254a2e;
+  --accent: #b4581b;
+  --on-accent: #ffffff;
+  --success: #2f6b3a;
+  --warning: #8a5a00;
+  --danger: #a63a1f;
+  --info: #2f5d3a;
+  --focus: #b4581b;
+  --link: #9a4a14;
+  --font-display: 'Fraunces', Georgia, 'Times New Roman', serif;
+  --font-body: 'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  --font-accent: 'Caveat', cursive;
+  --hero-overlay: linear-gradient(180deg, rgba(31, 42, 30, 0.15), rgba(31, 42, 30, 0.6));
+  --card-radius: 8px;
+  --btn-radius: 6px;
+  --input-radius: 6px;
+}
+
+/* // doplní agent tématu: full-bleed hero s fotografií, papírová textura, Caveat akcenty (.hero__accent, .price__prefix),
+   pomalé fade, varianta karet photo-top, tmavá patička (#1f2a1e s krémovým textem). */

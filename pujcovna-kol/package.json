@@ -1,0 +1,20 @@
+{
+  "name": "pujcovna-kol",
+  "version": "0.1.0",
+  "description": "Půjčovna kol – web s rezervacemi a platbami (demo musteru). Node ≥ 22.13, 0 npm závislostí.",
+  "private": true,
+  "license": "UNLICENSED",
+  "main": "server.js",
+  "engines": {
+    "node": ">=22.13"
+  },
+  "scripts": {
+    "start": "node --disable-warning=ExperimentalWarning server.js",
+    "dev": "node --disable-warning=ExperimentalWarning --watch server.js",
+    "test": "node --disable-warning=ExperimentalWarning --test \"test/**/*.test.js\"",
+    "demo-data": "node --disable-warning=ExperimentalWarning tools/demo-data.js",
+    "build-okoli": "node --disable-warning=ExperimentalWarning tools/build-okoli.js --tenant demo",
+    "e2e": "node --disable-warning=ExperimentalWarning tools/e2e.js",
+    "check-contrast": "node tools/check-contrast.js"
+  }
+}

@@ -1,0 +1,244 @@
+/* Styly feature „kola“ (/kola, /kola/:slug, /cenik) – jen přes tokeny z base.css, bez barev natvrdo. */
+
+/* Filtry */
+.filters {
+  display: grid;
+  gap: var(--space-4);
+  padding: var(--space-5);
+  background: var(--surface);
+  border-radius: var(--card-radius);
+  border: 1px solid var(--border);
+}
+.filters__grid {
+  display: grid;
+  gap: var(--space-4);
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+}
+.filters__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+  align-items: center;
+}
+.section--filters + .section--bikes {
+  padding-top: 0;
+}
+
+/* Drobečky */
+.breadcrumbs {
+  margin: 0 0 var(--space-2);
+  color: var(--text-muted);
+  font-size: var(--step--1);
+}
+
+/* Detail typu */
+.detail {
+  display: grid;
+  gap: var(--space-6);
+  grid-template-areas: 'media' 'side' 'body';
+}
+@media (min-width: 900px) {
+  .detail {
+    grid-template-columns: minmax(0, 2fr) minmax(280px, 1fr);
+    grid-template-areas: 'media side' 'body side';
+    align-items: start;
+  }
+}
+.detail__media {
+  grid-area: media;
+  min-width: 0;
+}
+.detail__side {
+  grid-area: side;
+  display: grid;
+  gap: var(--space-5);
+  position: sticky;
+  top: calc(var(--header-height, 72px) + var(--space-4));
+}
+.detail__body {
+  grid-area: body;
+  min-width: 0;
+}
+.detail__body h2 {
+  margin-top: var(--space-6);
+  font-size: var(--step-2);
+}
+.detail__body h2:first-child {
+  margin-top: 0;
+}
+.detail__body h2 small {
+  font-size: var(--step--1);
+  font-weight: 400;
+  color: var(--text-muted);
+}
+.detail__note {
+  color: var(--text-muted);
+  font-size: var(--step--1);
+}
+
+/* Galerie */
+.gallery {
+  margin: 0;
+  display: grid;
+  gap: var(--space-3);
+}
+.gallery__main {
+  display: block;
+  width: 100%;
+  aspect-ratio: 3 / 2;
+  object-fit: cover;
+  border-radius: var(--card-radius);
+  background: var(--surface-2);
+}
+.gallery--empty .card__placeholder {
+  aspect-ratio: 3 / 2;
+  display: grid;
+  place-items: center;
+  border-radius: var(--card-radius);
+  background: var(--surface-2);
+  color: var(--text-muted);
+}
+.gallery--empty .icon {
+  width: 72px;
+  height: 72px;
+}
+.gallery__thumbs {
+  display: flex;
+  gap: var(--space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  overflow-x: auto;
+}
+.gallery__thumb {
+  display: block;
+  width: 96px;
+  height: 64px;
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+  border: 2px solid transparent;
+  flex: 0 0 auto;
+}
+.gallery__thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+.gallery__thumb.is-active {
+  border-color: var(--primary);
+}
+.gallery__thumb:focus-visible {
+  outline: 3px solid var(--focus);
+  outline-offset: 2px;
+}
+.gallery__caption,
+.attribution {
+  color: var(--text-muted);
+  font-size: var(--step--1);
+}
+
+/* Cenový box a formulář termínu */
+.price-box {
+  display: grid;
+  gap: var(--space-3);
+  padding: var(--space-5);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--card-radius);
+}
+.price-box .price {
+  margin: 0;
+}
+.price-box .price__amount {
+  font-size: var(--step-3);
+}
+.price-box__label {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: var(--step--1);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.price-box__meta,
+.price-box__hint {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: var(--step--1);
+}
+.price-box .summary {
+  margin: 0;
+}
+.price-box .summary small {
+  display: block;
+  color: var(--text-muted);
+}
+.term-form {
+  padding: var(--space-5);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--card-radius);
+}
+.term-form__title {
+  margin: 0 0 var(--space-3);
+  font-size: var(--step-1);
+}
+.term-form__grid {
+  display: grid;
+  gap: var(--space-3);
+  grid-template-columns: 1fr 1fr;
+  margin-bottom: var(--space-3);
+}
+
+/* Velikosti */
+.sizes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.sizes__item {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-pill);
+  background: var(--surface);
+}
+.sizes__size {
+  font-weight: 700;
+  font-family: var(--font-display);
+}
+.sizes__total {
+  color: var(--text-muted);
+  font-size: var(--step--1);
+}
+
+/* Ceník */
+.section--cenik .table th[scope='row'] small {
+  display: block;
+  font-weight: 400;
+  color: var(--text-muted);
+}
+.rule-card {
+  display: grid;
+  gap: var(--space-3);
+  align-content: start;
+  padding: var(--space-5);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--card-radius);
+}
+.rule-card__title {
+  margin: 0;
+  font-size: var(--step-1);
+}
+.rule-card p {
+  margin: 0;
+}
+.rule-card .table-wrap {
+  margin: 0;
+}

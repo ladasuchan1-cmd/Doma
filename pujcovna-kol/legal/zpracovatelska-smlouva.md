@@ -1,6 +1,8 @@
+<!-- INTERNI: nerenderovat -->
+
 # Smlouva o zpracování osobních údajů (provozovatel musteru ↔ půjčovna) dle čl. 28 GDPR – návrh
 
-> **Návrh připravený jako podklad; před použitím vyžaduje kontrolu advokátem.**
+> **Návrh připravený jako podklad; před použitím vyžaduje kontrolu advokátem.** Tento rámeček, poznámky „Jak číst návrh“, oddíl „Parametry“ a oddíl „K ověření advokátem“ jsou interní a negenerují se do dokumentu (HTML komentáře INTERNI: nerenderovat … /INTERNI).
 
 Verze šablony {{VERZE}}, účinnost od {{UCINNOST_OD}}. Dokument generuje muster při onboardingu každé půjčovny dosazením parametrů z jejího nastavení (`tenant.json`, `platform.db`). Souvisí s [obchodními podmínkami půjčovny](obchodni-podminky.md) (čl. 1.3 a 14), se [Zásadami ochrany osobních údajů](zasady-ochrany-osobnich-udaju.md) a se [záznamy o činnostech zpracování](zaznam-o-cinnostech-zpracovani.md). Podklady: [rešerše 03 – GDPR, ÚOOÚ, bezpečnost](../docs/vyzkum/03-bezpecnost-gdpr-podminky.md), [rešerše 02 – platby, brány, Fio](../docs/vyzkum/02-platby-cr.md), [rešerše 07 – subdomény a TLS](../docs/vyzkum/07-domeny-a-tls.md), [PLAN.md kap. 5–8, 11–12](../PLAN.md).
 
@@ -55,11 +57,11 @@ Verze šablony {{VERZE}}, účinnost od {{UCINNOST_OD}}. Dokument generuje muste
 | `{{MONITORING_SLUZBA}}` | Externí monitoring dostupnosti, pokud se používá; řádek v Příloze 3 A je podmíněný fragment `{{#MONITORING_SLUZBA}}…{{/MONITORING_SLUZBA}}` | žádný externí (Uptime Kuma na vlastním serveru) |
 | `{{DNS_POSKYTOVATEL}}` | Poskytovatel DNS pro `{{DOMENA_MUSTERU}}` (nedostává osobní údaje zákazníků, uveden pro úplnost) | Cloudflare v režimu DNS-only nebo Hetzner DNS *(rešerše 07)* |
 | **Nastavení správce, která určují zpracování (pokyny)** | | |
-| `{{POPLATEK_KOLO}}` | Rezervační poplatek za jedno kolo (fixní částka, odečítá se při vyúčtování) | 300 Kč |
+| `{{POPLATEK_KOLO}}` | Rezervační poplatek za jedno kolo (fixní částka; úplata za zajištění služby – blokaci kola na termín, při řádném využití se započítává na nájemné) | 300 Kč |
 | `{{POPLATEK_EKOLO}}` | Rezervační poplatek za jedno elektrokolo | 500 Kč |
 | `{{KAUCE_KOLO}}` | Kauce za jedno kolo (hotově/terminál na místě nebo preautorizace karty při převzetí) | 3 000 Kč |
 | `{{KAUCE_EKOLO}}` | Kauce za jedno elektrokolo | 10 000 Kč |
-| `{{STORNO_TABULKA}}` | Odstupňovaná tabulka storna (hodin před začátkem nájmu → kolik z poplatku se vrací) | ≥ 72 h → 100 % · 24–72 h → 50 % · < 24 h / nevyzvednutí → 0 % |
+| `{{STORNO_TABULKA}}` | Storno pravidlo generované ze storno lhůty půjčovny (`STORNO_LHUTA_HODIN`, výchozí 48 h; rozhodnutí zadavatele 5. 10. 2026) – v textu jako věta | zrušení nejméně 48 hodin před začátkem nájmu → celý poplatek zpět · později nebo nevyzvednutí → poplatek propadá |
 | `{{DOBA_NEDOKONCENE_REZERVACE}}` | Po jaké době se maže rezervace, u které nedošlo k zaplacení poplatku ani k uzavření smlouvy (klíč shodný se Zásadami a Záznamem) | 90 dní od vytvoření (rozsah 30–90) |
 | `{{DOBA_CISLO_DOKLADU}}` | Po jaké době od vrácení kola a vypořádání kauce se maže typ a číslo dokladu totožnosti (klíč shodný se Zásadami, OP a nájemní smlouvou) | 30 dní (déle jen u nevyřešené škody, krádeže nebo nezaplacení – do vypořádání) |
 | `{{DOBA_SMLOUVA}}` | Jak dlouho se uchovává rezervace, smlouva o nájmu, protokoly, záznam o škodě a záznam o přijetí OP, než se osobní údaje anonymizují (klíč shodný se Zásadami a Záznamem) | 3 roky od skončení nájmu **nebo od vypořádání poslední pohledávky z nájmu** (škoda, nedoplatek, kauce), podle toho, co nastane později (§ 619, § 629 odst. 1 OZ); nastavitelný rozsah 3–4 roky (rezerva na doručení žaloby). Delší uchování jen jednotlivě u rezervace s příznakem „spor“ (otevřená škoda, krádež, soudní nebo reklamační spor) – do pravomocného skončení, nejdéle 10 let (§ 629 odst. 2, § 636 odst. 1 OZ); job „retence“ takovou rezervaci neanonymizuje |
@@ -87,7 +89,7 @@ Verze šablony {{VERZE}}, účinnost od {{UCINNOST_OD}}. Dokument generuje muste
 | `{{UCINNOST_OD}}` | Datum účinnosti této verze šablony | – |
 | `{{DATUM_UZAVRENI}}` | Datum uzavření smlouvy konkrétní půjčovnou (doplní systém při onboardingu) | – |
 
----
+<!-- /INTERNI -->
 
 # Smlouva o zpracování osobních údajů
 
@@ -545,7 +547,7 @@ Body, u kterých si nejsme jisti právní kvalifikací, nebo kde záleží na ro
 10. **Lhůta 24 h (čl. 12.2).** Je přísnější než „bez zbytečného odkladu“ (čl. 33 odst. 2). Ověřit formulaci „od okamžiku, kdy se o něm dozvěděl“ – zda se má počítat od důvodného podezření, a zda chceme rozlišit „podezření“ (24 h) a „potvrzení“ (doplnění). Zvážit, zda smlouva má řešit i výpadek služby bez dopadu na data (to patří do SLA hlavní smlouvy).
 11. **Break-glass přístup (čl. 6.6).** Přístup pracovníka zpracovatele při incidentu bez předchozího pokynu správce opíráme o pokyn daný touto smlouvou. Ověřit, zda to stačí jako „doložený pokyn“ podle čl. 29 GDPR, nebo zda má systém vyžadovat zpětné potvrzení správcem u každého takového přístupu.
 12. **Audit na sdílené infrastruktuře (čl. 14.2–14.4).** Omezení četnosti (1× ročně), formy (bez přístupu k OS a cizím instancím) a zpoplatnění nad 4 hodiny – posoudit přiměřenost vůči čl. 28 odst. 3 písm. h) GDPR; Hetzner DPA § 8 má obdobné limity (1× ročně, náklady). Ověřit, že nahrazení fyzické kontroly datového centra certifikacemi a audit reportem Hetzner je přijatelné.
-13. **Doklady při žádosti o výmaz (čl. 11.1 c), Příloha 1 D) – ověřit s daňovým poradcem.** Zapracováno rozlišení podle typu dokladu: plátce nemusí vystavit daňový doklad spotřebiteli (§ 28 odst. 1 ZDPH) a do 10 000 Kč stačí zjednodušený daňový doklad bez označení příjemce (§ 30, § 30a ZDPH) – u takových dokladů lze jméno a adresu anonymizovat bez kolize s § 29 ZDPH; identifikaci příjemce ponecháváme (a výmaz odmítáme podle čl. 17 odst. 3 písm. b) GDPR) jen u dokladů s IČO/DIČ příjemce nebo nad 10 000 Kč. Ověřit: (a) zda anonymizace jména na dokladu pro spotřebitele neodporuje náležitostem účetního dokladu (§ 11 odst. 1 písm. b) zákona o účetnictví – „účastníci“ účetního případu; navrhujeme, že účastníka dostatečně určuje číslo rezervace a smlouvy); (b) zda doklad k přijaté platbě (záloha) sdílí režim konečného dokladu; (c) zda hranici 10 000 Kč posuzovat za doklad, nebo za plnění (§ 30 odst. 1 ZDPH). Výsledné pravidlo promítnout do funkce v adminu.
+13. **Doklady při žádosti o výmaz (čl. 11.1 c), Příloha 1 D) – ověřit s daňovým poradcem.** Zapracováno rozlišení podle typu dokladu: plátce nemusí vystavit daňový doklad spotřebiteli (§ 28 odst. 1 ZDPH) a do 10 000 Kč stačí zjednodušený daňový doklad bez označení příjemce (§ 30, § 30a ZDPH; zadavatel 5. 10. 2026 rozhodl, že půjčovny-plátci ho do 10 000 Kč vystavují, nad to běžný doklad – parametr `REZIM_DOKLADU` v OP a Zásadách) – u takových dokladů lze jméno a adresu anonymizovat bez kolize s § 29 ZDPH; identifikaci příjemce ponecháváme (a výmaz odmítáme podle čl. 17 odst. 3 písm. b) GDPR) jen u dokladů s IČO/DIČ příjemce nebo nad 10 000 Kč. Ověřit: (a) zda anonymizace jména na dokladu pro spotřebitele neodporuje náležitostem účetního dokladu (§ 11 odst. 1 písm. b) zákona o účetnictví – „účastníci“ účetního případu; navrhujeme, že účastníka dostatečně určuje číslo rezervace a smlouvy); (b) zda doklad k přijaté platbě (záloha) sdílí režim konečného dokladu; (c) zda hranici 10 000 Kč posuzovat za doklad, nebo za plnění (§ 30 odst. 1 ZDPH). Výsledné pravidlo promítnout do funkce v adminu.
 14. **Zbytkové údaje zpracovatele po skončení (čl. 13.3).** Logy s otisky ponecháváme po {{DOBA_LOGY}} s tím, že klíč HMAC instance se smaže spolu s instancí, takže otisky už nelze přiřadit k osobě (recital 26 GDPR). Ověřit, že smazání klíče postačí k tomu, aby zbývající otisky nebyly osobními údaji v rukou zpracovatele, a zda evidence incidentů bez seznamů dotčených osob po 5 let (čl. 33 odst. 5 GDPR; srov. čl. 17 odst. 3 písm. e)) je přiměřená.
 
 **Role, dokumenty, předpisy**

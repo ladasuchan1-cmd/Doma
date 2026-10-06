@@ -1,0 +1,38 @@
+/* =====================================================================================================
+   Téma SPORT – PLACEHOLDER kostry. // doplní agent tématu (tema-sport)
+   Zatím jen semantické barvy a fonty palety ze SPEC kap. 7 / rešerše 05 B4, aby prošel tools/check-contrast.js.
+   Pravidla: přepisovat jen proměnné a layoutové varianty ([data-theme="sport"] …), nikdy HTML.
+   ===================================================================================================== */
+[data-theme='sport'] {
+  color-scheme: dark;
+  --bg: #0e0f12;
+  --bg-elevated: #15171c;
+  --surface: #1a1d23;
+  --surface-2: #262a33;
+  --text: #f2f4f7;
+  --text-muted: #a3abb8;
+  --border: #2f343f;
+  --primary: #c9ff3d;
+  --on-primary: #0e0f12;
+  --primary-hover: #b4ea2a;
+  --accent: #d92d20;
+  --on-accent: #ffffff;
+  --success: #6fdc8c;
+  --warning: #ffc940;
+  --danger: #ff4d3d;
+  --info: #7cc4ff;
+  --focus: #c9ff3d;
+  --link: #c9ff3d;
+  --font-display: 'Barlow Condensed', 'Arial Narrow', Impact, sans-serif;
+  --font-body: 'Space Grotesk', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  --hero-overlay: linear-gradient(180deg, rgba(14, 15, 18, 0.35), rgba(14, 15, 18, 0.85));
+  --shadow-1: 0 1px 2px rgba(0, 0, 0, 0.5);
+  --shadow-2: 0 4px 12px rgba(0, 0, 0, 0.6);
+  --shadow-3: 0 12px 32px rgba(0, 0, 0, 0.7);
+  --card-radius: 2px;
+  --btn-radius: 2px;
+  --input-radius: 2px;
+}
+
+/* // doplní agent tématu: duotone hero (mix-blend-mode), diagonální řezy, ticker, sticky rezervační lišta,
+   verzálky v nadpisech, velké číslovky cen, karty overlay. */

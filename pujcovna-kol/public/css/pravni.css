@@ -1,0 +1,224 @@
+/* Styly právních textů (feature pravni) – čitelná typografie dlouhého textu, obsah, demo box, tisk. Jen tokeny z base.css. */
+.legal-layout {
+  display: grid;
+  gap: var(--space-8);
+  align-items: start;
+}
+@media (min-width: 960px) {
+  .legal-layout {
+    grid-template-columns: 16rem minmax(0, 1fr);
+  }
+  .legal-toc {
+    position: sticky;
+    top: calc(var(--header-height) + var(--space-4));
+    max-height: calc(100vh - var(--header-height) - var(--space-8));
+    overflow: auto;
+  }
+}
+.legal-toc {
+  padding: var(--space-5);
+  background: var(--surface);
+  border-radius: var(--card-radius);
+  font-size: var(--step--1);
+}
+.legal-toc__title {
+  margin: 0 0 var(--space-3);
+  font-family: var(--font-display);
+  font-size: var(--step-0);
+  font-weight: 700;
+}
+.legal-toc__list {
+  margin: 0;
+  padding-left: var(--space-5);
+  display: grid;
+  gap: var(--space-2);
+}
+.legal-toc__list a {
+  color: var(--text);
+  text-decoration: none;
+}
+.legal-toc__list a:hover,
+.legal-toc__list a:focus-visible {
+  color: var(--link);
+  text-decoration: underline;
+}
+.legal-main {
+  min-width: 0;
+}
+.legal-meta {
+  margin: 0 0 var(--space-6);
+  color: var(--text-muted);
+  font-size: var(--step--1);
+}
+
+/* Článek: šířka řádku 72 znaků, výraznější řádkování, mezery mezi články */
+.legal {
+  max-width: 72ch;
+  font-size: var(--step-0);
+  line-height: 1.65;
+  overflow-wrap: anywhere;
+  hyphens: auto;
+}
+.legal h1,
+.legal h2,
+.legal h3,
+.legal h4 {
+  font-family: var(--font-display);
+  line-height: 1.25;
+  scroll-margin-top: calc(var(--header-height) + var(--space-4));
+}
+.legal h1 {
+  font-size: var(--step-3);
+  margin: var(--space-9) 0 var(--space-4);
+}
+.legal h2 {
+  font-size: var(--step-2);
+  margin: var(--space-9) 0 var(--space-4);
+  padding-top: var(--space-5);
+  border-top: 1px solid var(--border);
+}
+.legal h3 {
+  font-size: var(--step-1);
+  margin: var(--space-7) 0 var(--space-3);
+}
+.legal h4 {
+  font-size: var(--step-0);
+  margin: var(--space-6) 0 var(--space-2);
+}
+.legal p,
+.legal ul,
+.legal ol,
+.legal blockquote,
+.legal pre {
+  margin: 0 0 var(--space-4);
+}
+.legal ul,
+.legal ol {
+  padding-left: var(--space-6);
+}
+.legal li {
+  margin-bottom: var(--space-2);
+}
+.legal li > ul,
+.legal li > ol {
+  margin: var(--space-2) 0 0;
+}
+.legal blockquote {
+  padding: var(--space-3) var(--space-5);
+  border-left: 4px solid var(--primary);
+  background: var(--surface);
+  border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+}
+.legal blockquote p:last-child {
+  margin-bottom: 0;
+}
+.legal code {
+  font-family: var(--font-mono);
+  font-size: 0.92em;
+  padding: 0 var(--space-1);
+  background: var(--surface-2);
+  border-radius: var(--radius-xs);
+}
+.legal pre {
+  padding: var(--space-4);
+  background: var(--surface);
+  border-radius: var(--radius-sm);
+  overflow: auto;
+  font-size: var(--step--1);
+}
+.legal pre code {
+  padding: 0;
+  background: none;
+}
+.legal hr {
+  border: 0;
+  border-top: 1px solid var(--border);
+  margin: var(--space-8) 0;
+}
+.legal .table-wrap {
+  margin: 0 0 var(--space-5);
+  overflow-x: auto;
+}
+.legal .table {
+  font-size: var(--step--1);
+  line-height: 1.45;
+}
+.legal .table th,
+.legal .table td {
+  vertical-align: top;
+}
+.legal a {
+  color: var(--link);
+  text-decoration: underline;
+  text-underline-offset: 0.15em;
+}
+.legal-contact {
+  max-width: 72ch;
+  margin-top: var(--space-8);
+  padding: var(--space-6);
+  background: var(--surface);
+  border-radius: var(--card-radius);
+}
+
+/* Demo box – šedý, nenápadný, ale zřetelný */
+.legal-demo {
+  max-width: 72ch;
+  margin-top: var(--space-8);
+  padding: var(--space-4) var(--space-5);
+  background: var(--gray-100);
+  color: var(--gray-700);
+  border: 1px dashed var(--gray-400);
+  border-radius: var(--radius-sm);
+  font-size: var(--step--1);
+}
+
+/* Tisk: jen text dokumentu, černě, bez navigace a přepínače; URL odkazů za textem */
+@media print {
+  .site-header,
+  .site-footer,
+  .design-switch,
+  .skip-link,
+  .legal-toc,
+  .section--page-head .section__lead,
+  .legal-demo {
+    display: none !important;
+  }
+  .legal-layout {
+    display: block;
+  }
+  .legal,
+  .legal-contact {
+    max-width: none;
+    font-size: 11pt;
+    line-height: 1.4;
+    color: #000;
+  }
+  .legal h2 {
+    border-top: 0;
+    padding-top: 0;
+    break-after: avoid;
+  }
+  .legal h1,
+  .legal h3,
+  .legal h4 {
+    break-after: avoid;
+  }
+  .legal .table-wrap,
+  .legal blockquote,
+  .legal li {
+    break-inside: avoid;
+  }
+  .legal a {
+    color: #000;
+  }
+  .legal a[href^="http"]::after {
+    content: " (" attr(href) ")";
+    font-size: 0.85em;
+    word-break: break-all;
+  }
+  .legal .table,
+  .legal .table th,
+  .legal .table td {
+    border-color: #000;
+  }
+}

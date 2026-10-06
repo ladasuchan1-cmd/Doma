@@ -1,0 +1,48 @@
+/* Styly specifické pro domovskou stránku (feature home) – jen přes tokeny z base.css. */
+.usp {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-5);
+  background: var(--surface);
+  border-radius: var(--card-radius);
+}
+.usp__icon {
+  display: grid;
+  place-items: center;
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  background: var(--primary);
+  color: var(--on-primary);
+}
+.usp__icon .icon {
+  width: 28px;
+  height: 28px;
+}
+.usp__title {
+  margin: 0;
+  font-size: var(--step-1);
+}
+.usp__text {
+  margin: 0;
+  color: var(--text-muted);
+}
+.section--bikes {
+  background: var(--surface);
+  padding-block: var(--section-gap);
+}
+.section--bikes + .section {
+  padding-top: var(--section-gap);
+}
+.section--contact .contact-card {
+  padding: var(--space-5);
+  background: var(--surface);
+  border-radius: var(--card-radius);
+}
+.contact-note {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  align-items: flex-start;
+}
