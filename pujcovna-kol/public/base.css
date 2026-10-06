@@ -495,9 +495,16 @@ address {
   color: var(--link);
   text-decoration: underline;
 }
+/* Mobil: plovoucí přepínač by zakrýval formuláře a rozbalovací pole (výběr času, velikosti), proto na úzkém
+   displeji není fixní – leží na konci stránky pod patičkou. Design jde přepnout i subdoménou nebo přes /design. */
 @media (max-width: 719px) {
-  .design-switch__more {
-    display: none;
+  .design-switch {
+    position: static;
+    flex-wrap: wrap;
+    justify-content: center;
+    margin: var(--space-4);
+    box-shadow: none;
+    border-radius: var(--radius-md);
   }
 }
 

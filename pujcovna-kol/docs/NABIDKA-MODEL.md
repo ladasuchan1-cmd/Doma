@@ -33,14 +33,32 @@ které si klient kombinuje v konfigurátoru. Princip: **každá kombinace musí 
 ### A. Kola – koupě / pronájem / zkušební období
 
 **Tři třídy kol** (`tridyKol`): trekové/městské (`zakladni`), trekové/horské vyšší třídy (`trek`), trekové e-kolo se středovým
-motorem (`ekolo`). Klient skládá flotilu z tříd, minimum je **5 kol** (`pronajem.minKol`, `zkouska.minKol`) – pod tím se
-nevyplatí doprava, zaškolení ani servisní smlouva.
+motorem (`ekolo`). Klient skládá flotilu z tříd, minimum jsou **2 kola** (od 6. 10. 2026; dřív 5 – `pronajem.minKol`,
+`zkouska.minKol` a první stupeň `mnozstevniSlevy`). Malé flotile pokrývá fixní náklady rozjezdu (doprava, zaškolení, nasazení
+webu) **poplatek za rozjezd zkoušky** a vyšší záloha; s počtem kol obojí klesá (viz tabulka stupňů níže).
+
+**Množstevní stupně** (`mnozstevniSlevy`, počítá se celkový počet kol všech tříd): čím víc kol, tím vyšší sleva a lepší
+podmínky. Sleva se uplatní na kupní cenu (`slevaKoupe`), na měsíční sazbu pronájmu i zkoušky (`sleva`); kauce a záloha zkoušky
+se řídí stupněm. Návrh k potvrzení:
+
+| Stupeň | Kol | Sleva pronájem / zkouška | Sleva koupě | Poplatek za rozjezd zkoušky | Kauce | Záloha zkoušky | Další výhody |
+|---|---|---|---|---|---|---|---|
+| Start | 2–4 | 0 % | 0 % | 7 900 Kč | 10 % | 50 % | zaškolení, servis do 48 h |
+| Flotila | 5–9 | 4 % | 3 % | 3 900 Kč | 10 % | 40 % | – |
+| Hotel | 10–19 | 7 % | 5 % | zdarma | 8 % | 30 % | náhradní kolo po dobu opravy |
+| Resort | 20+ | 10 % | 7 % | zdarma | 5 % | 25 % | servis do 24 h, náhradní kolo, přednostní obměna modelů |
+
+Koupě má nižší slevu než pronájem, protože marže koupě je jednorázová: s ukázkovými nákupními cenami drží 10 % sleva e-kola
+na 19 % (pod prahem 20 %), 7 % na 22 %. Test `množstevní stupně: … marži nad prahem` projde všechny kombinace (2–50 kol,
+3 třídy, 4 způsoby pořízení, web, servis) a hlídá, že žádná nespadne pod `interni.prahMarzeProcent`. Se skutečnými nákupními
+cenami to ukazuje interní blok konfigurátoru. Konfigurátor ukazuje klientovi aktuální stupeň, úsporu v Kč a kolik kol chybí
+do dalšího stupně („Přidejte ještě 1 kolo a dostanete slevu 4 %“). Scénáře v kapitole 3 jsou počítané **bez** stupňů.
 
 | Varianta | Co klient dostane | Náš zisk | Pojistky |
 |---|---|---|---|
 | **Koupě** | kola za `prodejniCena`, dodání, sestavení, záruka výrobce, 2 roky přednostní odkup při obměně | `prodejniCena − nakupniCena` (s ukázkovými nákupními cenami ≈ 27–28 % z prodejní ceny) | platba předem nebo 50 % při objednávce + 50 % při dodání; vlastnictví přechází zaplacením |
 | **Pronájem 24 / 36 m** (operativní leasing s odkupem) | kola za měsíční splátku, na konci odkup za pevnou zůstatkovou cenu (`zustatkova36m`, pro 24 m lineárně přepočtená), vrácení nebo výměna za nová | marže `marzeRocni` (12 % ročně z nákupní ceny) nad anuitou; anuita pokrývá kapitál a jeho náklad `rocniUrok` | kauce `kauceProcent` × prodejní cena (vratná), min. délka = celá doba, předčasné ukončení = doplacení zbývajících splátek do zůstatkové hodnoty, protokol o stavu při vrácení s ceníkem oprav |
-| **Zkušební období 4 měsíce** | flotila na jednu sezónu za vyšší sazbu (`nasobekSazby36m` = 2,0× splátky 36 m); **v ceně** web s 1 designem, zaškolení, 1 konzultace/měsíc, 1 sezónní prohlídka, přilby a zámky | vysoká sazba kryje depreciaci a náklady na rozjezd; po zkoušce buď pokračování (pronájem/koupě se započtením 35 % zkušební ceny), odkup kol za 80 % prodejní ceny, nebo vrácení → ex-demo prodej / další klient | záloha 50 % předem, zbytek do 30 dnů; vratná kauce 10 %; **start nejpozději 15. 6.** (`startNejpozdeji`), aby zkouška pokryla hlavní sezónu; předávací protokol s ceníkem oprav; min. 5 kol |
+| **Zkušební období 4 měsíce** | flotila na jednu sezónu za vyšší sazbu (`nasobekSazby36m` = 2,0× splátky 36 m); **v ceně** web s 1 designem, zaškolení, 1 konzultace/měsíc, 1 sezónní prohlídka, přilby a zámky | vysoká sazba kryje depreciaci a náklady na rozjezd; po zkoušce buď pokračování (pronájem/koupě se započtením 35 % zkušební ceny), odkup kol za 80 % prodejní ceny, nebo vrácení → ex-demo prodej / další klient | záloha 50–25 % předem podle stupně, zbytek do 30 dnů; vratná kauce 10–5 % podle stupně; poplatek za rozjezd u flotil do 9 kol; **start nejpozději 15. 6.** (`startNejpozdeji`), aby zkouška pokryla hlavní sezónu; předávací protokol s ceníkem oprav; min. 2 kola |
 
 **Financování pronájmu:** z **vlastního kapitálu** zadavatele. `pronajem.rocniUrok` proto není bankovní úrok, ale **náklad
 vlastního kapitálu** – navrhujeme **7 %** (rozpětí 6–8 %): spoří-li kapitál na termínovaném vkladu, přijde o 3–4 % p. a.;
@@ -64,7 +82,11 @@ vypne, data se exportují a tenant se smaže (viz PLAN kap. 8). Při předčasn�
 |---|---|---|---|
 | **Šablona** (`web.sablona`) | subdoména `klient.rezervacekol.cz`, 1 ze 3 designů (Outdoor / Sport / Family), rezervace s poplatkem, platby, mapa okolí a zajímavosti, právní texty, admin | jednorázově 15 000 Kč (náklad nasazení 6 000 Kč) + 990 Kč/měs (hosting 150 Kč) | min. smlouva 12 měsíců; výpověď 2 měsíce; export dat při odchodu |
 | **Další design** | přepnutí/přidání designu | 5 000 Kč | – |
-| **Na míru** (`web.naMiru`) | vlastní doména, úpravy layoutu, integrace (PMS hotelu, channel manager) | od 60 000 Kč + 1 490 Kč/měs | rozsah fixně v nabídce, změny hodinově |
+| **Na míru** (`web.naMiru`) | vlastní doména, vlastní design a úpravy layoutu; **bez napojení na cizí systémy** (PMS hotelu, channel manager, stávající rezervační systém – od 6. 10. 2026 nenabízíme) | od 60 000 Kč + 1 490 Kč/měs | rozsah fixně v nabídce, změny hodinově |
+
+Rezervace kol běží vždy samostatně na naší subdoméně (nebo vlastní doméně u webu na míru). Se stávajícím webem klienta se
+„propojí“ jen **odkazem nebo tlačítkem „Půjčit kolo“** – klient ho vloží sám, žádná technická integrace, žádná závislost na
+jeho dodavateli webu.
 
 ### C. Správa – sami, nebo předplacená
 
@@ -257,7 +279,7 @@ Dosažitelnou ex-demo cenu je proto nutné ověřit na pilotu dřív, než se zk
 
 | Riziko | Pojistka |
 |---|---|
-| Klient po zkoušce vrátí kola a my je neprodáme | min. 5 kol, start do 15. 6. (celá sezóna), sazba 2× kryje depreciaci; druhý život kol u dalšího klienta; ex-demo kanál v prodejně zadavatele |
+| Klient po zkoušce vrátí kola a my je neprodáme | min. 2 kola s poplatkem za rozjezd, start do 15. 6. (celá sezóna), sazba 2× kryje depreciaci; druhý život kol u dalšího klienta; ex-demo kanál v prodejně zadavatele |
 | Nesplácení pronájmu | kauce 10 % prodejní ceny, vlastnictví kol zůstává u nás do odkupu, GPS u větších flotil, výpověď s odvozem kol do 14 dnů |
 | Předčasné ukončení pronájmu | doplatek rozdílu mezi zůstatkem splátek a aktuální zůstatkovou hodnotou (lineární křivka `zustatkova(T, m)`), nebo převod smlouvy na jiného klienta |
 | Stav při vrácení | předávací protokol s fotodokumentací a **ceníkem oprav** (díly + hodinová sazba partnera), započtení proti kauci |

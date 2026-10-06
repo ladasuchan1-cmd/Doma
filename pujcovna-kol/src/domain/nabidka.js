@@ -10,6 +10,7 @@
 //   normalizeInput(query, config) → vstup konfigurátoru { kola: {zakladni, trek, ekolo}, porizeni, web, dalsiDesign,
 //                                    sprava, servis, doplnky[] } (neznámé hodnoty → výchozí; počty 0–MAX_KOL)
 //   compute(input, config)        → výsledek: kola[], porizeni{}, web{}, sprava{}, servis{}, doplnky[], souhrn{},
+//                                    mnozstevni{} (stupeň, sleva, úspora, kolik kol chybí do dalšího stupně),
 //                                    upozorneni[], interni{} (marže, náklady, podíl partnera, varování)
 //   publicResult(result)          → výsledek bez interních čísel (pro veřejnost a API bez admin session)
 //   monthlyRate(trida, mesice, pronajem) → měsíční sazba pronájmu za 1 kolo (anuita + úrok ze zůstatku + marže)
@@ -158,6 +159,36 @@ function validateConfig(raw, interniRaw = null) {
     dop.push({ id: d.id, nazev: String(d.nazev || d.id), popis: String(d.popis || ''), mesicneZaKolo: r0(d.mesicneZaKolo), jednorazoveZaKolo: r0(d.jednorazoveZaKolo), jednorazove: r0(d.jednorazove), jenEkolo: !!d.jenEkolo });
   }
 
+  // množstevní stupně (volitelné): čím víc kol celkem, tím vyšší sleva na kola a lepší podmínky; první stupeň = minimum
+  const stupne = [];
+  if (raw.mnozstevniSlevy !== undefined) {
+    need(Array.isArray(raw.mnozstevniSlevy) && raw.mnozstevniSlevy.length > 0, '„mnozstevniSlevy“ musí být neprázdné pole stupňů.');
+    for (const [idx, st] of (Array.isArray(raw.mnozstevniSlevy) ? raw.mnozstevniSlevy : []).entries()) {
+      const lbl = `mnozstevniSlevy[${idx}]`;
+      if (!st || typeof st !== 'object') {
+        errors.push(`${lbl} není objekt.`);
+        continue;
+      }
+      need(Number.isInteger(st.odKol) && st.odKol >= 1, `${lbl}.odKol musí být celé číslo ≥ 1.`);
+      need(isNum(st.sleva) && pct(st.sleva) < 0.5, `${lbl}.sleva musí být 0–50 %.`);
+      for (const k of ['kauceProcent', 'zalohaZkouskyProcent', 'poplatekZkousky']) if (st[k] !== undefined) need(isNum(st[k]), `${lbl}.${k} musí být nezáporné číslo.`);
+      if (st.slevaKoupe !== undefined) need(isNum(st.slevaKoupe) && pct(st.slevaKoupe) < 0.5, `${lbl}.slevaKoupe musí být 0–50 %.`);
+      if (st.vyhody !== undefined) need(Array.isArray(st.vyhody), `${lbl}.vyhody musí být pole textů.`);
+      stupne.push({
+        odKol: st.odKol,
+        sleva: pct(st.sleva),
+        slevaKoupe: st.slevaKoupe === undefined ? pct(st.sleva) : pct(st.slevaKoupe),
+        poplatekZkousky: r0(st.poplatekZkousky),
+        kauceProcent: st.kauceProcent === undefined ? null : pct(st.kauceProcent),
+        zalohaZkouskyProcent: st.zalohaZkouskyProcent === undefined ? null : pct(st.zalohaZkouskyProcent),
+        nazev: String(st.nazev || ''),
+        vyhody: Array.isArray(st.vyhody) ? st.vyhody.map(String) : [],
+      });
+    }
+    for (let k = 1; k < stupne.length; k++) need(stupne[k].odKol > stupne[k - 1].odKol, 'mnozstevniSlevy musí být seřazené podle odKol vzestupně (bez duplicit).');
+  }
+  if (!stupne.length) stupne.push({ odKol: 1, sleva: 0, slevaKoupe: 0, poplatekZkousky: 0, kauceProcent: null, zalohaZkouskyProcent: null, nazev: '', vyhody: [] });
+
   need(interni && typeof interni === 'object', 'Chybí „interni“.');
   const i = interni || {};
   for (const k of ['prahMarzeProcent', 'nakladyHostingMesicne', 'nakladyKonzultaceHodina', 'nakladyNasazeniWebu']) need(isNum(i[k]), `interni.${k} musí být číslo.`);
@@ -186,6 +217,7 @@ function validateConfig(raw, interniRaw = null) {
     sprava: { sami: { mesicne: r0(sp.sami.mesicne) }, predplacena: { mesicne: r0(sp.predplacena.mesicne), konzultaceZdarmaMesicne: Number(sp.predplacena.konzultaceZdarmaMesicne), dalsiKonzultaceHodina: r0(sp.predplacena.dalsiKonzultaceHodina) } },
     servis: { vlastni: { slevaNaDilyProcent: pct(sv.vlastni.slevaNaDilyProcent), mesicne: r0(sv.vlastni.mesicne) }, partner: { mesicneZaKolo: r0(sv.partner.mesicneZaKolo), sezonniProhlidkaZaKolo: r0(sv.partner.sezonniProhlidkaZaKolo), provizeProNasProcent: pct(sv.partner.provizeProNasProcent), slaHodin: Number(sv.partner.slaHodin) } },
     doplnky: dop,
+    mnozstevniSlevy: stupne,
     interni: {
       prahMarzeProcent: pct(i.prahMarzeProcent),
       nakladyHostingMesicne: r0(i.nakladyHostingMesicne),
@@ -311,6 +343,12 @@ function compute(input, config) {
   const prodejniCelkem = sum(kola, 'prodejniCelkem');
   const nakupniCelkem = sum(kolaInterni, 'nakupniCelkem');
   if (pocetKol === 0) upozorneni.push({ kod: 'zadna-kola', text: 'Zadejte prosím počet kol alespoň v jedné třídě.' });
+  const stupen = stupenPro(config, pocetKol);
+  const slevaPorizeni = input.porizeni === 'koupe' ? stupen.slevaKoupe : stupen.sleva;
+  const faktor = 1 - slevaPorizeni;
+  const minimum = config.mnozstevniSlevy[0].odKol;
+  if (pocetKol > 0 && pocetKol < minimum) upozorneni.push({ kod: 'min-kol', text: `Nabídku sestavujeme od ${minimum} kol; přidejte prosím ještě ${minimum - pocetKol} ${minimum - pocetKol === 1 ? 'kolo' : 'kola'}.` });
+  const podMinimem = pocetKol > 0 && pocetKol < minimum;
   const isZkouska = input.porizeni === 'zkouska';
   const horizon = isZkouska ? config.zkouska.mesice : input.porizeni === 'pronajem24' ? 24 : 36;
   const roky = Math.ceil(horizon / 12);
@@ -320,42 +358,69 @@ function compute(input, config) {
   const porizeni = { typ: input.porizeni, label: PORIZENI_LABELS[input.porizeni], mesice: null, jednorazove: 0, mesicne: 0, kauce: 0, odkupNaKonci: 0, radky: [] };
   let zkouska = null;
 
+  // sleva na kola v Kč (bez slevy − se slevou) za periodu pořízení: koupě jednorázově, pronájem a zkouška měsíčně
+  let slevaKc = 0;
   if (input.porizeni === 'koupe') {
-    porizeni.jednorazove = prodejniCelkem;
-    porizeni.radky = kola.map((k) => ({ label: `${k.pocet}× ${k.nazev}`, hodnota: k.prodejniCelkem, zaKolo: k.prodejniCena }));
-    ip.push({ id: 'kola', label: 'Kola – prodejní minus nákupní cena', trzby: prodejniCelkem, naklady: nakupniCelkem, perioda: 'jednorazove' });
+    porizeni.radky = kola.map((k) => {
+      const zaKolo = r0(k.prodejniCena * faktor);
+      slevaKc += (k.prodejniCena - zaKolo) * k.pocet;
+      return { label: `${k.pocet}× ${k.nazev}`, hodnota: zaKolo * k.pocet, zaKolo, zaKoloBezSlevy: k.prodejniCena };
+    });
+    porizeni.jednorazove = sum(porizeni.radky, 'hodnota');
+    ip.push({ id: 'kola', label: `Kola – prodejní minus nákupní cena${slevaPorizeni ? ` (po slevě ${Math.round(slevaPorizeni * 100)} %)` : ''}`, trzby: porizeni.jednorazove, naklady: nakupniCelkem, perioda: 'jednorazove' });
   } else if (!isZkouska) {
     const mesice = horizon;
     porizeni.mesice = mesice;
     let marzeMes = 0;
+    let bezSlevyMes = 0;
     for (const k of kola) {
       const rate = monthlyRate(tridyById[k.id], mesice, config.pronajem);
-      const mes = rate.celkem * k.pocet;
+      const zaKolo = r0(rate.celkem * faktor);
+      const mes = zaKolo * k.pocet;
+      slevaKc += (rate.celkem - zaKolo) * k.pocet;
       porizeni.mesicne += mes;
       porizeni.odkupNaKonci += r0(rate.zustatkova) * k.pocet;
-      porizeni.radky.push({ label: `${k.pocet}× ${k.nazev}`, hodnota: mes, zaKolo: rate.celkem, zustatkova: r0(rate.zustatkova) });
+      porizeni.radky.push({ label: `${k.pocet}× ${k.nazev}`, hodnota: mes, zaKolo, zaKoloBezSlevy: rate.celkem, zustatkova: r0(rate.zustatkova) });
       marzeMes += rate.marze * k.pocet;
+      bezSlevyMes += rate.celkem * k.pocet;
     }
-    porizeni.kauce = r0(prodejniCelkem * config.pronajem.kauceProcent);
+    porizeni.kauceProcent = stupen.kauceProcent ?? config.pronajem.kauceProcent;
+    porizeni.kauce = r0(prodejniCelkem * porizeni.kauceProcent);
     porizeni.minKol = config.pronajem.minKol;
-    if (pocetKol > 0 && pocetKol < config.pronajem.minKol) upozorneni.push({ kod: 'min-kol', text: `Pronájem nabízíme od ${config.pronajem.minKol} kol; pro menší počet zvolte koupi nebo nám napište.` });
-    ip.push({ id: 'kola', label: `Pronájem kol (${mesice} měsíců) – marže nad anuitou`, trzby: porizeni.mesicne, naklady: porizeni.mesicne - r0(marzeMes), perioda: 'mesicne', poznamka: `anuita včetně nákladu kapitálu ${Math.round(config.pronajem.rocniUrok * 1000) / 10} % p. a. je počítána jako náklad` });
+    if (!podMinimem && pocetKol > 0 && pocetKol < config.pronajem.minKol) upozorneni.push({ kod: 'min-kol', text: `Pronájem nabízíme od ${config.pronajem.minKol} kol; pro menší počet zvolte koupi nebo nám napište.` });
+    ip.push({ id: 'kola', label: `Pronájem kol (${mesice} měsíců) – marže nad anuitou${stupen.sleva ? ` (po slevě ${Math.round(stupen.sleva * 100)} %)` : ''}`, trzby: porizeni.mesicne, naklady: bezSlevyMes - r0(marzeMes), perioda: 'mesicne', poznamka: `anuita včetně nákladu kapitálu ${Math.round(config.pronajem.rocniUrok * 1000) / 10} % p. a. je počítána jako náklad` });
   } else {
     const z = config.zkouska;
     porizeni.mesice = z.mesice;
     for (const k of kola) {
       const rate36 = monthlyRate(tridyById[k.id], 36, config.pronajem);
-      const zaKolo = r0(rate36.celkem * z.nasobekSazby36m);
+      const bezSlevy = r0(rate36.celkem * z.nasobekSazby36m);
+      const zaKolo = r0(rate36.celkem * z.nasobekSazby36m * faktor);
       const mes = zaKolo * k.pocet;
+      slevaKc += (bezSlevy - zaKolo) * k.pocet;
       porizeni.mesicne += mes;
-      porizeni.radky.push({ label: `${k.pocet}× ${k.nazev}`, hodnota: mes, zaKolo });
+      porizeni.radky.push({ label: `${k.pocet}× ${k.nazev}`, hodnota: mes, zaKolo, zaKoloBezSlevy: bezSlevy });
     }
     const celkem = porizeni.mesicne * z.mesice;
-    zkouska = { mesice: z.mesice, mesicne: porizeni.mesicne, celkem, zaloha: r0(celkem * z.zalohaProcent), zalohaProcent: z.zalohaProcent, kauce: r0(prodejniCelkem * z.kauceProcent), zapocet: r0(celkem * z.zapocetPriPokracovaniProcent), zapocetProcent: z.zapocetPriPokracovaniProcent, odkup: r0(prodejniCelkem * z.odkupPoZkousceProcentProdejni), odkupProcent: z.odkupPoZkousceProcentProdejni, startNejpozdeji: z.startNejpozdeji, vCene: z.vCene, minKol: z.minKol };
+    const zalohaProcent = stupen.zalohaZkouskyProcent ?? z.zalohaProcent;
+    const kauceProcent = stupen.kauceProcent ?? z.kauceProcent;
+    const rozjezd = stupen.poplatekZkousky || 0;
+    porizeni.jednorazove = rozjezd;
+    zkouska = { mesice: z.mesice, mesicne: porizeni.mesicne, celkem, rozjezd, zaloha: r0(celkem * zalohaProcent), zalohaProcent, kauce: r0(prodejniCelkem * kauceProcent), kauceProcent, zapocet: r0(celkem * z.zapocetPriPokracovaniProcent), zapocetProcent: z.zapocetPriPokracovaniProcent, odkup: r0(prodejniCelkem * z.odkupPoZkousceProcentProdejni), odkupProcent: z.odkupPoZkousceProcentProdejni, startNejpozdeji: z.startNejpozdeji, vCene: z.vCene, minKol: z.minKol };
     porizeni.kauce = zkouska.kauce;
+    porizeni.kauceProcent = kauceProcent;
     porizeni.minKol = z.minKol;
-    if (pocetKol > 0 && pocetKol < z.minKol) upozorneni.push({ kod: 'min-kol', text: `Zkušební období nabízíme od ${z.minKol} kol; pro menší počet zvolte koupi nebo nám napište.` });
+    if (!podMinimem && pocetKol > 0 && pocetKol < z.minKol) upozorneni.push({ kod: 'min-kol', text: `Zkušební období nabízíme od ${z.minKol} kol; pro menší počet zvolte koupi nebo nám napište.` });
   }
+  const dalsi = config.mnozstevniSlevy.find((st) => st.odKol > pocetKol) || null;
+  const mnozstevni = {
+    stupne: config.mnozstevniSlevy,
+    aktualni: pocetKol >= minimum ? stupen : null,
+    sleva: slevaPorizeni,
+    slevaKc: r0(slevaKc),
+    slevaPerioda: input.porizeni === 'koupe' ? 'jednorazove' : 'mesicne',
+    dalsi: dalsi && pocetKol > 0 ? { odKol: dalsi.odKol, sleva: input.porizeni === 'koupe' ? dalsi.slevaKoupe : dalsi.sleva, poplatekZkousky: dalsi.poplatekZkousky, chybi: dalsi.odKol - pocetKol, nazev: dalsi.nazev, vyhody: dalsi.vyhody } : null,
+  };
 
   // web – ve zkoušce šablona (1 design) v ceně
   const webOut = { typ: input.web, label: WEB_LABELS[input.web], jednorazove: 0, mesicne: 0, od: false, vCeneZkousky: false, dalsiDesign: 0, poznamka: '' };
@@ -449,7 +514,7 @@ function compute(input, config) {
   if (zkouska) {
     const ci = config.interni;
     const nakladyZkousky = ci.nakladyNasazeniWebu + ci.nakladyZaskoleniHodin * ci.nakladyKonzultaceHodina + zkouska.mesice * (ci.nakladyKonzultaceHodina + ci.nakladyHostingMesicne) + r0(prohlidkaRocne * (1 - provize)) + r0(prilbyVCene * doplnekNakladPodil(ci, 'prilby'));
-    ip.push({ id: 'kola', label: `Zkušební období (${zkouska.mesice} měsíce) – nájem minus náklady rozjezdu`, trzby: zkouska.celkem, naklady: nakladyZkousky, perioda: 'jednorazove', poznamka: `náklady: web, zaškolení, konzultace, hosting, prohlídka partnera, přilby; při pokračování se dále započte ${zkouska.zapocet} Kč; kola zůstávají naše (ex-demo ≈ ${Math.round(zkouska.odkupProcent * 100)} % prodejní ceny)` });
+    ip.push({ id: 'kola', label: `Zkušební období (${zkouska.mesice} měsíce) – nájem${zkouska.rozjezd ? ' a poplatek za rozjezd' : ''} minus náklady rozjezdu`, trzby: zkouska.celkem + zkouska.rozjezd, naklady: nakladyZkousky, perioda: 'jednorazove', poznamka: `náklady: web, zaškolení, konzultace, hosting, prohlídka partnera, přilby; při pokračování se dále započte ${zkouska.zapocet} Kč; kola zůstávají naše (ex-demo ≈ ${Math.round(zkouska.odkupProcent * 100)} % prodejní ceny)` });
     if (prohlidkaRocne) ip.push({ id: 'servis-rocne', label: 'Sezónní prohlídka v ceně zkoušky – podíl partnera', trzby: 0, naklady: 0, partner: r0(prohlidkaRocne * (1 - provize)), perioda: 'jednorazove' });
   }
 
@@ -487,7 +552,7 @@ function compute(input, config) {
   if (config.meta.nakupniCenyOdvozene && pocetKol > 0) varovani.push('Nákupní ceny kol nejsou nastaveny (chybí interní soubor cen) – počítá se s odhadem prodejní cena × (1 − práh marže).');
   const interni = { horizontMesice: horizon, trzby, naklady, marze, marzeProcent, prahMarzeProcent: config.interni.prahMarzeProcent, podilPartnera: partner, polozky, varovani, kola: kolaInterni, nakupniCelkem, nakupniCenyOdvozene: !!config.meta.nakupniCenyOdvozene, nakladyZkousky: zkouska ? ip.find((p) => p.id === 'kola').naklady : null };
 
-  return { vstup: input, meta: config.meta, kola, porizeni, zkouska, web: webOut, sprava: spravaOut, servis: servisOut, doplnky, souhrn, upozorneni, interni };
+  return { vstup: input, meta: config.meta, kola, porizeni, zkouska, mnozstevni, web: webOut, sprava: spravaOut, servis: servisOut, doplnky, souhrn, upozorneni, interni };
 }
 
 /** Výsledek bez interních čísel. */
@@ -519,6 +584,14 @@ function modelyInterni(modely, config, dph = 0.21) {
   });
 }
 
+/** Množstevní stupeň pro počet kol: nejvyšší stupeň s odKol ≤ pocet (pod minimem první stupeň). */
+function stupenPro(config, pocet) {
+  const stupne = config.mnozstevniSlevy;
+  let st = stupne[0];
+  for (const x of stupne) if (pocet >= x.odKol) st = x;
+  return st;
+}
+
 /** Doplňky dostupné pro vstup (jenEkolo jen s e-koly). */
 function availableDoplnky(config, input) {
   return config.doplnky.filter((d) => !d.jenEkolo || (input && input.kola.ekolo > 0));
@@ -545,6 +618,7 @@ module.exports = {
   compute,
   publicResult,
   modelyInterni,
+  stupenPro,
   availableDoplnky,
   pct,
 };

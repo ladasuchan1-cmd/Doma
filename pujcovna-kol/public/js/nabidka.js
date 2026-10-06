@@ -29,6 +29,25 @@
     });
   }
 
+  // zvýraznění množstevního stupně podle celkového počtu kol (stupně s data-od, poslední splněný je aktivní)
+  function syncTiers() {
+    var n = 0;
+    form.querySelectorAll('[data-nabidka-count]').forEach(function (inp) {
+      n += parseInt(inp.value, 10) || 0;
+    });
+    var tiers = document.querySelectorAll('[data-nabidka-tiers] [data-od]');
+    var active = null;
+    tiers.forEach(function (li) {
+      if (n >= (parseInt(li.getAttribute('data-od'), 10) || 0)) active = li;
+    });
+    tiers.forEach(function (li) {
+      var on = li === active;
+      li.classList.toggle('is-active', on);
+      if (on) li.setAttribute('aria-current', 'true');
+      else li.removeAttribute('aria-current');
+    });
+  }
+
   function syncChoices() {
     form.querySelectorAll('.nab-choice').forEach(function (label) {
       var input = label.querySelector('.nab-choice__input');
@@ -103,6 +122,7 @@
 
   form.addEventListener('change', function () {
     syncEkolo();
+    syncTiers();
     syncChoices();
     clearTimeout(timer);
     timer = setTimeout(recalc, 120);
@@ -112,6 +132,7 @@
       clearTimeout(timer);
       timer = setTimeout(function () {
         syncEkolo();
+        syncTiers();
         recalc();
       }, 350);
     }
@@ -122,6 +143,7 @@
   });
 
   syncEkolo();
+  syncTiers();
   syncChoices();
   bindPrint();
 })();

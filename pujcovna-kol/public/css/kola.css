@@ -55,8 +55,14 @@
   display: grid;
   gap: var(--space-5);
   min-width: 0;
-  position: sticky;
-  top: calc(var(--header-height, 72px) + var(--space-4));
+}
+/* Karta s cenou a tlačítkem Rezervovat drží pozici jen vedle obsahu na širokém displeji. Na mobilu je v jednom
+   sloupci nad specifikacemi a sticky by přes ně při rolování jezdila (překrytí tabulky specifikací). */
+@media (min-width: 900px) {
+  .detail__side {
+    position: sticky;
+    top: calc(var(--header-height, 72px) + var(--space-4));
+  }
 }
 .detail__body {
   grid-area: body;

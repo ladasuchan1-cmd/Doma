@@ -13,6 +13,7 @@ const { startServer } = require('./helpers');
 const { createLogger } = require('../src/log');
 const domain = require('../src/domain/nabidka');
 const feature = require('../src/features/nabidka');
+const page = require('../src/render/pages/nabidka');
 
 const FIXTURE = path.join(__dirname, 'fixtures', 'nabidka.json');
 const INTERNI = path.join(__dirname, 'fixtures', 'nabidka.interni.json');
@@ -475,4 +476,94 @@ test('chybná konfigurace cen → /nabidka 200 s „Nabídka se připravuje“, 
     fs.rmSync(dir, { recursive: true, force: true });
   }
   assert.match(await (await srv.fetch('/nabidka?zakladni=5')).text(), /Vaše nabídka/);
+});
+
+// ---------------------------------------------------------------------------------------------------------
+// Množstevní stupně (od 6. 10. 2026): nabídka od 2 kol, čím víc kol, tím vyšší sleva a lepší podmínky
+
+const TIERS = [
+  { odKol: 2, nazev: 'Start', sleva: 0, slevaKoupe: 0, poplatekZkousky: 7900, kauceProcent: 0.1, zalohaZkouskyProcent: 0.5, vyhody: ['zaškolení obsluhy'] },
+  { odKol: 5, nazev: 'Flotila', sleva: 0.04, slevaKoupe: 0.03, poplatekZkousky: 3900, kauceProcent: 0.1, zalohaZkouskyProcent: 0.4, vyhody: ['sleva 4 %'] },
+  { odKol: 10, nazev: 'Hotel', sleva: 0.07, slevaKoupe: 0.05, poplatekZkousky: 0, kauceProcent: 0.08, zalohaZkouskyProcent: 0.3, vyhody: ['náhradní kolo'] },
+  { odKol: 20, nazev: 'Resort', sleva: 0.1, slevaKoupe: 0.07, poplatekZkousky: 0, kauceProcent: 0.05, zalohaZkouskyProcent: 0.25, vyhody: ['servis do 24 h'] },
+];
+const tierRaw = { ...raw, mnozstevniSlevy: TIERS, pronajem: { ...raw.pronajem, minKol: 2 }, zkouska: { ...raw.zkouska, minKol: 2 } };
+const tierCfg = domain.validateConfig(tierRaw, rawInterni).config;
+const runT = (q) => domain.compute(domain.normalizeInput(q, tierCfg), tierCfg);
+
+test('množstevní stupně: validace, výběr stupně, minimum 2 kola, další stupeň', () => {
+  assert.ok(tierCfg, 'konfigurace se stupni je platná');
+  assert.equal(domain.stupenPro(tierCfg, 1).odKol, 2);
+  assert.equal(domain.stupenPro(tierCfg, 4).odKol, 2);
+  assert.equal(domain.stupenPro(tierCfg, 5).odKol, 5);
+  assert.equal(domain.stupenPro(tierCfg, 19).odKol, 10);
+  assert.equal(domain.stupenPro(tierCfg, 50).odKol, 20);
+  const one = runT({ trek: 1, porizeni: 'pronajem36' });
+  assert.deepEqual(one.upozorneni.map((u) => u.kod), ['min-kol']);
+  assert.match(one.upozorneni[0].text, /od 2 kol/);
+  const two = runT({ trek: 2, porizeni: 'pronajem36' });
+  assert.equal(two.upozorneni.length, 0, '2 kola stačí i na pronájem');
+  assert.equal(two.mnozstevni.aktualni.nazev, 'Start');
+  assert.deepEqual({ odKol: two.mnozstevni.dalsi.odKol, chybi: two.mnozstevni.dalsi.chybi }, { odKol: 5, chybi: 3 });
+  assert.equal(runT({ trek: 25, porizeni: 'pronajem36' }).mnozstevni.dalsi, null, 'nejvyšší stupeň už nemá další');
+  const bad = domain.validateConfig({ ...tierRaw, mnozstevniSlevy: [TIERS[1], TIERS[0]] }, rawInterni);
+  assert.equal(bad.ok, false);
+  assert.ok(bad.errors.some((e) => /seřazené/.test(e)));
+  assert.equal(domain.validateConfig({ ...tierRaw, mnozstevniSlevy: [{ ...TIERS[0], sleva: 0.6 }] }, rawInterni).ok, false);
+});
+
+test('množstevní stupně: sleva na pronájem, koupi a zkoušku, kauce a záloha podle stupně, poplatek za rozjezd', () => {
+  const base = runT({ trek: 12, porizeni: 'pronajem36' });
+  const rate = domain.monthlyRate(tierCfg.tridyKol[1], 36, tierCfg.pronajem).celkem;
+  assert.equal(base.porizeni.radky[0].zaKoloBezSlevy, rate);
+  assert.equal(base.porizeni.radky[0].zaKolo, Math.round(rate * 0.93));
+  assert.equal(base.mnozstevni.slevaKc, (rate - Math.round(rate * 0.93)) * 12);
+  assert.equal(base.souhrn.kauce, Math.round(12 * 50000 * 0.08), 'kauce 8 % od 10 kol');
+  const koupe = runT({ trek: 12, porizeni: 'koupe' });
+  assert.equal(koupe.porizeni.jednorazove, 12 * Math.round(50000 * 0.95), 'koupě se slevou 5 %');
+  assert.equal(koupe.mnozstevni.slevaPerioda, 'jednorazove');
+  const zk2 = runT({ trek: 2, porizeni: 'zkouska' });
+  assert.equal(zk2.zkouska.rozjezd, 7900);
+  assert.equal(zk2.porizeni.jednorazove, 7900);
+  assert.equal(zk2.zkouska.zaloha, Math.round(zk2.zkouska.celkem * 0.5));
+  const zk10 = runT({ trek: 10, porizeni: 'zkouska' });
+  assert.equal(zk10.zkouska.rozjezd, 0, 'od 10 kol bez poplatku za rozjezd');
+  assert.equal(zk10.zkouska.zaloha, Math.round(zk10.zkouska.celkem * 0.3));
+  assert.equal(zk10.zkouska.kauce, Math.round(10 * 50000 * 0.08));
+  // veřejný výsledek nese stupně, ale ne interní čísla
+  const pub = domain.publicResult(base);
+  assert.ok(pub.mnozstevni && pub.mnozstevni.aktualni);
+  assert.ok(!/nakupni/i.test(JSON.stringify(pub)));
+});
+
+test('množstevní stupně: s ukázkovými nákupními cenami drží každá kombinace marži nad prahem', () => {
+  const realRaw = JSON.parse(fs.readFileSync(feature.DEFAULT_CONFIG_PATH, 'utf8'));
+  const cfg = domain.validateConfig(realRaw, rawInterni).config;
+  let low = [];
+  for (const n of [2, 4, 5, 10, 20, 50]) for (const trida of ['zakladni', 'trek', 'ekolo']) for (const porizeni of ['koupe', 'pronajem24', 'pronajem36', 'zkouska']) for (const web of ['zadny', 'sablona', 'namiru']) for (const servis of ['vlastni', 'partner']) {
+    const r = domain.compute(domain.normalizeInput({ [trida]: n, porizeni, web, servis }, cfg), cfg);
+    if (r.interni.marzeProcent < cfg.interni.prahMarzeProcent) low.push(`${n} ${trida} ${porizeni} ${web} ${servis}: ${Math.round(r.interni.marzeProcent * 100)} %`);
+  }
+  assert.deepEqual(low, []);
+  assert.equal(cfg.mnozstevniSlevy[0].odKol, 2, 'nabídka od 2 kol');
+});
+
+test('stránka /nabidka: stupně v kroku 1, úspora a „přidejte ještě“ v souhrnu, web bez napojení na cizí systémy', () => {
+  const html = String(page.nabidka({ config: tierCfg, input: domain.normalizeInput({ trek: 4, porizeni: 'pronajem36' }, tierCfg), result: domain.publicResult(runT({ trek: 4, porizeni: 'pronajem36' })), internal: false, csrf: 'x', values: {}, errors: {}, query: '' }));
+  assert.match(html, /Čím víc kol, tím lepší podmínky/);
+  assert.match(html, /<li class="nab-tier is-active" data-od="2" aria-current="true">/);
+  assert.match(html, /Přidejte ještě <strong>1 kolo<\/strong> a dostanete slevu 4 %/);
+  assert.ok(!/napojení/i.test(html), 'žádné napojení na rezervační systém');
+  assert.match(html, /odkaz nebo tlačítko „Půjčit kolo“/);
+  const h12 = String(page.summaryFragment({ result: domain.publicResult(runT({ trek: 12, porizeni: 'pronajem36' })), internal: false, config: tierCfg }));
+  assert.match(h12, /Množstevní sleva 7 % \(Hotel\)/);
+});
+
+test('mobil: rezervační karta detailu kola není sticky pod 900 px, přepínač designů není fixní pod 720 px', () => {
+  const kolaCss = fs.readFileSync(path.join(__dirname, '..', 'public', 'css', 'kola.css'), 'utf8');
+  const side = /\.detail__side \{[^}]*\}/.exec(kolaCss)[0];
+  assert.ok(!/sticky/.test(side), 'základní pravidlo bez sticky');
+  assert.match(kolaCss, /@media \(min-width: 900px\) \{\s*\.detail__side \{\s*position: sticky;/);
+  const base = fs.readFileSync(path.join(__dirname, '..', 'public', 'base.css'), 'utf8');
+  assert.match(base, /@media \(max-width: 719px\) \{\s*\.design-switch \{\s*position: static;/);
 });

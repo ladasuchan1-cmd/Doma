@@ -28,6 +28,66 @@
       "popis": "Středový motor Bosch/Shimano/Yamaha, baterie 500–750 Wh, hydraulické brzdy, nosič, osvětlení. Prodejní cena = návrh (marže 20,5 %), zůstatková po 36 m = návrh 30 % (degradace baterie)."
     }
   ],
+  "mnozstevniSlevy": [
+    {
+      "odKol": 2,
+      "nazev": "Start",
+      "sleva": 0,
+      "slevaKoupe": 0,
+      "poplatekZkousky": 7900,
+      "kauceProcent": 0.1,
+      "zalohaZkouskyProcent": 0.5,
+      "vyhody": [
+        "zaškolení obsluhy",
+        "servis do 48 h"
+      ]
+    },
+    {
+      "odKol": 5,
+      "nazev": "Flotila",
+      "sleva": 0.04,
+      "slevaKoupe": 0.03,
+      "poplatekZkousky": 3900,
+      "kauceProcent": 0.1,
+      "zalohaZkouskyProcent": 0.4,
+      "vyhody": [
+        "sleva 4 % na pronájem (3 % na koupi)",
+        "nižší poplatek za rozjezd zkoušky",
+        "záloha zkoušky jen 40 %"
+      ]
+    },
+    {
+      "odKol": 10,
+      "nazev": "Hotel",
+      "sleva": 0.07,
+      "slevaKoupe": 0.05,
+      "poplatekZkousky": 0,
+      "kauceProcent": 0.08,
+      "zalohaZkouskyProcent": 0.3,
+      "vyhody": [
+        "sleva 7 % na pronájem (5 % na koupi)",
+        "zkouška bez poplatku za rozjezd",
+        "kauce 8 %, záloha zkoušky 30 %",
+        "náhradní kolo po dobu opravy"
+      ]
+    },
+    {
+      "odKol": 20,
+      "nazev": "Resort",
+      "sleva": 0.1,
+      "slevaKoupe": 0.07,
+      "poplatekZkousky": 0,
+      "kauceProcent": 0.05,
+      "zalohaZkouskyProcent": 0.25,
+      "vyhody": [
+        "sleva 10 % na pronájem (7 % na koupi)",
+        "zkouška bez poplatku za rozjezd",
+        "kauce 5 %, záloha zkoušky 25 %",
+        "servis do 24 h a náhradní kolo",
+        "přednostní obměna za nové modely"
+      ]
+    }
+  ],
   "pronajem": {
     "mesice": [
       24,
@@ -36,7 +96,7 @@
     "rocniUrok": 0.07,
     "marzeRocni": 0.12,
     "kauceProcent": 0.1,
-    "minKol": 5,
+    "minKol": 2,
     "servisVCene": false
   },
   "zkouska": {
@@ -44,7 +104,7 @@
     "nasobekSazby36m": 2,
     "zalohaProcent": 0.5,
     "kauceProcent": 0.1,
-    "minKol": 5,
+    "minKol": 2,
     "startNejpozdeji": "06-15",
     "zapocetPriPokracovaniProcent": 0.35,
     "odkupPoZkousceProcentProdejni": 0.8,

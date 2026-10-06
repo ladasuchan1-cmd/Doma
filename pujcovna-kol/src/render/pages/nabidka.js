@@ -31,6 +31,29 @@ function startText(s) {
   return format.date(s) || String(s || '');
 }
 
+/** Rozsah procent přes množstevní stupně (např. „5–10 %“); bez stupňů výchozí hodnota. */
+function rozsahProcent(config, key, vychozi) {
+  const vals = (config.mnozstevniSlevy || []).map((st) => (st[key] ?? vychozi)).filter((v) => typeof v === 'number');
+  if (!vals.length) return pctText(vychozi);
+  const lo = Math.min(...vals);
+  const hi = Math.max(...vals);
+  return lo === hi ? pctText(lo) : `${Math.round(lo * 100)}–${pctText(hi)}`;
+}
+function kauceRozsah(config, vychozi) {
+  return rozsahProcent(config, 'kauceProcent', vychozi);
+}
+function zalohaRozsah(config) {
+  return rozsahProcent(config, 'zalohaZkouskyProcent', config.zkouska.zalohaProcent);
+}
+/** „; poplatek za rozjezd 7 900 Kč (od 10 kol zdarma)“ podle stupňů. */
+function poplatekText(config) {
+  const st = config.mnozstevniSlevy || [];
+  const max = Math.max(0, ...st.map((x) => x.poplatekZkousky || 0));
+  if (!max) return '';
+  const zdarma = st.find((x) => !x.poplatekZkousky && x.odKol > st[0].odKol);
+  return `, jednorázový poplatek za rozjezd (web, zaškolení) nejvýše ${kc(max)}${zdarma ? ` – od ${zdarma.odKol} kol zdarma` : ''}`;
+}
+
 /** Volba (radio) jako karta. */
 function choice({ name, value, checked, title, text, badge: badgeText, badgeTone, meta, disabled }) {
   const id = `f-${name}-${value}`;
@@ -64,7 +87,25 @@ function stepKola({ config, input, modely = [] }) {
   ${c.field({ label: 'Počet kusů', name: t.id, type: 'number', value: input.kola[t.id], min: 0, max: domain.MAX_KOL, step: 1, inputmode: 'numeric', attrs: { 'data-nabidka-count': t.id } })}
 </article>`;
   });
-  return c.section({ id: 'krok-kola', eyebrow: 'Krok 1', title: 'Kolik kol a jakých', lead: 'Zadejte počty kusů podle tříd. Mix tříd je běžný – základní kola pro většinu hostů, elektrokola pro náročnější výlety.', children: c.grid(cards, 3), variant: 'nab-step' });
+  const stupne = config.mnozstevniSlevy || [];
+  const n = input.kola.zakladni + input.kola.trek + input.kola.ekolo;
+  const vyber = stupne.length ? stupne.reduce((a, st) => (n >= st.odKol ? st : a), null) : null;
+  const tiers = stupne.length > 1
+    ? html`<div class="nab-tiers" data-nabidka-tiers>
+  <h3 class="nab-tiers__title">Čím víc kol, tím lepší podmínky</h3>
+  <ol class="nab-tiers__list">${stupne.map((st, i) => {
+    const doKol = stupne[i + 1] ? stupne[i + 1].odKol - 1 : null;
+    const active = vyber === st;
+    return html`<li class="${active ? 'nab-tier is-active' : 'nab-tier'}" data-od="${st.odKol}"${attr({ 'aria-current': active ? 'true' : null })}>
+    <p class="nab-tier__range">${doKol ? `${st.odKol}–${doKol} kol` : `${st.odKol} a více kol`}${st.nazev ? html` <span class="nab-tier__name">${st.nazev}</span>` : ''}</p>
+    <p class="nab-tier__discount">${st.sleva ? `−${pctText(st.sleva)}` : 'základní cena'}</p>
+    ${st.vyhody.length ? html`<ul class="nab-tier__perks">${st.vyhody.map((v) => html`<li>${v}</li>`)}</ul>` : ''}
+  </li>`;
+  })}</ol>
+  <p class="nab-muted">Stupeň se počítá z celkového počtu kol všech tříd dohromady. Nabídku sestavujeme od ${stupne[0].odKol} kol.</p>
+</div>`
+    : '';
+  return c.section({ id: 'krok-kola', eyebrow: 'Krok 1', title: 'Kolik kol a jakých', lead: `Zadejte počty kusů podle tříd – stačí ${stupne.length ? stupne[0].odKol : 1} kola. Mix tříd je běžný: základní kola pro většinu hostů, elektrokola pro náročnější výlety.`, children: html`${c.grid(cards, 3)}${tiers}`, variant: 'nab-step' });
 }
 
 const KATEGORIE_MODELU = { ebike: 'Elektrokolo', kids: 'Dětské kolo', trek: 'Trekové kolo', mtb: 'Horské kolo', city: 'Městské kolo', gravel: 'Gravel' };
@@ -94,10 +135,10 @@ function modelySection({ modely = [], modelyMeta = {} }) {
 function stepPorizeni({ config, input }) {
   const z = config.zkouska;
   const items = [
-    choice({ name: 'porizeni', value: 'zkouska', checked: input.porizeni === 'zkouska', title: 'Zkušební období 4 měsíce', badge: 'bez dlouhého závazku', badgeTone: 'success', text: `Vyzkoušíte si celý provoz na jednu sezónu. Platíte ${z.mesice} měsíční splátky, záloha ${pctText(z.zalohaProcent)} předem. Po skončení kola vrátíte, odkoupíte za ${pctText(z.odkupPoZkousceProcentProdejni)} prodejní ceny, nebo přejdete na pronájem – započteme ${pctText(z.zapocetPriPokracovaniProcent)} zaplaceného.`, meta: `V ceně: ${z.vCene.join(', ')}.${z.startNejpozdeji ? ` Start nejpozději ${startText(z.startNejpozdeji)} – aby zkouška pokryla sezónu.` : ''}` }),
-    choice({ name: 'porizeni', value: 'pronajem36', checked: input.porizeni === 'pronajem36', title: 'Pronájem na 36 měsíců', text: `Nejnižší měsíční splátka, kola po celou dobu servisujeme my${config.pronajem.servisVCene ? ' (servis v ceně)' : ''}. Vratná kauce ${pctText(config.pronajem.kauceProcent)} prodejní ceny, od ${config.pronajem.minKol} kol.` }),
-    choice({ name: 'porizeni', value: 'pronajem24', checked: input.porizeni === 'pronajem24', title: 'Pronájem na 24 měsíců', text: `Kratší závazek, po dvou sezónách obměna za nové modely. Vratná kauce ${pctText(config.pronajem.kauceProcent)} prodejní ceny, od ${config.pronajem.minKol} kol.` }),
-    choice({ name: 'porizeni', value: 'koupe', checked: input.porizeni === 'koupe', title: 'Koupě', text: 'Kola jsou od začátku vaše – nejnižší celkové náklady při provozu delším než tři sezóny. Bez kauce a bez minimálního počtu.' }),
+    choice({ name: 'porizeni', value: 'zkouska', checked: input.porizeni === 'zkouska', title: 'Zkušební období 4 měsíce', badge: 'bez dlouhého závazku', badgeTone: 'success', text: `Vyzkoušíte si celý provoz na jednu sezónu. Platíte ${z.mesice} měsíční splátky, záloha ${zalohaRozsah(config)} předem podle počtu kol${poplatekText(config)}. Po skončení kola vrátíte, odkoupíte za ${pctText(z.odkupPoZkousceProcentProdejni)} prodejní ceny, nebo přejdete na pronájem – započteme ${pctText(z.zapocetPriPokracovaniProcent)} zaplaceného.`, meta: `V ceně: ${z.vCene.join(', ')}.${z.startNejpozdeji ? ` Start nejpozději ${startText(z.startNejpozdeji)} – aby zkouška pokryla sezónu.` : ''}` }),
+    choice({ name: 'porizeni', value: 'pronajem36', checked: input.porizeni === 'pronajem36', title: 'Pronájem na 36 měsíců', text: `Nejnižší měsíční splátka, kola po celou dobu servisujeme my${config.pronajem.servisVCene ? ' (servis v ceně)' : ''}. Vratná kauce ${kauceRozsah(config, config.pronajem.kauceProcent)} prodejní ceny podle počtu kol, od ${config.pronajem.minKol} kol.` }),
+    choice({ name: 'porizeni', value: 'pronajem24', checked: input.porizeni === 'pronajem24', title: 'Pronájem na 24 měsíců', text: `Kratší závazek, po dvou sezónách obměna za nové modely. Vratná kauce ${kauceRozsah(config, config.pronajem.kauceProcent)} prodejní ceny podle počtu kol, od ${config.pronajem.minKol} kol.` }),
+    choice({ name: 'porizeni', value: 'koupe', checked: input.porizeni === 'koupe', title: 'Koupě', text: `Kola jsou od začátku vaše – nejnižší celkové náklady při provozu delším než tři sezóny. Bez kauce${config.mnozstevniSlevy && config.mnozstevniSlevy[0].odKol > 1 ? `, od ${config.mnozstevniSlevy[0].odKol} kol` : ''}; množstevní sleva podle počtu kol.` }),
   ];
   return c.section({ id: 'krok-porizeni', eyebrow: 'Krok 2', title: 'Jak kola pořídíte', lead: 'Zkušební období je nejčastější první krok: bez dlouhého závazku zjistíte, kolik kol hosté skutečně využijí.', children: choiceGroup(items, { label: 'Způsob pořízení' }), variant: 'nab-step' });
 }
@@ -105,8 +146,8 @@ function stepPorizeni({ config, input }) {
 function stepWeb({ config, input }) {
   const w = config.web;
   const items = [
-    choice({ name: 'web', value: 'sablona', checked: input.web === 'sablona', title: 'Rezervační web ze šablony', text: `Hotový rezervační web s online platbami, správou a výdejem – vyberete si jeden ze tří designů (${html`<a href="/design">ukázky</a>`}) a doplníte logo, texty a fotky. Nasazení do týdne.`, meta: `${kc(w.sablona.jednorazove)} jednorázově + ${kc(w.sablona.mesicne)} měsíčně${input.porizeni === 'zkouska' ? ' · ve zkušebním období v ceně' : ''}` }),
-    choice({ name: 'web', value: 'namiru', checked: input.web === 'namiru', title: 'Web na míru', text: 'Vlastní design a funkce podle vašeho ubytování, napojení na váš rezervační systém nebo recepci.', meta: `od ${kc(w.naMiru.jednorazoveOd)} jednorázově + ${kc(w.naMiru.mesicne)} měsíčně` }),
+    choice({ name: 'web', value: 'sablona', checked: input.web === 'sablona', title: 'Rezervační web ze šablony', text: `Hotový rezervační web s online platbami, správou a výdejem – vyberete si jeden ze tří designů (${html`<a href="/design">ukázky</a>`}) a doplníte logo, texty a fotky. Z vašeho webu na něj povede odkaz nebo tlačítko „Půjčit kolo“. Nasazení do týdne.`, meta: `${kc(w.sablona.jednorazove)} jednorázově + ${kc(w.sablona.mesicne)} měsíčně${input.porizeni === 'zkouska' ? ' · ve zkušebním období v ceně' : ''}` }),
+    choice({ name: 'web', value: 'namiru', checked: input.web === 'namiru', title: 'Web na míru', text: 'Vlastní design, vlastní doména a úpravy podle vašeho ubytování. Rezervace kol běží samostatně – na váš stávající web jen přidáte odkaz nebo tlačítko „Půjčit kolo“, žádné propojení systémů.', meta: `od ${kc(w.naMiru.jednorazoveOd)} jednorázově + ${kc(w.naMiru.mesicne)} měsíčně` }),
     choice({ name: 'web', value: 'zadny', checked: input.web === 'zadny', title: 'Bez webu – jen kola', text: 'Kola půjčujete ručně na recepci bez online rezervací.' }),
   ];
   return c.section({
@@ -205,6 +246,9 @@ function summaryFragment({ result, internal, config, actions = true, detailsOpen
   totals.push(['Jednorázově', kc(s.jednorazove)]);
   totals.push([z ? `Měsíčně (${z.mesice} měsíce)` : 'Měsíčně', kc(s.mesicne)]);
   if (s.rocne) totals.push(['Ročně (sezónní prohlídky)', kc(s.rocne)]);
+  const mn = result.mnozstevni;
+  if (mn && mn.slevaKc) totals.push([`Množstevní sleva ${pctText(mn.sleva)}${mn.aktualni && mn.aktualni.nazev ? ` (${mn.aktualni.nazev})` : ''} – už započtena`, `−${kc(mn.slevaKc)}${mn.slevaPerioda === 'mesicne' ? ' / měs.' : ''}`]);
+  if (z && z.rozjezd) totals.push(['z toho poplatek za rozjezd zkoušky', kc(z.rozjezd)]);
   if (s.kauce) totals.push(['Vratná kauce', kc(s.kauce)]);
   if (s.odkupNaKonci) totals.push([`Odkup kol na konci (volitelný, za zůstatkovou cenu)`, kc(s.odkupNaKonci)]);
   for (const h of s.horizonty) totals.push({ label: h.label, value: kc(h.castka), strong: true });
@@ -213,11 +257,13 @@ function summaryFragment({ result, internal, config, actions = true, detailsOpen
   <h2 class="nab-summary__title">Vaše nabídka ${meta.zastupneCeny ? c.badge('ukázkové ceny', 'warning') : ''}</h2>
   ${result.upozorneni.map((u) => c.notice(u.text, u.kod === 'zadna-kola' ? 'info' : 'warning'))}
   ${c.summary(totals)}
+  ${mn && mn.dalsi && !result.upozorneni.some((u) => u.kod === 'min-kol') ? html`<p class="nab-summary__upsell">Přidejte ještě <strong>${mn.dalsi.chybi} ${mn.dalsi.chybi === 1 ? 'kolo' : mn.dalsi.chybi < 5 ? 'kola' : 'kol'}</strong> a dostanete${mn.dalsi.sleva ? ` slevu ${pctText(mn.dalsi.sleva)}` : ' lepší podmínky'}${mn.dalsi.nazev ? ` (stupeň ${mn.dalsi.nazev})` : ''}.</p>` : ''}
   <details class="nab-summary__details"${attr({ open: !!detailsOpen })}><summary>Co nabídka obsahuje</summary>${c.summary(rows)}</details>
   ${z
     ? html`<div class="nab-summary__next">
     <h3 class="nab-summary__subtitle">A co po zkoušce?</h3>
     <ul class="nab-list nab-list--bullets">
+      ${z.rozjezd ? html`<li>Jednorázový poplatek za rozjezd (web, zaškolení, nastavení) ${kc(z.rozjezd)}.</li>` : ''}
       <li>Za kola zaplatíte ${kc(z.celkem)}: záloha ${kc(z.zaloha)} (${pctText(z.zalohaProcent)}) při podpisu, zbytek do 30 dnů.</li>
       <li>Pokud pokračujete pronájmem, započteme <strong>${kc(z.zapocet)}</strong> (${pctText(z.zapocetProcent)} zaplaceného).</li>
       <li>Odkup kol po zkoušce za <strong>${kc(z.odkup)}</strong> (${pctText(z.odkupProcent)} prodejní ceny).</li>
