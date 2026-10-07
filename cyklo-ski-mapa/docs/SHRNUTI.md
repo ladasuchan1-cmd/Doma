@@ -90,9 +90,10 @@ v OpenStreetMap (odkaz je u každého místa); do mapy se dostane s příští m
 ## Provoz, přístup a bezpečnost
 
 - **Kde běží:** server Hetzner Cloud (`37.27.203.154`, Ubuntu, Docker). Dva kontejnery – aplikace (Node.js 22,
-  bez závislostí) a Caddy, která sama obstarává HTTPS certifikát. Web je na **https://cyklomapa.ksprehledy.cz**
-  (DNS záznam A domény míří přímo na server, správa DNS je u Cloudflare). Případná další změna domény = nový
-  A záznam + změna variable `CSM_HETZNER_DOMAIN` v GitHubu + Run workflow.
+  bez závislostí) a Caddy. Web je na **https://cyklomapa.ksprehledy.cz** a od 7. 10. 2026 jde přes **Cloudflare
+  proxy**: server má Cloudflare Origin certifikát platný do roku 2041, takže se nic neobnovuje, a zvenčí
+  s ním mluví jen Cloudflare. Případná další změna domény = nový záznam v Cloudflare (oranžový mrak) + změna
+  variable `CSM_HETZNER_DOMAIN` v GitHubu + Run workflow.
 - **Kdo se dostane dovnitř:** jen přihlášení uživatelé. Hesla jsou v GitHub secretu `HETZNER_USERS`; přidání
   nebo změna = upravit secret a spustit workflow „Cyklo & Ski mapa“. Bez přihlášení je vidět jen přihlašovací
   formulář, po 10 špatných pokusech se adresa na 15 minut zablokuje.
