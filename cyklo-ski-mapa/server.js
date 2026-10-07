@@ -381,7 +381,7 @@ function serveStatic(req, res, url) {
       res.writeHead(304, baseHeaders({ 'Last-Modified': lastMod.toUTCString() }));
       return res.end();
     }
-    const headers = baseHeaders({ 'Content-Type': MIME[ext] || 'application/octet-stream', 'Last-Modified': lastMod.toUTCString(), 'Cache-Control': ext === '.html' ? 'no-cache' : 'public, max-age=300, must-revalidate', Vary: 'Accept-Encoding' });
+    const headers = baseHeaders({ 'Content-Type': MIME[ext] || 'application/octet-stream', 'Last-Modified': lastMod.toUTCString(), 'Cache-Control': ext === '.html' ? 'no-cache' : 'private, max-age=300, must-revalidate' /* private: statika je za přihlášením – cache na okraji (Cloudflare) ji nesmí podat nepřihlášeným */, Vary: 'Accept-Encoding' });
     const gzip = COMPRESSIBLE.has(ext) && st.size > 1024 && /\bgzip\b/.test(req.headers['accept-encoding'] || '');
     if (gzip) headers['Content-Encoding'] = 'gzip';
     else headers['Content-Length'] = st.size;

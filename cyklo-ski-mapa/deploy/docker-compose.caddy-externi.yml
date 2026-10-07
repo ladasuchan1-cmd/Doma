@@ -2,7 +2,7 @@
 # kontejner `caddy`, Caddyfile v /root/Caddyfile). Spustí jen aplikaci, připojí ji do sítě `web` a nic
 # nepublikuje – Caddy se na ni odkazuje jménem kontejneru. Blok pro Caddyfile: deploy/Caddyfile.externi-blok.
 #
-#   cd /opt/Doma/cyklo-ski-mapa/deploy && cp ../.env.example .env   # vyplnit CSM_USERS
+#   cd /opt/cyklo-ski-mapa/Doma/cyklo-ski-mapa/deploy && cp ../.env.example .env   # vyplnit CSM_USERS
 #   CSM_COMPOSE=docker-compose.caddy-externi.yml bash hetzner.sh instalace mapa.vase-domena.cz
 #   (nebo přímo: docker compose -f docker-compose.caddy-externi.yml up -d --build)
 services:
