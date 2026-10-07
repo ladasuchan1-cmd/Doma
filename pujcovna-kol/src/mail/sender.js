@@ -58,7 +58,7 @@ async function runOnce({ config, tenants, dbs, fieldCrypto, log }, { isClient = 
         out.sent++;
         if (log) log.info('E-mail odeslán', { outboxId: row.id, type: row.type, tenant: tenant.slug });
       } catch (e) {
-        const msg = (e && e.message) || 'chyba';
+        const msg = smtpClient.popisChyby(e);
         outbox.markFailed(db, row.id, msg);
         const attempts = (row.attempts || 0) + 1;
         db.prepare('UPDATE outbox SET run_at = ? WHERE id = ?').run(new Date(now().getTime() + attempts * 5 * 60000).toISOString(), row.id);

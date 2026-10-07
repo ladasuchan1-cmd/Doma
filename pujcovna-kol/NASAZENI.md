@@ -307,19 +307,23 @@ Se zapnutým SMTP je job `mail-sender` (každou minutu) navíc **odešle na e-ma
 `info@ksprehledy.cz`) s **Reply-To tazatele** – odpovědí v poště odpovídáte rovnou jemu.
 
 **Zapnutí:** v GitHubu (Settings → Secrets and variables → Actions) secrets `PK_SMTP_HOST` (Thinline / Český hosting:
-`smtp.cesky-hosting.cz`), `PK_SMTP_PORT` (`465`), `PK_SMTP_USER` (`info@ksprehledy.cz`), `PK_SMTP_PASS` (heslo schránky) a znovu
+`smtp.cesky-hosting.cz`), `PK_SMTP_PORT` (`587` – viz níže),  `PK_SMTP_USER` (`info@ksprehledy.cz`), `PK_SMTP_PASS` (heslo schránky) a znovu
 nasadit. Workflow je pošle na server v base64 a `hetzner.sh` je zapíše do `deploy/.env` (heslo jako `PK_SMTP_PASS_B64`, aby
 znaky `$` a uvozovky nerozbily soubor); hodnoty se nikde nevypisují. Ruční provoz: stejné proměnné v `deploy/.env`
-(`PK_SMTP_PASS` nebo `PK_SMTP_PASS_B64`, volitelně `PK_SMTP_FROM`, `PK_SMTP_SECURE=starttls` pro port 587).
+(`PK_SMTP_PASS` nebo `PK_SMTP_PASS_B64`, volitelně `PK_SMTP_FROM`; port 587 = STARTTLS, 465 = TLS).
+
+**Port 587, ne 465:** Hetzner Cloud u nových serverů blokuje odchozí porty 25 a 465 (odblokování jen žádostí na podporu).
+S portem 465 se spojení vůbec nenaváže – v admin → E-maily je pak chyba „nepodařilo se spojit s …:465 (ETIMEDOUT…)“
+(do 7. 10. 2026 tam stálo jen „chyba“). Port 587 se STARTTLS blokovaný není a bez nabídky STARTTLS se neodesílá.
 
 **Co se posílá:** jen typy `nabidka` a `contact_inquiry`, jen u webů platformy (demo), ne u webů klientů, a jen řádky mladší
 7 dní (zapnutí nerozešle starou frontu). **E-maily zákazníkům (potvrzení rezervací, platby, připomínky) se neposílají** –
 demo má smyšlené rezervace. Chyba (špatné heslo, odmítnutý adresát) → `attempts + 1`, chyba v admin → E-maily, další pokus za
 5 × počet pokusů minut, po 5 pokusech konec; log obsahuje jen id, typ a text odpovědi serveru, nikdy adresy ani obsah.
 
-**DNS:** aby pošta z `ksprehledy.cz` nekončila ve spamu, přidejte v Cloudflare TXT záznam SPF podle pokynů poskytovatele
-schránky (Thinline / Český hosting). Odesílací server `smtp.cesky-hosting.cz` má jinou IP adresu než přijímací servery
-z MX – samotné `mx` v SPF nestačí.
+**DNS:** aby pošta z `ksprehledy.cz` nekončila ve spamu, přidejte v Cloudflare TXT záznam SPF na kořen domény (Name `@`,
+ne „SPF“): `v=spf1 include:spf.cesky-hosting.cz ~all`. Záznam `spf.cesky-hosting.cz` zveřejňuje Český hosting / Thinline
+(ověřeno v DNS 7. 10. 2026). Odesílací server má jinou IP adresu než přijímací servery z MX – samotné `mx` v SPF nestačí.
 
 ## 8. Když něco nejde
 

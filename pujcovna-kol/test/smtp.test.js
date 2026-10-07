@@ -109,6 +109,21 @@ test('send: rozhovor s SMTP serverem (AUTH LOGIN bez TLS jen na localhostu), dot
   await assert.rejects(smtp.send({ host: 'smtp.example.com', port: 25, secure: 'none', from: 'a@b.cz' }, { from: 'a@b.cz', to: 'c@d.cz', data: 'x' }), /jen pro localhost/);
 });
 
+test('send: nespojí-li se, chyba jmenuje host:port a kód (ne prázdný text); popisChyby u AggregateError bez message', async () => {
+  const free = net.createServer();
+  await new Promise((r) => free.listen(0, '127.0.0.1', r));
+  const port = free.address().port;
+  await new Promise((r) => free.close(r));
+  await assert.rejects(
+    smtp.send({ host: '127.0.0.1', port, secure: 'none', from: 'a@b.cz' }, { from: 'a@b.cz', to: 'c@d.cz', data: 'x' }),
+    (e) => new RegExp(`nepodařilo se spojit s 127\\.0\\.0\\.1:${port} \\(.*ECONNREFUSED`).test(e.message),
+  );
+  const agg = new AggregateError([Object.assign(new Error(''), { code: 'ETIMEDOUT' }), Object.assign(new Error(''), { code: 'ENETUNREACH' })], '');
+  assert.equal(smtp.popisChyby(Object.assign(agg, { code: 'ETIMEDOUT' })), 'ETIMEDOUT, ENETUNREACH');
+  assert.equal(smtp.popisChyby(Object.assign(new Error('spojení odmítnuto'), { code: 'ECONNREFUSED' })), 'ECONNREFUSED: spojení odmítnuto');
+  assert.equal(smtp.popisChyby(null), 'neznámá chyba');
+});
+
 test('config: PK_SMTP_* → config.smtp (465 = tls, 587 = starttls); bez hostitele null', () => {
   assert.equal(loadConfig({ PK_DATA: '/tmp/x' }).smtp, null);
   const c = loadConfig({ PK_DATA: '/tmp/x', PK_SMTP_HOST: 'smtp.cesky-hosting.cz', PK_SMTP_USER: 'info@ksprehledy.cz', PK_SMTP_PASS: 'x' }).smtp;

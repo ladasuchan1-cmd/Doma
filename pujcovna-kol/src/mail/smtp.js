@@ -44,6 +44,18 @@ function cleanAddress(a) {
   return s;
 }
 
+/**
+ * Čitelný text chyby pro outbox a log. Síťové chyby Node mají často prázdné message (AggregateError při pokusu
+ * o IPv4 i IPv6) – pak se vezme kód (ETIMEDOUT, ECONNREFUSED…) z chyby nebo z jejích vnitřních chyb.
+ */
+function popisChyby(e) {
+  if (!e) return 'neznámá chyba';
+  if (e.message) return e.code && !e.message.includes(e.code) ? `${e.code}: ${e.message}` : e.message;
+  const vnitrni = Array.isArray(e.errors) ? e.errors.map((x) => (x && (x.code || x.message)) || '').filter(Boolean) : [];
+  const kody = [...new Set([e.code, ...vnitrni].filter(Boolean))];
+  return kody.length ? kody.join(', ') : 'neznámá chyba';
+}
+
 function wrap76(s) {
   return s.replace(/(.{76})/g, '$1\r\n');
 }
@@ -135,7 +147,12 @@ async function send(smtp, { from, to, data }) {
     return r;
   };
   try {
-    await expect([220], 'pozdrav');
+    try {
+      await expect([220], 'pozdrav');
+    } catch (e) {
+      // nespojilo se – uvést kam (host:port, žádné adresy ani heslo), ať je vidět např. blokovaný port u poskytovatele
+      throw new Error(`SMTP: nepodařilo se spojit s ${smtp.host}:${smtp.port} (${popisChyby(e)}).`);
+    }
     write(`EHLO ${helo}`);
     let ehlo = await expect([250], 'EHLO');
     let tlsOn = secure === 'tls';
@@ -184,4 +201,4 @@ async function send(smtp, { from, to, data }) {
   }
 }
 
-module.exports = { buildMessage, send, encodeHeader, cleanAddress };
+module.exports = { buildMessage, send, encodeHeader, cleanAddress, popisChyby };
