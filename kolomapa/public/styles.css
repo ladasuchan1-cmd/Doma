@@ -246,6 +246,32 @@ a {
   min-width: 0;
 }
 
+.topbar__user {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: none;
+  font-size: 13px;
+  color: var(--text-2);
+}
+
+.topbar__user[hidden] {
+  display: none;
+}
+
+.topbar__email {
+  max-width: 220px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+@media (max-width: 899px) {
+  .topbar__email {
+    display: none;
+  }
+}
+
 .topbar__actions {
   display: flex;
   align-items: center;

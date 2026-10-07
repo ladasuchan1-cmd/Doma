@@ -145,6 +145,7 @@ Ve Windows v souboru `nastaveni.txt` (řádky `KLÍČ=hodnota`), jinde i jako pr
 | `KOLOMAPA_HOST` | `0.0.0.0` = přístupné z celé sítě (pak nastavte i heslo) | `127.0.0.1` |
 | `KOLOMAPA_PASSWORD` | společné heslo do aplikace (HTTP Basic, jméno libovolné) | – |
 | `KOLOMAPA_USERS` | uživatelé `jana:heslo;petr:heslo2` (stejný formát jako `CSM_USERS` v Cyklo & Ski mapě); platí vedle společného hesla | – |
+| `KOLOMAPA_CF_ACCESS_TEAM`, `KOLOMAPA_CF_ACCESS_AUD`, `KOLOMAPA_CF_ACCESS_EMAILS` | přihlášení jen přes Cloudflare Access: tým, AUD tag aplikace, povolené e-maily (`@koloshop.cz`); server ověřuje podepsaný token u každého požadavku, heslo a jména pak neplatí (deploy/docker/HETZNER.md) | – |
 | `KOLOMAPA_USERS_FILE` | soubor s uživateli (řádky `KOLOMAPA_USERS=`, `CSM_USERS=`, `CSM_PASSWORD=` → „tým“), načítá se znovu po každé změně – na serveru ho plní `nasadit.sh` z Cyklo & Ski mapy | – |
 | `KOLOMAPA_TRUST_PROXY` | `1` = za reverzní proxy na stejném serveru (Caddy, nginx) – viz [deploy/NASAZENI.md](deploy/NASAZENI.md) | `0` |
 | `KOLOMAPA_SOURCES` | zdroje, např. `bazos,cyklobazar` nebo `all` (proč jen Bazoš – viz [Zdroje](#zdroje-šetrnost-a-pravidla)) | `bazos` |

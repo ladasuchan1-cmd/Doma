@@ -47,11 +47,11 @@ function rawTcp(port, text) {
   });
 }
 
-async function startApp({ password = null, users, usersFile, allowedHosts, db: givenDb, runFn, now, trustProxy = false } = {}) {
+async function startApp({ password = null, users, usersFile, allowedHosts, db: givenDb, runFn, now, trustProxy = false, cfAccess, accessVerifier, domain } = {}) {
   const { db } = givenDb ? { db: givenDb } : sampleDb();
-  const config = { ...loadConfig({}), dbFile: ':memory:', publicDir: PUBLIC_DIR, password, trustProxy, ...(allowedHosts ? { allowedHosts } : {}), ...(users ? { users } : {}), ...(usersFile ? { usersFile } : {}) };
+  const config = { ...loadConfig({}), dbFile: ':memory:', publicDir: PUBLIC_DIR, password, trustProxy, ...(allowedHosts ? { allowedHosts } : {}), ...(users ? { users } : {}), ...(usersFile ? { usersFile } : {}), ...(cfAccess ? { cfAccess } : {}), ...(domain ? { domain } : {}) };
   const runner = createRunner({ db, config, log, runFn: runFn || (async () => ({ status: 'ok' })) });
-  const server = http.createServer(createApp({ db, config, log, runner, ...(now ? { now } : {}) }));
+  const server = http.createServer(createApp({ db, config, log, runner, ...(now ? { now } : {}), ...(accessVerifier ? { accessVerifier } : {}) }));
   await new Promise((r) => server.listen(0, '127.0.0.1', r));
   const port = server.address().port;
   return {
@@ -188,6 +188,55 @@ test('jen soubor uživatelů bez společného hesla: přihlášení zapnuté, CS
   } finally {
     await s2.close();
     fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('Cloudflare Access: jen platný token (hlavička i cookie), heslo neplatí, cizí e-mail 403, /api/me, žádné okno na heslo', async () => {
+  const { makeTeam } = require('./cfaccess-helpers');
+  const { createAccessVerifier } = require('../src/server/cfaccess');
+  const t = makeTeam();
+  const cfAccess = { team: `${t.team}.cloudflareaccess.com`, aud: t.aud, emails: '@koloshop.cz' };
+  const accessVerifier = createAccessVerifier({ ...cfAccess, fetchImpl: t.fetchImpl });
+  const s = await startApp({ password: 'stare-heslo', cfAccess, accessVerifier, domain: 'kolomapa.ksprehledy.cz' });
+  const jwt = (claims) => ({ 'Cf-Access-Jwt-Assertion': t.sign(claims) });
+  const basic = { Authorization: 'Basic ' + Buffer.from('x:stare-heslo').toString('base64') };
+  try {
+    const none = await raw(s.port, 'GET', '/data/summary.json');
+    assert.equal(none.status, 403, 'bez tokenu nic');
+    assert.equal(none.headers['www-authenticate'], undefined, 'prohlížeč nemá nabízet okno na heslo');
+    assert.match(JSON.parse(none.body).error, /Cloudflare Access – otevřete https:\/\/kolomapa\.ksprehledy\.cz/);
+    assert.equal((await raw(s.port, 'GET', '/data/summary.json', basic)).status, 403, 'heslo už neplatí');
+    assert.equal((await raw(s.port, 'GET', '/', { Host: 'cizi.example.com' })).status, 403);
+    assert.equal((await raw(s.port, 'GET', '/data/summary.json', jwt())).status, 200);
+    assert.equal((await raw(s.port, 'GET', '/', { Cookie: `CF_Authorization=${t.sign()}` })).status, 200, 'cookie CF_Authorization');
+    const cizi = await raw(s.port, 'GET', '/data/summary.json', jwt({ email: 'jan@gmail.com' }));
+    assert.equal(cizi.status, 403);
+    assert.match(JSON.parse(cizi.body).error, /jan@gmail\.com nemá do Kolomapy přístup/);
+    assert.equal((await raw(s.port, 'GET', '/data/summary.json', jwt({ aud: ['jina-aplikace'] }))).status, 403);
+    const me = await raw(s.port, 'GET', '/api/me', jwt());
+    assert.deepEqual(JSON.parse(me.body), { user: 'lada@koloshop.cz', access: true, logout: '/cdn-cgi/access/logout' });
+    assert.equal(me.headers['cache-control'], 'no-store');
+    // zdravotní kontrola Dockeru (bez tokenu) dostane < 500 → kontejner „healthy“
+    assert.ok((await raw(s.port, 'GET', '/api/run')).status < 500);
+  } finally {
+    await s.close();
+  }
+  // neúplné nastavení → 503 se srozumitelnou hláškou, nikoho nepustí (ani s heslem)
+  const s2 = await startApp({ password: 'heslo', cfAccess: { error: 'Cloudflare Access není úplně nastavené – chybí KOLOMAPA_CF_ACCESS_AUD.' } });
+  try {
+    const r = await raw(s2.port, 'GET', '/data/summary.json', { Authorization: 'Basic ' + Buffer.from('x:heslo').toString('base64') });
+    assert.equal(r.status, 503);
+    assert.match(JSON.parse(r.body).error, /chybí KOLOMAPA_CF_ACCESS_AUD/);
+  } finally {
+    await s2.close();
+  }
+  // bez Cloudflare Access: /api/me s heslem → jméno neuvádí, access false
+  const s3 = await startApp({ password: 'heslo' });
+  try {
+    const r = await raw(s3.port, 'GET', '/api/me', { Authorization: 'Basic ' + Buffer.from('x:heslo').toString('base64') });
+    assert.deepEqual(JSON.parse(r.body), { user: null, access: false, logout: null });
+  } finally {
+    await s3.close();
   }
 });
 

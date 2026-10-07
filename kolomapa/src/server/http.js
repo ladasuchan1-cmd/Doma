@@ -14,6 +14,9 @@
 // Volitelné přihlášení → HTTP Basic, porovnání v konstantním čase: společné heslo (config.password, KOLOMAPA_PASSWORD;
 // jméno libovolné) a/nebo uživatelé jméno:heslo (config.users z KOLOMAPA_USERS, config.usersFile z KOLOMAPA_USERS_FILE –
 // soubor se čte znovu, jakmile se změní; na serveru ho plní nasadit.sh ze seznamu uživatelů Cyklo & Ski mapy).
+// S Cloudflare Access (config.cfAccess z KOLOMAPA_CF_ACCESS_TEAM, _AUD, _EMAILS) platí JEN přihlášení přes Cloudflare: každý požadavek musí
+// nést podepsaný JWT (hlavička Cf-Access-Jwt-Assertion), který se ověří v cfaccess.js; heslo a jména se nepoužívají.
+// GET /api/me → {user, access, logout} (kdo je přihlášený; odkaz na odhlášení z Cloudflare Access).
 // Po AUTH_MAX_FAILS špatných pokusech z jedné IP adresy 429 na AUTH_WINDOW_MS (hádání hesla v síti). Za reverzní proxy
 // na stejném serveru (Caddy, nginx) přicházejí všechny požadavky z 127.0.0.1 → s config.trustProxy
 // (KOLOMAPA_TRUST_PROXY=1) se adresa návštěvníka bere z poslední položky X-Forwarded-For, jinak by jeden útočník
@@ -35,6 +38,7 @@ const zlib = require('node:zlib');
 const { promisify } = require('node:util');
 const defaultLog = require('../util/log');
 const { parseUsersFile } = require('../config');
+const { createAccessVerifier, tokenFromRequest } = require('./cfaccess');
 const data = require('./data');
 
 const gzipAsync = promisify(zlib.gzip);
@@ -308,7 +312,7 @@ function cacheEntry(raw, etag) {
  *   (bez hesla), viz hostAllowed. now = hodiny (testy).
  * @returns {(req: import('node:http').IncomingMessage, res: import('node:http').ServerResponse) => Promise<void>}
  */
-function createApp({ db, config, log = defaultLog, runner = null, now: clock = () => new Date() }) {
+function createApp({ db, config, log = defaultLog, runner = null, now: clock = () => new Date(), accessVerifier = null }) {
   const publicDir = config.publicDir ? path.resolve(config.publicDir) : null;
   const allowedHosts = new Set(
     [...(Array.isArray(config.allowedHosts) ? config.allowedHosts : []), os.hostname(), config.host]
@@ -316,9 +320,24 @@ function createApp({ db, config, log = defaultLog, runner = null, now: clock = (
       .map((h) => h.trim().toLowerCase())
   );
   const getUsers = createUsersSource(config, log);
-  // přihlášení je zapnuté, když je společné heslo, uživatelé, nebo aspoň soubor s uživateli (i prázdný/chybějící –
-  // raději nikoho nepustit než pustit všechny)
-  const authOn = !!(config.password || (config.users instanceof Map && config.users.size) || config.usersFile);
+  // Cloudflare Access: ověřovač tokenů (testy ho mohou podstrčit); neúplné nastavení → accessError, nikoho nepustit
+  let access = null;
+  let accessError = null;
+  if (config.cfAccess) {
+    if (config.cfAccess.error) accessError = config.cfAccess.error;
+    else {
+      try {
+        access = accessVerifier || createAccessVerifier({ ...config.cfAccess, log });
+      } catch (e) {
+        accessError = e.message;
+      }
+    }
+  }
+  const accessOn = !!(access || accessError);
+  const accessHint = `Kolomapa je přístupná jen po přihlášení firemním e-mailem přes Cloudflare Access${config.domain ? ` – otevřete https://${config.domain}` : ''}.`;
+  // přihlášení je zapnuté, když je Cloudflare Access, společné heslo, uživatelé, nebo aspoň soubor s uživateli (i
+  // prázdný/chybějící – raději nikoho nepustit než pustit všechny)
+  const authOn = !!(accessOn || config.password || (config.users instanceof Map && config.users.size) || config.usersFile);
   let geojsonEntry = null;
 
   // ------------------------------------------------------------------ cache sestavených dat
@@ -549,12 +568,16 @@ function createApp({ db, config, log = defaultLog, runner = null, now: clock = (
       if (!r.started) return sendJson(req, res, 409, { error: r.reason || 'Stahování už běží.', status: runner.status() });
       return sendJson(req, res, 202, { started: true, status: runner.status() });
     }
+    if (p === '/api/me') {
+      if (!isGet) throw new HttpError(405, 'Metoda není povolena.');
+      return sendJson(req, res, 200, { user: req.kolomapaUser || null, access: !!access, logout: access ? access.logoutPath : null }, { headers: { 'Cache-Control': 'no-store' } });
+    }
     if (p.startsWith('/api/') || p === '/api') throw new HttpError(404, 'Nenalezeno.');
     if (!isGet) throw new HttpError(405, 'Metoda není povolena.');
     return serveStatic(req, res, p);
   }
 
-  return async function handler(req, res) {
+  const handler = async function handler(req, res) {
     // Tělo požadavku nepotřebujeme: zahodit, ale ne neomezeně (jinak by šlo server zaměstnat nekonečným uploadem).
     let received = 0;
     req.on('data', (c) => {
@@ -581,7 +604,23 @@ function createApp({ db, config, log = defaultLog, runner = null, now: clock = (
             'nebo nastavte heslo (KOLOMAPA_PASSWORD), případně povolte jméno serveru v KOLOMAPA_ALLOWED_HOSTS.'
         );
       }
-      if (authOn) {
+      if (accessOn) {
+        // Jen Cloudflare Access: bez platného podepsaného tokenu nic (ani heslo). 403 bez WWW-Authenticate – prohlížeč
+        // nemá nabízet okno na heslo.
+        if (accessError) throw new HttpError(503, `Přihlášení není nastavené: ${accessError}`, { expose: true });
+        const token = tokenFromRequest(req);
+        if (!token) throw new HttpError(403, accessHint);
+        const r = await access.verify(token);
+        if (!r.ok) {
+          if (r.status === 503) {
+            log.warn('Cloudflare Access: nejde ověřit přihlášení', { reason: r.reason });
+            throw new HttpError(503, `Přihlášení teď nejde ověřit – ${r.reason}. Zkuste to za chvíli.`, { expose: true });
+          }
+          log.info('Cloudflare Access: přístup odepřen', { reason: r.reason, ip: clientIp(req, !!config.trustProxy) });
+          throw new HttpError(403, `Přístup odepřen: ${r.reason}. ${accessHint}`);
+        }
+        req.kolomapaUser = r.name;
+      } else if (authOn) {
         const ip = clientIp(req, !!config.trustProxy);
         const now = Date.now();
         const blocked = authBlockedFor(ip, now);
@@ -604,14 +643,16 @@ function createApp({ db, config, log = defaultLog, runner = null, now: clock = (
       await route(req, res, url);
     } catch (e) {
       const status = e instanceof HttpError ? e.status : 500;
-      if (status >= 500) log.error('Chyba při obsluze požadavku', { url: req.url, error: e });
+      const exposed = e instanceof HttpError && e.headers && e.headers.expose; // 5xx se srozumitelnou hláškou (přihlášení)
+      if (status >= 500 && !exposed) log.error('Chyba při obsluze požadavku', { url: req.url, error: e });
       if (res.headersSent) {
         res.destroy();
         return;
       }
-      const message = status >= 500 ? 'Interní chyba serveru.' : e.message;
+      const message = status >= 500 && !exposed ? 'Interní chyba serveru.' : e.message;
       const wantsJson = !!url && (url.pathname.startsWith('/api/') || url.pathname.startsWith('/data/'));
-      const headers = { 'Cache-Control': 'no-store', ...(e instanceof HttpError && e.headers ? e.headers : {}) };
+      const { expose: _expose, ...extraHeaders } = (e instanceof HttpError && e.headers) || {};
+      const headers = { 'Cache-Control': 'no-store', ...extraHeaders };
       if (status === 405) headers.Allow = url && url.pathname === '/api/run' ? 'GET, HEAD, POST' : 'GET, HEAD';
       try {
         if (wantsJson) await sendJson(req, res, status, { error: message }, { headers });
@@ -621,6 +662,8 @@ function createApp({ db, config, log = defaultLog, runner = null, now: clock = (
       }
     }
   };
+  handler.accessVerifier = access; // server.js stáhne klíče týmu hned po startu
+  return handler;
 }
 
 /** Existuje public/index.html? (diagnostika při startu serveru) */

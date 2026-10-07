@@ -51,11 +51,16 @@
 //   KOLOMAPA_PASSWORD           heslo pro přístup k webu (HTTP Basic, jméno libovolné); prázdné = bez hesla
 //   KOLOMAPA_USERS              uživatelé „jana:heslo;petr:heslo2“ (oddělovač ; , nebo nový řádek; jméno bez ohledu na
 //                               velikost písmen) – stejný formát jako CSM_USERS v Cyklo & Ski mapě; platí vedle hesla
+//   KOLOMAPA_CF_ACCESS_TEAM     přihlášení přes Cloudflare Access: tým (např. bold-dust-a2b5 = bold-dust-a2b5.cloudflareaccess.com)
+//   KOLOMAPA_CF_ACCESS_AUD      … AUD tag aplikace Kolomapa v Cloudflare Access (Zero Trust → Access → Applications)
+//   KOLOMAPA_CF_ACCESS_EMAILS   … povolené e-maily: „@koloshop.cz“ = celá doména, nebo konkrétní adresy (čárkou).
+//                               S týmem a AUD platí jen přihlášení přes Cloudflare (podepsaný JWT), heslo a jména
+//                               (KOLOMAPA_PASSWORD / KOLOMAPA_USERS) se nepoužívají. Neúplné nastavení = nikoho nepustí.
 //   KOLOMAPA_USERS_FILE         soubor s uživateli (řádky KOLOMAPA_USERS=…, CSM_USERS=…, CSM_PASSWORD=… → uživatel
 //                               „tým“); čte se znovu při každé změně souboru – na serveru ho plní nasadit.sh z Cyklo & Ski
 //                               mapy, takže obě aplikace mají stejná jména a hesla
-//   KOLOMAPA_DOMENA, KOLOMAPA_PROHLIZEC   čte jen deploy/docker/nasadit.sh (doména pro Caddy, Chromium do obrazu);
-//                               Kolomapa sama je ignoruje
+//   KOLOMAPA_DOMENA, KOLOMAPA_PROHLIZEC   čte hlavně deploy/docker/nasadit.sh (doména pro Caddy/tunel, Chromium do
+//                               obrazu); Kolomapa doménu jen uvádí v hlášce o přihlášení
 //   KOLOMAPA_EVAL_DIR           data pro tools/eval-pricing.js (výchozí data/eval)
 //   LOG_LEVEL                   debug | info | warn | error | silent
 //
@@ -64,6 +69,7 @@
 
 const fs = require('node:fs');
 const path = require('node:path');
+const { teamDomain, parseEmailRules } = require('./server/cfaccess');
 
 const PROJECT_DIR = path.join(__dirname, '..');
 const ALL_SOURCES = ['bazos', 'sbazar', 'aukro', 'cyklobazar'];
@@ -87,6 +93,9 @@ const KNOWN_KEYS = new Set([
   'KOLOMAPA_PASSWORD',
   'KOLOMAPA_USERS',
   'KOLOMAPA_USERS_FILE',
+  'KOLOMAPA_CF_ACCESS_TEAM',
+  'KOLOMAPA_CF_ACCESS_AUD',
+  'KOLOMAPA_CF_ACCESS_EMAILS',
   'KOLOMAPA_USER_AGENT',
   'KOLOMAPA_SOURCES',
   'KOLOMAPA_SCHEDULE',
@@ -434,6 +443,26 @@ function loadConfig(env = process.env) {
   const logRaw = envStr(env.LOG_LEVEL);
   if (logRaw && !LOG_LEVELS.includes(logRaw.toLowerCase())) bad('LOG_LEVEL', logRaw, 'čekám debug, info, warn, error nebo silent', 'info');
 
+  // Cloudflare Access: tým + AUD = jen přihlášení přes Cloudflare. Cokoli z trojice bez zbytku je chyba nastavení –
+  // server pak nikoho nepustí (raději než by tiše přešel na heslo nebo na mapu bez přihlášení).
+  const cfTeamRaw = envStr(env.KOLOMAPA_CF_ACCESS_TEAM);
+  const cfAud = envStr(env.KOLOMAPA_CF_ACCESS_AUD);
+  const cfEmails = envStr(env.KOLOMAPA_CF_ACCESS_EMAILS);
+  let cfAccess = null;
+  if (cfTeamRaw || cfAud || cfEmails) {
+    const team = teamDomain(cfTeamRaw);
+    if (team && cfAud) cfAccess = { team, aud: cfAud, emails: cfEmails || '' };
+    else {
+      const missing = [!team ? (cfTeamRaw ? `KOLOMAPA_CF_ACCESS_TEAM („${shorten(cfTeamRaw, 40)}“ není tým)` : 'KOLOMAPA_CF_ACCESS_TEAM') : null, !cfAud ? 'KOLOMAPA_CF_ACCESS_AUD' : null].filter(Boolean);
+      const error = `Cloudflare Access není úplně nastavené – chybí ${missing.join(' a ')}. Kolomapa nikoho nepustí.`;
+      warnings.push(error);
+      cfAccess = { error };
+    }
+    if (cfAccess && !cfAccess.error && cfEmails && !parseEmailRules(cfEmails).length) {
+      warnings.push(`KOLOMAPA_CF_ACCESS_EMAILS=„${shorten(cfEmails, 40)}“ neobsahuje žádný e-mail ani doménu – rozhoduje jen politika v Cloudflare Access.`);
+    }
+  }
+
   const aiKey = envStr(env.ANTHROPIC_API_KEY);
   const config = {
     projectDir: PROJECT_DIR,
@@ -449,6 +478,8 @@ function loadConfig(env = process.env) {
     password: env.KOLOMAPA_PASSWORD != null && String(env.KOLOMAPA_PASSWORD) !== '' ? String(env.KOLOMAPA_PASSWORD) : null,
     users: parseUsers(env.KOLOMAPA_USERS),
     usersFile: envStr(env.KOLOMAPA_USERS_FILE) ? path.resolve(PROJECT_DIR, envStr(env.KOLOMAPA_USERS_FILE)) : null,
+    cfAccess,
+    domain: envStr(env.KOLOMAPA_DOMENA),
     userAgent: envStr(env.KOLOMAPA_USER_AGENT),
     sources,
     schedule,

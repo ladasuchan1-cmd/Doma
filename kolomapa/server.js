@@ -106,8 +106,20 @@ async function start(options = {}) {
     const port = typeof addr === 'object' && addr ? addr.port : config.port;
     const url = displayUrl(config.host, port);
     const users = config.users instanceof Map ? config.users.size : 0;
-    const authOn = !!(config.password || users || config.usersFile);
-    log.info(`Kolomapa běží na ${url}`, { db: config.dbFile, heslo: !!config.password, uzivatele: users, souborUzivatelu: config.usersFile || null });
+    const cf = config.cfAccess;
+    const authOn = !!(cf || config.password || users || config.usersFile);
+    if (cf && !cf.error) {
+      log.info(`Kolomapa běží na ${url} – přihlášení jen přes Cloudflare Access`, { db: config.dbFile, tym: cf.team, emaily: cf.emails || '(politika v Cloudflare)' });
+      // klíče týmu stáhnout hned – chyba (síť, překlep v týmu) je pak vidět v logu, ne až u prvního návštěvníka
+      app.accessVerifier?.refresh().then(
+        (n) => log.info(`Cloudflare Access: klíče týmu načteny (${n})`),
+        (e) => log.warn(`Cloudflare Access: klíče týmu ${cf.team} nejde stáhnout – ${e.message}`)
+      );
+    } else if (cf && cf.error) {
+      log.error(cf.error);
+    } else {
+      log.info(`Kolomapa běží na ${url}`, { db: config.dbFile, heslo: !!config.password, uzivatele: users, souborUzivatelu: config.usersFile || null });
+    }
     if (!authOn && config.host !== '127.0.0.1' && config.host !== 'localhost' && config.host !== '::1') {
       log.warn('Server naslouchá v síti bez hesla – nastavte KOLOMAPA_PASSWORD nebo KOLOMAPA_USERS.');
     }

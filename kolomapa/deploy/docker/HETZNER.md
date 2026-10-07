@@ -61,7 +61,8 @@ Změny v postupu nasazení patří do `nasadit.sh`, ne do workflow – skript po
 |---|---|
 | kód | `/root/Doma` (klon repozitáře, aplikace ve složce `kolomapa`) – při nasazení přes runner netřeba |
 | nastavení | `/root/kolomapa.env` (mimo git; při prvním nasazení vznikne – s náhodným heslem jen bez Cyklo & Ski mapy) |
-| přihlášení | jména a hesla Cyklo & Ski mapy: `/usr/local/sbin/kolomapa-uzivatele` → `/root/kolomapa-data/uzivatele.env` (cron každých 5 min) |
+| přihlášení | Cloudflare Access (jen `@koloshop.cz`): `KOLOMAPA_CF_ACCESS_*` v `/root/kolomapa.env`; bez něj jména a hesla Cyklo & Ski mapy (`/usr/local/sbin/kolomapa-uzivatele` → `/root/kolomapa-data/uzivatele.env`, cron každých 5 min) |
+| tunel | kontejner `kolomapa-tunel` (cloudflared), token v `/root/kolomapa-tunel.env` (600); Cloudflare → tunel → `kolomapa:8050` |
 | data | `/root/kolomapa-data` → `/app/data` v kontejneru (databáze; přežije přestavbu), zálohy v `zalohy/` |
 | kontejner | `kolomapa` z obrazu `kolomapa`, port 8050 |
 | vrátnice | Caddy Cyklo & Ski mapy (`deploy-caddy-1`) → `https://kolomapa.37-27-203-154.sslip.io`; blok `/config/sites/kolomapa.caddy` ve svazku `caddy_config` zapíše `nasadit.sh` |
@@ -79,7 +80,45 @@ Caddy jako služba systému (`/etc/caddy/Caddyfile`, Kolomapa publikuje jen `127
 caddy`). Když v Caddyfile je sdílený snippet `(header_sec)`, blok ho použije. Před načtením se konfigurace ověří a
 při chybě se vrátí původní. Na konci skript zkusí `https://<doména>` přes Caddy (čeká 401 = chce heslo).
 
-## Přihlášení – stejná jména a hesla jako Cyklo & Ski mapa
+## Přihlášení jen e-mailem Koloshopu (Cloudflare Access) – doporučeno
+
+Stejně jako `sales.ksprehledy.cz` a `projekty.ksprehledy.cz`: kdo otevře Kolomapu, přihlásí se u Cloudflare firemním
+e-mailem (tým Cloudflare Zero Trust `bold-dust-a2b5`), jinak se nedostane dál. Kolomapa jde ven **jen Cloudflare
+tunelem** – Caddy na serveru její doménu nezná, takže přímo na server (mimo Cloudflare) se nedá. A Kolomapa sama
+ověřuje podpis Cloudflare u každého požadavku: bez platného přihlášení pro e-mail `@koloshop.cz` vrátí 403, heslo ani
+jména Cyklo & Ski mapy už neplatí.
+
+V Cloudflare (dash.cloudflare.com → Zero Trust; názvy položek se mohou mírně lišit):
+
+1. **DNS** (ksprehledy.cz → DNS → Records): smažte záznam **A** `kolomapa` → `37.27.203.154` (nahradí ho tunel).
+2. **Tunel**: Networks → Tunnels → *Create a tunnel* → Cloudflared → jméno `kolomapa` → u instalace vyberte
+   *Docker* a zkopírujte celý zobrazený příkaz (`docker run … --token eyJ…`) – stačí si ho schovat, nespouštějte ho.
+   Dál → **Public hostname**: subdoména `kolomapa`, doména `ksprehledy.cz`, Service: **HTTP**, URL **`kolomapa:8050`** → Save.
+3. **Aplikace Access**: Access → Applications → *Add an application* → *Self-hosted* → jméno `Kolomapa`, doména
+   `kolomapa.ksprehledy.cz` → politika *Allow*, Include: **Emails ending in** `@koloshop.cz` (nebo stejná politika jako
+   u sales) → přihlašovací metoda stejná jako u ostatních aplikací → Save.
+4. **Na serveru** jeden příkaz (token = celý zkopírovaný příkaz z bodu 2 v uvozovkách, nebo jen část `eyJ…`):
+
+   ```bash
+   KOLOMAPA_CF_TUNEL_TOKEN='docker run cloudflare/cloudflared:latest tunnel --no-autoupdate run --token eyJ…' KOLOMAPA_CF_ACCESS_EMAILS=@koloshop.cz bash /root/Doma/kolomapa/deploy/docker/nasadit.sh
+   ```
+
+   Skript uloží token do `/root/kolomapa-tunel.env` (chmod 600, Kolomapa ho nevidí), spustí kontejner
+   `kolomapa-tunel` (cloudflared), sám zjistí tým a aplikaci z přesměrování na přihlášení a zapíše je do
+   `/root/kolomapa.env` (`KOLOMAPA_CF_ACCESS_TEAM`, `_AUD`, `_EMAILS`), z Caddy odebere doménu Kolomapy a na konci
+   ověří: `zvenku: https://kolomapa.ksprehledy.cz chce přihlášení Cloudflare Access` a `přímo na server mimo
+   Cloudflare: nedostupné`. Další nasazení už jen `bash …/nasadit.sh` – tunel i Access zůstávají.
+
+V mapě je pak vpravo nahoře přihlášený e-mail a **Odhlásit**. Odebrat přístup = upravit politiku v Cloudflare Access
+(platí okamžitě po vypršení přihlášení, výchozí 24 h). Zpět na heslo: v `/root/kolomapa.env` smazat řádky
+`KOLOMAPA_CF_ACCESS_*`, smazat `/root/kolomapa-tunel.env`, `docker rm -f kolomapa-tunel`, vrátit záznam A a
+`nasadit.sh`.
+
+Proč tunel a ne jen oranžový mráček u záznamu A: za proxy Cloudflare by Caddy neuměla obnovit certifikát Let's Encrypt
+(za ~2 měsíce by web spadl na chybu 526) a server by zůstal dostupný i přímo přes IP. Kdo přesto zvolí mráček, stačí
+bez tokenu tunelu: `KOLOMAPA_CF_ACCESS_EMAILS=@koloshop.cz bash …/nasadit.sh` – ověřování v Kolomapě funguje stejně.
+
+## Přihlášení – stejná jména a hesla jako Cyklo & Ski mapa (bez Cloudflare Access)
 
 Cyklo & Ski mapa má uživatele v `CSM_USERS=jmeno:heslo;…` v `/opt/Doma/cyklo-ski-mapa/deploy/.env` (plní se z GitHubu,
 secret `HETZNER_USERS`, při každém jejím nasazení). Kolomapa používá tentýž seznam: `nasadit.sh` založí skript
@@ -121,6 +160,7 @@ Formát `docker --env-file`: `KLÍČ=hodnota` bez uvozovek, `#` komentář. Po z
 |---|---|
 | `KOLOMAPA_PASSWORD` | společné heslo do mapy (jméno libovolné); bez Cyklo & Ski mapy povinné, s ní volitelné |
 | `KOLOMAPA_USERS` | vlastní uživatelé `jana:heslo;petr:heslo2` místo seznamu Cyklo & Ski mapy |
+| `KOLOMAPA_CF_ACCESS_TEAM`, `_AUD`, `_EMAILS` | přihlášení jen přes Cloudflare Access (tým, AUD tag aplikace, povolené e-maily `@koloshop.cz`); zapisuje `nasadit.sh` |
 | `KOLOMAPA_DOMENA` | adresa mapy (výchozí `kolomapa.<IP-s-pomlčkami>.sslip.io`) |
 | `KOLOMAPA_SOURCES` | weby (výchozí `bazos`; ostatní viz README – Zdroje, šetrnost a pravidla) |
 | `KOLOMAPA_PROHLIZEC` | `1` = do obrazu se přidá Chromium pro Cyklobazar (~400 MB; jen s `cyklobazar` v `KOLOMAPA_SOURCES`) |
@@ -160,6 +200,11 @@ z logů. Nic nemění.
 | mapa prázdná | první stahování ještě běží (stav nahoře v mapě, `docker logs kolomapa`) |
 | mapa prázdná, ale inzeráty v databázi jsou (kraje 0) | běh byl přerušen před závěrečným zpracováním (např. nasazením uprostřed stahování): `docker exec kolomapa node tools/run.js --process-only` doplní polohu a nacenění bez stahování (pár minut). Kraj se jinak doplňuje průběžně po každém tisíci inzerátů. |
 | stav v mapě hlásí „Stahuje jiný proces“, ale nic neběží | zámek po zabitém procesu: `rm -f /root/kolomapa-data/kolomapa.db.run-lock` (nasazení ho maže samo, server ho při startu pozná a smaže) |
+| „Kolomapa je přístupná jen po přihlášení firemním e-mailem přes Cloudflare Access“ | požadavek nešel přes Cloudflare Access (přímo na server / tunel bez aplikace Access) – otevřete https://kolomapa.ksprehledy.cz |
+| „Přístup odepřen: e-mail … nemá do Kolomapy přístup“ | přihlášení jiným než `@koloshop.cz` e-mailem – Odhlásit a přihlásit se firemním |
+| „Přihlášení teď nejde ověřit“ (503) | server nestáhne klíče týmu z `bold-dust-a2b5.cloudflareaccess.com` (síť) – `docker logs kolomapa \| grep Access` |
+| `nasadit.sh`: „Cloudflare Access pro … nevidím“ | aplikace v Cloudflare Access ještě není, nebo doména nejde přes Cloudflare (tunel / mráček) |
+| `nasadit.sh`: „tunel se do 25 s nepřipojil“ | špatný nebo zrušený token tunelu – nový z Cloudflare (Tunnels → kolomapa → Configure) a znovu s `KOLOMAPA_CF_TUNEL_TOKEN` |
 | jméno z Cyklo & Ski mapy se nepřihlásí | `cat /root/kolomapa-data/uzivatele.env` má být opis `CSM_USERS` z `/opt/Doma/cyklo-ski-mapa/deploy/.env`; jinak `/usr/local/sbin/kolomapa-uzivatele` a `docker logs kolomapa \| grep -i uživatel`; v `/root/kolomapa.env` nesmí být vlastní `KOLOMAPA_USERS` |
 
 ## Rollback

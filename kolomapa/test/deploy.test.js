@@ -98,7 +98,19 @@ test('docker: nasadit.sh je platný bash, nasazuje jen s heslem a šablona .env 
   assert.doesNotMatch(s, /-p "\$PORT:|-p 0\.0\.0\.0|-p "\$\{?PORT\}?:/);
   assert.match(s, /sslip\.io/, 'výchozí adresa bez vlastní DNS');
   // vlastní doména: KOLOMAPA_DOMENA=… bash nasadit.sh se zapíše do nastavení a původní adresa (sslip.io) přesměrovává
-  assert.match(s, /sed -i "s\|\^KOLOMAPA_DOMENA=\.\*\|KOLOMAPA_DOMENA=\$KOLOMAPA_DOMENA\|" "\$ENV_SOUBOR"/);
+  assert.match(s, /uloz_hodnotu KOLOMAPA_DOMENA "\$KOLOMAPA_DOMENA"/);
+  // Cloudflare Access + tunel: token tunelu jen v souboru 600 (ne v nastavení Kolomapy), Kolomapa ven jen tunelem
+  // (Caddy pro doménu nic), tým a AUD z přesměrování na přihlášení Access, bez hesla jen s Access / uživateli
+  assert.match(s, /^TUNEL_ENV="\$\{KOLOMAPA_TUNEL_ENV:-\/root\/kolomapa-tunel\.env\}"/m);
+  assert.match(s, /umask 077 && printf .*TUNNEL_TOKEN=%s/);
+  assert.match(s, /chmod 600 "\$TUNEL_ENV"/);
+  assert.match(s, /--env-file "\$TUNEL_ENV" "\$TUNEL_IMAGE" tunnel --no-autoupdate run/);
+  assert.match(s, /\[\[ -n "\$TUNEL_ZAP" \]\] && BLOK=""/);
+  assert.match(s, /cloudflareaccess\\\.com\/cdn-cgi\/access\/login\/\[\^\?\]\*\\\?\(\.\*&\)\?kid=/);
+  assert.match(s, /uloz_hodnotu "KOLOMAPA_CF_ACCESS_\$k" "\$v"/);
+  assert.match(s, /^  UZIVATELE=access/m);
+  // stará verze Caddyfile v kontejneru (soubor na disku vyměněný) → restart Caddy
+  assert.match(s, /docker exec "\$CADDY" grep -qxF "\$IMPORT_RADEK" "\$CADDY_CONFIG"[^\n]*\n[^\n]*\n\s+docker restart "\$CADDY"/);
   assert.match(s, /redir https:\/\/\$DOMENA\{uri\} permanent/);
   assert.match(s, /"\$BLOK\$PRESMEROVANI"/);
   assert.match(s, /--network "\$SIT"/);
@@ -110,7 +122,8 @@ test('docker: nasadit.sh je platný bash, nasazuje jen s heslem a šablona .env 
   assert.match(s, /caddy validate --config/, 'Caddyfile se před reloadem ověří');
   assert.doesNotMatch(s, /caddy reload --config "\$CADDY_CONFIG" >\/dev\/null 2>&1 \|\| true/, 'selhání reloadu se nesmí ignorovat');
   assert.match(s, /localhost:2019\/config\/apps\/http\/servers/, 'po reloadu se ověří, že běžící konfigurace doménu zná');
-  assert.match(s, /^if \[\[ "\$\{1:-\}" == "--stav" \]\]; then$/m, 'nasadit.sh --stav');
+  assert.match(s, /^STAV=""; \[\[ "\$\{1:-\}" == "--stav" \]\] && STAV=1$/m, 'nasadit.sh --stav');
+  assert.match(s, /^if \[\[ -n "\$STAV" \]\]; then$/m);
   assert.match(s, /chmod 600 "\$ENV_SOUBOR"/);
   // Caddy ze stacku Cyklo & Ski mapy (deploy-caddy-1): kontejner podle obrazu, ne jen podle jména „caddy“; její
   // Caddyfile je v git klonu, proto blok do svazku caddy_config (/config/sites/kolomapa.caddy) + řádek import,

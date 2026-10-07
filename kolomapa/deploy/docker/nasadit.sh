@@ -32,6 +32,14 @@
 #   b) jako služba systému (/etc/caddy/Caddyfile): Kolomapa publikuje 127.0.0.1:8050, blok
 #      „reverse_proxy 127.0.0.1:8050“, systemctl reload caddy;
 #   c) jinak blok jen vypíše (přidáte ručně).
+#
+# Přihlášení jen e-mailem Koloshopu (Cloudflare Access, jako sales/projekty.ksprehledy.cz) – postup v HETZNER.md:
+#   KOLOMAPA_CF_TUNEL_TOKEN=eyJ… KOLOMAPA_CF_ACCESS_EMAILS=@koloshop.cz bash nasadit.sh
+#   - tunel: kontejner „kolomapa-tunel“ (cloudflared) na stejné Docker síti; Kolomapa jde ven JEN tunelem, Caddy pro
+#     její doménu nic neobsluhuje (přímý přístup na server mimo Cloudflare neexistuje); token v /root/kolomapa-tunel.env,
+#   - Access: tým a AUD aplikace skript zjistí sám z přesměrování https://<doména> na přihlášení Cloudflare (nebo
+#     KOLOMAPA_CF_ACCESS_TEAM / _AUD) a zapíše je do /root/kolomapa.env; Kolomapa pak pustí jen požadavek s platným
+#     podepsaným tokenem Cloudflare Access pro povolený e-mail – heslo ani jména Cyklo & Ski mapy se nepoužívají.
 # Když cokoli selže (stavba, testy v obrazu, Caddy), starý kontejner běží dál.
 set -euo pipefail
 
@@ -51,6 +59,10 @@ CSM_ENV="${CSM_ENV:-}"                         # .env Cyklo & Ski mapy (CSM_USER
 UZIVATELE_SKRIPT="${KOLOMAPA_UZIVATELE_SKRIPT:-/usr/local/sbin/kolomapa-uzivatele}"
 UZIVATELE_CRON="${KOLOMAPA_UZIVATELE_CRON:-/etc/cron.d/kolomapa-uzivatele}"
 UZIVATELE_SOUBOR=uzivatele.env                 # v $DATA → /app/data/uzivatele.env v kontejneru (KOLOMAPA_USERS_FILE)
+TUNEL=kolomapa-tunel                           # kontejner cloudflared (Cloudflare tunel), jen s tokenem tunelu
+TUNEL_ENV="${KOLOMAPA_TUNEL_ENV:-/root/kolomapa-tunel.env}"   # TUNNEL_TOKEN=… (chmod 600; Kolomapa ho nevidí)
+TUNEL_IMAGE="${KOLOMAPA_TUNEL_IMAGE:-cloudflare/cloudflared:latest}"
+STAV=""; [[ "${1:-}" == "--stav" ]] && STAV=1
 
 say() { printf '\n\033[1m→ %s\033[0m\n' "$*"; }
 die() { printf '\nCHYBA: %s\n' "$*" >&2; exit 1; }
@@ -181,6 +193,8 @@ KOLOMAPA_DOMENA=${KOLOMAPA_DOMENA:-$(vychozi_domena)}
 KOLOMAPA_PASSWORD=$NOVE_HESLO
 # Vlastní seznam místo Cyklo & Ski mapy (pak se nic neopisuje): jana:heslo;petr:heslo2
 #KOLOMAPA_USERS=
+# Jen firemní e-maily přes Cloudflare Access (pak heslo ani jména neplatí) – zapíná nasadit.sh, viz HETZNER.md:
+#KOLOMAPA_CF_ACCESS_EMAILS=@koloshop.cz
 
 # Čas denního stahování (pražský čas):
 #KOLOMAPA_SCHEDULE=05:30
@@ -197,28 +211,86 @@ EOF
   chmod 600 "$ENV_SOUBOR"
 fi
 hodnota() { sed -n "s/^$1=//p" "$ENV_SOUBOR" | tail -1 | tr -d '\r'; }
+uloz_hodnotu() {   # KLÍČ HODNOTA → /root/kolomapa.env (přepíše řádek, nebo připíše)
+  local v="${2//\\/\\\\}"; v="${v//&/\\&}"; v="${v//|/\\|}"
+  if grep -q "^$1=" "$ENV_SOUBOR"; then sed -i "s|^$1=.*|$1=$v|" "$ENV_SOUBOR"; else printf '\n%s=%s\n' "$1" "$2" >>"$ENV_SOUBOR"; fi
+}
 DOMENA="${KOLOMAPA_DOMENA:-$(hodnota KOLOMAPA_DOMENA)}"
 DOMENA="${DOMENA:-$VYCHOZI_DOMENA}"
 PROHLIZEC="${KOLOMAPA_PROHLIZEC:-$(hodnota KOLOMAPA_PROHLIZEC)}"
 [[ -n "$DOMENA" ]] || die "nenašel jsem veřejnou IP adresu serveru – zadejte doménu: KOLOMAPA_DOMENA=mapa.vase-domena.cz bash nasadit.sh"
 [[ "$DOMENA" =~ ^[A-Za-z0-9]([A-Za-z0-9-]*[A-Za-z0-9])?(\.[A-Za-z0-9]([A-Za-z0-9-]*[A-Za-z0-9])?)+$ ]] || die "KOLOMAPA_DOMENA=„$DOMENA“ nevypadá jako doména"
 # Doména zadaná proměnnou (KOLOMAPA_DOMENA=… bash nasadit.sh) se zapíše do nastavení, aby platila i pro příští nasazení.
-if [[ -n "${KOLOMAPA_DOMENA:-}" && "$(hodnota KOLOMAPA_DOMENA)" != "$KOLOMAPA_DOMENA" ]]; then
+if [[ -z "$STAV" && -n "${KOLOMAPA_DOMENA:-}" && "$(hodnota KOLOMAPA_DOMENA)" != "$KOLOMAPA_DOMENA" ]]; then
   say "Doména $KOLOMAPA_DOMENA → zapisuji do $ENV_SOUBOR"
-  if grep -q '^KOLOMAPA_DOMENA=' "$ENV_SOUBOR"; then sed -i "s|^KOLOMAPA_DOMENA=.*|KOLOMAPA_DOMENA=$KOLOMAPA_DOMENA|" "$ENV_SOUBOR"
-  else printf '\nKOLOMAPA_DOMENA=%s\n' "$KOLOMAPA_DOMENA" >>"$ENV_SOUBOR"; fi
+  uloz_hodnotu KOLOMAPA_DOMENA "$KOLOMAPA_DOMENA"
 fi
-if grep -qE '^KOLOMAPA_USERS(_FILE)?=.' "$ENV_SOUBOR"; then UZIVATELE=vlastni; fi
+
+# --- Cloudflare Access + tunel (přihlášení jen e-mailem Koloshopu) ------------------------------------------------
+# Tým a AUD aplikace jsou vidět v přesměrování na přihlášení: https://<tým>.cloudflareaccess.com/cdn-cgi/access/login/
+# <doména>?kid=<AUD>&… – Cloudflare ho pošle každému, kdo doménu otevře bez přihlášení (Access stojí před tunelem
+# i před serverem, takže to funguje, i když tunel ještě neběží).
+zjisti_access() {
+  local loc re='^https://([a-z0-9-]+)\.cloudflareaccess\.com/cdn-cgi/access/login/[^?]*\?(.*&)?kid=([0-9a-fA-F]{16,128})(&|$)'
+  loc="$(curl -s -o /dev/null -m 15 -w '%{redirect_url}' "https://$DOMENA/" 2>/dev/null || true)"
+  if [[ "$loc" =~ $re ]]; then
+    CF_TEAM="${CF_TEAM:-${BASH_REMATCH[1]}}"
+    CF_AUD="${CF_AUD:-${BASH_REMATCH[3]}}"
+    return 0
+  fi
+  echo "   https://$DOMENA nepřesměrovává na přihlášení Cloudflare Access (${loc:-žádné přesměrování})"
+  return 1
+}
+CF_TEAM="${KOLOMAPA_CF_ACCESS_TEAM:-$(hodnota KOLOMAPA_CF_ACCESS_TEAM)}"
+CF_AUD="${KOLOMAPA_CF_ACCESS_AUD:-$(hodnota KOLOMAPA_CF_ACCESS_AUD)}"
+CF_EMAILS="${KOLOMAPA_CF_ACCESS_EMAILS:-$(hodnota KOLOMAPA_CF_ACCESS_EMAILS)}"
+TUNEL_TOKEN_NOVY=""
+if [[ -n "${KOLOMAPA_CF_TUNEL_TOKEN:-}" ]]; then
+  # stačí token, ale vloží-li se celý příkaz z Cloudflare („docker run … --token eyJ…“), token se z něj vybere
+  TUNEL_TOKEN_NOVY="$(grep -oE 'eyJ[A-Za-z0-9_=+/-]{40,}' <<<"$KOLOMAPA_CF_TUNEL_TOKEN" | head -1 || true)"
+  [[ -n "$TUNEL_TOKEN_NOVY" ]] || die "KOLOMAPA_CF_TUNEL_TOKEN nevypadá jako token tunelu (začíná eyJ…) – zkopírujte ho z příkazu, který Cloudflare u tunelu ukáže (záložka Docker)"
+fi
+TUNEL_ZAP=""; [[ -n "$TUNEL_TOKEN_NOVY" || -f "$TUNEL_ENV" ]] && TUNEL_ZAP=1
+ACCESS=""
+if [[ -n "$CF_TEAM$CF_AUD$CF_EMAILS" ]]; then
+  ACCESS=1
+  if [[ -z "$STAV" ]]; then
+    if [[ -z "$CF_TEAM" || -z "$CF_AUD" ]]; then
+      say "Cloudflare Access: zjišťuji tým a aplikaci z přihlašovací stránky https://$DOMENA"
+      zjisti_access || die "Cloudflare Access pro $DOMENA nevidím. Založte v Cloudflare Zero Trust aplikaci (Access → Applications → Self-hosted, doména $DOMENA, politika: e-maily končící na ${CF_EMAILS:-@koloshop.cz}) a doménu veďte přes Cloudflare (tunel nebo oranžový mráček) – postup v HETZNER.md. Nebo zadejte KOLOMAPA_CF_ACCESS_TEAM a KOLOMAPA_CF_ACCESS_AUD ručně."
+      echo "   tým: $CF_TEAM, AUD aplikace: $CF_AUD"
+    fi
+    [[ "$CF_TEAM" =~ ^[A-Za-z0-9.-]+$ && "$CF_AUD" =~ ^[A-Za-z0-9,-]+$ ]] || die "KOLOMAPA_CF_ACCESS_TEAM / _AUD vypadají divně („$CF_TEAM“, „$CF_AUD“)"
+    for k in TEAM AUD EMAILS; do
+      v="CF_$k"; v="${!v}"
+      if [[ -n "$v" && "$(hodnota "KOLOMAPA_CF_ACCESS_$k")" != "$v" ]]; then uloz_hodnotu "KOLOMAPA_CF_ACCESS_$k" "$v"; ZAPSANO_ACCESS=1; fi
+    done
+    [[ -n "${ZAPSANO_ACCESS:-}" ]] && echo "   Cloudflare Access zapsané do $ENV_SOUBOR (tým $CF_TEAM${CF_EMAILS:+, e-maily $CF_EMAILS})"
+  fi
+  UZIVATELE=access   # heslo ani jména Cyklo & Ski mapy se nepoužívají
+fi
+if [[ -z "$ACCESS" ]] && grep -qE '^KOLOMAPA_USERS(_FILE)?=.' "$ENV_SOUBOR"; then UZIVATELE=vlastni; fi
 [[ -n "$UZIVATELE" ]] || grep -q '^KOLOMAPA_PASSWORD=.\+' "$ENV_SOUBOR" || die "v $ENV_SOUBOR chybí KOLOMAPA_PASSWORD (a na serveru není Cyklo & Ski mapa s uživateli) – mapa na internetu musí mít heslo"
 HESLO_TAKE="$(hodnota KOLOMAPA_PASSWORD)"
 
 # --- Jen stav (--stav) ------------------------------------------------------------------------------------------
 # Co potřebuje vidět člověk, když se mapa neotevře: běží kontejner? zná Caddy doménu? je řádek import i blok tam, kde
 # je Caddy čte? má certifikát? co říká log? Nic nemění.
-if [[ "${1:-}" == "--stav" ]]; then
+if [[ -n "$STAV" ]]; then
   say "Stav Kolomapy na tomto serveru"
   echo "Kontejner:    $(docker ps -a --filter "name=^$APP\$" --format '{{.Status}}, obraz {{.Image}}' | head -1)"
   echo "Doména:       $DOMENA${VYCHOZI_DOMENA:+   (adresa podle IP: $VYCHOZI_DOMENA)}"
+  if [[ -n "$ACCESS" ]]; then
+    echo "Přihlášení:   Cloudflare Access – tým ${CF_TEAM:-?}, AUD ${CF_AUD:0:12}${CF_AUD:+…}, e-maily ${CF_EMAILS:-(jen politika v Cloudflare)}"
+  else
+    echo "Přihlášení:   heslo / jména (Cloudflare Access není zapnutý)"
+  fi
+  if [[ -n "$TUNEL_ZAP" ]]; then
+    echo "Tunel:        $TUNEL – $(docker ps -a --filter "name=^$TUNEL\$" --format '{{.Status}}' | head -1), spojení: $(docker logs "$TUNEL" 2>&1 | grep -c 'Registered tunnel connection' || true)"
+  else
+    echo "Tunel:        není ($TUNEL_ENV chybí)"
+  fi
+  echo "Zvenku:       https://$DOMENA → $(curl -s -o /dev/null -m 10 -w '%{http_code} %{redirect_url}' "https://$DOMENA/" 2>/dev/null | cut -c1-110 || true)"
   echo "Caddy:        $REZIM${CADDY:+ – kontejner $CADDY, $(docker ps --filter "name=^$CADDY\$" --format '{{.Status}}' | head -1)}"
   if [[ -n "${CADDYFILE:-}" && -f "$CADDYFILE" ]]; then
     IMPORT_JE=NE; grep -qxF "$IMPORT_RADEK" "$CADDYFILE" && IMPORT_JE=ano
@@ -310,6 +382,31 @@ docker run -d \
   "${ENV_NAVIC[@]}" \
   "$IMAGE" >/dev/null
 
+# --- Cloudflare tunel ------------------------------------------------------------------------------------------
+# cloudflared na stejné Docker síti: Cloudflare (po přihlášení přes Access) → tunel → http://kolomapa:8050. V Cloudflare
+# u tunelu „Public hostname“: doména Kolomapy → služba HTTP, URL kolomapa:8050. Token jen v $TUNEL_ENV (chmod 600).
+if [[ -n "$TUNEL_ZAP" ]]; then
+  if [[ -n "$TUNEL_TOKEN_NOVY" ]]; then
+    (umask 077 && printf '# Token Cloudflare tunelu Kolomapy (zapsal nasadit.sh) – tajné, necommitovat\nTUNNEL_TOKEN=%s\n' "$TUNEL_TOKEN_NOVY" >"$TUNEL_ENV")
+    chmod 600 "$TUNEL_ENV"
+  fi
+  say "Cloudflare tunel ($TUNEL → http://$APP:$PORT)"
+  docker pull -q "$TUNEL_IMAGE" >/dev/null 2>&1 || echo "   VAROVÁNÍ: obraz $TUNEL_IMAGE nejde stáhnout – použiji uložený"
+  docker rm -f "$TUNEL" >/dev/null 2>&1 || true
+  docker run -d --name "$TUNEL" --restart unless-stopped --network "$SIT" --env-file "$TUNEL_ENV" "$TUNEL_IMAGE" tunnel --no-autoupdate run >/dev/null
+  TUNEL_OK=""
+  for _ in $(seq 1 25); do
+    if docker logs "$TUNEL" 2>&1 | grep -q 'Registered tunnel connection'; then TUNEL_OK=1; break; fi
+    sleep 1
+  done
+  if [[ -n "$TUNEL_OK" ]]; then
+    echo "   tunel připojený k Cloudflare"
+  else
+    echo "   VAROVÁNÍ: tunel se do 25 s nepřipojil (špatný token? síť?) – poslední řádky logu ($TUNEL):"
+    docker logs --tail 8 "$TUNEL" 2>&1 | cut -c1-200 | sed 's/^/   /'
+  fi
+fi
+
 # --- Caddy -------------------------------------------------------------------------------------------------------
 BLOK="# Kolomapa – mapa inzerátů kol (blok přidal kolomapa/deploy/docker/nasadit.sh)
 $DOMENA {
@@ -319,6 +416,8 @@ $DOMENA {
 # bezpečnostní hlavičky sdílené s ostatními aplikacemi (snippet header_sec), když v Caddyfile jsou
 if [[ -f "$CADDYFILE" ]] && grep -q '^(header_sec)' "$CADDYFILE"; then BLOK="${BLOK/reverse_proxy/import header_sec
     reverse_proxy}"; fi
+# S tunelem jde Kolomapa ven jen přes Cloudflare – Caddy pro její doménu nic neobsluhuje (žádný přímý přístup na server).
+[[ -n "$TUNEL_ZAP" ]] && BLOK=""
 # Vlastní doména: původní adresa podle IP (sslip.io) přesměrovává na ni, aby staré odkazy a záložky fungovaly dál.
 PRESMEROVANI=""
 if [[ -n "$VYCHOZI_DOMENA" && "$DOMENA" != "$VYCHOZI_DOMENA" ]]; then
@@ -338,7 +437,7 @@ caddy_docker_nacti() {   # ověřit a načíst konfiguraci běžícího kontejne
   # Opravdu běžící konfigurace zná doménu? (admin API Caddy; chybí-li řádek import, reload „projde“, ale blok se nenačte)
   local konf
   konf="$(docker exec "$CADDY" sh -c 'wget -qO- http://localhost:2019/config/apps/http/servers 2>/dev/null' 2>/dev/null || true)"
-  if [[ -n "$konf" && "$konf" != *"\"$DOMENA\""* ]]; then
+  if [[ -z "$TUNEL_ZAP" && -n "$konf" && "$konf" != *"\"$DOMENA\""* ]]; then
     echo "   VAROVÁNÍ: Caddy načetla konfiguraci, ale $DOMENA v ní není – Caddy blok nečte (řádek „$IMPORT_RADEK“ v $CADDYFILE?). Stav: bash $SKRIPT --stav"
   fi
 }
@@ -375,7 +474,13 @@ caddyfile_git_srovnat() {   # $1 Caddyfile, $2 klon
   echo "          GitHubu ve větvi $vetev (sloučení větve Kolomapy)."
 }
 
-if [[ ! -f "$CADDYFILE" ]]; then
+if [[ -n "$TUNEL_ZAP" && "$ZPUSOB" != sites ]]; then
+  # Caddy s bloky přímo v Caddyfile: nic nepřidávat; zbylý blok pro doménu by pouštěl na Kolomapu i mimo Cloudflare
+  # (přihlášení by stejně chtělo token Cloudflare Access, ale čistší je ho smazat).
+  if [[ -f "$CADDYFILE" ]] && grep -qE "^[[:space:]]*$DOMENA([[:space:],{]|$)" "$CADDYFILE"; then
+    echo "POZOR: $CADDYFILE má blok pro $DOMENA – s tunelem ho smažte a Caddy načtěte znovu."
+  fi
+elif [[ ! -f "$CADDYFILE" ]]; then
   echo "VAROVÁNÍ: $CADDYFILE neexistuje – do své konfigurace Caddy přidejte ručně:"
   printf '%s\n' "$BLOK"
 elif grep -qE "^[[:space:]]*$DOMENA([[:space:],{]|$)" "$CADDYFILE"; then
@@ -384,7 +489,11 @@ elif [[ "$ZPUSOB" == sites ]]; then
   # Caddyfile je v git klonu (Cyklo & Ski mapa) – blok nejde dovnitř, ale do svazku caddy_config: /config/sites/kolomapa.caddy.
   # V Caddyfile musí být řádek „import /config/sites/*.caddy“ (v repozitáři je; starší klon ho dostane tady).
   SOUBOR="$CADDY_SITES/$APP.caddy"
-  say "Caddy: zapisuji blok pro $DOMENA do $SOUBOR v kontejneru $CADDY"
+  if [[ -n "$TUNEL_ZAP" ]]; then
+    say "Caddy: Kolomapa jde ven tunelem – $DOMENA v Caddy není${PRESMEROVANI:+; v $SOUBOR jen přesměrování z $VYCHOZI_DOMENA}"
+  else
+    say "Caddy: zapisuji blok pro $DOMENA do $SOUBOR v kontejneru $CADDY"
+  fi
   PUVODNI="$(docker exec "$CADDY" cat "$SOUBOR" 2>/dev/null || true)"
   PUVODNI_CADDYFILE=""   # záloha jen v paměti – soubor .zaloha by v git klonu vadil (hetzner.sh: necommitnuté změny)
   if ! grep -qxF "$IMPORT_RADEK" "$CADDYFILE"; then
@@ -393,7 +502,18 @@ elif [[ "$ZPUSOB" == sites ]]; then
     # >> drží stejný soubor (inode) – kontejner caddy ho má připojený, nový soubor by neviděl
     printf '\n%s\n%s\n' "$IMPORT_KOMENTAR" "$IMPORT_RADEK" >>"$CADDYFILE"
   fi
-  printf '%s\n' "$BLOK$PRESMEROVANI" | docker exec -i "$CADDY" sh -c "mkdir -p '$CADDY_SITES' && cat >'$SOUBOR'"
+  # Kontejner Caddy čte starou verzi Caddyfile, když se soubor na disku vyměnil (git checkout = nový soubor; připojený
+  # jednotlivý soubor zůstává v kontejneru starý) – pak import nevidí a Kolomapu nezná. Restart ho připojí znovu.
+  if ! docker exec "$CADDY" grep -qxF "$IMPORT_RADEK" "$CADDY_CONFIG" >/dev/null 2>&1; then
+    echo "   kontejner $CADDY čte starou verzi $CADDYFILE (bez řádku import) → restartuji Caddy (pár sekund výpadek webů na ní)"
+    docker restart "$CADDY" >/dev/null
+    for _ in $(seq 1 20); do docker exec "$CADDY" grep -qxF "$IMPORT_RADEK" "$CADDY_CONFIG" >/dev/null 2>&1 && break; sleep 1; done
+  fi
+  if [[ -n "$BLOK$PRESMEROVANI" ]]; then
+    printf '%s\n' "$BLOK$PRESMEROVANI" | docker exec -i "$CADDY" sh -c "mkdir -p '$CADDY_SITES' && cat >'$SOUBOR'"
+  else
+    docker exec "$CADDY" rm -f "$SOUBOR"
+  fi
   if caddy_docker_nacti; then
     echo "   Caddy načetla novou konfiguraci"
   else
@@ -453,7 +573,21 @@ say "Čekám, až Kolomapa odpoví"
 for i in $(seq 1 30); do
   if docker exec "$APP" node -e "fetch('http://127.0.0.1:$PORT/api/run').then((r) => process.exit(r.status < 500 ? 0 : 1)).catch(() => process.exit(1))" 2>/dev/null; then
     echo "   odpovídá (pokus $i): $(docker ps --filter "name=^$APP\$" --format '{{.Status}}')"
-    if ! getent ahosts "$DOMENA" >/dev/null 2>&1; then
+    if [[ -n "$ACCESS" ]] && command -v curl >/dev/null; then
+      # Zvenku (přes Cloudflare): bez přihlášení přesměrování na přihlášení Access. Přímo na server (mimo Cloudflare):
+      # buď nic (tunel – Caddy doménu nezná), nebo 403 od Kolomapy (bez tokenu Cloudflare nic).
+      ZVENKU="$(curl -s -o /dev/null -m 15 -w '%{http_code} %{redirect_url}' "https://$DOMENA/" 2>/dev/null || true)"
+      case "$ZVENKU" in
+        30?\ https://*.cloudflareaccess.com/*) echo "   zvenku: https://$DOMENA chce přihlášení Cloudflare Access" ;;
+        *) CO="oranžový mráček u DNS záznamu"; [[ -n "$TUNEL_ZAP" ]] && CO="Public hostname tunelu ($DOMENA → HTTP kolomapa:$PORT)"
+           echo "   POZOR: https://$DOMENA nepřesměrovává na přihlášení Cloudflare Access (odpověď: ${ZVENKU% }) – zkontrolujte aplikaci v Cloudflare Access a $CO" ;;
+      esac
+      PRIMO="$(curl -sk -o /dev/null -m 10 -w '%{http_code}' --resolve "$DOMENA:443:127.0.0.1" "https://$DOMENA/data/summary.json" 2>/dev/null || true)"
+      case "${PRIMO:-000}" in
+        000|403|421) echo "   přímo na server mimo Cloudflare: ${PRIMO/000/nedostupné} – bez přihlášení Cloudflare nic" ;;
+        *) echo "   POZOR: přímo na server mimo Cloudflare vrací $PRIMO – Kolomapa má odpovídat 403" ;;
+      esac
+    elif ! getent ahosts "$DOMENA" >/dev/null 2>&1; then
       echo
       echo "POZOR: doména $DOMENA se zatím nepřekládá – u správce domény přidejte záznam A na IP tohoto serveru."
       echo "       Certifikát HTTPS si Caddy vyřídí sama, jakmile se DNS projeví."
@@ -477,16 +611,18 @@ for i in $(seq 1 30); do
     echo
     echo "Mapa:       https://$DOMENA${PRESMEROVANI:+   (https://$VYCHOZI_DOMENA přesměrovává sem)}"
     case "$UZIVATELE" in
+      access)  echo "Přihlášení: jen Cloudflare Access (tým $CF_TEAM${CF_EMAILS:+, e-maily $CF_EMAILS}) – heslo ani jména se nepoužívají" ;;
       csm)     echo "Přihlášení: jména a hesla z Cyklo & Ski mapy ($CSM_ENV)${HESLO_TAKE:+; navíc KOLOMAPA_PASSWORD z $ENV_SOUBOR s libovolným jménem}" ;;
       vlastni) echo "Přihlášení: podle KOLOMAPA_USERS / KOLOMAPA_USERS_FILE v $ENV_SOUBOR${HESLO_TAKE:+ (+ KOLOMAPA_PASSWORD, jméno libovolné)}" ;;
       *)       echo "Přihlášení: jméno libovolné, heslo KOLOMAPA_PASSWORD v $ENV_SOUBOR" ;;
     esac
-    case "$REZIM" in
+    if [[ -n "$TUNEL_ZAP" ]]; then echo "Vrátnice:   Cloudflare tunel $TUNEL → http://$APP:$PORT (Caddy pro $DOMENA nic neobsluhuje)"
+    else case "$REZIM" in
       docker) if [[ "$ZPUSOB" == sites ]]; then echo "Vrátnice:   Caddy v kontejneru $CADDY → $CIL (blok $CADDY_SITES/$APP.caddy, import v $CADDYFILE)"
               else echo "Vrátnice:   Caddy v kontejneru $CADDY → $CIL (blok v $CADDYFILE)"; fi ;;
       system) echo "Vrátnice:   Caddy jako služba ($CADDYFILE) → $CIL" ;;
       *)      echo "Vrátnice:   ŽÁDNÁ – Caddy nenalezena, https://$DOMENA se neotevře (viz VAROVÁNÍ výše)" ;;
-    esac
+    esac; fi
     [[ -n "$NOVE_HESLO" ]] && echo "Nové heslo: $NOVE_HESLO"
     echo "Log:        docker logs -f $APP        Stav: docker ps --filter name=$APP"
     echo "Nastavení:  $ENV_SOUBOR  (po změně znovu spustit nasadit.sh)"

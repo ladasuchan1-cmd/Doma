@@ -900,6 +900,26 @@
     box.append(btn);
   }
 
+  /** Kdo je přihlášený (Cloudflare Access) – e-mail a odhlášení v horní liště; bez přihlášení přes Cloudflare nic. */
+  async function loadMe() {
+    try {
+      const r = await fetch('api/me', { headers: { accept: 'application/json' }, cache: 'no-store' });
+      if (!r.ok) return;
+      const me = await r.json();
+      const box = $('user');
+      if (!box || !me || typeof me.user !== 'string' || !me.user) return;
+      const parts = [el('span', { class: 'topbar__email', text: me.user, title: 'Přihlášen přes Cloudflare Access' })];
+      if (typeof me.logout === 'string' && me.logout.startsWith('/')) {
+        const out = new URL(me.logout, location.href); // odhlášení Cloudflare Access na stejné doméně
+        if (out.origin === location.origin) parts.push(el('a', { class: 'linkbtn', href: out.href }, 'Odhlásit'));
+      }
+      box.replaceChildren(...parts);
+      box.hidden = false;
+    } catch {
+      /* statická verze / bez sítě – nic */
+    }
+  }
+
   // =========================================================================================== panel – přehled ČR
 
   function card(l, { showKraj = false } = {}) {
@@ -1894,7 +1914,10 @@
     });
     if (!parseHash().kraj) renderOverview();
     await applyRoute();
-    if (state.mode === 'server') pollRun(false);
+    if (state.mode === 'server') {
+      pollRun(false);
+      loadMe();
+    }
   }
 
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);

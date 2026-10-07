@@ -97,6 +97,19 @@ test('uživatelé: „jana:heslo;petr:heslo2“ jako CSM_USERS (oddělovače ; ,
   assert.equal(loadConfig({}).users.size, 0);
 });
 
+test('Cloudflare Access: tým + AUD (+ e-maily) → cfAccess; neúplné → chyba a varování (server nikoho nepustí)', () => {
+  const { loadConfig, KNOWN_KEYS } = require('../src/config');
+  for (const k of ['KOLOMAPA_CF_ACCESS_TEAM', 'KOLOMAPA_CF_ACCESS_AUD', 'KOLOMAPA_CF_ACCESS_EMAILS']) assert.ok(KNOWN_KEYS.has(k), k);
+  const c = loadConfig({ KOLOMAPA_CF_ACCESS_TEAM: 'bold-dust-a2b5', KOLOMAPA_CF_ACCESS_AUD: 'abc123', KOLOMAPA_CF_ACCESS_EMAILS: '@koloshop.cz', KOLOMAPA_DOMENA: 'kolomapa.ksprehledy.cz' });
+  assert.deepEqual(c.cfAccess, { team: 'bold-dust-a2b5.cloudflareaccess.com', aud: 'abc123', emails: '@koloshop.cz' });
+  assert.equal(c.domain, 'kolomapa.ksprehledy.cz');
+  assert.equal(loadConfig({}).cfAccess, null);
+  const bad = loadConfig({ KOLOMAPA_CF_ACCESS_EMAILS: '@koloshop.cz' });
+  assert.match(bad.cfAccess.error, /chybí KOLOMAPA_CF_ACCESS_TEAM a KOLOMAPA_CF_ACCESS_AUD/);
+  assert.ok(bad.warnings.some((w) => /nikoho nepustí/.test(w)));
+  assert.match(loadConfig({ KOLOMAPA_CF_ACCESS_TEAM: 'a b', KOLOMAPA_CF_ACCESS_AUD: 'x' }).cfAccess.error, /není tým/);
+});
+
 test('nastaveni.txt: komentáře, „set“, uvozovky, malá písmena, překlepy, nesmysly', () => {
   const { values, warnings } = C.parseSettings(
     [
