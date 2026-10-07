@@ -26,8 +26,8 @@ a **AAAA záznam** → IPv6 serveru (Hetzner ji dává zdarma; když AAAA nedát
 
 ```bash
 ssh root@IP_SERVERU            # nebo ssh agent@IP_SERVERU – skript se přes sudo povýší sám
-sudo apt-get install -y git && sudo git clone https://github.com/ladasuchan1-cmd/Doma.git /opt/Doma   # (přeskočit, když klonoval cloud-init)
-sudo bash /opt/Doma/cyklo-ski-mapa/deploy/hetzner.sh instalace mapa.vase-domena.cz
+sudo apt-get install -y git && sudo git clone https://github.com/ladasuchan1-cmd/Doma.git /opt/cyklo-ski-mapa/Doma   # (přeskočit, když klonoval cloud-init)
+sudo bash /opt/cyklo-ski-mapa/Doma/cyklo-ski-mapa/deploy/hetzner.sh instalace mapa.vase-domena.cz
 ```
 
 Skript doinstaluje Docker, zeptá se na **uživatele a hesla** (`jmeno:heslo;jmeno2:heslo2`; Enter =
@@ -40,20 +40,20 @@ Bez dotazu: `sudo env CSM_USERS='lada:heslo;obchod:heslo2' bash …/hetzner.sh i
 > změnou `DOMAIN=` v `deploy/.env` a `hetzner.sh aktualizace`.
 
 > Pokud aplikace zatím není v hlavní větvi repa, klonujte větev, kde je:
-> `git clone -b NAZEV_VETVE https://github.com/ladasuchan1-cmd/Doma.git /opt/Doma`.
-> Aktualizace pak sledují tuto větev, dokud ji na serveru nepřepnete (`git -C /opt/Doma checkout main`).
+> `git clone -b NAZEV_VETVE https://github.com/ladasuchan1-cmd/Doma.git /opt/cyklo-ski-mapa/Doma`.
+> Aktualizace pak sledují tuto větev, dokud ji na serveru nepřepnete (`git -C /opt/cyklo-ski-mapa/Doma checkout main`).
 
 **4. Zálohy a provoz.**
 
 ```bash
-bash /opt/Doma/cyklo-ski-mapa/deploy/hetzner.sh zaloha          # ruční záloha stav.json do /opt/zalohy-cyklo-ski-mapa (denní ve 2:30 se nastaví sama, 60 posledních)
-bash /opt/Doma/cyklo-ski-mapa/deploy/hetzner.sh stav            # kontejnery, health, disk
-bash /opt/Doma/cyklo-ski-mapa/deploy/hetzner.sh log             # živý log
-bash /opt/Doma/cyklo-ski-mapa/deploy/hetzner.sh aktualizace     # nový kód z GitHubu → build → výměna (při chybě vrátí předchozí)
-bash /opt/Doma/cyklo-ski-mapa/deploy/hetzner.sh zpet            # ruční návrat k předchozí verzi
+bash /opt/cyklo-ski-mapa/Doma/cyklo-ski-mapa/deploy/hetzner.sh zaloha          # ruční záloha stav.json do /opt/zalohy-cyklo-ski-mapa (denní ve 2:30 se nastaví sama, 60 posledních)
+bash /opt/cyklo-ski-mapa/Doma/cyklo-ski-mapa/deploy/hetzner.sh stav            # kontejnery, health, disk
+bash /opt/cyklo-ski-mapa/Doma/cyklo-ski-mapa/deploy/hetzner.sh log             # živý log
+bash /opt/cyklo-ski-mapa/Doma/cyklo-ski-mapa/deploy/hetzner.sh aktualizace     # nový kód z GitHubu → build → výměna (při chybě vrátí předchozí)
+bash /opt/cyklo-ski-mapa/Doma/cyklo-ski-mapa/deploy/hetzner.sh zpet            # ruční návrat k předchozí verzi
 ```
 
-Uživatele měníte v `/opt/Doma/cyklo-ski-mapa/deploy/.env` (`CSM_USERS=…`) a `docker compose -f … up -d`
+Uživatele měníte v `/opt/cyklo-ski-mapa/Doma/cyklo-ski-mapa/deploy/.env` (`CSM_USERS=…`) a `docker compose -f … up -d`
 (nebo `hetzner.sh aktualizace`). Stav oslovení žije v Docker svazku `deploy_data`; záloha je obyčejný JSON,
 obnova = `docker compose cp zaloha.json app:/data/stav.json && docker compose restart app`.
 
@@ -72,7 +72,8 @@ dotkne složky `cyklo-ski-mapa/`, proběhnou testy a pak se přes SSH na serveru
      (soukromý klíč, celý včetně hlaviček), `HETZNER_USER` (např. `agent`; výchozí `root`), `HETZNER_USERS` =
      `jmeno:heslo;jmeno2:heslo2` (přihlášení do aplikace; jména nerozlišují velikost písmen), volitelně `HETZNER_PORT`.
    - **Variables**: `CSM_HETZNER` = `1` (zapíná job), `CSM_HETZNER_DOMAIN` = doména webu,
-     volitelně `CSM_HETZNER_DIR` (výchozí `/opt/Doma/cyklo-ski-mapa`).
+     volitelně `CSM_HETZNER_DIR` (výchozí `/opt/cyklo-ski-mapa/Doma/cyklo-ski-mapa`), `CSM_CLOUDFLARE` (viz oddíl
+     Cloudflare).
    - **Uživatelé i doména se při každém nasazení propíší na server** (do `deploy/.env`). Změna hesla nebo nový
      kolega = upravit secret `HETZNER_USERS` a spustit workflow (Actions → „Cyklo & Ski mapa“ → Run workflow);
      nová doména = změnit variable `CSM_HETZNER_DOMAIN` (po nastavení DNS) a spustit workflow.
@@ -165,7 +166,7 @@ Runner staví ze svého workspace, takže `.env` i data zůstávají jen v `/hom
 Totéž, co dělá `hetzner.sh`, ručně – na libovolném VPS:
 
 ```bash
-git clone https://github.com/ladasuchan1-cmd/Doma.git /opt/Doma && cd /opt/Doma/cyklo-ski-mapa/deploy
+git clone https://github.com/ladasuchan1-cmd/Doma.git /opt/cyklo-ski-mapa/Doma && cd /opt/cyklo-ski-mapa/Doma/cyklo-ski-mapa/deploy
 cp ../.env.example .env && nano .env            # CSM_USERS=…  a přidat řádek DOMAIN=mapa.vase-domena.cz
 docker compose up -d --build
 docker compose logs -f app                      # „Cyklo & Ski mapa běží…, uživatelé: …“
@@ -186,6 +187,35 @@ sudo systemctl daemon-reload && sudo systemctl enable --now cyklo-ski-mapa
 
 Caddy stejně jako ve variantě A (`reverse_proxy 127.0.0.1:8091`). Aktualizace: `git pull && sudo systemctl restart cyklo-ski-mapa`.
 
+## Cloudflare před serverem (od 7. 10. 2026)
+
+Doména `ksprehledy.cz` má DNS u Cloudflare. Když se u záznamu zapne proxy (oranžový mrak), chodí návštěvníci
+přes Cloudflare a server je zvenčí vidět jen pro Cloudflare. Co to pro aplikaci znamená a jak se to zapíná:
+
+1. **Origin certifikát.** Caddy si normálně bere certifikát od Let's Encrypt přímým ověřením serveru; za proxy
+   je to nespolehlivé. Místo něj se použije Cloudflare Origin certifikát: Cloudflare → SSL/TLS → Origin Server →
+   *Create Certificate*, hostnames `*.ksprehledy.cz` a `ksprehledy.cz`, platnost 15 let. Certifikát do secretu
+   `CSM_ORIGIN_CERT`, soukromý klíč do `CSM_ORIGIN_KEY` (celé PEM od řádku BEGIN po END; klíč nikam jinam).
+   Nasazení oba ověří (platný pár; vypíše platnost a hostnames) a uloží je na server do `/opt/caddy-origin/`
+   (Caddy je vidí jako `/etc/caddy/origin`). V Cloudflare → SSL/TLS → Overview musí být režim **Full (strict)**.
+2. **Proxy zapnout u všech záznamů domény najednou.** Origin certifikát pro `*.ksprehledy.cz` použije Caddy pro
+   všechny weby na serveru, tedy i pro Půjčovnu kol, a prohlížeče mu bez Cloudflare nevěří. Nejdřív proto oranžový
+   mrak u `cyklomapa` i u hostů Půjčovny kol (`ksprehledy.cz`, `www`, `outdoor`, `sport`, `family`) – do té doby
+   běží dál Let's Encrypt a nic se nemění.
+3. **Zapnutí:** variable `CSM_CLOUDFLARE` = `1` a Run workflow. Skript ověří, že doména už nemíří přímo na server
+   (jinak skončí chybou), zapíše `/opt/caddy-origin/tls.caddy` a Caddy znovu načte. Hodnota `0` vrátí Let's Encrypt
+   (až po vypnutí proxy); prázdná proměnná nic nemění. Ruční běh skriptu na serveru nastavení nepřepíná.
+4. **Skutečné IP adresy.** Za proxy vidí server adresy Cloudflare; Caddy jim důvěřuje (`trusted_proxies`
+   v `Caddyfile`) a předává aplikaci adresu klienta z `X-Forwarded-For`. Brzda přihlášení (10 pokusů / 15 min)
+   i logy tak fungují po uživatelích, ne po celém Cloudflare. Seznam adres je v Caddyfile, Cloudflare ho mění
+   zřídka (https://www.cloudflare.com/ips).
+5. **Nastavení Cloudflare, která aplikaci vadí:** Rocket Loader, Email Address Obfuscation a Auto Minify vypnout
+   – aplikace má přísnou CSP a cizí skripty blokuje, e-maily v datech by obfuskace přepsala. Cloudflare Access
+   na `cyklomapa` nezapínat, aplikace má vlastní přihlášení. Cache: statické soubory posílá aplikace jako
+   `Cache-Control: private`, Cloudflare je tedy neukládá a nepodá je nepřihlášeným; po měsíční obnově dat nic nevisí.
+6. **Firewall (volitelně):** když jsou všechny weby za proxy, lze porty 80/443 omezit jen na adresy Cloudflare
+   (Hetzner Cloud Firewall) – server pak zvenčí neodpovídá vůbec.
+
 ## Provoz
 
 - **Záloha stavu**: `stav.json` v datové složce (JSON, atomický zápis). Stačí ho kopírovat; obnova = nahradit
@@ -205,7 +235,14 @@ Caddy stejně jako ve variantě A (`reverse_proxy 127.0.0.1:8091`). Aktualizace:
   `pujcovna-kol/deploy/vedle-mapy.sh`; adresář je připojený v `docker-compose.yml`) a **Kolomapa**
   (`/config/sites/*.caddy` ve svazku `caddy_config`). Oba adresáře `Caddyfile` importuje – prázdné nevadí.
   Řádky jsou v repu proto, aby je nasazení mapy nesmazalo a weby ostatních projektů nespadly.
-- **Sdílený klon `/opt/Doma`.** Druhé projekty si v něm přepínají svou větev, takže `hetzner.sh aktualizace`
-  rychloposouvá tu větev, která je právě vytažená. Nasazení z GitHubu proto předává `CSM_VETEV` (nasazovanou
-  větev): když je na serveru jiná větev a složka `cyklo-ski-mapa` se v nich liší, nasazení **skončí chybou**
-  místo tichého nasazení cizího kódu – řešením je sloučit větve. Větev na serveru skript nikdy nepřepíná.
+- **Vlastní klon mapy (od 7. 10. 2026).** Server sdílí Půjčovna kol a Kolomapa, které mají klon v `/opt/Doma`
+  a přepínají si v něm své větve – nasazení mapy z něj tak jednou nasadilo cizí větev. Mapa má proto vlastní klon
+  `/opt/cyklo-ski-mapa/Doma` (variable `CSM_HETZNER_DIR`). Při prvním nasazení do nového místa skript převzal
+  `.env` ze starého; kontejnery, svazky (`deploy_data` se stavem oslovení, `deploy_caddy_data` s certifikáty)
+  i síť `deploy_default`, do které se připojuje Půjčovna kol, zůstaly, protože projekt Compose se jmenuje pořád
+  `deploy`. Skript `pujcovna-kol/deploy/vedle-mapy.sh` na Caddy mapy sahá přes jméno projektu, takže funguje dál;
+  `.env` v `/opt/Doma/cyklo-ski-mapa/deploy` už ale není ten platný. Nasazení z GitHubu navíc předává `CSM_VETEV`:
+  kdyby v klonu byla jiná větev s odlišnou aplikací, skončí chybou místo tichého nasazení cizího kódu.
+- **Caddy se po každém nasazení znovu načte** (`caddy validate` + `caddy reload`): Compose změnu `Caddyfile`
+  ani souborů v `/opt/caddy-origin` sám nepozná. Neplatný Caddyfile Caddy nepoloží – běží dál se starou
+  konfigurací a nasazení skončí chybou s výpisem.

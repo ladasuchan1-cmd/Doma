@@ -103,7 +103,7 @@ v OpenStreetMap (odkaz je u každého místa); do mapy se dostane s příští m
   serveru. Obnova = nahrát soubor zpět (`deploy/hetzner.sh zpet`, viz NASAZENI.md).
 - **Náklady:** jen měsíční cena serveru Hetzner; žádné placené API, licence ani mapové podklady.
 - **Správa na serveru** (`ssh agent@37.27.203.154`):
-  `sudo bash /opt/Doma/cyklo-ski-mapa/deploy/hetzner.sh stav | log | zaloha | zpet | aktualizace`.
+  `sudo bash /opt/cyklo-ski-mapa/Doma/cyklo-ski-mapa/deploy/hetzner.sh stav | log | zaloha | zpet | aktualizace`.
   Stav aplikace a verzi hlásí `/api/health`.
 
 ## Omezení a na co dát pozor

@@ -1,6 +1,10 @@
 # Samostatný server s veřejnou doménou: aplikace + Caddy (HTTPS z Let's Encrypt automaticky).
 # Použití:  cp ../.env.example .env  (vyplnit)  →  DOMAIN=mapa.example.cz docker compose up -d --build
 # Pro server, kde už Caddy běží (Koloshop), se compose nepoužívá – viz NASAZENI.md a deploy.sh.
+# Název projektu musí zůstat „deploy“: podle něj se jmenují svazky (deploy_data = stav oslovení, deploy_caddy_data =
+# certifikáty) a síť deploy_default, do které se připojuje i Půjčovna kol. Dřív vyplýval jen z názvu této složky.
+name: deploy
+
 services:
   app:
     build:
@@ -31,6 +35,8 @@ services:
       - ./Caddyfile:/etc/caddy/Caddyfile:ro
       # bloky dalších webů na témže serveru (Caddyfile je importuje) – viz pujcovna-kol/deploy/vedle-mapy.sh
       - /opt/caddy-extra:/etc/caddy/extra:ro
+      # Cloudflare Origin certifikát + tls.caddy, zapisuje hetzner.sh (CSM_CLOUDFLARE=1); prázdný adresář nevadí
+      - /opt/caddy-origin:/etc/caddy/origin:ro
       - caddy_data:/data
       - caddy_config:/config
     depends_on:

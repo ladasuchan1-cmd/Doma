@@ -3,19 +3,26 @@
 # záloha stavu, log, návrat k předchozí verzi. Spouští se NA SERVERU jako root (Ubuntu 22.04/24.04,
 # Debian 12). Používá Docker Compose s Caddy (HTTPS z Let's Encrypt automaticky) – deploy/docker-compose.yml.
 #
-#   apt-get install -y git && git clone https://github.com/ladasuchan1-cmd/Doma.git /opt/Doma
-#   bash /opt/Doma/cyklo-ski-mapa/deploy/hetzner.sh instalace mapa.vase-domena.cz
+#   apt-get install -y git && git clone https://github.com/ladasuchan1-cmd/Doma.git /opt/cyklo-ski-mapa/Doma
+#   bash /opt/cyklo-ski-mapa/Doma/cyklo-ski-mapa/deploy/hetzner.sh instalace mapa.vase-domena.cz
 #
-#   bash /opt/Doma/cyklo-ski-mapa/deploy/hetzner.sh aktualizace    # stáhne nový kód a znovu postaví (pouští i GitHub Actions)
-#   bash /opt/Doma/cyklo-ski-mapa/deploy/hetzner.sh zaloha         # zkopíruje stav.json do /opt/zalohy-cyklo-ski-mapa
-#   bash /opt/Doma/cyklo-ski-mapa/deploy/hetzner.sh zaloha --cron  # + denní záloha ve 2:30 (cron)
-#   bash /opt/Doma/cyklo-ski-mapa/deploy/hetzner.sh zpet           # vrátí předchozí verzi aplikace
-#   bash /opt/Doma/cyklo-ski-mapa/deploy/hetzner.sh stav | log
+#   bash /opt/cyklo-ski-mapa/Doma/cyklo-ski-mapa/deploy/hetzner.sh aktualizace    # nový kód a znovu postavit (pouští i GitHub Actions)
+#   bash /opt/cyklo-ski-mapa/Doma/cyklo-ski-mapa/deploy/hetzner.sh zaloha         # zkopíruje stav.json do /opt/zalohy-cyklo-ski-mapa
+#   bash /opt/cyklo-ski-mapa/Doma/cyklo-ski-mapa/deploy/hetzner.sh zaloha --cron  # + denní záloha ve 2:30 (cron)
+#   bash /opt/cyklo-ski-mapa/Doma/cyklo-ski-mapa/deploy/hetzner.sh zpet           # vrátí předchozí verzi aplikace
+#   bash /opt/cyklo-ski-mapa/Doma/cyklo-ski-mapa/deploy/hetzner.sh stav | log
 #
-# Proměnné: CSM_REPO_DIR (/opt/Doma), CSM_COMPOSE (docker-compose.yml, pro Caddy v jiném kontejneru
-# docker-compose.caddy-externi.yml), CSM_ZALOHY (/opt/zalohy-cyklo-ski-mapa), CSM_USERS (uživatelé pro
-# instalaci bez dotazu; nebo CSM_USERS_B64 = totéž v base64, bez starostí s uvozovkami), CSM_VETEV (větev
-# repa pro první klon), CSM_UFW=0 (nenastavovat firewall).
+# Mapa má vlastní klon repa (výchozí /opt/cyklo-ski-mapa/Doma, od 7. 10. 2026); /opt/Doma patří dalším projektům na
+# témže serveru (Půjčovna kol, Kolomapa), které si v něm přepínají větve. Projekt Compose se jmenuje „deploy“, takže
+# kontejnery, svazky i síť zůstaly při přesunu stejné – viz prevezmi_stare_nastaveni.
+#
+# Proměnné: CSM_REPO_DIR (klon repa; výchozí složka, ve které skript leží, jinak /opt/cyklo-ski-mapa/Doma),
+# CSM_COMPOSE (docker-compose.yml, pro Caddy v jiném kontejneru docker-compose.caddy-externi.yml), CSM_ZALOHY
+# (/opt/zalohy-cyklo-ski-mapa), CSM_USERS (uživatelé pro instalaci bez dotazu; nebo CSM_USERS_B64 = totéž v base64,
+# bez starostí s uvozovkami), CSM_VETEV (větev repa pro první klon a kontrola při aktualizaci), CSM_UFW=0
+# (nenastavovat firewall), CSM_CLOUDFLARE=1|0 + CSM_ORIGIN_CERT_B64 / CSM_ORIGIN_KEY_B64 (Cloudflare před serverem,
+# viz synchronizuj_cloudflare; CSM_ORIGIN_DIR = /opt/caddy-origin), CSM_STARY_DEPLOY (odkud převzít .env při
+# první instalaci do nového místa; /opt/Doma/cyklo-ski-mapa/deploy).
 #
 # Běží i bez repa na disku – skript lze poslat přes SSH ze stdin (první instalace z GitHub Actions):
 #   ssh agent@server 'sudo -n env CSM_USERS_B64=… bash -s -- instalace mapa.domena.cz' < deploy/hetzner.sh
@@ -26,6 +33,8 @@ if [ "$(id -u)" != 0 ]; then
   if [ -f "${BASH_SOURCE[0]:-}" ] && sudo -n true 2>/dev/null; then
     exec sudo -n env CSM_USERS="${CSM_USERS:-}" CSM_USERS_B64="${CSM_USERS_B64:-}" CSM_DOMAIN="${CSM_DOMAIN:-}" CSM_REPO_DIR="${CSM_REPO_DIR:-}" \
       CSM_COMPOSE="${CSM_COMPOSE:-}" CSM_ZALOHY="${CSM_ZALOHY:-}" CSM_VETEV="${CSM_VETEV:-}" CSM_UFW="${CSM_UFW:-}" CSM_CRON="${CSM_CRON:-}" \
+      CSM_CLOUDFLARE="${CSM_CLOUDFLARE:-}" CSM_ORIGIN_CERT_B64="${CSM_ORIGIN_CERT_B64:-}" CSM_ORIGIN_KEY_B64="${CSM_ORIGIN_KEY_B64:-}" \
+      CSM_ORIGIN_DIR="${CSM_ORIGIN_DIR:-}" CSM_STARY_DEPLOY="${CSM_STARY_DEPLOY:-}" \
       bash "${BASH_SOURCE[0]}" "$@"
   fi
   echo "CHYBA: spusťte jako root nebo přes sudo (sudo bash $0 …)." >&2
@@ -37,12 +46,21 @@ if [ -z "${CSM_USERS:-}" ] && [ -n "${CSM_USERS_B64:-}" ]; then
 fi
 
 REPO_URL="${CSM_REPO:-https://github.com/ladasuchan1-cmd/Doma.git}"
-REPO_DIR="${CSM_REPO_DIR:-/opt/Doma}"
+# Klon repa: zadaný, jinak ten, ve kterém skript leží (deploy/ → cyklo-ski-mapa/ → klon), jinak výchozí místo.
+if [ -n "${CSM_REPO_DIR:-}" ]; then
+  REPO_DIR="$CSM_REPO_DIR"
+elif [ -f "${BASH_SOURCE[0]:-}" ]; then
+  REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+else
+  REPO_DIR=/opt/cyklo-ski-mapa/Doma
+fi
 APP_DIR="$REPO_DIR/cyklo-ski-mapa"
 DEPLOY_DIR="$APP_DIR/deploy"
 COMPOSE_FILE="${CSM_COMPOSE:-docker-compose.yml}"
 ZALOHY="${CSM_ZALOHY:-/opt/zalohy-cyklo-ski-mapa}"
 IMAGE=cyklo-ski-mapa
+ORIGIN_DIR="${CSM_ORIGIN_DIR:-/opt/caddy-origin}"
+CADDY_ZMENA=0
 
 compose() { (cd "$DEPLOY_DIR" && docker compose -f "$COMPOSE_FILE" "$@"); }
 
@@ -168,15 +186,111 @@ instalace() {
     git clone ${CSM_VETEV:+-b "$CSM_VETEV"} "$REPO_URL" "$REPO_DIR"
     [ -d "$APP_DIR" ] || chyba "ve větvi není složka cyklo-ski-mapa – naklonujte větev, kde aplikace je (CSM_VETEV=… nebo git clone -b …)."
   fi
+  prevezmi_stare_nastaveni
   vytvor_env "${d:-$(domena)}"
+  [ -n "$d" ] && export CSM_DOMAIN="${CSM_DOMAIN:-$d}"
+  synchronizuj_env
+  synchronizuj_cloudflare
   echo "→ Stavím a spouštím (aplikace + Caddy)…"
   APP_VERSION="$(verze_z_gitu)" compose up -d --build
   cekej_na_app
+  nacti_caddy
   cekej_na_web || true
   mkdir -p "$ZALOHY"
   zajisti_cron
   echo
   echo "Hotovo. Další krok: v GitHubu nastavit automatické nasazení (NASAZENI.md)."
+}
+
+# První instalace do nového místa na serveru, kde už mapa běží ze sdíleného klonu (/opt/Doma): převezme se .env
+# (doména, uživatelé, nastavení). Kontejnery, svazky (stav oslovení, certifikáty) i síť zůstávají, protože projekt
+# Compose se jmenuje pořád „deploy“ – compose up z nového místa je jen převezme a znovu vytvoří.
+prevezmi_stare_nastaveni() {
+  local stary="${CSM_STARY_DEPLOY:-/opt/Doma/cyklo-ski-mapa/deploy}"
+  [ -f "$DEPLOY_DIR/.env" ] && return 0
+  [ "$stary" != "$DEPLOY_DIR" ] && [ -f "$stary/.env" ] || return 0
+  mkdir -p "$DEPLOY_DIR"
+  cp -p "$stary/.env" "$DEPLOY_DIR/.env" && chmod 600 "$DEPLOY_DIR/.env"
+  echo "→ Převzato nastavení z $stary/.env (původní nasazení ve sdíleném klonu); kontejnery a data pokračují."
+}
+
+# Míří doména přes Cloudflare? Když se její adresa shoduje s adresou tohoto serveru, proxy zapnutá není.
+domena_pres_cloudflare() {
+  local d ip adresy vlastni
+  d="$(domena)"
+  [ -n "$d" ] || return 1
+  adresy="$(getent ahosts "$d" 2>/dev/null | awk '{print $1}' | sort -u)"
+  [ -n "$adresy" ] || return 1
+  vlastni=" $(hostname -I 2>/dev/null | tr '\n' ' ') "
+  for ip in $adresy; do
+    case "$vlastni" in *" $ip "*) return 1 ;; esac
+  done
+  return 0
+}
+
+# Cloudflare před serverem (NASAZENI.md, oddíl „Cloudflare před serverem“): Origin certifikát ze secrets GitHubu se
+# uloží do $ORIGIN_DIR (v kontejneru Caddy /etc/caddy/origin). CSM_CLOUDFLARE=1 ho zapne souborem tls.caddy, který
+# Caddyfile importuje – Caddy pak pro doménu (a kvůli *.ksprehledy.cz i pro další weby na serveru) nepoužije
+# Let's Encrypt. CSM_CLOUDFLARE=0 ho vypne; nezadáno = beze změny (ruční běh na serveru nic nepřepíná).
+synchronizuj_cloudflare() {
+  mkdir -p "$ORIGIN_DIR" && chmod 755 "$ORIGIN_DIR"
+  local cert="$ORIGIN_DIR/cert.pem" key="$ORIGIN_DIR/key.pem" tls="$ORIGIN_DIR/tls.caddy"
+  local radek="tls /etc/caddy/origin/cert.pem /etc/caddy/origin/key.pem"
+  if [ -n "${CSM_ORIGIN_CERT_B64:-}" ] && [ -n "${CSM_ORIGIN_KEY_B64:-}" ]; then
+    printf %s "$CSM_ORIGIN_CERT_B64" | base64 -d > "$cert.tmp" || chyba "CSM_ORIGIN_CERT_B64 není base64."
+    printf %s "$CSM_ORIGIN_KEY_B64" | base64 -d > "$key.tmp" || chyba "CSM_ORIGIN_KEY_B64 není base64."
+    chmod 600 "$cert.tmp" "$key.tmp"
+    if command -v openssl >/dev/null 2>&1; then
+      openssl x509 -noout -in "$cert.tmp" 2>/dev/null || chyba "Origin certifikát není platný PEM certifikát."
+      openssl pkey -noout -in "$key.tmp" 2>/dev/null || chyba "Origin klíč není platný PEM soukromý klíč."
+      [ "$(openssl x509 -noout -pubkey -in "$cert.tmp")" = "$(openssl pkey -pubout -in "$key.tmp" 2>/dev/null)" ] \
+        || chyba "Origin certifikát a klíč k sobě nepatří."
+    fi
+    if ! cmp -s "$cert.tmp" "$cert" || ! cmp -s "$key.tmp" "$key"; then
+      mv "$cert.tmp" "$cert" && mv "$key.tmp" "$key" && chmod 644 "$cert" && chmod 600 "$key"
+      CADDY_ZMENA=1
+      echo "→ Cloudflare Origin certifikát uložen do $ORIGIN_DIR ($(openssl x509 -noout -enddate -in "$cert" 2>/dev/null | sed 's/notAfter=/platí do /' || echo 'bez openssl'))."
+    else
+      rm -f "$cert.tmp" "$key.tmp"
+    fi
+  fi
+  case "${CSM_CLOUDFLARE:-}" in
+    1)
+      [ -s "$cert" ] && [ -s "$key" ] || chyba "CSM_CLOUDFLARE=1, ale na serveru není Origin certifikát – vyplňte secrets CSM_ORIGIN_CERT a CSM_ORIGIN_KEY."
+      domena_pres_cloudflare || chyba "CSM_CLOUDFLARE=1, ale $(domena) zatím míří přímo na tento server (DNS only). Nejdřív v Cloudflare zapněte proxy (oranžový mrak) u všech záznamů domény, pak nasazení zopakujte – jinak by prohlížeče dostaly nedůvěryhodný Origin certifikát."
+      if [ "$(cat "$tls" 2>/dev/null)" != "$radek" ]; then
+        printf '%s\n' "$radek" > "$tls.tmp" && mv "$tls.tmp" "$tls"
+        CADDY_ZMENA=1
+        echo "→ Cloudflare zapnuto: Caddy použije Origin certifikát (Let's Encrypt se pro doménu nepoužije)."
+      fi
+      ;;
+    0)
+      if [ -e "$tls" ]; then
+        rm -f "$tls"
+        CADDY_ZMENA=1
+        echo "→ Cloudflare vypnuto: Caddy si bere certifikát od Let's Encrypt."
+      fi
+      ;;
+  esac
+}
+
+# Změny Caddyfile (z gitu) a souborů v $ORIGIN_DIR Compose nepozná – Caddy se po každém nasazení znovu načte.
+# Neplatná konfigurace Caddy nepoloží: validate ji odmítne a běží dál ta stará; nasazení pak skončí chybou, ať je to vidět.
+nacti_caddy() {
+  local id
+  id="$(compose ps -q caddy 2>/dev/null || true)"
+  [ -n "$id" ] || return 0
+  if ! docker exec "$id" caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile >/dev/null 2>&1; then
+    echo "CHYBA: Caddyfile není platný – Caddy běží dál se starou konfigurací. Výpis:" >&2
+    docker exec "$id" caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile 2>&1 | tail -20 >&2
+    exit 1
+  fi
+  if ! docker exec "$id" caddy reload --config /etc/caddy/Caddyfile --adapter caddyfile >/dev/null 2>&1; then
+    echo "VAROVÁNÍ: reload Caddy selhal – restartuji kontejner." >&2
+    compose restart caddy
+  fi
+  if [ "$CADDY_ZMENA" = 1 ]; then echo "→ Caddy znovu načtena s novým nastavením."; fi
+  return 0
 }
 
 # Klon $REPO_DIR může sdílet víc projektů (Půjčovna kol, Kolomapa) a na serveru pak bývá vytažená jejich větev.
@@ -216,6 +330,7 @@ aktualizace() {
   fi
   zkontroluj_vetev
   synchronizuj_env
+  synchronizuj_cloudflare
   # předchozí verze pro cestu zpět – před buildem, než se přepíše tag latest
   if docker image inspect "$IMAGE:latest" >/dev/null 2>&1; then docker tag "$IMAGE:latest" "$IMAGE:predchozi"; fi
   echo "→ Stavím a spouštím…"
@@ -225,6 +340,7 @@ aktualizace() {
     zpet
     exit 1
   fi
+  nacti_caddy
   docker image prune -f >/dev/null 2>&1 || true
   zajisti_cron
   cekej_na_web || true

@@ -1,8 +1,8 @@
 #cloud-config
 # Hetzner Cloud → při zakládání serveru vložit do pole „Cloud config“ (user data). Server se po startu sám
-# připraví: Docker, firewall, repozitář v /opt/Doma. Pak už jen:
+# připraví: Docker, firewall, repozitář v /opt/cyklo-ski-mapa/Doma. Pak už jen:
 #   ssh root@IP
-#   bash /opt/Doma/cyklo-ski-mapa/deploy/hetzner.sh instalace mapa.vase-domena.cz
+#   bash /opt/cyklo-ski-mapa/Doma/cyklo-ski-mapa/deploy/hetzner.sh instalace mapa.vase-domena.cz
 # Pokud aplikace zatím není v hlavní větvi repa, přidejte před `git clone` větev: git clone -b NAZEV_VETVE …
 package_update: true
 package_upgrade: true
@@ -19,4 +19,4 @@ runcmd:
   - ufw allow 443/tcp
   - ufw allow 443/udp
   - ufw --force enable
-  - git clone https://github.com/ladasuchan1-cmd/Doma.git /opt/Doma
+  - git clone https://github.com/ladasuchan1-cmd/Doma.git /opt/cyklo-ski-mapa/Doma
