@@ -6,7 +6,7 @@ stránku [SHRNUTI.md](SHRNUTI.md).
 
 ## 1. Přihlášení a odhlášení
 
-- Adresa aplikace: **https://37-27-203-154.sslip.io** (dočasná adresa, do přechodu na vlastní doménu).
+- Adresa aplikace: **https://cyklomapa.ksprehledy.cz**.
 - Jméno a heslo dostanete od správce. Na velikosti písmen ve **jméně** nezáleží, v **hesle** ano.
 - Přihlášení platí **30 dní** v daném prohlížeči. Odhlášení: tlačítko vedle vašeho jména vpravo nahoře.
 - Po **10 špatných pokusech** se vaše adresa na 15 minut zablokuje („Příliš mnoho pokusů“) – počkejte, nehádejte.

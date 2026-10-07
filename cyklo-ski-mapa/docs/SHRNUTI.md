@@ -1,6 +1,6 @@
 # Cyklo & Ski mapa – shrnutí na jednu stránku
 
-*Stav k 5. 10. 2026, data sestavená 3. 10. 2026. Podrobnosti: [MANUAL.md](MANUAL.md) (ovládání),
+*Stav k 7. 10. 2026, data sestavená 3. 10. 2026. Podrobnosti: [MANUAL.md](MANUAL.md) (ovládání),
 [METODIKA.md](METODIKA.md) (data a výpočty), [../NASAZENI.md](../NASAZENI.md) (provoz).*
 
 ## Co to je a k čemu slouží
@@ -16,7 +16,7 @@ Volali jsme · Osobní návštěva proběhla), poznámkou a ručně doplněnými
 server a u každé změny je vidět, kdo a kdy ji udělal. Výběr (např. „ubytování do 1 km od cyklotrasy bez vlastní
 půjčovny v okrese Trutnov“) jde exportovat do **CSV pro Excel**.
 
-Aplikace běží jako web s přihlášením na **https://37-27-203-154.sslip.io**, kód i data jsou v repozitáři GitHub
+Aplikace běží jako web s přihlášením na **https://cyklomapa.ksprehledy.cz**, kód i data jsou v repozitáři GitHub
 `ladasuchan1-cmd/Doma` ve složce `cyklo-ski-mapa/`.
 
 ## Co v mapě je
@@ -72,7 +72,7 @@ v OpenStreetMap (odkaz je u každého místa); do mapy se dostane s příští m
 
 ## Jak s tím pracovat (postup pro obchodníka)
 
-1. **Přihlášení** na https://37-27-203-154.sslip.io jménem a heslem od správce; přihlášení platí 30 dní,
+1. **Přihlášení** na https://cyklomapa.ksprehledy.cz jménem a heslem od správce; přihlášení platí 30 dní,
    odhlášení je vpravo nahoře.
 2. **Oblast**: klik na kraj, pak na okres (nebo výběr v liště nahoře); zpět drobečkovou navigací. Hledání názvu,
    obce nebo trasy – pole nahoře, klávesa `/`.
@@ -90,9 +90,9 @@ v OpenStreetMap (odkaz je u každého místa); do mapy se dostane s příští m
 ## Provoz, přístup a bezpečnost
 
 - **Kde běží:** server Hetzner Cloud (`37.27.203.154`, Ubuntu, Docker). Dva kontejnery – aplikace (Node.js 22,
-  bez závislostí) a Caddy, která sama obstarává HTTPS certifikát. Web je zatím na dočasné adrese
-  **https://37-27-203-154.sslip.io**; vlastní doména = DNS A záznam na IP serveru + změna variable
-  `CSM_HETZNER_DOMAIN` v GitHubu + Run workflow.
+  bez závislostí) a Caddy, která sama obstarává HTTPS certifikát. Web je na **https://cyklomapa.ksprehledy.cz**
+  (DNS záznam A domény míří přímo na server, správa DNS je u Cloudflare). Případná další změna domény = nový
+  A záznam + změna variable `CSM_HETZNER_DOMAIN` v GitHubu + Run workflow.
 - **Kdo se dostane dovnitř:** jen přihlášení uživatelé. Hesla jsou v GitHub secretu `HETZNER_USERS`; přidání
   nebo změna = upravit secret a spustit workflow „Cyklo & Ski mapa“. Bez přihlášení je vidět jen přihlašovací
   formulář, po 10 špatných pokusech se adresa na 15 minut zablokuje.
@@ -116,8 +116,8 @@ v OpenStreetMap (odkaz je u každého místa); do mapy se dostane s příští m
   v detailu jde přepsat na ano/ne.
 - **E-maily jsou z veřejných webů firem.** Při hromadném rozesílání nabídek platí pravidla pro obchodní sdělení
   (zákon č. 480/2004 Sb.) – posílat adresně, s možností odmítnutí.
-- **Dočasná doména** sslip.io je funkční, ale nevypadá důvěryhodně; doporučeno přejít na vlastní subdoménu
-  (např. `mapa.koloshop.cz`).
+- **Doména:** do 7. 10. 2026 web běžel na dočasné adrese `37-27-203-154.sslip.io`, od přepnutí na
+  `cyklomapa.ksprehledy.cz` staré odkazy a záložky nefungují a každý se jednou znovu přihlásí.
 - **Hlavní větev repozitáře** se jmenuje `claude/terms-reader-app-dl4h8h`; doporučeno přejmenovat na `main`
   (GitHub → Settings → Branches). Workflow i skripty si název zjišťují samy, přejmenování nic nerozbije.
 - **Historie stavu** se nevede – u každé fáze je uložené datum zaškrtnutí a poslední úprava (kdo, kdy), ne celý
@@ -126,7 +126,7 @@ v OpenStreetMap (odkaz je u každého místa); do mapy se dostane s příští m
 
 ## Odkazy
 
-- **Aplikace:** https://37-27-203-154.sslip.io (stav a verze: `/api/health`)
+- **Aplikace:** https://cyklomapa.ksprehledy.cz (stav a verze: `/api/health`)
 - **Repozitář:** https://github.com/ladasuchan1-cmd/Doma – složka `cyklo-ski-mapa/`
 - **Dokumentace:** [README.md](../README.md) (přehled a spuštění), [MANUAL.md](MANUAL.md) (manuál pro obchodní
   tým), [METODIKA.md](METODIKA.md) (zdroje dat, klasifikace, výpočty), [NASAZENI.md](../NASAZENI.md) (nasazení
