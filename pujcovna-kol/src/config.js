@@ -17,6 +17,11 @@
 //                        ksprehledy.cz. Weby klientů leží v $PK_DATA/klienti/<slug>/ (tenant.json, logo) – přežijí nasazení.
 //   PK_PLATFORMA_HESLO   heslo do správy platformy /platforma (pozvánky do průvodce, přehled klientů); min. 12 znaků.
 //                        Bez něj je /platforma vypnutá (404) a pozvánky jdou jen nástrojem tools/pozvanka.js.
+//   PK_SMTP_HOST         SMTP server pro odesílání e-mailů provozovateli (poptávky, kontaktní formulář); bez něj se nic
+//                        neodesílá a e-maily zůstávají ve frontě (admin → E-maily). Např. smtp.cesky-hosting.cz.
+//   PK_SMTP_PORT         port (465 = implicitní TLS, 587 = STARTTLS); výchozí 465
+//   PK_SMTP_SECURE       tls | starttls (výchozí podle portu); none jen pro localhost (testy)
+//   PK_SMTP_USER / PK_SMTP_PASS   přihlášení ke schránce (heslo lze i v base64 jako PK_SMTP_PASS_B64 – tak ho píše nasazení); PK_SMTP_FROM odesílatel (výchozí PK_SMTP_USER)
 //   APP_VERSION          verze aplikace do patičky a ?v= u statických souborů (výchozí z package.json)
 //   LOG_LEVEL            debug | info | warn | error | silent (info)
 
@@ -50,6 +55,25 @@ function packageVersion() {
   }
 }
 
+/** SMTP z env (PK_SMTP_*); bez hostitele nebo odesílatele null = odesílání vypnuté. */
+function smtpConfig(env) {
+  const host = String(env.PK_SMTP_HOST || '').trim();
+  const from = String(env.PK_SMTP_FROM || env.PK_SMTP_USER || '').trim();
+  if (!host || !from) return null;
+  const port = envInt(env.PK_SMTP_PORT, 465);
+  const sec = String(env.PK_SMTP_SECURE || '').trim().toLowerCase();
+  return Object.freeze({
+    host,
+    port,
+    secure: ['tls', 'starttls', 'none'].includes(sec) ? sec : port === 465 ? 'tls' : 'starttls',
+    user: String(env.PK_SMTP_USER || '').trim() || null,
+    pass: env.PK_SMTP_PASS ? String(env.PK_SMTP_PASS) : env.PK_SMTP_PASS_B64 ? Buffer.from(String(env.PK_SMTP_PASS_B64), 'base64').toString('utf8') : null,
+    from,
+    fromName: String(env.PK_SMTP_FROM_NAME || '').trim() || null,
+    helo: String(env.PK_DOMAIN || 'localhost').trim(),
+  });
+}
+
 /**
  * Načte konfiguraci z env.
  * @param {NodeJS.ProcessEnv} [env]
@@ -80,6 +104,7 @@ function loadConfig(env = process.env) {
     bodyLimitBytes: BODY_LIMIT_BYTES,
     klientiDir: path.join(dataDir, 'klienti'),
     klientiDomena: String(env.PK_KLIENTI_DOMENA || env.PK_DOMAIN || 'ksprehledy.cz').trim().toLowerCase().replace(/^\.+|\.+$/g, ''),
+    smtp: smtpConfig(env),
     platformaHeslo: env.PK_PLATFORMA_HESLO && String(env.PK_PLATFORMA_HESLO).length >= 12 ? String(env.PK_PLATFORMA_HESLO) : null,
   });
 }

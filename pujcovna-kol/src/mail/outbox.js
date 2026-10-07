@@ -1,6 +1,6 @@
 'use strict';
 // Outbox e-mailů (SPEC kap. 9): zápis do tabulky outbox + render šablon ze src/mail/templates.js.
-// Odesílání řeší až budoucí sender (v demu e-maily zobrazuje admin). Adresa se nikdy neukládá v čitelné podobě:
+// Odesílání: src/mail/sender.js (job mail-sender, jen oznámení provozovateli při PK_SMTP_HOST); ostatní zobrazuje admin. Adresa se nikdy neukládá v čitelné podobě:
 // outbox.to_hmac = HMAC e-mailu (dedup/hledání), payload.to_enc = AES-GCM šifrovaná adresa pro sender.
 // Nikdy nelogovat adresu, jméno ani tělo e-mailu – do logu patří jen id řádku a typ.
 //   enqueue(db, { type, to, subject, text, html, payload, runAt, fieldCrypto })            → id
@@ -119,7 +119,7 @@ function listForReservation(db, reservationId) {
     .all(Number(reservationId));
 }
 
-/** Neodeslané e-maily k odeslání (pro budoucí sender). */
+/** Neodeslané e-maily k odeslání (src/mail/sender.js). */
 function pending(db, limit = 50, now = nowIso()) {
   return db.prepare('SELECT * FROM outbox WHERE sent_at IS NULL AND run_at <= ? AND attempts < 5 ORDER BY run_at, id LIMIT ?').all(now, Number(limit));
 }

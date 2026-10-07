@@ -150,7 +150,8 @@ jobs:
   # u mapy (HETZNER_HOST, HETZNER_SSH_KEY, …). Volitelný secret PK_PLATFORMA_HESLO (min. 12 znaků) zapne správu
   # platformy /platforma (pozvánky do průvodce pro nové klienty). Volitelný secret PK_NABIDKA_INTERNI_JSON (obsah interního ceníku
   # s nákupními cenami kol, NASAZENI.md kap. 6b) se zapíše do datového svazku jako /data/nabidka.interni.json –
-  # nikdy do repa ani do logu.
+  # nikdy do repa ani do logu. Volitelné secrets PK_SMTP_HOST, PK_SMTP_PORT, PK_SMTP_USER, PK_SMTP_PASS zapnou odesílání
+  # poptávek a dotazů z kontaktu na e-mail provozovatele (NASAZENI.md kap. 7d).
   deploy-vedle-mapy:
     needs: test
     if: github.event_name == 'workflow_dispatch' && inputs.vedle_mapy
@@ -168,6 +169,10 @@ jobs:
           KEY: ${{ secrets.PK_HETZNER_SSH_KEY || secrets.HETZNER_SSH_KEY }}
           INTERNI_JSON: ${{ secrets.PK_NABIDKA_INTERNI_JSON }}
           PLATFORMA_HESLO: ${{ secrets.PK_PLATFORMA_HESLO }}
+          SMTP_HOST: ${{ secrets.PK_SMTP_HOST }}
+          SMTP_PORT: ${{ secrets.PK_SMTP_PORT }}
+          SMTP_USER: ${{ secrets.PK_SMTP_USER }}
+          SMTP_PASS: ${{ secrets.PK_SMTP_PASS }}
           DOMAIN: ${{ vars.PK_HETZNER_DOMAIN || 'ksprehledy.cz' }}
           BRANCH: ${{ github.ref_name }}
         run: |
@@ -187,7 +192,11 @@ jobs:
           echo "→ Větev $BRANCH → server (vedle Cyklo & Ski mapy)"
           # heslo správy platformy (/platforma) jde na server v base64 (bez starostí s uvozovkami); prázdné = beze změny
           PLAT_B64="$(printf %s "$PLATFORMA_HESLO" | base64 -w0)"
-          ssh_cmd "$SUDO env PK_VETEV='$BRANCH' PK_DOMAIN='$DOMAIN' PK_PLATFORMA_HESLO=\"\$(printf %s '$PLAT_B64' | base64 -d)\" bash -s -- aktualizace" < pujcovna-kol/deploy/vedle-mapy.sh
+          # SMTP (odesílání poptávek a dotazů z kontaktu na e-mail provozovatele): vše v base64, heslo zůstane v base64 i v .env
+          b64() { printf %s "$1" | base64 -w0; }
+          SMTP_ENV="PK_SMTP_HOST=\"\$(printf %s '$(b64 "$SMTP_HOST")' | base64 -d)\" PK_SMTP_PORT=\"\$(printf %s '$(b64 "$SMTP_PORT")' | base64 -d)\" PK_SMTP_USER=\"\$(printf %s '$(b64 "$SMTP_USER")' | base64 -d)\" PK_SMTP_PASS_B64='$(b64 "$SMTP_PASS")'"
+          [ -n "$SMTP_HOST" ] && echo "→ Odesílání e-mailů: SMTP se nastaví ze secrets PK_SMTP_* (hodnoty se nevypisují)." || echo "→ Secret PK_SMTP_HOST není nastaven – e-maily zůstávají jen ve frontě."
+          ssh_cmd "$SUDO env PK_VETEV='$BRANCH' PK_DOMAIN='$DOMAIN' PK_PLATFORMA_HESLO=\"\$(printf %s '$PLAT_B64' | base64 -d)\" $SMTP_ENV bash -s -- aktualizace" < pujcovna-kol/deploy/vedle-mapy.sh
           if [ -n "$INTERNI_JSON" ]; then
             echo "→ Zapisuji interní ceník (secret PK_NABIDKA_INTERNI_JSON) do svazku pujcovna-kol_data (obsah se neloguje)."
             printf '%s' "$INTERNI_JSON" | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{JSON.parse(s);})' || { echo "PK_NABIDKA_INTERNI_JSON není platný JSON"; exit 1; }

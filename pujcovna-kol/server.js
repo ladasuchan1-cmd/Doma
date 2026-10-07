@@ -343,6 +343,10 @@ async function start(options = {}) {
       log.info('Noční reset demo dat proveden');
     });
   }
+  if (config.smtp) {
+    const sender = require('./src/mail/sender');
+    jobs.register('mail-sender', 60 * 1000, (d) => sender.runOnce(d, { isClient: klienti.isClientTenant }));
+  }
   for (const job of featureJobs) jobs.register(job.name, job.everyMs, job.fn);
   app.jobs = jobs;
 

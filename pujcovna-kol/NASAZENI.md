@@ -300,6 +300,27 @@ Ručně: `bash /opt/Doma/pujcovna-kol/deploy/vedle-mapy.sh caddy-sync`.
 > Samostatné nasazení s vlastní Caddy (`deploy/docker-compose.yml`, kap. 3) průvodce zatím nesynchronizuje – weby
 > klientů tam fungují, ale jejich hosty je potřeba do `deploy/Caddyfile` doplnit ručně.
 
+## 7d. Odesílání e-mailů provozovateli – SMTP (od 7. 10. 2026)
+
+Poptávky z konfigurátoru `/nabidka` a dotazy z kontaktního formuláře se vždy uloží do fronty (admin → E-maily, `/admin/nabidky`).
+Se zapnutým SMTP je job `mail-sender` (každou minutu) navíc **odešle na e-mail půjčovny** z `tenant.json` (u dema
+`info@ksprehledy.cz`) s **Reply-To tazatele** – odpovědí v poště odpovídáte rovnou jemu.
+
+**Zapnutí:** v GitHubu (Settings → Secrets and variables → Actions) secrets `PK_SMTP_HOST` (Thinline / Český hosting:
+`smtp.cesky-hosting.cz`), `PK_SMTP_PORT` (`465`), `PK_SMTP_USER` (`info@ksprehledy.cz`), `PK_SMTP_PASS` (heslo schránky) a znovu
+nasadit. Workflow je pošle na server v base64 a `hetzner.sh` je zapíše do `deploy/.env` (heslo jako `PK_SMTP_PASS_B64`, aby
+znaky `$` a uvozovky nerozbily soubor); hodnoty se nikde nevypisují. Ruční provoz: stejné proměnné v `deploy/.env`
+(`PK_SMTP_PASS` nebo `PK_SMTP_PASS_B64`, volitelně `PK_SMTP_FROM`, `PK_SMTP_SECURE=starttls` pro port 587).
+
+**Co se posílá:** jen typy `nabidka` a `contact_inquiry`, jen u webů platformy (demo), ne u webů klientů, a jen řádky mladší
+7 dní (zapnutí nerozešle starou frontu). **E-maily zákazníkům (potvrzení rezervací, platby, připomínky) se neposílají** –
+demo má smyšlené rezervace. Chyba (špatné heslo, odmítnutý adresát) → `attempts + 1`, chyba v admin → E-maily, další pokus za
+5 × počet pokusů minut, po 5 pokusech konec; log obsahuje jen id, typ a text odpovědi serveru, nikdy adresy ani obsah.
+
+**DNS:** aby pošta z `ksprehledy.cz` nekončila ve spamu, přidejte v Cloudflare TXT záznam SPF podle pokynů poskytovatele
+schránky (Thinline / Český hosting). Odesílací server `smtp.cesky-hosting.cz` má jinou IP adresu než přijímací servery
+z MX – samotné `mx` v SPF nestačí.
+
 ## 8. Když něco nejde
 
 - **Caddy nedostane certifikát** (`hetzner.sh log` hlásí ACME chyby): DNS záznam daného hostu nemíří na server,

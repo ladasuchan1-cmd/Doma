@@ -13,7 +13,7 @@
 #   bash /opt/Doma/pujcovna-kol/deploy/hetzner.sh zpet           # vrátí předchozí verzi aplikace (image :predchozi)
 #   bash /opt/Doma/pujcovna-kol/deploy/hetzner.sh stav | log
 #
-# Proměnné: PK_REPO_DIR (/opt/Doma), PK_COMPOSE (docker-compose.yml), PK_ZALOHY (/opt/zalohy-pujcovna-kol), PK_PLATFORMA_HESLO
+# Proměnné: PK_REPO_DIR (/opt/Doma), PK_COMPOSE (docker-compose.yml), PK_ZALOHY (/opt/zalohy-pujcovna-kol), PK_SMTP_HOST/PORT/USER/PASS_B64, PK_PLATFORMA_HESLO
 # (heslo /platforma – propíše se do .env), PK_DOMAIN
 # (apex doména – při nasazení z GitHubu se propíše do .env), PK_ADMIN_PASSWORD (heslo správce – propíše se do .env, v demu
 # netřeba: demo@ksprehledy.cz / kolo-demo-2026), PK_VETEV (větev repa pro první klon), PK_UFW=0 (nenastavovat firewall),
@@ -26,7 +26,8 @@ set -euo pipefail
 
 if [ "$(id -u)" != 0 ]; then
   if [ -f "${BASH_SOURCE[0]:-}" ] && sudo -n true 2>/dev/null; then
-    exec sudo -n env PK_DOMAIN="${PK_DOMAIN:-}" PK_ADMIN_PASSWORD="${PK_ADMIN_PASSWORD:-}" PK_PLATFORMA_HESLO="${PK_PLATFORMA_HESLO:-}" PK_REPO_DIR="${PK_REPO_DIR:-}" \
+    exec sudo -n env PK_DOMAIN="${PK_DOMAIN:-}" PK_ADMIN_PASSWORD="${PK_ADMIN_PASSWORD:-}" PK_PLATFORMA_HESLO="${PK_PLATFORMA_HESLO:-}" \
+      PK_SMTP_HOST="${PK_SMTP_HOST:-}" PK_SMTP_PORT="${PK_SMTP_PORT:-}" PK_SMTP_USER="${PK_SMTP_USER:-}" PK_SMTP_PASS_B64="${PK_SMTP_PASS_B64:-}" PK_REPO_DIR="${PK_REPO_DIR:-}" \
       PK_COMPOSE="${PK_COMPOSE:-}" PK_ZALOHY="${PK_ZALOHY:-}" PK_VETEV="${PK_VETEV:-}" PK_UFW="${PK_UFW:-}" PK_CRON="${PK_CRON:-}" \
       PK_ZALOHY_POCET="${PK_ZALOHY_POCET:-}" bash "${BASH_SOURCE[0]}" "$@"
   fi
@@ -80,6 +81,17 @@ synchronizuj_env() {
     nastav_env PK_PLATFORMA_HESLO "$PK_PLATFORMA_HESLO"
     echo "→ Heslo správy platformy (/platforma) v .env aktualizováno podle nastavení GitHubu."
   fi
+  # SMTP pro odesílání e-mailů provozovateli (poptávky, kontaktní formulář); heslo jen v base64 (PK_SMTP_PASS_B64),
+  # aby znaky jako $ nebo uvozovky nerozbily .env. Prázdné = beze změny; hodnoty se nevypisují.
+  local k zmena=0
+  for k in PK_SMTP_HOST PK_SMTP_PORT PK_SMTP_USER PK_SMTP_PASS_B64; do
+    if [ -n "${!k:-}" ] && [ "$(sed -n "s/^$k=//p" "$env" | head -1)" != "${!k}" ]; then
+      nastav_env "$k" "${!k}"
+      zmena=1
+    fi
+  done
+  [ "$zmena" = 1 ] && echo "→ Nastavení odesílání e-mailů (SMTP) v .env aktualizováno podle nastavení GitHubu."
+  return 0
 }
 
 # Čeká, až aplikace v kontejneru odpoví na /api/health.
