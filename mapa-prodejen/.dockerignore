@@ -1,0 +1,13 @@
+# Do image nepatří stažené zdroje, testy, nástroje, nasazovací skripty ani lokální data a tajemství.
+cache/
+node_modules/
+test/
+tools/
+deploy/
+docs/
+server-data/
+.env
+.env.*
+!.env.example
+*.log
+.DS_Store

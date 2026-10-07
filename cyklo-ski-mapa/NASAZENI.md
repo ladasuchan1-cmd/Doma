@@ -259,6 +259,10 @@ přes Cloudflare a server je zvenčí vidět jen pro Cloudflare. Co to pro aplik
   `pujcovna-kol/deploy/vedle-mapy.sh`; adresář je připojený v `docker-compose.yml`) a **Kolomapa**
   (`/config/sites/*.caddy` ve svazku `caddy_config`). Oba adresáře `Caddyfile` importuje – prázdné nevadí.
   Řádky jsou v repu proto, aby je nasazení mapy nesmazalo a weby ostatních projektů nespadly.
+  Od 7. 10. 2026 tu je i **Mapa prodejen** (`mapa.ksprehledy.cz`, složka `mapa-prodejen/`): kontejner
+  `mapa-prodejen` v síti `deploy_default` a blok `/opt/caddy-extra/mapa-prodejen.caddy`, který zapisuje její
+  nasazení (`mapa-prodejen/NASAZENI.md`). Blok importuje Origin certifikát z `/etc/caddy/origin`, takže
+  `mapa` musí být v Cloudflare za proxy stejně jako ostatní weby.
 - **Vlastní klon mapy (od 7. 10. 2026).** Server sdílí Půjčovna kol a Kolomapa, které mají klon v `/opt/Doma`
   a přepínají si v něm své větve – nasazení mapy z něj tak jednou nasadilo cizí větev. Mapa má proto vlastní klon
   `/opt/cyklo-ski-mapa/Doma` (variable `CSM_HETZNER_DIR`). Při prvním nasazení do nového místa skript převzal

@@ -1,0 +1,24 @@
+# Mapa prodejen a servisů kol – blok pro Caddy Cyklo & Ski mapy (ta drží porty 80/443 celého serveru a importuje
+# /etc/caddy/extra/*.caddy). deploy/server.sh ho s dosazenou doménou zapíše do /opt/caddy-extra/mapa-prodejen.caddy,
+# ověří celou konfiguraci Caddy a teprve pak ji načte. Neupravovat na serveru ručně – přepíše se při nasazení.
+#
+# TLS: za Cloudflare (proxy) Cloudflare Origin certifikát *.ksprehledy.cz, který spravuje nasazení Cyklo & Ski mapy
+# (/opt/caddy-origin → /etc/caddy/origin); bez něj Let's Encrypt. Skutečnou adresu návštěvníka bere Caddy
+# z CF-Connecting-IP (globální nastavení v Caddyfile mapy) a aplikaci ji pošle jako jedinou v X-Forwarded-For.
+DOMENA {
+	import /etc/caddy/origin/*.caddy
+	encode zstd gzip
+	reverse_proxy mapa-prodejen:8094 {
+		header_up X-Forwarded-For {client_ip}
+	}
+	header {
+		Strict-Transport-Security "max-age=31536000"
+		-Server
+	}
+	log {
+		output file /data/access-mapa-prodejen.log {
+			roll_size 20mb
+			roll_keep 5
+		}
+	}
+}

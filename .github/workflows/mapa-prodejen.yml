@@ -1,0 +1,94 @@
+# Testy a nasazení Mapy prodejen a servisů kol (složka mapa-prodejen/) na mapa.ksprehledy.cz.
+#
+# Testy běží na každém pushi a PR, který se složky dotkne. Nasazení běží po pushi do hlavní větve repa
+# (default branch) a při ručním spuštění (Actions → „Mapa prodejen“ → Run workflow – i z jiné větve), jen když je
+# zapnuté proměnnou repa MP_HETZNER = 1 (Settings → Secrets and variables → Actions → Variables).
+#
+# Server je tentýž jako u Cyklo & Ski mapy, proto se používají její secrets: HETZNER_HOST, HETZNER_SSH_KEY,
+# volitelně HETZNER_USER (výchozí root; jiný účet potřebuje sudo bez hesla) a HETZNER_PORT. Uživatelé aplikace:
+# secret MP_USERS (jmeno:heslo;…), jinak HETZNER_USERS – tedy stejná jména a hesla jako mapa cyklotras.
+# Variable MP_DOMAIN = doména webu (výchozí mapa.ksprehledy.cz). Postup: mapa-prodejen/NASAZENI.md.
+#
+# Runner pošle na server archiv složky mapa-prodejen z právě testovaného commitu a spustí deploy/server.sh nasadit
+# (skript přes stdin, hesla v base64 před skriptem – ne v příkazové řádce). Na serveru se nic nestahuje z gitu.
+name: Mapa prodejen
+
+on:
+  push:
+    branches: ["**"]
+    paths:
+      - "mapa-prodejen/**"
+      - ".github/workflows/mapa-prodejen.yml"
+  pull_request:
+    paths:
+      - "mapa-prodejen/**"
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.event_name == 'pull_request' && format('mp-pr-{0}', github.ref) || 'mp-deploy' }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: mapa-prodejen
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Testy knihoven, serveru a konzistence dat
+        run: npm test
+
+  deploy:
+    needs: test
+    if: github.event_name != 'pull_request' && vars.MP_HETZNER == '1' && (github.event_name == 'workflow_dispatch' || github.ref_name == github.event.repository.default_branch)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Nasazení přes SSH (archiv vydání + deploy/server.sh nasadit)
+        env:
+          HOST: ${{ secrets.HETZNER_HOST }}
+          USER: ${{ secrets.HETZNER_USER }}
+          PORT: ${{ secrets.HETZNER_PORT }}
+          KEY: ${{ secrets.HETZNER_SSH_KEY }}
+          MP_USERS: ${{ secrets.MP_USERS }}
+          HETZNER_USERS: ${{ secrets.HETZNER_USERS }}
+          DOMAIN: ${{ vars.MP_DOMAIN }}
+        run: |
+          test -n "$HOST" || { echo "Chybí secret HETZNER_HOST (stejný jako pro Cyklo & Ski mapu)"; exit 1; }
+          test -n "$KEY" || { echo "Chybí secret HETZNER_SSH_KEY"; exit 1; }
+          mkdir -p ~/.ssh
+          # Klíč vložený ze schránky (Windows) mívá CRLF, BOM nebo je slepený do jednoho řádku – znovu ho zalomíme.
+          raw="$(printf '%s\n' "$KEY" | sed '1s/^\xEF\xBB\xBF//' | tr -d '\r')"
+          typ="$(printf '%s\n' "$raw" | grep -o -m1 'BEGIN [A-Z0-9 ]*PRIVATE KEY' | sed 's/^BEGIN //')"
+          test -n "$typ" || { echo "Secret HETZNER_SSH_KEY neobsahuje soukromý klíč (řádek -----BEGIN … PRIVATE KEY-----)."; exit 1; }
+          body="$(printf '%s\n' "$raw" | sed -e 's/-----BEGIN [A-Z0-9 ]*PRIVATE KEY-----//' -e 's/-----END [A-Z0-9 ]*PRIVATE KEY-----//' | tr -d '[:space:]')"
+          { echo "-----BEGIN $typ-----"; printf '%s\n' "$body" | fold -w 70; echo "-----END $typ-----"; } > ~/.ssh/id_deploy
+          chmod 600 ~/.ssh/id_deploy
+          ssh-keygen -y -P "" -f ~/.ssh/id_deploy >/dev/null || { echo "Secret HETZNER_SSH_KEY není použitelný klíč (chráněný heslem?)."; exit 1; }
+          echo "Klíč v pořádku, otisk: $(ssh-keygen -lf ~/.ssh/id_deploy | awk '{print $2}')"
+          ssh-keyscan -p "${PORT:-22}" -H "$HOST" >> ~/.ssh/known_hosts 2>/dev/null
+          SUDO=""; [ "${USER:-root}" != "root" ] && SUDO="sudo -n"
+          ssh_cmd() { ssh -i ~/.ssh/id_deploy -p "${PORT:-22}" -o StrictHostKeyChecking=yes "${USER:-root}@$HOST" "$@"; }
+          USERS="${MP_USERS:-$HETZNER_USERS}"
+          USERS_B64="$(printf %s "$USERS" | base64 -w0)"
+          [ -n "$USERS_B64" ] && echo "::add-mask::$USERS_B64"
+          [ -n "$USERS" ] || echo "Secret MP_USERS ani HETZNER_USERS není – server převezme uživatele z Cyklo & Ski mapy."
+          SHA="$(git rev-parse HEAD)"
+          VERZE="v$(git log -1 --format=%cd --date=format:%Y-%m-%d)-$(git rev-parse --short=7 HEAD)"
+          DOM="${DOMAIN:-mapa.ksprehledy.cz}"
+          echo "→ Posílám vydání $VERZE (složka mapa-prodejen) na server…"
+          git archive --format=tar.gz HEAD mapa-prodejen \
+            | ssh_cmd "$SUDO mkdir -p /opt/mapa-prodejen/vydani && $SUDO tee /opt/mapa-prodejen/vydani/$SHA.tar.gz >/dev/null"
+          echo "→ Nasazuji na $DOM…"
+          { printf 'export MP_USERS_B64=%q\n' "$USERS_B64"; cat mapa-prodejen/deploy/server.sh; } \
+            | ssh_cmd "$SUDO env MP_VYDANI='$SHA' MP_VERZE='$VERZE' MP_DOMENA='$DOM' bash -s -- nasadit"

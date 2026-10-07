@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="cs">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light dark">
+  <meta name="description" content="Mapa prodejen a servisů kol v ČR – velikost firem podle ARES/ČSÚ, objednávky e-shopu podle obcí a hledání partnerů pro spolupráci.">
+  <title>Mapa prodejen a servisů kol</title>
+  <link rel="icon" href="favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="vendor/leaflet/leaflet.css">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div id="app" class="app">
+    <header class="top">
+      <div class="brand">
+        <span class="brand-mark" aria-hidden="true">🚲</span>
+        <div class="brand-text">
+          <strong>Mapa prodejen a servisů kol</strong>
+          <small id="meta-line">Načítám data…</small>
+        </div>
+      </div>
+      <nav class="crumbs" id="crumbs" aria-label="Oblast"></nav>
+      <div class="top-actions">
+        <input id="search" class="input search" type="search" placeholder="Hledat prodejnu, firmu, IČO, obec, značku…" autocomplete="off" aria-label="Hledat">
+        <button id="btn-view" class="btn" type="button" title="Přepnout mapu / tabulku">Tabulka</button>
+        <button id="btn-obj" class="btn" type="button" title="Nahrát objednávky z e-shopu (CSV / XLSX) – na server jdou jen součty podle PSČ">Objednávky</button>
+        <button id="btn-add" class="btn" type="button" title="Přidat prodejnu, servis nebo naši pobočku, která v datech chybí">+ Místo</button>
+        <button id="btn-data" class="btn" type="button" title="Export, záloha stavu, import obratů, naše firma">Data</button>
+        <button id="btn-theme" class="btn btn-icon" type="button" title="Tmavý / světlý režim" aria-label="Přepnout motiv">◐</button>
+        <span id="user-box" class="user-box hidden"><span id="user-name"></span><a href="logout" class="btn btn-sm btn-ghost" title="Odhlásit se">Odhlásit</a></span>
+      </div>
+    </header>
+
+    <div class="body">
+      <aside class="filters" id="filters" aria-label="Filtry">
+        <div class="boot" id="boot">Načítám data…</div>
+      </aside>
+
+      <main class="map-wrap" id="map-wrap">
+        <div id="map" class="map" role="application" aria-label="Mapa"></div>
+        <div id="legend" class="legend" aria-label="Legenda"></div>
+        <div id="table-wrap" class="table-wrap hidden"></div>
+      </main>
+
+      <aside class="side" id="side" aria-label="Seznam a detail">
+        <div class="side-tabs" id="side-tabs" role="tablist"></div>
+        <div class="side-list" id="side-list"></div>
+        <div class="side-detail hidden" id="side-detail"></div>
+      </aside>
+    </div>
+  </div>
+
+  <div id="toast" class="toast hidden" role="status"></div>
+  <div id="modal-root"></div>
+
+  <noscript><p style="padding:24px">Aplikace vyžaduje zapnutý JavaScript.</p></noscript>
+
+  <script src="vendor/leaflet/leaflet.js"></script>
+  <script src="lib/geo.js"></script>
+  <script src="lib/csv.js"></script>
+  <script src="lib/stav.js"></script>
+  <script src="lib/velikost.js"></script>
+  <script src="lib/objednavky.js"></script>
+  <script src="lib/partneri.js"></script>
+  <script src="lib/vlastni.js"></script>
+  <script src="lib/xlsx.js"></script>
+  <script src="data/meta.js"></script>
+  <script src="data/hranice.js"></script>
+  <script src="data/mista.js"></script>
+  <script src="data/firmy.js"></script>
+  <script src="data/weby.js"></script>
+  <script src="data/psc.js"></script>
+  <script src="data/obce.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>

@@ -1,0 +1,69 @@
+# Měsíční obnova dat Mapy prodejen: znovu stáhne prodejny, servisy a půjčovny z OpenStreetMap, firmy z ARES
+# (s počtem zaměstnanců od ČSÚ), projde weby prodejen (kontakty, IČO, služby, značky), PSČ a obce, výsledek
+# commitne do hlavní větve a spustí workflow „Mapa prodejen“ (testy + nasazení) – pushe z Actions ho samy
+# nespouštějí. Ručně: Actions → „Mapa prodejen – obnova dat“ → Run workflow. Data týmu (stav spolupráce,
+# objednávky, ručně přidaná místa, obraty) jsou na serveru a obnova se jich nedotkne.
+name: Mapa prodejen – obnova dat
+
+on:
+  schedule:
+    - cron: "37 3 1 * *"   # 1. den v měsíci 3:37 UTC
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  actions: write
+
+concurrency:
+  group: mp-data
+  cancel-in-progress: false
+
+jobs:
+  obnova:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - name: Hlavní větev repa
+        id: vetev
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: echo "nazev=$(gh repo view ${{ github.repository }} --json defaultBranchRef -q .defaultBranchRef.name)" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ steps.vetev.outputs.nazev }}
+
+      - name: Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Sestavení dat (nové stažení zdrojů a průchod webů)
+        working-directory: mapa-prodejen
+        run: node tools/build-data.js --fetch --concurrency 10
+
+      - name: Testy nad novými daty
+        working-directory: mapa-prodejen
+        run: npm test
+
+      - name: Commit a push
+        id: commit
+        working-directory: mapa-prodejen
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add data/*.js
+          if git diff --cached --quiet; then
+            echo "Žádná změna dat."
+            echo "changed=0" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          git commit -m "Mapa prodejen: měsíční obnova dat ($(date +%Y-%m-%d))"
+          git push origin "HEAD:${{ steps.vetev.outputs.nazev }}"
+          echo "changed=1" >> "$GITHUB_OUTPUT"
+
+      - name: Spustit testy a nasazení nad novými daty
+        if: steps.commit.outputs.changed == '1'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh workflow run mapa-prodejen.yml --ref "${{ steps.vetev.outputs.nazev }}"

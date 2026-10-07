@@ -1,0 +1,16 @@
+{
+  "name": "mapa-prodejen",
+  "version": "0.1.0",
+  "description": "Mapa prodejen a servisů kol v ČR – velikost firem podle ARES/ČSÚ, objednávky e-shopu podle PSČ a hledání partnerů pro spolupráci.",
+  "private": true,
+  "type": "commonjs",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "start": "node server.js",
+    "build-data": "node tools/build-data.js",
+    "test": "node --test \"test/**/*.test.js\""
+  },
+  "license": "MIT"
+}

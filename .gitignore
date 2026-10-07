@@ -15,3 +15,7 @@ cyklo-ski-mapa/.env
 cyklo-ski-mapa/deploy/.env
 cyklo-ski-mapa/data/.secret
 cyklo-ski-mapa/data/stav.json.tmp
+mapa-prodejen/cache/
+mapa-prodejen/server-data/
+mapa-prodejen/.env
+mapa-prodejen/deploy/.env
