@@ -124,6 +124,29 @@ test('send: nespojí-li se, chyba jmenuje host:port a kód (ne prázdný text); 
   assert.equal(smtp.popisChyby(null), 'neznámá chyba');
 });
 
+test('send: server po STARTTLS zmlkne (TLS handshake visí) → send() skončí chybou s krokem, nezasekne frontu', async () => {
+  const server = net.createServer((socket) => {
+    socket.on('error', () => {});
+    socket.write('220 test ESMTP\r\n');
+    socket.on('data', (d) => {
+      const t = d.toString();
+      if (/^EHLO/i.test(t)) socket.write('250-test\r\n250-STARTTLS\r\n250 AUTH PLAIN LOGIN\r\n');
+      else if (/^STARTTLS/i.test(t)) socket.write('220 Ready to start TLS\r\n'); // a dál nic – handshake neodpoví
+    });
+  });
+  await new Promise((r) => server.listen(0, '127.0.0.1', r));
+  try {
+    const t0 = Date.now();
+    await assert.rejects(
+      smtp.send({ host: '127.0.0.1', port: server.address().port, secure: 'starttls', user: 'u', pass: 'p', timeoutMs: 400 }, { from: 'a@b.cz', to: 'c@d.cz', data: 'x' }),
+      /vypršel časový limit \(TLS po STARTTLS, 127\.0\.0\.1:\d+\)/,
+    );
+    assert.ok(Date.now() - t0 < 3000, 'limit platí na celý rozhovor');
+  } finally {
+    server.close();
+  }
+});
+
 test('config: PK_SMTP_* → config.smtp (465 = tls, 587 = starttls); bez hostitele null', () => {
   assert.equal(loadConfig({ PK_DATA: '/tmp/x' }).smtp, null);
   const c = loadConfig({ PK_DATA: '/tmp/x', PK_SMTP_HOST: 'smtp.cesky-hosting.cz', PK_SMTP_USER: 'info@ksprehledy.cz', PK_SMTP_PASS: 'x' }).smtp;

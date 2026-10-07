@@ -6,7 +6,7 @@
 //   tls       implicitní TLS (port 465, např. smtp.cesky-hosting.cz)
 //   starttls  prostý spoj + STARTTLS (port 587); bez nabídky STARTTLS se neodesílá
 //   none      bez šifrování – jen pro localhost (testy); jinde se odmítne
-// AUTH PLAIN (s TLS), jinak AUTH LOGIN. Časový limit 20 s na celý rozhovor. Nikdy nelogovat adresy, heslo ani tělo zprávy –
+// AUTH PLAIN (s TLS), jinak AUTH LOGIN. Pevný časový limit 20 s na celý rozhovor (smtp.timeoutMs) – send() se vždy vyřídí. Nikdy nelogovat adresy, heslo ani tělo zprávy –
 // chyba nese jen kód a text odpovědi serveru (bez parametrů příkazu).
 
 const net = require('node:net');
@@ -139,14 +139,16 @@ async function send(smtp, { from, to, data }) {
   let socket = secure === 'tls' ? tls.connect(opts) : net.connect(opts);
   const reader = responseReader(socket);
   reader.attach(socket);
-  const timer = setTimeout(() => socket.destroy(new Error('SMTP: vypršel časový limit.')), TIMEOUT_MS);
+  let krok = 'spojení';
   const write = (line) => socket.write(`${line}\r\n`);
   const expect = async (codes, step) => {
+    krok = step;
     const r = await reader.next();
     if (!codes.includes(r.code)) throw new Error(`SMTP ${step}: ${r.code} ${(r.lines[r.lines.length - 1] || '').slice(4, 200)}`);
     return r;
   };
-  try {
+
+  async function rozhovor() {
     try {
       await expect([220], 'pozdrav');
     } catch (e) {
@@ -160,10 +162,13 @@ async function send(smtp, { from, to, data }) {
       if (!ehlo.lines.some((l) => /STARTTLS/i.test(l))) throw new Error('SMTP: server nenabízí STARTTLS.');
       write('STARTTLS');
       await expect([220], 'STARTTLS');
+      krok = 'TLS po STARTTLS';
       reader.detach(socket);
+      const plain = socket;
       socket = await new Promise((resolve, reject) => {
-        const s = tls.connect({ socket, servername: smtp.host }, () => resolve(s));
+        const s = tls.connect({ socket: plain, servername: smtp.host }, () => resolve(s));
         s.once('error', reject);
+        s.once('close', () => reject(new Error('SMTP: spojení uzavřeno během TLS.')));
       });
       reader.attach(socket);
       tlsOn = true;
@@ -191,13 +196,25 @@ async function send(smtp, { from, to, data }) {
     write('DATA');
     await expect([354], 'DATA');
     // dot-stuffing: řádek začínající tečkou se zdvojí
+    krok = 'odeslání';
     socket.write(`${String(data).replace(/(^|\r\n)\./g, '$1..')}\r\n.\r\n`);
     const done = await expect([250], 'odeslání');
     write('QUIT');
     return { ok: true, response: (done.lines[done.lines.length - 1] || '').slice(4, 200) };
+  }
+
+  // Pevný limit na celý rozhovor: send() se vždy vyřídí, i když se zasekne něco, co samo chybu nevyhodí (TLS handshake
+  // po STARTTLS) – jinak by visel job mail-sender a s ním celá fronta. Chyba jmenuje krok, ve kterém se čekalo.
+  let timer;
+  const limit = new Promise((_, reject) => {
+    timer = setTimeout(() => reject(new Error(`SMTP: vypršel časový limit (${krok}, ${smtp.host}:${smtp.port}).`)), smtp.timeoutMs || TIMEOUT_MS);
+  });
+  try {
+    return await Promise.race([rozhovor(), limit]);
   } finally {
     clearTimeout(timer);
-    setTimeout(() => socket.destroy(), 200).unref();
+    const s = socket; // po QUIT chvíli počkat, ať příkaz odejde; při chybě/limitu zavřít v každém případě
+    setTimeout(() => s.destroy(), 200).unref();
   }
 }
 
