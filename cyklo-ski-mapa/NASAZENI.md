@@ -245,6 +245,11 @@ přes Cloudflare a server je zvenčí vidět jen pro Cloudflare. Co to pro aplik
 Do mapy se dostane jen člověk s e-mailem **@koloshop.cz**, kterého pustí Cloudflare Access – stejně jako
 u R01 Sales. Jména a hesla aplikace (`HETZNER_USERS`) se v tomto režimu nepoužívají a přihlásit se jimi nejde.
 
+> **Stav: zapnuto 7. 10. 2026.** Aplikace v Zero Trust pro `cyklomapa.ksprehledy.cz`, tým `bold-dust-a2b5`,
+> AUD končí `…7dd58cf6`, e-maily `@koloshop.cz`. Nasazení ověřilo, že server bez tokenu Access vrací 403.
+> Do té doby se přihlašovalo jménem a heslem aplikace; záznamy z té doby mají ve sloupci „Upravil“ jméno,
+> novější e-mail.
+
 **Jak to funguje.** Cloudflare Access stojí před webem: nepřihlášenému vrátí svou přihlašovací stránku (tým
 `bold-dust-a2b5`). Přihlášenému přidá Cloudflare ke každému požadavku na server podepsaný token
 (`Cf-Access-Jwt-Assertion`). Aplikace ho ověří – podpis klíčem týmu Access (stahuje
@@ -259,7 +264,12 @@ kontejneru). Ověření odpovídá `core/cfaccess.py` v R01 Sales, stejné jsou 
    private → Add public hostname** `cyklomapa.ksprehledy.cz`. Pravidlo (policy): **Allow**, Include **Emails ending
    in** `@koloshop.cz` – nebo stávající pravidlo pro Koloshop z R01 Sales. Přihlašovací metody a délku relace
    (Session Duration, např. 1 týden) podle zvyklosti. Uložit.
-2. V téže aplikaci **Configure → Additional settings** zkopírovat **Application Audience (AUD) Tag**.
+2. V téže aplikaci **Configure → Additional settings** zkopírovat **Application Audience (AUD) Tag**. Když ho
+   tam Cloudflare neukáže (7. 10. 2026 nebyl vidět), stačí ho vzít z přesměrování na přihlášení – je to parametr
+   `kid`:
+   ```bash
+   curl -sS -o /dev/null -w '%{redirect_url}' https://cyklomapa.ksprehledy.cz/ | sed -n 's/.*[?&]kid=\([0-9a-f]*\).*/\1/p'
+   ```
 3. GitHub → Settings → Secrets and variables → Actions → **Variables**: `CSM_ACCESS_AUD` = AUD tag. Volitelně
    `CSM_ACCESS_TEAM` (výchozí `bold-dust-a2b5`) a `CSM_ACCESS_DOMENY` (výchozí `koloshop.cz`, víc domén čárkou).
 4. Actions → „Cyklo & Ski mapa“ → Run workflow. Skript nejdřív ověří, že `https://cyklomapa.ksprehledy.cz/`
