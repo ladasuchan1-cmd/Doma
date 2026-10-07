@@ -6,7 +6,8 @@ Nasazení dělá jeden skript (`nasadit.sh`) – ručně v konzoli Hetzneru, neb
 (stejně jako Cashflow Radar).
 
 Výsledek: **https://kolomapa.37-27-203-154.sslip.io** s heslem; stahování běží každý den v 05:30 přímo na serveru.
-Adresa je podle IP serveru (sslip.io), takže nepotřebuje žádnou DNS – vlastní doménu lze dát kdykoli (níže).
+Adresa je podle IP serveru (sslip.io), takže nepotřebuje žádnou DNS – vlastní doména (`kolomapa.ksprehledy.cz`) je
+jeden příkaz navíc, viz níže.
 
 ## První nasazení – jeden příkaz přes SSH
 
@@ -94,13 +95,22 @@ v `/root/kolomapa.env` – pak se z Cyklo & Ski mapy nic neopisuje. Přihlášen
 odhlášení = zavřít prohlížeč. Session Cyklo & Ski mapy (cookie) se nesdílí – jde o stejná jména a hesla, ne o
 společné přihlášení.
 
-## Vlastní doména místo sslip.io
+## Vlastní doména místo sslip.io (kolomapa.ksprehledy.cz)
 
-1. U správce domény přidejte záznam **A**, např. `kolomapa.ksprehledy.cz` → `37.27.203.154`
-   (je-li doména za Cloudflare, záznam dejte „DNS only“ – šedý mráček, ať certifikát vyřídí Caddy).
-2. V `/root/kolomapa.env` přepište `KOLOMAPA_DOMENA=kolomapa.ksprehledy.cz`.
-3. `bash /root/Doma/kolomapa/deploy/docker/nasadit.sh` – přepíše blok v Caddy na novou doménu (u Caddy s blokem přímo
-   v Caddyfile přidá nový; starý pro sslip.io můžete smazat).
+1. U správce domény záznam **A** `kolomapa.ksprehledy.cz` → `37.27.203.154`. Doména ksprehledy.cz je na Cloudflare:
+   záznam musí být „DNS only“ (šedý mráček), ať certifikát vyřídí Caddy sama – oranžový mráček (proxy) by
+   vydání certifikátu rozbil. (Záznam už existuje a míří na server.)
+2. Na serveru jeden příkaz – doménu zapíše do `/root/kolomapa.env`, přepíše blok Caddy a Caddy si do minuty vyřídí
+   certifikát Let's Encrypt:
+
+   ```bash
+   KOLOMAPA_DOMENA=kolomapa.ksprehledy.cz bash /root/Doma/kolomapa/deploy/docker/nasadit.sh
+   ```
+
+   Původní adresa `https://kolomapa.37-27-203-154.sslip.io` pak trvale přesměrovává na novou (staré odkazy a záložky
+   fungují dál). Zpět na sslip.io: `KOLOMAPA_DOMENA=kolomapa.37-27-203-154.sslip.io bash …/nasadit.sh`.
+   U Caddy s bloky přímo v Caddyfile (ksprehledy.cz server) se přidá nový blok; starý blok pro sslip.io, je-li tam,
+   zůstává a přesměrování se nepřidá.
 
 ## Nastavení (`/root/kolomapa.env`)
 

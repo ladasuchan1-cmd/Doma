@@ -152,11 +152,13 @@ if [[ -f "$CSM_ENV" ]] && grep -qE '^CSM_(USERS|PASSWORD)=.' "$CSM_ENV"; then UZ
 # --- Nastavení (/root/kolomapa.env) -----------------------------------------------------------------------------
 # Výchozí doména: kolomapa.<veřejná IP serveru s pomlčkami>.sslip.io – funguje bez vlastní DNS, Caddy si pro ni
 # vyřídí certifikát sama. Vlastní doménu (kolomapa.ksprehledy.cz) stačí zapsat do KOLOMAPA_DOMENA a přidat záznam A.
-vychozi_domena() {
+vychozi_domena() {   # kolomapa.<IP>.sslip.io podle veřejné IP serveru; bez ní prázdné (KOLOMAPA_VYCHOZI_DOMENA = přepis pro zkoušky)
   local ip
+  if [[ -n "${KOLOMAPA_VYCHOZI_DOMENA:-}" ]]; then echo "$KOLOMAPA_VYCHOZI_DOMENA"; return; fi
   ip="$(hostname -I 2>/dev/null | tr ' ' '\n' | grep -E '^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$' | grep -vE '^(10\.|127\.|172\.(1[6-9]|2[0-9]|3[01])\.|192\.168\.)' | head -1 || true)"
-  if [[ -n "$ip" ]]; then echo "kolomapa.${ip//./-}.sslip.io"; else echo "kolomapa.ksprehledy.cz"; fi
+  [[ -n "$ip" ]] && echo "kolomapa.${ip//./-}.sslip.io"
 }
+VYCHOZI_DOMENA="$(vychozi_domena)"
 NOVE_HESLO=""
 if [[ ! -f "$ENV_SOUBOR" ]]; then
   if [[ "$UZIVATELE" == csm ]]; then
@@ -195,9 +197,16 @@ EOF
 fi
 hodnota() { sed -n "s/^$1=//p" "$ENV_SOUBOR" | tail -1 | tr -d '\r'; }
 DOMENA="${KOLOMAPA_DOMENA:-$(hodnota KOLOMAPA_DOMENA)}"
-DOMENA="${DOMENA:-$(vychozi_domena)}"
+DOMENA="${DOMENA:-$VYCHOZI_DOMENA}"
 PROHLIZEC="${KOLOMAPA_PROHLIZEC:-$(hodnota KOLOMAPA_PROHLIZEC)}"
+[[ -n "$DOMENA" ]] || die "nenašel jsem veřejnou IP adresu serveru – zadejte doménu: KOLOMAPA_DOMENA=mapa.vase-domena.cz bash nasadit.sh"
 [[ "$DOMENA" =~ ^[A-Za-z0-9]([A-Za-z0-9-]*[A-Za-z0-9])?(\.[A-Za-z0-9]([A-Za-z0-9-]*[A-Za-z0-9])?)+$ ]] || die "KOLOMAPA_DOMENA=„$DOMENA“ nevypadá jako doména"
+# Doména zadaná proměnnou (KOLOMAPA_DOMENA=… bash nasadit.sh) se zapíše do nastavení, aby platila i pro příští nasazení.
+if [[ -n "${KOLOMAPA_DOMENA:-}" && "$(hodnota KOLOMAPA_DOMENA)" != "$KOLOMAPA_DOMENA" ]]; then
+  say "Doména $KOLOMAPA_DOMENA → zapisuji do $ENV_SOUBOR"
+  if grep -q '^KOLOMAPA_DOMENA=' "$ENV_SOUBOR"; then sed -i "s|^KOLOMAPA_DOMENA=.*|KOLOMAPA_DOMENA=$KOLOMAPA_DOMENA|" "$ENV_SOUBOR"
+  else printf '\nKOLOMAPA_DOMENA=%s\n' "$KOLOMAPA_DOMENA" >>"$ENV_SOUBOR"; fi
+fi
 if grep -qE '^KOLOMAPA_USERS(_FILE)?=.' "$ENV_SOUBOR"; then UZIVATELE=vlastni; fi
 [[ -n "$UZIVATELE" ]] || grep -q '^KOLOMAPA_PASSWORD=.\+' "$ENV_SOUBOR" || die "v $ENV_SOUBOR chybí KOLOMAPA_PASSWORD (a na serveru není Cyklo & Ski mapa s uživateli) – mapa na internetu musí mít heslo"
 HESLO_TAKE="$(hodnota KOLOMAPA_PASSWORD)"
@@ -274,6 +283,15 @@ $DOMENA {
 # bezpečnostní hlavičky sdílené s ostatními aplikacemi (snippet header_sec), když v Caddyfile jsou
 if [[ -f "$CADDYFILE" ]] && grep -q '^(header_sec)' "$CADDYFILE"; then BLOK="${BLOK/reverse_proxy/import header_sec
     reverse_proxy}"; fi
+# Vlastní doména: původní adresa podle IP (sslip.io) přesměrovává na ni, aby staré odkazy a záložky fungovaly dál.
+PRESMEROVANI=""
+if [[ -n "$VYCHOZI_DOMENA" && "$DOMENA" != "$VYCHOZI_DOMENA" ]]; then
+  PRESMEROVANI="
+# Původní adresa Kolomapy podle IP serveru → přesměrování na $DOMENA (přidal kolomapa/deploy/docker/nasadit.sh)
+$VYCHOZI_DOMENA {
+    redir https://$DOMENA{uri} permanent
+}"
+fi
 
 caddy_docker_nacti() {   # ověřit a načíst konfiguraci běžícího kontejneru Caddy; 1 = kontrola neprošla
   docker exec "$CADDY" caddy validate --config "$CADDY_CONFIG" >/dev/null 2>&1 || return 1
@@ -330,7 +348,7 @@ elif [[ "$ZPUSOB" == sites ]]; then
     # >> drží stejný soubor (inode) – kontejner caddy ho má připojený, nový soubor by neviděl
     printf '\n%s\n%s\n' "$IMPORT_KOMENTAR" "$IMPORT_RADEK" >>"$CADDYFILE"
   fi
-  printf '%s\n' "$BLOK" | docker exec -i "$CADDY" sh -c "mkdir -p '$CADDY_SITES' && cat >'$SOUBOR'"
+  printf '%s\n' "$BLOK$PRESMEROVANI" | docker exec -i "$CADDY" sh -c "mkdir -p '$CADDY_SITES' && cat >'$SOUBOR'"
   if caddy_docker_nacti; then
     echo "   Caddy načetla novou konfiguraci"
   else
@@ -342,8 +360,13 @@ elif [[ "$ZPUSOB" == sites ]]; then
 else
   say "Caddy: přidávám blok pro $DOMENA do $CADDYFILE"
   cp "$CADDYFILE" "$CADDYFILE.zaloha"
+  # přesměrování z původní adresy jen když pro ni v Caddyfile ještě žádný blok není (starý blok by ho vyloučil)
+  if [[ -n "$PRESMEROVANI" ]] && grep -qE "^[[:space:]]*$VYCHOZI_DOMENA([[:space:],{]|$)" "$CADDYFILE"; then
+    echo "   $VYCHOZI_DOMENA má v $CADDYFILE vlastní blok – nechávám (přesměrování na $DOMENA přidejte ručně, chcete-li)"
+    PRESMEROVANI=""
+  fi
   # >> drží stejný soubor (inode) – kontejner caddy ho má připojený, nový soubor by neviděl
-  printf '\n%s\n' "$BLOK" >>"$CADDYFILE"
+  printf '\n%s\n' "$BLOK$PRESMEROVANI" >>"$CADDYFILE"
   case "$REZIM" in
     docker)
       if caddy_docker_nacti; then
@@ -407,7 +430,7 @@ for i in $(seq 1 30); do
       esac
     fi
     echo
-    echo "Mapa:       https://$DOMENA"
+    echo "Mapa:       https://$DOMENA${PRESMEROVANI:+   (https://$VYCHOZI_DOMENA přesměrovává sem)}"
     case "$UZIVATELE" in
       csm)     echo "Přihlášení: jména a hesla z Cyklo & Ski mapy ($CSM_ENV)${HESLO_TAKE:+; navíc KOLOMAPA_PASSWORD z $ENV_SOUBOR s libovolným jménem}" ;;
       vlastni) echo "Přihlášení: podle KOLOMAPA_USERS / KOLOMAPA_USERS_FILE v $ENV_SOUBOR${HESLO_TAKE:+ (+ KOLOMAPA_PASSWORD, jméno libovolné)}" ;;

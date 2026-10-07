@@ -97,6 +97,10 @@ test('docker: nasadit.sh je platný bash, nasazuje jen s heslem a šablona .env 
   assert.match(s, /PUBLISH=\(-p "127\.0\.0\.1:\$PORT:\$PORT"\)/);
   assert.doesNotMatch(s, /-p "\$PORT:|-p 0\.0\.0\.0|-p "\$\{?PORT\}?:/);
   assert.match(s, /sslip\.io/, 'výchozí adresa bez vlastní DNS');
+  // vlastní doména: KOLOMAPA_DOMENA=… bash nasadit.sh se zapíše do nastavení a původní adresa (sslip.io) přesměrovává
+  assert.match(s, /sed -i "s\|\^KOLOMAPA_DOMENA=\.\*\|KOLOMAPA_DOMENA=\$KOLOMAPA_DOMENA\|" "\$ENV_SOUBOR"/);
+  assert.match(s, /redir https:\/\/\$DOMENA\{uri\} permanent/);
+  assert.match(s, /"\$BLOK\$PRESMEROVANI"/);
   assert.match(s, /--network "\$SIT"/);
   // stálé jméno hostitele + smazání zámku běhu po zabitém kontejneru (jinak by nový server čekal na „jiný proces“)
   assert.match(s, /--hostname "\$APP"/);
