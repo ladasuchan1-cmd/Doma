@@ -144,6 +144,10 @@ Ostatní volby (`KOLOMAPA_DELAY_MS`, `KOLOMAPA_MAX_DETAILS`, `KOLOMAPA_AI_MAX_PE
 
 ## Řešení potíží
 
+Nejdřív `bash /root/Doma/kolomapa/deploy/docker/nasadit.sh --stav` – vypíše kontejner, doménu, Caddy (řádek import
+v Caddyfile i v kontejneru, blok Kolomapy, zda běžící konfigurace Caddy doménu zná, certifikáty) a poslední chyby
+z logů. Nic nemění.
+
 | Příznak | Příčina / řešení |
 |---|---|
 | job `deploy` visí na „Waiting for a runner“ | runner neběží (`cd /root/actions-runner-kolomapa && ./svc.sh status`) nebo nemá štítek `kolomapa` |

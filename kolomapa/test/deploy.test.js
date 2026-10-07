@@ -108,6 +108,9 @@ test('docker: nasadit.sh je platný bash, nasazuje jen s heslem a šablona .env 
   assert.match(s, /--env-file "\$ENV_SOUBOR"/);
   assert.match(s, /-v "\$DATA":\/app\/data/);
   assert.match(s, /caddy validate --config/, 'Caddyfile se před reloadem ověří');
+  assert.doesNotMatch(s, /caddy reload --config "\$CADDY_CONFIG" >\/dev\/null 2>&1 \|\| true/, 'selhání reloadu se nesmí ignorovat');
+  assert.match(s, /localhost:2019\/config\/apps\/http\/servers/, 'po reloadu se ověří, že běžící konfigurace doménu zná');
+  assert.match(s, /^if \[\[ "\$\{1:-\}" == "--stav" \]\]; then$/m, 'nasadit.sh --stav');
   assert.match(s, /chmod 600 "\$ENV_SOUBOR"/);
   // Caddy ze stacku Cyklo & Ski mapy (deploy-caddy-1): kontejner podle obrazu, ne jen podle jména „caddy“; její
   // Caddyfile je v git klonu, proto blok do svazku caddy_config (/config/sites/kolomapa.caddy) + řádek import,

@@ -4,6 +4,7 @@
 #
 # Skript běží NA SERVERU – pouští ho GitHub Actions přes self-hosted runner (štítek „kolomapa“), nebo ručně
 # v konzoli Hetzneru:   bash /root/Doma/kolomapa/deploy/docker/nasadit.sh
+# Jen stav (nic nenasazuje): bash …/nasadit.sh --stav – kontejner, Caddy, řádek import, blok, certifikáty, logy.
 # Je schválně jeden pro obě cesty, aby se ruční zásah a automat nerozešly. Lze spouštět opakovaně.
 #
 # Co se kde drží:
@@ -211,6 +212,41 @@ if grep -qE '^KOLOMAPA_USERS(_FILE)?=.' "$ENV_SOUBOR"; then UZIVATELE=vlastni; f
 [[ -n "$UZIVATELE" ]] || grep -q '^KOLOMAPA_PASSWORD=.\+' "$ENV_SOUBOR" || die "v $ENV_SOUBOR chybí KOLOMAPA_PASSWORD (a na serveru není Cyklo & Ski mapa s uživateli) – mapa na internetu musí mít heslo"
 HESLO_TAKE="$(hodnota KOLOMAPA_PASSWORD)"
 
+# --- Jen stav (--stav) ------------------------------------------------------------------------------------------
+# Co potřebuje vidět člověk, když se mapa neotevře: běží kontejner? zná Caddy doménu? je řádek import i blok tam, kde
+# je Caddy čte? má certifikát? co říká log? Nic nemění.
+if [[ "${1:-}" == "--stav" ]]; then
+  say "Stav Kolomapy na tomto serveru"
+  echo "Kontejner:    $(docker ps -a --filter "name=^$APP\$" --format '{{.Status}}, obraz {{.Image}}' | head -1)"
+  echo "Doména:       $DOMENA${VYCHOZI_DOMENA:+   (adresa podle IP: $VYCHOZI_DOMENA)}"
+  echo "Caddy:        $REZIM${CADDY:+ – kontejner $CADDY, $(docker ps --filter "name=^$CADDY\$" --format '{{.Status}}' | head -1)}"
+  if [[ -n "${CADDYFILE:-}" && -f "$CADDYFILE" ]]; then
+    IMPORT_JE=NE; grep -qxF "$IMPORT_RADEK" "$CADDYFILE" && IMPORT_JE=ano
+    GITSTAV=""
+    if [[ -n "$KLON" ]]; then
+      GITSTAV="$(git -C "$KLON" status --porcelain -- "$CADDYFILE" 2>/dev/null | head -1)"
+      if [[ -n "$GITSTAV" ]]; then GITSTAV=", git: $GITSTAV"; else GITSTAV=", git čistý"; fi
+    fi
+    echo "Caddyfile:    $CADDYFILE – řádek „$IMPORT_RADEK“: $IMPORT_JE$GITSTAV"
+  fi
+  if [[ "$REZIM" == docker ]]; then
+    IMPORT_V_KONT=NE; docker exec "$CADDY" grep -qxF "$IMPORT_RADEK" "$CADDY_CONFIG" >/dev/null 2>&1 && IMPORT_V_KONT=ano
+    echo "V kontejneru: $CADDY_CONFIG má import: $IMPORT_V_KONT"
+    BLOK_V_KONT="$(docker exec "$CADDY" cat "$CADDY_SITES/$APP.caddy" 2>/dev/null | grep -vE '^#|^[[:space:]]*$' | tr -s ' \n' ' ' || true)"
+    echo "Blok:         $CADDY_SITES/$APP.caddy: ${BLOK_V_KONT:-CHYBÍ}"
+    KONF="$(docker exec "$CADDY" sh -c 'wget -qO- http://localhost:2019/config/apps/http/servers 2>/dev/null' 2>/dev/null || true)"
+    ZNA="NE"
+    if [[ -z "$KONF" ]]; then ZNA="nezjištěno (admin API neodpovídá)"; elif [[ "$KONF" == *"\"$DOMENA\""* ]]; then ZNA=ano; fi
+    echo "Běžící konfigurace Caddy zná $DOMENA: $ZNA"
+    echo "Certifikáty:  $(docker exec "$CADDY" sh -c 'ls /data/caddy/certificates/*/ 2>/dev/null' 2>/dev/null | tr '\n' ' ')"
+    echo "Log Caddy (kolomapa / chyby, posledních 6 h):"
+    docker logs "$CADDY" --since 6h 2>&1 | grep -iE "kolomapa|\"level\":\"error\"" | tail -8 | cut -c1-240 | sed 's/^/   /'
+  fi
+  echo "Log Kolomapy (posledních 5 řádků):"
+  docker logs "$APP" --tail 5 2>&1 | cut -c1-200 | sed 's/^/   /'
+  exit 0
+fi
+
 # --- Obraz + testy ---------------------------------------------------------------------------------------------
 say "Stavím obraz $IMAGE (--no-cache${PROHLIZEC:+, s prohlížečem pro Cyklobazar})"
 docker build --no-cache --build-arg "S_PROHLIZECEM=${PROHLIZEC:-0}" -t "$IMAGE" "$ZDROJ"
@@ -293,9 +329,18 @@ $VYCHOZI_DOMENA {
 }"
 fi
 
-caddy_docker_nacti() {   # ověřit a načíst konfiguraci běžícího kontejneru Caddy; 1 = kontrola neprošla
+caddy_docker_nacti() {   # ověřit a načíst konfiguraci běžícího kontejneru Caddy; 1 = kontrola nebo načtení neprošlo
   docker exec "$CADDY" caddy validate --config "$CADDY_CONFIG" >/dev/null 2>&1 || return 1
-  docker exec "$CADDY" caddy reload --config "$CADDY_CONFIG" >/dev/null 2>&1 || true
+  if ! docker exec "$CADDY" caddy reload --config "$CADDY_CONFIG" >/tmp/kolomapa-caddy-reload.log 2>&1; then
+    echo "   caddy reload selhal:"; tail -5 /tmp/kolomapa-caddy-reload.log | cut -c1-240 | sed 's/^/   /'
+    return 1
+  fi
+  # Opravdu běžící konfigurace zná doménu? (admin API Caddy; chybí-li řádek import, reload „projde“, ale blok se nenačte)
+  local konf
+  konf="$(docker exec "$CADDY" sh -c 'wget -qO- http://localhost:2019/config/apps/http/servers 2>/dev/null' 2>/dev/null || true)"
+  if [[ -n "$konf" && "$konf" != *"\"$DOMENA\""* ]]; then
+    echo "   VAROVÁNÍ: Caddy načetla konfiguraci, ale $DOMENA v ní není – Caddy blok nečte (řádek „$IMPORT_RADEK“ v $CADDYFILE?). Stav: bash $SKRIPT --stav"
+  fi
 }
 caddy_docker_chyba() {
   docker exec "$CADDY" caddy validate --config "$CADDY_CONFIG" 2>&1 | tail -5 || true
