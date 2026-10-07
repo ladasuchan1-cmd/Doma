@@ -32,8 +32,8 @@ Aplikace běží jako web s přihlášením na **https://cyklomapa.ksprehledy.cz
 
 **Kontakty u míst:** telefon u 5 537 míst (43 %), e-mail u 4 760 (37 %), aspoň jeden kontakt u 5 692 (44 %).
 Web má 5 763 míst, z toho se 4 473 podařilo automaticky načíst a vytěžit. **Půjčovna** je potvrzená u 740 míst
-podle OpenStreetMap a u dalších 411 podle textu webu (309 kola, 168 lyže). 1 480 míst nemá název (např. chaty jen
-s evidenčním číslem) a zobrazují se až po zapnutí filtru.
+podle OpenStreetMap a u dalších 357 ji zmiňuje web (celkem ji web zmiňuje u 411 míst: 309 kola, 168 lyže).
+1 480 míst nemá název (např. chaty jen s evidenčním číslem) a zobrazují se až po zapnutí filtru.
 
 Každé místo má spočítané **nejbližší cyklotrasy do 3 km** (12 844 míst) a **skiareály do 15 km** (8 415 míst).
 
