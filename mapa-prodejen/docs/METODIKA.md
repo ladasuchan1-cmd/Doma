@@ -157,6 +157,9 @@ uvádí místa s názvem a souřadnicemi, často přibližnými. Postup pro kaž
 
 1. Každé místo PSČ **hlasuje** pro obec: obec stejného jména do 25 km (i „Plzeň 3-Valcha“ → Plzeň, „Brno 2“ →
    Brno) má váhu 3, jinak obec, ve které bod leží podle hranic obcí RÚIAN – přesné souřadnice 2, přibližné 1.
+   Pražské místo, které podle souřadnic leží mimo Prahu, dostane polohu stejnojmenné pražské čtvrti z GeoNames.
+   GeoNames totiž u „153 00 Radotín“, „156 00 Zbraslav“ a „197 00 Kbely“ uvádí souřadnice stejnojmenných vesnic
+   jinde v Česku.
 2. **Hlavní obec PSČ** = nejvyšší hlasy × počet obyvatel obce (min. 50). Pošta bývá v největší obci svého obvodu
    („741 01“ je Nový Jičín, ne Starý Jičín). Praha jen tehdy, když jsou pražská místa PSČ alespoň polovinou.
 3. Poloha PSČ = průměr míst, která leží uvnitř hlavní obce; když žádné, střed obce.
@@ -325,3 +328,4 @@ vhodnější než velká; filtr velikosti se dá použít zvlášť.
 | 7. 10. 2026 | První verze: OSM (8 dotazů), ARES podle 39 slov, IČO z OSM / webu / názvu / odhadu, velikost podle obratu nebo kategorie zaměstnanců ČSÚ, PSČ → obec podle hranic obcí RÚIAN a hlasování, skóre partnera 50 / 20 / 20 / 10. |
 | 7. 10. 2026 | Import tabulek vložených z Excelu (kontingenční tabulky: nadpis a filtry, řádky Celkem, dvě tabulky vedle sebe, křížová tabulka, kompaktní forma), veličiny zákazníci a aktivní zákazníci, oprava 4místných PSČ, zahraniční města podle názvu, kontrola proti „Celkovému součtu“. Neznámé PSČ s nesouhlasícím názvem obce se už nepřiřazuje podle prvních tří číslic. |
 | 7. 10. 2026 | Obec podle názvu i v tvarech z adres: přívlastky („u Prahy“, „na Moravě“, „nad Ohří“), zkratky („p.R.“, „n/L“), části názvů se spojovníkem a začátky názvů, části obcí a adresy, okres a pošta. Jmenovce rozliší vodítko, oblast a řeka. Slovenské tvary, cizí písmena a země v názvu jdou do zahraničí. Na tabulce zákazníků podle obcí je o 2 370 přiřazených zákazníků víc a o 1 960 víc v zahraničí, nepřiřazených s názvem obce ubylo z 13 200 na 8 900. |
+| 7. 10. 2026 | Pražská PSČ 153 00 (Radotín), 156 00 (Zbraslav) a 197 00 (Kbely) patří Praze. Dřív je chybné souřadnice v GeoNames přiřadily Olbramovicím, Dolnímu Dvořišti a Čížkovu. Čížkov, Nové Mitrovice, Louňová a Olbramovice mají místo pražského PSČ svoje. |

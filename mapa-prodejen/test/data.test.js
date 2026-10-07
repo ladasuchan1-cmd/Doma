@@ -65,6 +65,8 @@ test('data mapy prodejen jsou konzistentní', () => {
     assert.ok(p[0] > 48.5 && p[0] < 51.1 && p[1] > 12 && p[1] < 18.9, 'PSČ mimo ČR ' + k);
     assert.ok(okresy.has(p[2]), 'PSČ bez okresu ' + k);
     assert.ok(p[3] && Number.isInteger(p[4]), 'PSČ bez obce ' + k);
+    // PSČ 1xx xx jsou jen pražská (GeoNames u „156 00 Zbraslav“ uvádí vesnici u Dolního Dvořiště)
+    if (k[0] === '1') assert.ok(p[3] === 'Praha' && p[2] === 3100, 'pražské PSČ mimo Prahu ' + k + ' ' + p[3]);
   }
   assert.strictEqual(psc['60200'][3], 'Brno');
   assert.strictEqual(psc['11000'][3], 'Praha');

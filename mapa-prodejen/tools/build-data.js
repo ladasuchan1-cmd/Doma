@@ -274,8 +274,11 @@ async function buildPscObce(locate, obceRuian, obecAt) {
   const unzip = (buf, name) => zipText(buf, name, async (b) => zlib.inflateRawSync(Buffer.from(b)));
 
   const popObce = new Map(); // kód obce → počet obyvatel (největší sídlo stejného jména v obci)
+  const prazskaMista = new Map(); // pražské čtvrti z GeoNames: fold(název) → [lat, lon]
   for (const f of (await unzip(dumpZip, 'CZ.txt')).split('\n').map((l) => l.split('\t'))) {
-    if (f.length < 15 || f[6] !== 'P' || /^(PPLH|PPLQ|PPLW|PPLX)$/.test(f[7])) continue;
+    if (f.length < 15 || f[6] !== 'P') continue;
+    if (f[10] === PRAHA_ADMIN1 && !prazskaMista.has(fold(f[1]))) prazskaMista.set(fold(f[1]), [Number(f[4]), Number(f[5])]);
+    if (/^(PPLH|PPLQ|PPLW|PPLX)$/.test(f[7])) continue;
     const pop = Number(f[14]) || 0;
     if (!pop) continue;
     const o = obecAt(Number(f[5]), Number(f[4]));
@@ -293,7 +296,13 @@ async function buildPscObce(locate, obceRuian, obecAt) {
     const psc = f[1].replace(/\s+/g, '');
     if (!/^\d{5}$/.test(psc)) continue;
     if (!byPsc.has(psc)) byPsc.set(psc, []);
-    byPsc.get(psc).push({ name: f[2], lat: Number(f[9]), lon: Number(f[10]), presne: f[11] === '4', praha: f[4] === PRAHA_ADMIN1 });
+    const x = { name: f[2], lat: Number(f[9]), lon: Number(f[10]), presne: f[11] === '4', praha: f[4] === PRAHA_ADMIN1 };
+    // GeoNames dává některým pražským PSČ souřadnice stejnojmenné vesnice jinde („156 00 Zbraslav“ u Dolního
+    // Dvořiště, „153 00 Radotín“, „197 00 Kbely“) – pražské místo mimo Prahu se dohledá mezi pražskými čtvrtěmi
+    const o = x.praha ? obecAt(x.lon, x.lat) : null;
+    const ctvrt = x.praha && (!o || o.kod !== PRAHA_KOD) && prazskaMista.get(fold(x.name.replace(/^Praha\s*\d+\s*-\s*/i, '')));
+    if (ctvrt) [x.lat, x.lon, x.presne] = [ctvrt[0], ctvrt[1], true];
+    byPsc.get(psc).push(x);
   }
   // obce podle jména – místo „Plzeň 3-Vnitřní Město“ patří Plzni, i když má v GeoNames nepřesné souřadnice
   const obceByName = new Map();
