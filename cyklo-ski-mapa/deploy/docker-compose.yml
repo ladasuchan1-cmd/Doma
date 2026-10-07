@@ -29,6 +29,8 @@ services:
       DOMAIN: ${DOMAIN:?Nastavte DOMAIN=vase.domena.cz}
     volumes:
       - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      # bloky dalších webů na témže serveru (Caddyfile je importuje) – viz pujcovna-kol/deploy/vedle-mapy.sh
+      - /opt/caddy-extra:/etc/caddy/extra:ro
       - caddy_data:/data
       - caddy_config:/config
     depends_on:
