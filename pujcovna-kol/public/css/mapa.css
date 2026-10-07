@@ -466,3 +466,22 @@
     transform: none;
   }
 }
+
+/* Karty „Jak s mapou pracovat“ / „Začněte u nás“ – stejné jako v kola.css (ta se na mapě nenačítá, bez ní text
+   lepil na rámeček). Témata přidávají jen pozadí, rámeček a stín. */
+.rule-card {
+  display: grid;
+  gap: var(--space-3);
+  align-content: start;
+  padding: var(--space-5);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--card-radius);
+}
+.rule-card__title {
+  margin: 0;
+  font-size: var(--step-1);
+}
+.rule-card p {
+  margin: 0;
+}

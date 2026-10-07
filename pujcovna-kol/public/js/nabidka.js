@@ -1,7 +1,8 @@
 'use strict';
 // Progresivní JS feature „nabídka“: (1) při změně formuláře konfigurátoru načte /api/v1/nabidka/spocitat?… a vymění obsah
 // souhrnu (pole `html` z odpovědi = stejný SSR fragment), (2) aktualizuje hidden pole konfigurace v poptávce a adresu
-// stránky (history.replaceState), (3) doplňky „jen e-kola“ povoluje podle počtu e-kol, (4) tlačítko Vytisknout nabídku.
+// stránky (history.replaceState), (3) doplňky „jen e-kola“ povoluje podle počtu e-kol, (4) tlačítko Vytisknout nabídku,
+// (5) „Spočítat pro N kol“ u množstevních stupňů dosadí počet kol a přepočítá souhrn.
 // Pole kalkulačky návratnosti (krok 6: sezona, vytizenost, cena_* = type=number, neplatce = checkbox) jdou na API stejnou
 // cestou – číselná pole přes `input`, checkbox přes `change`.
 // Bez JS funguje tlačítko „Přepočítat nabídku“ (GET formulář). Žádné knihovny, žádný inline kód.
@@ -138,6 +139,19 @@
         recalc();
       }, 350);
     }
+  });
+  // předvolba stupně („Spočítat pro N kol“): bez JS je to odkaz s query, s JS dosadí počty (jako e-kola) a přepočítá
+  form.addEventListener('click', function (e) {
+    var link = e.target && e.target.closest ? e.target.closest('[data-nabidka-preset]') : null;
+    if (!link) return;
+    e.preventDefault();
+    var n = parseInt(link.getAttribute('data-nabidka-preset'), 10) || 0;
+    form.querySelectorAll('[data-nabidka-count]').forEach(function (inp) {
+      inp.value = inp.getAttribute('data-nabidka-count') === 'ekolo' ? String(n) : '0';
+    });
+    form.dispatchEvent(new Event('change', { bubbles: true }));
+    var ek = form.querySelector('[data-nabidka-count="ekolo"]');
+    if (ek) ek.focus({ preventScroll: true });
   });
   form.addEventListener('submit', function (e) {
     e.preventDefault();

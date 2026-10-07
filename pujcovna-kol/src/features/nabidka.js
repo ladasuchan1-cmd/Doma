@@ -10,8 +10,9 @@
 //   GET  /nabidka/dekujeme/:token          rekapitulace s číslem poptávky NAB-RRRR-NNNNNN
 //   GET  /admin/nabidky, /admin/nabidky/:id  interní seznam a detail poptávek (admin session přes admin.guard; zobrazení
 //                                          kontaktních údajů se audituje jako nabidka.view)
-// Interní blok (marže, náklady, podíl partnera, varování) se na /nabidka a v API zobrazí jen s platnou admin session
-// (admin.currentUser); ?interni=0 ho skryje. Log nikdy neobsahuje název, osobu, e-mail ani telefon – jen id/číslo.
+// Interní blok (marže, náklady, podíl partnera, nákupní ceny, varování) se na /nabidka, v API i v /admin/nabidky zobrazí
+// jen přihlášenému správci PLATFORMY (vidiInterni – session z /platforma); ?interni=0 ho skryje. Správce tenanta (demo má
+// veřejné heslo) ani správce klientského webu interní čísla nevidí. Log nikdy neobsahuje název, osobu, e-mail ani telefon – jen id/číslo.
 
 const fs = require('node:fs');
 const path = require('node:path');
@@ -207,25 +208,36 @@ function str(v) {
 }
 
 /** Je požadavek od přihlášeného správce (platná admin session, aktivní uživatel)? */
-function isAdmin(ctx) {
+/**
+ * Smí vidět interní čísla (marže, nákupní ceny)? Jen přihlášený správce PLATFORMY (/platforma, PK_PLATFORMA_HESLO) na
+ * hostu platformy – ne správce tenanta: heslo administrace dema je veřejné a správce klientského webu naše marže vidět
+ * nesmí. Bez PK_PLATFORMA_HESLO interní čísla nevidí nikdo.
+ */
+function vidiInterni(ctx) {
+  if (ctx.klient || !ctx.config.platformaHeslo) return false;
   try {
-    return !!admin.currentUser(ctx);
+    return ctx.platformSession.get('ok') === true;
   } catch {
     return false;
   }
 }
 
-/** Zobrazit interní blok? Jen s admin session; ?interni=0 skryje. Bez admin session nikdy. */
+/** Zobrazit interní blok? Jen správce platformy (vidiInterni); ?interni=0 skryje. */
 function showInternal(ctx) {
-  if (!isAdmin(ctx)) return false;
+  if (!vidiInterni(ctx)) return false;
   return ctx.query.interni !== '0';
 }
 
-/** Vstup konfigurátoru z query (doplnky mohou být opakované i s čárkami). */
-function inputFromSearchParams(sp, config) {
+// Úvodní stav konfigurátoru bez zadaných počtů: nejmenší nabídka (2 kola jako v kampani „Pojďme to zkusit“), aby souhrn
+// od začátku ukazoval ceny a „Vyplatí se to?“ a proklikávání kroků bylo vidět. Poptávka (POST) výchozí kola nedostává.
+const VYCHOZI_KOLA = Object.freeze({ trek: '1', ekolo: '1' });
+
+/** Vstup konfigurátoru z query (doplnky mohou být opakované i s čárkami). vychoziKola: bez počtů kol použít VYCHOZI_KOLA. */
+function inputFromSearchParams(sp, config, { vychoziKola = false } = {}) {
   const q = {};
   for (const k of ['zakladni', 'trek', 'ekolo', 'porizeni', 'web', 'dalsiDesign', 'sprava', 'servis', 'sezona', 'vytizenost', 'cena_zakladni', 'cena_trek', 'cena_ekolo', 'neplatce']) if (sp.has(k)) q[k] = sp.get(k);
   if (sp.has('doplnky')) q.doplnky = sp.getAll('doplnky');
+  if (vychoziKola && !['zakladni', 'trek', 'ekolo'].some((k) => sp.has(k))) Object.assign(q, VYCHOZI_KOLA);
   return domain.normalizeInput(q, config);
 }
 
@@ -243,14 +255,15 @@ function renderUnavailable(ctx, status = 200) {
 async function nabidkaGet(ctx) {
   const st = configFor(ctx);
   if (!st.config) return renderUnavailable(ctx);
-  const input = inputFromSearchParams(ctx.url.searchParams, st.config);
+  const input = inputFromSearchParams(ctx.url.searchParams, st.config, { vychoziKola: true });
   const result = domain.compute(input, st.config);
   const internal = showInternal(ctx);
   const modely = loadModely();
   if (internal) result.interni.modely = domain.modelyInterni(modely.modely, st.config);
+  const priklady = domain.modelovePriklady(st.config, modely.modely);
   return ctx.render(
     page.nabidka,
-    { tenant: ctx.tenant, config: st.config, input, result: internal ? result : domain.publicResult(result), internal, csrf: ctx.csrfToken(), values: {}, errors: {}, query: domain.inputToQuery(input), modely: modely.modely, modelyMeta: modely.meta },
+    { tenant: ctx.tenant, config: st.config, input, result: internal ? result : domain.publicResult(result), internal, csrf: ctx.csrfToken(), values: {}, errors: {}, query: domain.inputToQuery(input), modely: modely.modely, modelyMeta: modely.meta, priklady: internal ? priklady : domain.verejnePriklady(priklady) },
     { title: 'Pro hotely a půjčovny', description: 'Sestavte si nabídku: kola pro hosty, rezervační web, správa a servis – koupě, pronájem nebo zkušební období bez dlouhého závazku.', feature: 'nabidka' }
   );
 }
@@ -258,7 +271,7 @@ async function nabidkaGet(ctx) {
 async function spocitatApi(ctx) {
   const st = configFor(ctx);
   if (!st.config) return ctx.json({ ok: false, error: 'Nabídka se připravuje – ceník zatím není k dispozici.' }, 503);
-  const input = inputFromSearchParams(ctx.url.searchParams, st.config);
+  const input = inputFromSearchParams(ctx.url.searchParams, st.config, { vychoziKola: true });
   const result = domain.compute(input, st.config);
   const internal = showInternal(ctx);
   if (internal) result.interni.modely = domain.modelyInterni(loadModely().modely, st.config);
@@ -449,7 +462,7 @@ async function adminList(ctx) {
     return { id: r.id, createdAt: r.created_at, sentAt: r.sent_at, number: p.number || `#${r.id}`, nazev: decField(ctx, p.nazev_enc), obec: p.obec || '', payload: p };
   });
   const st = loader.get();
-  adminRender(ctx, adminPage.list({ rows, total, page: pg, pages, config: st.config, configError: st.error }), { title: 'Poptávky nabídek', lead: `${total} přijatých poptávek z konfigurátoru /nabidka`, actions: html`<a class="btn btn--secondary btn--sm" href="/nabidka">Otevřít konfigurátor</a>` });
+  adminRender(ctx, adminPage.list({ rows, total, page: pg, pages, config: st.config, configError: st.error, interni: vidiInterni(ctx) }), { title: 'Poptávky nabídek', lead: `${total} přijatých poptávek z konfigurátoru /nabidka`, actions: html`<a class="btn btn--secondary btn--sm" href="/nabidka">Otevřít konfigurátor</a>` });
 }
 
 async function adminDetail(ctx) {
@@ -461,7 +474,7 @@ async function adminDetail(ctx) {
   ctx.db
     .prepare('INSERT INTO audit_log(at, user_id, action, entity, entity_id, meta, ip_hash) VALUES (?, ?, ?, ?, ?, ?, ?)')
     .run(nowIso(), ctx.user ? ctx.user.id : null, 'nabidka.view', 'outbox', String(row.id), JSON.stringify({ number: p.number || null, fields: ['nazev', 'osoba', 'email', 'telefon', 'poznamka'] }), ctx.ipHash);
-  adminRender(ctx, adminPage.detail({ row, payload: p, contact }), { title: `Poptávka ${p.number || `#${row.id}`}`, lead: contact.nazev ? `${contact.nazev}${contact.obec ? `, ${contact.obec}` : ''}` : '', actions: html`<a class="btn btn--ghost btn--sm" href="/admin/nabidky">← Seznam</a> <a class="btn btn--ghost btn--sm" href="/nabidka?${p.query || ''}">Otevřít v konfigurátoru</a>${ctx.config.platformaHeslo ? html` <a class="btn btn--primary btn--sm" href="/platforma?poptavka=${row.id}#nova-pozvanka">Pozvat do průvodce</a>` : ''}`, wide: true });
+  adminRender(ctx, adminPage.detail({ row, payload: p, contact, interni: vidiInterni(ctx) }), { title: `Poptávka ${p.number || `#${row.id}`}`, lead: contact.nazev ? `${contact.nazev}${contact.obec ? `, ${contact.obec}` : ''}` : '', actions: html`<a class="btn btn--ghost btn--sm" href="/admin/nabidky">← Seznam</a> <a class="btn btn--ghost btn--sm" href="/nabidka?${p.query || ''}">Otevřít v konfigurátoru</a>${ctx.config.platformaHeslo ? html` <a class="btn btn--primary btn--sm" href="/platforma?poptavka=${row.id}#nova-pozvanka">Pozvat do průvodce</a>` : ''}`, wide: true });
 }
 
 module.exports = {
@@ -489,7 +502,7 @@ module.exports = {
   validate,
   enqueueInquiry,
   recapText,
-  isAdmin,
+  vidiInterni,
   showInternal,
   LIMITS,
 };

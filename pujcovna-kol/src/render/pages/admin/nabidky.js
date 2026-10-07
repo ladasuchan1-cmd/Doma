@@ -7,10 +7,10 @@ const s = require('./shared');
 const { html, c } = s;
 const { summaryFragment, kc } = require('../nabidka');
 
-function list({ rows, total, page, pages, config, configError }) {
+function list({ rows, total, page, pages, config, configError, interni = false }) {
   return html`
 ${configError ? s.card({ tone: 'danger', compact: true, children: c.notice(html`Konfigurace cen (config/nabidka.json) není použitelná – konfigurátor zobrazuje „nabídka se připravuje“. ${configError}`, 'danger') }) : ''}
-${config ? s.card({ compact: true, children: html`<p class="small muted">Ceník verze <strong>${config.meta.verze}</strong>, platnost od ${s.format.date(config.meta.platnostOd)}${config.meta.zastupneCeny ? html` ${c.badge('ukázkové ceny', 'warning')}` : ''}; práh marže ${Math.round(config.interni.prahMarzeProcent * 100)} %. Zdroj: config/nabidka.json, model: docs/NABIDKA-MODEL.md.</p>` }) : ''}
+${config ? s.card({ compact: true, children: html`<p class="small muted">Ceník verze <strong>${config.meta.verze}</strong>, platnost od ${s.format.date(config.meta.platnostOd)}${config.meta.zastupneCeny ? html` ${c.badge('ukázkové ceny', 'warning')}` : ''}${interni ? `; práh marže ${Math.round(config.interni.prahMarzeProcent * 100)} %` : ''}. Zdroj: config/nabidka.json, model: docs/NABIDKA-MODEL.md.</p>` }) : ''}
 ${s.card({
     title: `Poptávky (${total})`,
     children: html`${s.table({
@@ -18,7 +18,7 @@ ${s.card({
       head: ['Přijato', 'Číslo', 'Ubytování / půjčovna', 'Obec', { label: 'Kol', align: 'right', sort: 'num' }, 'Pořízení', { label: 'Měsíčně', align: 'right', sort: 'num' }, { label: 'Jednorázově', align: 'right', sort: 'num' }, 'Marže', 'E-mail'],
       rows: rows.map((r) => {
         const v = r.payload.vysledek || {};
-        const i = r.payload.interni || null;
+        const i = interni ? r.payload.interni || null : null;
         const sou = v.souhrn || {};
         return [
           s.dt(r.createdAt),
@@ -39,9 +39,9 @@ ${s.card({
   })}`;
 }
 
-function detail({ row, payload, contact }) {
+function detail({ row, payload, contact, interni = false }) {
   const v = payload.vysledek || null;
-  const i = payload.interni || null;
+  const i = interni ? payload.interni || null : null;
   const cenik = payload.cenik || {};
   const contactRows = [
     ['Ubytování / půjčovna', contact.nazev || html`<span class="muted">–</span>`],
@@ -82,7 +82,7 @@ function detail({ row, payload, contact }) {
         ].filter(Boolean))}
       ${s.table({ sortable: false, head: ['Položka', { label: 'Tržby', align: 'right' }, { label: 'Náklady', align: 'right' }, { label: 'Marže', align: 'right' }], rows: (i.polozky || []).map((p) => [html`${p.label}<br><small class="muted">${p.perioda}${p.poznamka ? html` · ${p.poznamka}` : ''}</small>`, kc(p.trzby), kc(p.naklady), html`${kc(p.marze)} <small class="muted">(${Math.round(p.marzeProcent * 100)} %)</small>`]), empty: 'Bez položek.' })}
       ${(i.varovani || []).map((w) => c.notice(w, 'warning'))}`
-      : c.notice('Interní čísla nejsou uložena.', 'info'),
+      : interni ? c.notice('Interní čísla nejsou uložena.', 'info') : c.notice(html`Marže a nákupní ceny vidí jen správce platformy – přihlaste se na <a href="/platforma">/platforma</a>.`, 'info'),
   })}
 </div>
 ${s.card({ title: 'Text e-mailu provozovateli', children: html`<pre class="admin-pre">${row.body_text}</pre>` })}`;

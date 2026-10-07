@@ -14,8 +14,9 @@ náklad kapitálu, ceny webu, správy, servisu, doplňků a interní náklady js
 | `config/nabidka.interni.example.json` | VZOR interního souboru s **UKÁZKOVÝMI** hodnotami (třídy 18 000 / 36 000 / 64 000 Kč; modely viz soubor) | git |
 
 Chybí-li interní soubor, konfigurátor funguje dál a nákupní cenu odvodí jako prodejní × (1 − `interni.prahMarzeProcent`)
-(`meta.nakupniCenyOdvozene = true`); interní blok to označí varováním. Nákupní ceny se zobrazují **jen v interním bloku pro přihlášené
-správce** (tabulka tříd a tabulka konkrétních modelů: veřejná cena výrobce bez DPH vs. nákupní, marže), nikdy veřejně. Konkrétní
+(`meta.nakupniCenyOdvozene = true`); interní blok to označí varováním. Nákupní ceny se zobrazují **jen v interním bloku pro přihlášeného
+správce platformy** (session z `/platforma`, heslo `PK_PLATFORMA_HESLO`; od 7. 10. 2026 – dřív stačilo přihlášení do administrace
+tenanta, jenže heslo administrace dema je veřejné) (tabulka tříd a tabulka konkrétních modelů: veřejná cena výrobce bez DPH vs. nákupní, marže), nikdy veřejně. Konkrétní
 modely z `config/kola-modely.json` se zobrazují na /nabidka v sekci „Konkrétní modely, které flotilu tvoří“ a v demu půjčovny jako typy kol.
 
 **Všechny nákupní ceny, marže a scénáře v tomto dokumentu jsou počítány z UKÁZKOVÝCH nákupních cen** z `config/nabidka.interni.example.json`
@@ -108,8 +109,13 @@ roční paušál 2 160 Kč tak odpovídá jednomu velkému servisu a drobným op
 ### E. Doplňky (`doplnky`)
 
 Pojištění flotily 120 Kč/kolo/měs (odhad podle KoloNaOperák, kde je pojištění krádeže a vandalismu součástí splátky), GPS lokátor
-1 500 Kč + 60 Kč/měs (SIM), přilby a zámky 1 200 Kč/kolo, nabíjecí stanice pro e-kola 25 000 Kč, sezónní prohlídka u partnera
-900 Kč/kolo. Naše marže: přilby 30 %, GPS 25 %, pojištění 20 %, nabíječky 20 % (`interni.naklady*ProcentCeny`).
+1 500 Kč + 60 Kč/měs (SIM), přilby a zámky 1 200 Kč/kolo, sezónní prohlídka u partnera 900 Kč/kolo. Naše marže: přilby 30 %,
+GPS 25 %, pojištění 20 % (`interni.naklady*ProcentCeny`).
+
+**Nabíjecí stanice pro e-kola se od 7. 10. 2026 nenabízí za pevnou cenu** – je jen „po individuální domluvě“ (blok `naDomluvu`
+v `config/nabidka.json`, konfigurátor ji v kroku 5 vypíše bez ceny a do souhrnu ani marže nevstupuje). Dřív to byl doplněk
+25 000 Kč jednorázově s marží 20 %; scénáře v sekci 3 ji ještě obsahují (spočítané před změnou), starší poptávky ji mají v uložené
+konfiguraci. Odkaz se starým parametrem `doplnky=nabijecky` se tiše ignoruje (neznámý doplněk).
 
 ---
 
@@ -119,7 +125,7 @@ Konfigurátor nejdřív načte veřejný `config/nabidka.json` (validace ho odm�
 (`PK_NABIDKA_INTERNI` → `$PK_DATA/nabidka.interni.json` → lokálně `config/nabidka.interni.json`; změna se projeví do 2 s bez restartu).
 `validateConfig(veřejný, interní)` z nich složí jednu konfiguraci, ve které má každá třída `T.nakupniCena`. Bez interního souboru se
 `T.nakupniCena = prodejniCena × (1 − interni.prahMarzeProcent)` a `meta.nakupniCenyOdvozene = true`. Veřejný výstup konfigurátoru nákupní
-ceny nikdy neobsahuje, jen blok `interni` pro přihlášené správce.
+ceny nikdy neobsahuje, jen blok `interni` pro přihlášeného správce platformy (`vidiInterni` ve `src/features/nabidka.js`).
 
 ```
 C = načti config/nabidka.json + interní soubor (nákupní ceny);  T = C.tridyKol[id];  R(x) = zaokrouhli na celé Kč
@@ -203,6 +209,9 @@ do té doby jsou výpočty v sekci 3 ilustrativní.
 ---
 
 ## 3. Tři scénáře (spočítáno z `nabidka.json` a UKÁZKOVÝCH nákupních cen z `nabidka.interni.example.json`, Kč bez DPH)
+
+> Scénáře jsou spočítané **před 7. 10. 2026** a obsahují nabíjecí stanici 25 000 Kč, která od té doby není placený doplněk
+> (jen po domluvě, sekce 1E). Aktuální čísla se skutečnými modely ukazuje sekce 10 a konfigurátor.
 
 Společná konfigurace: web šablona, servis u partnera, přilby a zámky, 1 sezónní prohlídka ročně. Řádek „Zkouška“ předpokládá
 přechod na pronájem 36 m po 4 měsících se započtením 35 %; sloupec „3 roky“ zahrnuje zkoušku (4 měsíce) + 32 splátek pronájmu (celkem 36 měsíců); „1 rok“ = jednorázově (vč. celé ceny zkoušky) + 4 × měsíčně mimo kola ve zkoušce + 8 × měsíčně pronájmu − započet. Náš hrubý zisk = tržby − nákup kol (u pronájmu jen marže nad anuitou) − přímé náklady (nasazení, hosting,
@@ -423,3 +432,44 @@ včetně DPH“). Sazba DPH 21 % u půjčovného je předpoklad – ověřit s d
 
 Novinka bez zlomu v historii: dosavadní čísla nabídky (souhrn, horizonty, interní marže, scénáře v kap. 3) se nemění; starší
 uložené poptávky blok `navratnost` ve výsledku nemají.
+
+## 10. Modelové příklady se skutečnými koly a srozumitelné „Vyplatí se to?“ (od 7. 10. 2026)
+
+**Modelové příklady.** Pod množstevními stupni (krok 1) ukazuje konfigurátor pro každý stupeň jednu flotilu ze skutečných
+elektrokol Superior a Rock Machine (`config/nabidka.json` → `modelovePriklady`, slugy z `config/kola-modely.json`):
+
+| Stupeň | Kola |
+|---|---|
+| Start (2) | 1× Rock Machine Crossride e400 B Touring, 1× Superior eXP 6.4 STEPS |
+| Flotila (5) | 2× Crossride e400, 2× eXP 6.4 STEPS, 1× Superior eWAY 6.4 |
+| Hotel (10) | 3× Crossride e400, 3× eXP 6.4 STEPS SUV, 2× eWAY 6.4, 2× Rock Machine eBlizzard 30 S |
+| Resort (20) | 6× Crossride e400, 4× eXP 6.4 STEPS, 4× eXP 6.4 STEPS SUV, 3× eWAY 6.4, 3× eBlizzard 30 S |
+
+Výpočet (`modelovePriklady` v `src/domain/nabidka.js`) používá **stejný `compute()` jako konfigurátor**, jen místo třídy „ekolo“
+dosadí modely příkladu: prodejní cena modelu = aktuální veřejná cena výrobce / 1,21, zůstatková po 36 m stejným podílem jako třída
+e-kol (26 500 / 88 000), nákupní cena z interního souboru (`modely`), chybí-li, odhad prodejní × (1 − práh marže). Modely se
+pro výpočet sloučí do jedné třídy s váženým průměrem cen – výpočet je v cenách lineární, rozdíl proti součtu po modelech je jen
+v zaokrouhlení na celé Kč za kolo. Každý příklad má tři varianty se stejnými službami (web ze šablony, vlastní správa a servis,
+bez doplňků) a návratnost s výchozím odhadem z `navratnost` (150 dní, 35 %, 890 Kč/den za e-kolo):
+
+- **zkouška 4 měsíce** – kolik hotel zaplatí celkem (vč. poplatku za rozjezd) a výsledek za zkoušku,
+- **pronájem 36 měsíců** – měsíčně, web jednorázově, celkem za 3 roky; výsledek prvního a dalších let,
+- **koupě** – jednorázově (kola po slevě + web), za kolik sezón se vrátí.
+
+Interně (jen správce platformy) má každý příklad tabulku **naše tržby a marže** pro všechny tři varianty a horizont: zkouška za
+4 měsíce (kola zůstávají naše – ex-demo prodej), pronájem za 36 měsíců (marže nad anuitou, náklad kapitálu je náklad), koupě
+= marže z kol jednorázově + web po dobu 36 měsíců; pod tím nákupní ceny modelů (označené „odhad“, když v interním souboru chybí).
+
+**Pozor – příklady a konfigurátor se liší:** příklady počítají s cenami skutečných modelů (≈ 44–63 tis. Kč bez DPH), konfigurátor
+s cenou třídy „ekolo“ 88 000 Kč (otevřené rozhodnutí 11, sekce 8). Dokud se ceny tříd nesladí s flotilou, vyjde stejný počet
+e-kol v konfigurátoru dráž než v příkladu.
+
+**Verdikt nahoře v souhrnu.** Nad cenami je jednovětá odpověď na „Vyplatí se to?“ z existující kalkulačky (sekce 9, nic se
+nepřepočítává jinak): „Ano, vyplatí se“ / „Vyplatí se od druhého roku“ / „Takhle se … nevyplatí“, jedno rozhodující číslo
+(výdělek za zkoušku; první a další roky u pronájmu; za kolik sezón se zaplatí koupě) a kolik vytíženosti stačí (bod zvratu).
+Podrobný rozpis zůstává níž pod názvem „Vyplatí se to? Rozpis odhadu“.
+
+**Ovládání.** Bez zadaných počtů kol se konfigurátor otevře s nejmenší nabídkou 1 trek + 1 e-kolo (jako odkaz z kampaně
+„Pojďme to zkusit“), aby souhrn od začátku ukazoval ceny a verdikt – dřív začínal na 0 kol a při proklikávání kroků se nic
+neměnilo. Výslovné `zakladni=0&trek=0&ekolo=0` zůstává nula; poptávka výchozí kola nedostává. Kroky nahoře jsou odkazy na sekce,
+u každého stupně je „Spočítat pro N kol“ (dosadí N e-kol a přepočítá souhrn; bez JS odkaz s query).

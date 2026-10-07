@@ -77,6 +77,7 @@ ${c.section({
     titleTag: 'h1',
     lead: `Nové weby vznikají na adrese <název>.${domena}. Klient dostane odkaz do průvodce, vyplní údaje a web se spustí v náhledovém provozu.`,
     children: html`${flash ? c.notice(flash.text, flash.tone || 'success') : ''}
+<p class="pr-links"><a href="/nabidka#priklady">Modelové propočty s naší marží</a> · <a href="/admin/nabidky">Poptávky z konfigurátoru</a> <small class="nab-muted">(marže a nákupní ceny vidíte jen s tímto přihlášením)</small></p>
 <form method="post" action="/platforma/odhlaseni" class="pr-inline pr-logout"><input type="hidden" name="_csrf" value="${csrf}"><button class="btn btn--ghost btn--sm" type="submit">Odhlásit</button></form>`,
   })}
 ${c.section({

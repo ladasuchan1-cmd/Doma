@@ -17,6 +17,7 @@ const page = require('../src/render/pages/nabidka');
 
 const FIXTURE = path.join(__dirname, 'fixtures', 'nabidka.json');
 const INTERNI = path.join(__dirname, 'fixtures', 'nabidka.interni.json');
+const PLATFORMA_HESLO = 'test-platforma-heslo-2026';
 const raw = JSON.parse(fs.readFileSync(FIXTURE, 'utf8'));
 const rawInterni = JSON.parse(fs.readFileSync(INTERNI, 'utf8'));
 const { config } = domain.validateConfig(raw, rawInterni);
@@ -241,13 +242,19 @@ test.before(async () => {
   feature.setConfigPath(FIXTURE);
   feature.setInterniPath(INTERNI);
   const log = createLogger({ level: 'debug', stdout: { write: (l) => logLines.push(l) }, stderr: { write: (l) => logLines.push(l) } });
-  srv = await startServer({ log });
+  srv = await startServer({ log, env: { PK_PLATFORMA_HESLO: PLATFORMA_HESLO } });
 });
 test.after(async () => {
   if (srv) await srv.stop();
   feature.setConfigPath(feature.DEFAULT_CONFIG_PATH);
   feature.setInterniPath(null);
 });
+
+async function platformLogin() {
+  const token = /name="_csrf" value="([^"]+)"/.exec(await (await srv.fetch('/platforma')).text())[1];
+  const r = await srv.fetch('/platforma/prihlaseni', { method: 'POST', body: { _csrf: token, heslo: PLATFORMA_HESLO } });
+  assert.equal(r.status, 303);
+}
 
 async function adminLogin() {
   const token = await srv.csrf('/admin/login');
@@ -268,7 +275,9 @@ test('stránka /nabidka: 200 ve 3 tématech, bez {{ / undefined / NaN, bez inlin
     assert.match(html, /site-nav__link is-active" href="\/nabidka" aria-current="page">Pro hotely a půjčovny</);
     assert.match(html, /\/css\/nabidka\.css/);
     assert.match(html, /\/js\/nabidka\.js/);
-    assert.match(html, /<ol class="steps">/);
+    assert.match(html, /<ol class="steps nab-steps">/);
+    assert.match(html, /class="steps__link" href="#krok-navratnost"/, 'kroky jsou odkazy na sekce');
+    assert.match(html, /data-nabidka-verdikt/, 'verdikt „Vyplatí se to?“ nahoře v souhrnu');
     assert.match(html, /name="trek" required="" |name="trek"/);
     assert.match(html, /value="6"[^>]*data-nabidka-count="zakladni"|data-nabidka-count="zakladni"/);
     assert.match(html, /36\u00a0142\u00a0Kč/, 'měsíčně hotel');
@@ -295,8 +304,13 @@ test('stránka /nabidka: 200 ve 3 tématech, bez {{ / undefined / NaN, bez inlin
   const malo = await (await srv.fetch('/nabidka?zakladni=2&porizeni=pronajem36')).text();
   assert.match(malo, /notice notice--warning[^>]*>Pronájem nabízíme od 5 kol/);
   const prazdna = await (await srv.fetch('/nabidka')).text();
-  assert.match(prazdna, /Zadejte prosím počet kol/);
+  assert.ok(!/Zadejte prosím počet kol/.test(prazdna), 'bez zadání výchozí 2 kola – souhrn hned ukazuje ceny');
+  assert.match(prazdna, /data-nabidka-count="trek" type="number" value="1"/);
+  assert.match(prazdna, /data-nabidka-count="ekolo" type="number" value="1"/);
+  assert.match(prazdna, /data-nabidka-verdikt/);
   assert.match(prazdna, /name="porizeni" value="zkouska" checked/, 'výchozí = zkouška');
+  const nula = await (await srv.fetch('/nabidka?zakladni=0&trek=0&ekolo=0')).text();
+  assert.match(nula, /Zadejte prosím počet kol/, 'výslovně 0 kol zůstává 0');
 });
 
 test('API /api/v1/nabidka/spocitat: JSON bez interních polí, doplnky čárkou, html souhrnu; neplatný vstup → výchozí', async () => {
@@ -319,13 +333,19 @@ test('API /api/v1/nabidka/spocitat: JSON bez interních polí, doplnky čárkou,
   assert.equal(dflt.souhrn.pocetKol, 0);
 });
 
-test('interní blok jen s admin session (/nabidka i API); ?interni=0 ho skryje; bez session nikdy, ani s ?interni=1', async () => {
+test('interní blok jen pro správce platformy (/nabidka i API), ne pro správce tenanta (veřejné demo heslo); ?interni=0 ho skryje', async () => {
   srv.jar.clear();
   const q = '/nabidka?trek=2&ekolo=3&porizeni=pronajem36&servis=partner&doplnky=prilby,nabijecky';
   assert.ok(!/nab-internal/.test(await (await srv.fetch(q + '&interni=1')).text()), 'veřejnost s ?interni=1 nic');
   const pubApi = await (await srv.fetch('/api/v1/nabidka/spocitat?trek=2&ekolo=3&porizeni=pronajem36&interni=1')).json();
   assert.equal('interni' in pubApi, false);
   await adminLogin();
+  const jenAdmin = await (await srv.fetch(q + '&interni=1')).text();
+  assert.ok(!/nab-internal/.test(jenAdmin), 'správce tenanta (demo heslo je veřejné) interní čísla nevidí');
+  assert.ok(!/33\u00a0000/.test(jenAdmin), 'ani nákupní ceny');
+  assert.equal('interni' in (await (await srv.fetch('/api/v1/nabidka/spocitat?trek=2&ekolo=3&porizeni=pronajem36')).json()), false);
+  srv.jar.clear();
+  await platformLogin();
   const html = await (await srv.fetch(q)).text();
   assert.match(html, /nab-internal/);
   assert.match(html, /Naše marže/);
@@ -338,9 +358,7 @@ test('interní blok jen s admin session (/nabidka i API); ?interni=0 ho skryje; 
   const api = await (await srv.fetch('/api/v1/nabidka/spocitat?trek=2&ekolo=3&porizeni=pronajem36&servis=partner&doplnky=prilby,nabijecky')).json();
   assert.equal(api.interni.marze, 147965);
   assert.match(api.html, /nab-internal/);
-  // odhlášení → zase nic
-  const logout = await srv.fetch('/admin/logout', { method: 'POST', body: { _csrf: (await srv.fetch('/admin')).headers.get('x-none') || '' } });
-  assert.ok([303, 403].includes(logout.status));
+  // bez session → zase nic
   srv.jar.clear();
   assert.ok(!/nab-internal/.test(await (await srv.fetch(q)).text()));
 });
@@ -421,7 +439,7 @@ test('poptávka: CSRF 403, validace 422 s předvyplněním, honeypot, úspěch �
   assert.match(srv.db.prepare("SELECT subject FROM outbox WHERE type = 'nabidka' ORDER BY id DESC").get().subject, /000002/);
 });
 
-test('/admin/nabidky: bez přihlášení 303 na login; s přihlášením seznam a detail s dešifrovaným kontaktem, interní marží a auditem nabidka.view', async () => {
+test('/admin/nabidky: bez přihlášení 303 na login; s přihlášením seznam a detail s dešifrovaným kontaktem a auditem nabidka.view; interní marže jen se session platformy', async () => {
   srv.jar.clear();
   const anon = await srv.fetch('/admin/nabidky');
   assert.equal(anon.status, 303);
@@ -442,7 +460,11 @@ test('/admin/nabidky: bez přihlášení 303 na login; s přihlášením seznam 
   assert.match(dh, /jana\.novakova@example\.com/);
   assert.match(dh, /Jana Nováková/);
   assert.match(dh, /Interně: naše marže/);
-  assert.match(dh, /Vázaný kapitál/);
+  assert.ok(!/Vázaný kapitál/.test(dh), 'správce tenanta nevidí interní čísla poptávky');
+  assert.match(dh, /vidí jen správce platformy/);
+  await platformLogin();
+  const dh2 = await (await srv.fetch(`/admin/nabidky/${id}`)).text();
+  assert.match(dh2, /Vázaný kapitál/, 'správce platformy (+ admin session) interní čísla vidí');
   assert.match(dh, /Začít bychom chtěli v květnu/);
   assert.ok(!BAD_TOKENS.test(dh));
   const audit = srv.db.prepare("SELECT * FROM audit_log WHERE action = 'nabidka.view' ORDER BY id DESC").get();
@@ -799,4 +821,57 @@ test('kalkulačka návratnosti přes server: vlastní sezóna, vytíženost, cen
   assert.match(html, /Vyplatí se to\?/);
   assert.match(html, /name="sezona"[^>]*value="120"|value="120"[^>]*name="sezona"/);
   assert.match(html, /name="konfigurace" value="[^"]*sezona=120[^"]*neplatce=1/);
+});
+
+test('modelové příklady (config/nabidka.json + kola-modely.json): 4 stupně, skutečné modely, veřejně bez marží a nákupních cen', () => {
+  const real = JSON.parse(fs.readFileSync(feature.DEFAULT_CONFIG_PATH, 'utf8'));
+  const v = domain.validateConfig(real, JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'config', 'nabidka.interni.example.json'), 'utf8')));
+  assert.ok(v.ok, v.errors.join(' '));
+  assert.ok(!v.config.doplnky.some((d) => /nabij/i.test(d.id)), 'nabíjecí stanice není placený doplněk');
+  assert.ok(v.config.naDomluvu.some((t) => /Nabíjecí stanice/.test(t)), 'nabíjecí stanice je „po individuální domluvě“');
+  const modely = JSON.parse(fs.readFileSync(feature.MODELY_PATH, 'utf8')).modely;
+  const pr = domain.modelovePriklady(v.config, modely);
+  assert.deepEqual(pr.map((p) => [p.stupen, p.pocet]), [['Start', 2], ['Flotila', 5], ['Hotel', 10], ['Resort', 20]]);
+  for (const p of pr) {
+    assert.equal(p.odKol <= p.pocet, true);
+    assert.ok(p.kola.every((k) => /^(Superior|Rock Machine) /.test(k.nazev)), 'jen Superior a Rock Machine');
+    const z = p.varianty.zkouska;
+    const n = p.varianty.pronajem36;
+    const k = p.varianty.koupe;
+    assert.ok(z.celkem > 0 && n.mesicne > 0 && k.jednorazove > 0);
+    assert.equal(n.tri, n.jednorazove + 36 * n.mesicne, 'pronájem: web jednorázově + 36 splátek');
+    for (const id of ['zkouska', 'pronajem36', 'koupe']) assert.ok(Number.isFinite(p.interni[id].marze));
+  }
+  // větší stupeň = nižší cena za kolo (sleva) – měsíční pronájem na kolo
+  const naKolo = pr.map((p) => (p.varianty.pronajem36.mesicne - v.config.web.sablona.mesicne) / p.pocet);
+  assert.ok(naKolo[3] < naKolo[0], 'Resort levnější na kolo než Start');
+  const verejne = domain.verejnePriklady(pr);
+  const txt = JSON.stringify(verejne);
+  assert.ok(!/interni|nakupni|marze/i.test(txt), 'veřejné příklady bez interních čísel');
+  // výpočet sedí s konfigurátorem: Start = 1+1 e-kolo s cenou modelu, ruční kontrola koupě (sleva 0 %, web 15 000)
+  const start = pr[0];
+  const kolaKoupe = start.kola.reduce((a, x) => a + Math.round(x.cenaVerejna / 1.21) * x.pocet, 0);
+  assert.ok(Math.abs(start.varianty.koupe.kola - kolaKoupe) <= 2, 'koupě = ceny modelů bez DPH (± zaokrouhlení průměru)');
+  assert.equal(start.varianty.koupe.jednorazove, start.varianty.koupe.kola + v.config.web.sablona.jednorazove);
+});
+
+test('stránka /nabidka se skutečným ceníkem: příklady, předvolby stupňů a nabíjecí stanice na domluvu; interní příklady jen pro platformu', async () => {
+  feature.setConfigPath(feature.DEFAULT_CONFIG_PATH);
+  try {
+    srv.jar.clear();
+    const html = await (await srv.fetch('/nabidka')).text();
+    assert.ok(html.includes('Modelové příklady se skutečnými koly'));
+    assert.match(html, /data-nabidka-preset="10"/);
+    assert.match(html, /href="\/nabidka\?zakladni=0&amp;trek=0&amp;ekolo=20[^"]*#krok-kola"/, 'předvolba funguje i bez JS');
+    assert.ok(html.includes('Po individuální domluvě'));
+    assert.ok(!/name="doplnky" value="nabijecky"/.test(html), 'nabíjecí stanice bez ceny');
+    assert.ok(!/marže|nákupní|nakupni/i.test(html), 'veřejnost nevidí marže ani nákupní ceny');
+    assert.ok(!BAD_TOKENS.test(html));
+    await platformLogin();
+    const intern = await (await srv.fetch('/nabidka')).text();
+    assert.match(intern, /Naše marže a horizont/);
+  } finally {
+    srv.jar.clear();
+    feature.setConfigPath(FIXTURE);
+  }
 });

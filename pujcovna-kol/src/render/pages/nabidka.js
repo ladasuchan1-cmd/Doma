@@ -15,6 +15,12 @@ const format = require('../format');
 const domain = require('../../domain/nabidka');
 
 const STEPS = ['Kola', 'Způsob pořízení', 'Web', 'Správa a servis', 'Doplňky', 'Vyplatí se to?'];
+const STEP_IDS = ['krok-kola', 'krok-porizeni', 'krok-web', 'krok-sprava', 'krok-doplnky', 'krok-navratnost'];
+
+/** Navigace kroků: odkazy na sekce formuláře (souhrn vpravo se přepočítává s každou změnou v kroku). */
+function stepsNav() {
+  return html`<nav aria-label="Kroky konfigurátoru"><ol class="steps nab-steps">${STEPS.map((label, i) => html`<li class="steps__item"><a class="steps__link" href="#${STEP_IDS[i]}"><span class="steps__num" aria-hidden="true">${i + 1}</span><span class="steps__label">${label}</span></a></li>`)}</ol></nav>`;
+}
 
 /** Částka v Kč (celé) → „12 900 Kč“. */
 function kc(n) {
@@ -75,7 +81,7 @@ function choiceGroup(children, { label }) {
 // ---------------------------------------------------------------------------------------------------------
 // Kroky
 
-function stepKola({ config, input, modely = [] }) {
+function stepKola({ config, input, modely = [], priklady = [], internal = false }) {
   const cards = config.tridyKol.map((t) => {
     const priklady = modely.filter((m) => m.tridaNabidky === t.id);
     return html`<article class="nab-class">
@@ -97,16 +103,60 @@ function stepKola({ config, input, modely = [] }) {
   <ol class="nab-tiers__list">${stupne.map((st, i) => {
     const doKol = stupne[i + 1] ? stupne[i + 1].odKol - 1 : null;
     const active = vyber === st;
+    const preset = { ...input, kola: { zakladni: 0, trek: 0, ekolo: st.odKol } };
     return html`<li class="${active ? 'nab-tier is-active' : 'nab-tier'}" data-od="${st.odKol}"${attr({ 'aria-current': active ? 'true' : null })}>
     <p class="nab-tier__range">${doKol ? `${st.odKol}–${doKol} kol` : `${st.odKol} a více kol`}${st.nazev ? html` <span class="nab-tier__name">${st.nazev}</span>` : ''}</p>
     <p class="nab-tier__discount">${st.sleva ? `−${pctText(st.sleva)}` : 'základní cena'}</p>
     ${st.vyhody.length ? html`<ul class="nab-tier__perks">${st.vyhody.map((v) => html`<li>${v}</li>`)}</ul>` : ''}
+    <a class="nab-tier__pick" href="/nabidka?${domain.inputToQuery(preset)}#krok-kola" data-nabidka-preset="${st.odKol}">Spočítat pro ${format.plural(st.odKol, 'kolo', 'kola', 'kol')}</a>
   </li>`;
   })}</ol>
-  <p class="nab-muted">Stupeň se počítá z celkového počtu kol všech tříd dohromady. Nabídku sestavujeme od ${stupne[0].odKol} kol.</p>
+  <p class="nab-muted">Stupeň se počítá z celkového počtu kol všech tříd dohromady. Nabídku sestavujeme od ${stupne[0].odKol} kol. Tlačítkem „Spočítat“ si stupeň dosadíte do konfigurátoru (jako elektrokola) a souhrn vpravo se přepočítá.</p>
 </div>`
     : '';
-  return c.section({ id: 'krok-kola', eyebrow: 'Krok 1', title: 'Kolik kol a jakých', lead: `Zadejte počty kusů podle tříd – stačí ${stupne.length ? stupne[0].odKol : 1} kola. Mix tříd je běžný: základní kola pro většinu hostů, elektrokola pro náročnější výlety.`, children: html`${c.grid(cards, 3)}${tiers}`, variant: 'nab-step' });
+  return c.section({ id: 'krok-kola', eyebrow: 'Krok 1', title: 'Kolik kol a jakých', lead: `Zadejte počty kusů podle tříd – stačí ${stupne.length ? stupne[0].odKol : 1} kola. Mix tříd je běžný: základní kola pro většinu hostů, elektrokola pro náročnější výlety.`, children: html`${c.grid(cards, 3)}${tiers}${prikladyBlock({ priklady, internal })}`, variant: 'nab-step' });
+}
+
+/** Výsledek se znaménkem a slovem pro tabulku příkladů. */
+function vysledekText(n, kdy) {
+  return n >= 0 ? html`<strong>${kcVysledek(n)}</strong> ${kdy}` : html`<strong>ztráta ${kc(-n)}</strong> ${kdy}`;
+}
+
+/**
+ * Modelové příklady pro každý stupeň (domain.modelovePriklady): kolik zaplatí hotel ve třech způsobech pořízení a jestli
+ * se mu to vyplatí; s interním pohledem (jen správce platformy) i naše marže a horizont.
+ */
+function prikladyBlock({ priklady = [], internal = false }) {
+  if (!priklady.length) return '';
+  const p0 = priklady[0];
+  const card = (p) => {
+    const v = p.varianty;
+    const rows = [
+      [html`<strong>Zkouška ${v.zkouska.mesice} měsíce</strong>`, html`${kc(v.zkouska.celkem)} celkem<br><small class="nab-muted">${kc(v.zkouska.mesicne)}/měs.${v.zkouska.rozjezd ? html` + rozjezd ${kc(v.zkouska.rozjezd)}` : ''}</small>`, vysledekText(v.zkouska.vysledek, 'za zkoušku')],
+      [html`<strong>Pronájem 36 měsíců</strong>`, html`${kc(v.pronajem36.mesicne)}/měs.<br><small class="nab-muted">+ web ${kc(v.pronajem36.jednorazove)} jednorázově; za 3 roky ${kc(v.pronajem36.tri)}</small>`, html`${vysledekText(v.pronajem36.vysledekDalsiRoky, 'ročně')}<br><small class="nab-muted">první rok ${kcVysledek(v.pronajem36.vysledekPrvniRok)}</small>`],
+      [html`<strong>Koupě</strong>`, html`${kc(v.koupe.jednorazove)} jednorázově<br><small class="nab-muted">kola ${kc(v.koupe.kola)}${p.slevaKoupe ? ` (po slevě ${pctText(p.slevaKoupe)})` : ''} + web; pak ${kc(v.koupe.mesicne)}/měs.</small>`, v.koupe.navratnostSezon !== null ? html`vrátí se za <strong>${domain.sezonyText(v.koupe.navratnostSezon)}</strong><br><small class="nab-muted">pak ${kcVysledek(v.koupe.vysledekDalsiRoky)} ročně</small>` : html`<strong>nevrátí se</strong>`],
+    ];
+    const i = p.interni;
+    const horizont = (x, typ) => (typ === 'zkouska' ? `${x.horizontMesice} měsíce` : typ === 'koupe' ? `kola hned, web ${x.horizontMesice} měsíců` : `${x.horizontMesice} měsíců`);
+    return html`<article class="nab-example">
+  <header class="nab-example__head">
+    <p class="nab-example__tier">${p.stupen} · ${format.plural(p.pocet, 'kolo', 'kola', 'kol')}${p.sleva ? html` <span class="nab-example__discount">−${pctText(p.sleva)}</span>` : ''}</p>
+    <ul class="nab-example__bikes">${p.kola.map((k) => html`<li>${k.pocet}× <a href="/kola/${k.slug}">${k.nazev}</a> <small class="nab-muted">${kc(k.cenaVerejna)}</small></li>`)}</ul>
+  </header>
+  ${c.table({ compact: true, head: ['Pořízení', 'Hotel platí', 'Vyplatí se?'], rows })}
+  ${internal && i
+    ? html`<div class="nab-example__internal">
+    ${c.table({ compact: true, caption: html`${c.badge('Interně', 'warning')} Naše marže a horizont`, head: ['Pořízení', 'Tržby', 'Marže', 'Za'], rows: [['zkouska', 'Zkouška'], ['pronajem36', 'Pronájem 36 m'], ['koupe', 'Koupě']].map(([id, label]) => [label, { value: kc(i[id].trzby), align: 'right' }, { value: html`<strong>${kc(i[id].marze)}</strong> <small class="nab-muted">(${pctText(i[id].marzeProcent)})</small>`, align: 'right' }, horizont(i[id], id)]) })}
+    <p class="nab-muted">Nákupní ceny: ${i.kola.map((k) => `${k.pocet}× ${k.nazev} ${kc(k.nakupniCena)}${k.odvozena ? ' (odhad)' : ''}`).join(', ')}. Zkouška: kola zůstávají naše (ex-demo prodej). Koupě: marže z kol jednorázově + web po dobu 36 měsíců.</p>
+  </div>`
+    : ''}
+</article>`;
+  };
+  return html`<div class="nab-examples" id="priklady">
+  <h3 class="nab-tiers__title">Modelové příklady se skutečnými koly</h3>
+  <p class="nab-muted">Elektrokola Superior a Rock Machine za aktuální ceny výrobce (bez DPH), rezervační web ze šablony, vlastní správa a servis. „Vyplatí se?“ počítá s ${p0.sezonaDni} dny sezóny, vytížeností ${Math.round(p0.vytizenost * 100)} % a cenou ${kc(p0.cenaDen)} za den pro hosta (vč. DPH) – v kroku 6 si odhad upravíte pro vlastní nabídku. Částky bez DPH.</p>
+  <div class="nab-examples__grid">${priklady.map(card)}</div>
+</div>`;
 }
 
 const KATEGORIE_MODELU = { ebike: 'Elektrokolo', kids: 'Dětské kolo', trek: 'Trekové kolo', mtb: 'Horské kolo', city: 'Městské kolo', gravel: 'Gravel' };
@@ -202,7 +252,8 @@ function stepDoplnky({ config, input }) {
       attrs: { 'data-nabidka-jen-ekolo': d.jenEkolo ? '1' : null },
     });
   });
-  return c.section({ id: 'krok-doplnky', eyebrow: 'Krok 5', title: 'Doplňky', lead: n ? `Ceny za kolo se počítají pro ${format.plural(n, 'kolo', 'kola', 'kol')} z kroku 1.` : 'Ceny za kolo se počítají podle počtu kol z kroku 1.', children: html`<div class="nab-addons">${items}</div>`, variant: 'nab-step' });
+  const domluva = config.naDomluvu || [];
+  return c.section({ id: 'krok-doplnky', eyebrow: 'Krok 5', title: 'Doplňky', lead: n ? `Ceny za kolo se počítají pro ${format.plural(n, 'kolo', 'kola', 'kol')} z kroku 1.` : 'Ceny za kolo se počítají podle počtu kol z kroku 1.', children: html`<div class="nab-addons">${items}</div>${domluva.length ? html`<div class="nab-domluva"><h3 class="nab-subtitle">Po individuální domluvě</h3><ul class="nab-list nab-list--bullets">${domluva.map((t) => html`<li>${t}</li>`)}</ul></div>` : ''}`, variant: 'nab-step' });
 }
 
 /** Krok 6: kalkulačka návratnosti – odhad sezóny, vytíženosti a cen pro hosta (GET parametry sezona, vytizenost, cena_*, neplatce). */
@@ -249,6 +300,37 @@ function kcVysledek(n) {
   return n > 0 ? `+${kc(n)}` : kc(n);
 }
 
+/**
+ * Verdikt „Vyplatí se to?“ nahoře v souhrnu: jedna věta ano/ne a jedno číslo, které rozhodne (výdělek za zkoušku, za rok,
+ * nebo za kolik sezón se vrátí koupě) + kolik vytíženosti stačí. Podrobný rozpis je níž (navratnostBlock).
+ */
+function verdiktBlock(result) {
+  const n = result.navratnost;
+  if (!n) return '';
+  let ok;
+  let titulek;
+  let cislo;
+  if (n.typ === 'zkouska') {
+    ok = n.vysledekPrvniRok >= 0;
+    titulek = ok ? 'Ano, vyplatí se' : 'Takhle se zkouška nevyplatí';
+    cislo = ok ? html`Za zkoušku vyděláte <strong>${kc(n.vysledekPrvniRok)}</strong>` : html`Za zkoušku ztráta <strong>${kc(-n.vysledekPrvniRok)}</strong>`;
+  } else if (n.typ === 'koupe') {
+    ok = n.navratnostSezon !== null;
+    titulek = ok ? 'Ano, vyplatí se' : 'Takhle se koupě nevyplatí';
+    cislo = ok ? html`Kola se zaplatí za <strong>${domain.sezonyText(n.navratnostSezon)}</strong>, pak ${kcVysledek(n.vysledekDalsiRoky)} ročně` : html`Tržby nepokryjí ani roční provoz`;
+  } else {
+    ok = n.vysledekPrvniRok >= 0 || n.vysledekDalsiRoky >= 0;
+    titulek = n.vysledekPrvniRok >= 0 ? 'Ano, vyplatí se' : n.vysledekDalsiRoky >= 0 ? 'Vyplatí se od druhého roku' : 'Takhle se pronájem nevyplatí';
+    cislo = html`První rok <strong>${kcVysledek(n.vysledekPrvniRok)}</strong>, další roky <strong>${kcVysledek(n.vysledekDalsiRoky)}</strong> ročně`;
+  }
+  const bz = n.bodZvratu;
+  return html`<div class="${ok ? 'nab-verdikt' : 'nab-verdikt is-loss'}" data-nabidka-verdikt>
+  <p class="nab-verdikt__title">${titulek}</p>
+  <p class="nab-verdikt__value">${cislo}</p>
+  <p class="nab-verdikt__note">${bz && bz.dosazitelny ? `Stačí ${domain.procentNahoru(bz.vytizenost)} % vytíženosti – odhad počítá s ${Math.round(n.vstupy.vytizenost * 100)} %.` : `Odhad: ${Math.round(n.vstupy.vytizenost * 100)} % vytíženost, ${n.vstupy.sezonaDni} dní sezóny.`} <a href="#krok-navratnost">Upravit odhad</a></p>
+</div>`;
+}
+
 /** Blok „Vyplatí se to?“ v souhrnu (result.navratnost z compute; bez kol nic). */
 function navratnostBlock(result) {
   const n = result.navratnost;
@@ -273,7 +355,7 @@ function navratnostBlock(result) {
   }
   if (n.navratnostText) rows.push(['Návratnost koupě', n.navratnostText]);
   return html`<section class="nab-roi" aria-label="Vyplatí se to?" data-nabidka-navratnost>
-  <h3 class="nab-summary__subtitle">Vyplatí se to?</h3>
+  <h3 class="nab-summary__subtitle">Vyplatí se to? Rozpis odhadu</h3>
   <p class="${n.vysledekPrvniRok >= 0 ? 'nab-roi__lead' : 'nab-roi__lead is-loss'}">${n.veta}</p>
   ${c.summary(rows)}
   ${n.poznamkaDalsiRoky ? html`<p class="nab-muted nab-roi__note">${n.poznamkaDalsiRoky}</p>` : ''}
@@ -330,6 +412,7 @@ function summaryFragment({ result, internal, config, actions = true, detailsOpen
   return html`<div class="nab-summary__inner">
   <h2 class="nab-summary__title">Vaše nabídka ${meta.zastupneCeny ? c.badge('ukázkové ceny', 'warning') : ''}</h2>
   ${result.upozorneni.map((u) => c.notice(u.text, u.kod === 'zadna-kola' ? 'info' : 'warning'))}
+  ${verdiktBlock(result)}
   ${c.summary(totals)}
   ${mn && mn.dalsi && !result.upozorneni.some((u) => u.kod === 'min-kol') ? html`<p class="nab-summary__upsell">Přidejte ještě <strong>${mn.dalsi.chybi} ${mn.dalsi.chybi === 1 ? 'kolo' : mn.dalsi.chybi < 5 ? 'kola' : 'kol'}</strong> a dostanete${mn.dalsi.sleva ? ` slevu ${pctText(mn.dalsi.sleva)}` : ' lepší podmínky'}${mn.dalsi.nazev ? ` (stupeň ${mn.dalsi.nazev})` : ''}.</p>` : ''}
   <details class="nab-summary__details"${attr({ open: !!detailsOpen })}><summary>Co nabídka obsahuje</summary>${c.summary(rows)}</details>
@@ -399,7 +482,7 @@ ${c.form({
 // Stránky
 
 /** Konfigurátor. data: { tenant, config, input, result, internal, csrf, values, errors, query } */
-function nabidka({ config, input, result, internal, csrf, values, errors, query, modely = [], modelyMeta = {} }) {
+function nabidka({ config, input, result, internal, csrf, values, errors, query, modely = [], modelyMeta = {}, priklady = [] }) {
   return html`
 ${c.section({
     variant: 'page-head',
@@ -407,11 +490,11 @@ ${c.section({
     title: 'Kola pro vaše hosty – s rezervačním webem, správou a servisem',
     titleTag: 'h1',
     lead: 'Sestavte si nabídku v šesti krocích. Souhrn se přepočítává průběžně; na konci pošlete poptávku a my se ozveme se závaznou nabídkou.',
-    children: html`${config.meta.zastupneCeny ? c.notice('Konfigurátor zatím počítá s ukázkovými cenami – slouží k představě o struktuře nabídky, ne jako závazný ceník.', 'warning') : ''}${c.steps(STEPS, -1, { links: false })}`,
+    children: html`${config.meta.zastupneCeny ? c.notice('Konfigurátor zatím počítá s ukázkovými cenami – slouží k představě o struktuře nabídky, ne jako závazný ceník.', 'warning') : ''}${stepsNav()}`,
   })}
 <div class="container nab-layout">
   <form class="nab-form" method="get" action="/nabidka" data-nabidka-form>
-    ${stepKola({ config, input, modely })}
+    ${stepKola({ config, input, modely, priklady, internal })}
     ${stepPorizeni({ config, input })}
     ${stepWeb({ config, input })}
     ${stepSprava({ config, input })}

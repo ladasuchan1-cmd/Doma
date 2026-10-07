@@ -33,7 +33,7 @@ viz níže).
 servis, doplňky, interní nákladové parametry). **Nákupní ceny kol v něm nejsou a nesmí být** (validace soubor
 s `nakupniCena` odmítne): čtou se z interního souboru mimo git – `PK_NABIDKA_INTERNI`, jinak `$PK_DATA/nabidka.interni.json`
 nebo `config/nabidka.interni.json` (oba v `.gitignore`); vzor `config/nabidka.interni.example.json` má ukázkové hodnoty.
-Bez souboru se nákupní cena odvodí z prodejní a prahu marže a interní blok (jen přihlášený správce) to označí. Konkrétní
+Bez souboru se nákupní cena odvodí z prodejní a prahu marže a interní blok (jen přihlášený správce platformy, `/platforma`) to označí. Konkrétní
 modely flotily s veřejnými cenami výrobce jsou v `config/kola-modely.json` – zobrazují se na `/nabidka` a demo seed z nich
 dělá typy kol (`/kola`, ilustrační fotky CC BY). Nasazení interního souboru na server: `NASAZENI.md` kap. 6b.
 

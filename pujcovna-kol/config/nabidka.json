@@ -165,12 +165,27 @@
       "id": "prilby",
       "nazev": "Přilby a zámky (sada ke kolu)",
       "jednorazoveZaKolo": 1200
+    }
+  ],
+  "naDomluvu": [
+    "Nabíjecí stanice pro e-kola – po individuální domluvě, cenu připravíme podle místa a počtu kol."
+  ],
+  "modelovePriklady": [
+    {
+      "stupen": "Start",
+      "kola": { "rock-machine-crossride-e400-b-touring": 1, "superior-exp-6-4-steps": 1 }
     },
     {
-      "id": "nabijecky",
-      "nazev": "Nabíjecí stanice pro e-kola",
-      "jednorazove": 25000,
-      "jenEkolo": true
+      "stupen": "Flotila",
+      "kola": { "rock-machine-crossride-e400-b-touring": 2, "superior-exp-6-4-steps": 2, "superior-eway-6-4": 1 }
+    },
+    {
+      "stupen": "Hotel",
+      "kola": { "rock-machine-crossride-e400-b-touring": 3, "superior-exp-6-4-steps-suv": 3, "superior-eway-6-4": 2, "rock-machine-eblizzard-30-s": 2 }
+    },
+    {
+      "stupen": "Resort",
+      "kola": { "rock-machine-crossride-e400-b-touring": 6, "superior-exp-6-4-steps": 4, "superior-exp-6-4-steps-suv": 4, "superior-eway-6-4": 3, "rock-machine-eblizzard-30-s": 3 }
     }
   ],
   "navratnost": {
@@ -192,7 +207,6 @@
     "nakladyPrilbyProcentCeny": 0.7,
     "nakladyGpsProcentCeny": 0.75,
     "nakladyPojisteniProcentCeny": 0.8,
-    "nakladySpravyHodinMesicne": 3,
-    "nakladyNabijeckyProcentCeny": 0.8
+    "nakladySpravyHodinMesicne": 3
   }
 }

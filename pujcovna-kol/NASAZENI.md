@@ -163,8 +163,9 @@ Konfigurátor `/nabidka` počítá marže z nákupních cen kol. Ty **nikdy nepa
 `config/nabidka.json` je bez nich (validace by soubor s `nakupniCena` odmítla) a čtou se jen z interního souboru
 v datovém svazku: `/data/nabidka.interni.json` (cesta přepsatelná `PK_NABIDKA_INTERNI`). Vzor s ukázkovými hodnotami
 je `config/nabidka.interni.example.json`; změna souboru se projeví do 2 s bez restartu. Bez souboru konfigurátor běží
-s odhadem (prodejní cena × (1 − práh marže)) a interní blok pro správce to označí varováním. Nákupní ceny vidí jen
-přihlášený správce v interním bloku `/nabidka` (tabulka tříd a konkrétních modelů z `config/kola-modely.json`).
+s odhadem (prodejní cena × (1 − práh marže)) a interní blok pro správce to označí varováním. Nákupní ceny a marže vidí jen
+přihlášený správce platformy (`/platforma`, heslo `PK_PLATFORMA_HESLO`) v interním bloku `/nabidka` a v `/admin/nabidky` – správce
+tenanta ne (heslo administrace dema je veřejné). Bez `PK_PLATFORMA_HESLO` je nevidí nikdo.
 
 Zápis na serveru (svazek dat se jmenuje `pujcovna-kol_data`; hodnoty vyplňte podle skutečnosti – do gitu, chatu ani
 e-mailu je nekopírujte):

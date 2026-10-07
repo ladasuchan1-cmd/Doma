@@ -221,6 +221,28 @@ function validateConfig(raw, interniRaw = null) {
     }
   }
 
+  // modelové příklady (volitelné): [{ stupen, kola: { slug modelu z kola-modely.json: počet } }]
+  const priklady = [];
+  if (raw.modelovePriklady !== undefined) {
+    need(Array.isArray(raw.modelovePriklady), '„modelovePriklady“ musí být pole.');
+    for (const [idx, pr] of (Array.isArray(raw.modelovePriklady) ? raw.modelovePriklady : []).entries()) {
+      const ok = pr && typeof pr === 'object' && pr.kola && typeof pr.kola === 'object' && !Array.isArray(pr.kola);
+      need(ok, `modelovePriklady[${idx}].kola musí být objekt {slug: počet}.`);
+      if (!ok) continue;
+      const kola = {};
+      for (const [slug, n] of Object.entries(pr.kola)) {
+        need(/^[a-z0-9-]{1,80}$/.test(slug), `modelovePriklady[${idx}]: neplatný slug „${slug}“.`);
+        need(Number.isInteger(n) && n > 0 && n <= MAX_KOL, `modelovePriklady[${idx}].kola.${slug} musí být kladné celé číslo.`);
+        kola[slug] = n;
+      }
+      priklady.push({ stupen: String(pr.stupen || ''), kola });
+    }
+  }
+
+  // položky jen „po individuální domluvě“ (bez ceny; konfigurátor je jen vypíše), např. nabíjecí stanice pro e-kola
+  if (raw.naDomluvu !== undefined) need(Array.isArray(raw.naDomluvu) && raw.naDomluvu.every((x) => typeof x === 'string' && x), '„naDomluvu“ musí být pole neprázdných textů.');
+  const naDomluvu = Array.isArray(raw.naDomluvu) ? raw.naDomluvu.filter((x) => typeof x === 'string' && x).map(String) : [];
+
   need(interni && typeof interni === 'object', 'Chybí „interni“.');
   const i = interni || {};
   for (const k of ['prahMarzeProcent', 'nakladyHostingMesicne', 'nakladyKonzultaceHodina', 'nakladyNasazeniWebu']) need(isNum(i[k]), `interni.${k} musí být číslo.`);
@@ -251,6 +273,8 @@ function validateConfig(raw, interniRaw = null) {
     doplnky: dop,
     mnozstevniSlevy: stupne,
     navratnost,
+    modelovePriklady: priklady,
+    naDomluvu,
     interni: {
       prahMarzeProcent: pct(i.prahMarzeProcent),
       nakladyHostingMesicne: r0(i.nakladyHostingMesicne),
@@ -774,6 +798,79 @@ function modelyInterni(modely, config, dph = 0.21) {
   });
 }
 
+/**
+ * Modelové příklady pro každý množstevní stupeň (config.modelovePriklady = [{ stupen, kola: { slug: pocet } }]) nad
+ * skutečnými modely z config/kola-modely.json. Prodejní cena modelu = veřejná cena výrobce bez DPH, zůstatková po 36 m
+ * stejným podílem jako třída e-kol, nákupní cena z interního souboru (chybí-li, odhad jako u tříd). Pro výpočet se modely
+ * příkladu sloučí do jedné „třídy“ s váženým průměrem cen a pustí se stejný compute() jako v konfigurátoru (výpočet je
+ * v cenách kol lineární – rozdíl proti součtu po modelech je jen v zaokrouhlení na celé Kč za kolo). Varianty: zkouška,
+ * pronájem 36 m a koupě; vždy s webem ze šablony, vlastní správou a servisem, bez doplňků, návratnost s výchozím odhadem
+ * z config.navratnost. Vrací pole { stupen, odKol, nazevStupne, pocet, kola[], varianty{}, interni{} } – `interni`
+ * (marže, nákupní ceny) volající u veřejného výstupu odstraní (verejnePriklady).
+ */
+function modelovePriklady(config, modely, { dph } = {}) {
+  const defs = Array.isArray(config && config.modelovePriklady) ? config.modelovePriklady : [];
+  if (!defs.length) return [];
+  const bySlug = Object.fromEntries((Array.isArray(modely) ? modely : []).map((m) => [m.slug, m]));
+  const ek = config.tridyKol.find((t) => t.id === 'ekolo');
+  const zustPodil = ek && ek.prodejniCena > 0 ? ek.zustatkova36m / ek.prodejniCena : 0.3;
+  const prah = config.interni.prahMarzeProcent;
+  const nakup = config.interni.modelyNakup || {};
+  const sazba = Number.isFinite(dph) ? dph : (config.navratnost && config.navratnost.dph) || NAVRATNOST_VYCHOZI.dph;
+  const out = [];
+  for (const p of defs) {
+    const radky = [];
+    for (const [slug, pocet] of Object.entries(p.kola || {})) {
+      const m = bySlug[slug];
+      if (!m || !(pocet > 0)) continue;
+      const prodejni = r0(Number(m.cenaVerejna || 0) / (1 + sazba));
+      const zeSouboru = Object.prototype.hasOwnProperty.call(nakup, slug);
+      radky.push({ slug, nazev: `${m.znacka || ''} ${m.model || ''}`.trim(), pocet, cenaVerejna: r0(m.cenaVerejna), prodejni, nakupni: zeSouboru ? nakup[slug] : r0(prodejni * (1 - prah)), odvozena: !zeSouboru, zustatkova36m: r0(prodejni * zustPodil) });
+    }
+    const pocet = sum(radky, 'pocet');
+    if (!pocet) continue;
+    const prumer = (k) => r0(radky.reduce((a, r) => a + r[k] * r.pocet, 0) / pocet);
+    const odvozene = radky.some((r) => r.odvozena);
+    const trida = { ...ek, nazev: 'Elektrokola z příkladu', prodejniCena: prumer('prodejni'), nakupniCena: prumer('nakupni'), zustatkova36m: prumer('zustatkova36m'), nakupniCenaOdvozena: odvozene };
+    const cfg = { ...config, tridyKol: config.tridyKol.map((t) => (t.id === 'ekolo' ? trida : t)), meta: { ...config.meta, nakupniCenyOdvozene: odvozene } };
+    const stupen = stupenPro(config, pocet);
+    const varianty = {};
+    const interni = { nakupniOdvozene: odvozene, kola: radky.map((r) => ({ slug: r.slug, nazev: r.nazev, pocet: r.pocet, nakupniCena: r.nakupni, odvozena: r.odvozena })) };
+    for (const porizeni of ['zkouska', 'pronajem36', 'koupe']) {
+      const res = compute(normalizeInput({ ekolo: String(pocet), porizeni }, cfg), cfg);
+      const n = res.navratnost;
+      const s = res.souhrn;
+      if (porizeni === 'zkouska') {
+        varianty.zkouska = { mesice: res.zkouska.mesice, mesicne: s.mesicne, celkem: s.horizonty[0].castka, rozjezd: res.zkouska.rozjezd, kauce: s.kauce, vysledek: n.vysledekPrvniRok, trzby: n.trzby };
+      } else if (porizeni === 'pronajem36') {
+        varianty.pronajem36 = { mesicne: s.mesicne, jednorazove: s.jednorazove, rok: s.horizonty[0].castka, tri: s.horizonty[1].castka, kauce: s.kauce, vysledekPrvniRok: n.vysledekPrvniRok, vysledekDalsiRoky: n.vysledekDalsiRoky, trzby: n.trzby };
+      } else {
+        varianty.koupe = { kola: res.porizeni.jednorazove, jednorazove: s.jednorazove, mesicne: s.mesicne, navratnostSezon: n.navratnostSezon, vysledekDalsiRoky: n.vysledekDalsiRoky, trzby: n.trzby };
+      }
+      interni[porizeni] = { horizontMesice: res.interni.horizontMesice, trzby: res.interni.trzby, naklady: res.interni.naklady, marze: res.interni.marze, marzeProcent: res.interni.marzeProcent, nakupniCelkem: res.interni.nakupniCelkem };
+    }
+    out.push({
+      stupen: stupen.nazev || String(stupen.odKol),
+      odKol: stupen.odKol,
+      sleva: stupen.sleva,
+      slevaKoupe: stupen.slevaKoupe,
+      pocet,
+      kola: radky.map((r) => ({ slug: r.slug, nazev: r.nazev, pocet: r.pocet, cenaVerejna: r.cenaVerejna })),
+      cenaDen: (cfg.navratnost || NAVRATNOST_VYCHOZI).cenaDen.ekolo,
+      sezonaDni: (cfg.navratnost || NAVRATNOST_VYCHOZI).sezonaDni,
+      vytizenost: (cfg.navratnost || NAVRATNOST_VYCHOZI).vytizenost,
+      varianty,
+      interni,
+    });
+  }
+  return out;
+}
+
+/** Modelové příklady bez interních čísel (pro veřejnost). */
+function verejnePriklady(priklady) {
+  return (priklady || []).map(({ interni, ...rest }) => rest);
+}
+
 /** Množstevní stupeň pro počet kol: nejvyšší stupeň s odKol ≤ pocet (pod minimem první stupeň). */
 function stupenPro(config, pocet) {
   const stupne = config.mnozstevniSlevy;
@@ -812,6 +909,8 @@ module.exports = {
   sezonyText,
   procentNahoru,
   modelyInterni,
+  modelovePriklady,
+  verejnePriklady,
   stupenPro,
   availableDoplnky,
   pct,
