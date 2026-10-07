@@ -226,6 +226,15 @@ if [[ -z "$STAV" && -n "${KOLOMAPA_DOMENA:-}" && "$(hodnota KOLOMAPA_DOMENA)" !=
   uloz_hodnotu KOLOMAPA_DOMENA "$KOLOMAPA_DOMENA"
 fi
 
+# Certifikát, který Caddy na tomto serveru podává pro doménu (vydavatel, platnost) – za proxy Cloudflare má být
+# Cloudflare Origin (Cyklo & Ski mapa ho zapíná pro všechny weby, které pokrývá: CSM_CLOUDFLARE=1); Let's Encrypt by
+# za proxy neobnovila.
+cert_na_serveru() {
+  command -v openssl >/dev/null || return 0
+  echo | timeout 10 openssl s_client -connect 127.0.0.1:443 -servername "$DOMENA" 2>/dev/null \
+    | openssl x509 -noout -issuer -enddate 2>/dev/null | sed -E 's/^issuer= *//; s/"//g; s/^notAfter=/· platí do /' | cut -c1-90 | tr '\n' ' ' || true
+}
+
 # --- Cloudflare Access + tunel (přihlášení jen e-mailem Koloshopu) ------------------------------------------------
 # Tým a AUD aplikace jsou vidět v přesměrování na přihlášení: https://<tým>.cloudflareaccess.com/cdn-cgi/access/login/
 # <doména>?kid=<AUD>&… – Cloudflare ho pošle každému, kdo doménu otevře bez přihlášení (Access stojí před tunelem
@@ -291,6 +300,7 @@ if [[ -n "$STAV" ]]; then
     echo "Tunel:        není ($TUNEL_ENV chybí)"
   fi
   echo "Zvenku:       https://$DOMENA → $(curl -s -o /dev/null -m 10 -w '%{http_code} %{redirect_url}' "https://$DOMENA/" 2>/dev/null | cut -c1-110 || true)"
+  [[ -z "$TUNEL_ZAP" ]] && echo "Certifikát:   $(cert_na_serveru)"
   echo "Caddy:        $REZIM${CADDY:+ – kontejner $CADDY, $(docker ps --filter "name=^$CADDY\$" --format '{{.Status}}' | head -1)}"
   if [[ -n "${CADDYFILE:-}" && -f "$CADDYFILE" ]]; then
     IMPORT_JE=NE; grep -qxF "$IMPORT_RADEK" "$CADDYFILE" && IMPORT_JE=ano
@@ -582,6 +592,15 @@ for i in $(seq 1 30); do
         *) CO="oranžový mráček u DNS záznamu"; [[ -n "$TUNEL_ZAP" ]] && CO="Public hostname tunelu ($DOMENA → HTTP kolomapa:$PORT)"
            echo "   POZOR: https://$DOMENA nepřesměrovává na přihlášení Cloudflare Access (odpověď: ${ZVENKU% }) – zkontrolujte aplikaci v Cloudflare Access a $CO" ;;
       esac
+      if [[ -z "$TUNEL_ZAP" ]]; then
+        CERT="$(cert_na_serveru)"
+        case "$CERT" in
+          *[Cc]loud[Ff]lare*) echo "   certifikát na serveru: $CERT (Cloudflare Origin – za proxy v pořádku)" ;;
+          "") ;;
+          *) echo "   POZOR: certifikát na serveru: $CERT – za proxy Cloudflare ho Caddy neobnoví. Zapněte Cloudflare Origin certifikát"
+             echo "          pokrývající $DOMENA (na tomto serveru ho spravuje Cyklo & Ski mapa: CSM_CLOUDFLARE=1), nebo použijte tunel." ;;
+        esac
+      fi
       PRIMO="$(curl -sk -o /dev/null -m 10 -w '%{http_code}' --resolve "$DOMENA:443:127.0.0.1" "https://$DOMENA/data/summary.json" 2>/dev/null || true)"
       case "${PRIMO:-000}" in
         000|403|421) echo "   přímo na server mimo Cloudflare: ${PRIMO/000/nedostupné} – bez přihlášení Cloudflare nic" ;;

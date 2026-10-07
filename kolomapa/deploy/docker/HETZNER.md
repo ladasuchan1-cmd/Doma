@@ -80,13 +80,34 @@ Caddy jako služba systému (`/etc/caddy/Caddyfile`, Kolomapa publikuje jen `127
 caddy`). Když v Caddyfile je sdílený snippet `(header_sec)`, blok ho použije. Před načtením se konfigurace ověří a
 při chybě se vrátí původní. Na konci skript zkusí `https://<doména>` přes Caddy (čeká 401 = chce heslo).
 
-## Přihlášení jen e-mailem Koloshopu (Cloudflare Access) – doporučeno
+## Přihlášení jen e-mailem Koloshopu (Cloudflare Access)
 
-Stejně jako `sales.ksprehledy.cz` a `projekty.ksprehledy.cz`: kdo otevře Kolomapu, přihlásí se u Cloudflare firemním
-e-mailem (tým Cloudflare Zero Trust `bold-dust-a2b5`), jinak se nedostane dál. Kolomapa jde ven **jen Cloudflare
-tunelem** – Caddy na serveru její doménu nezná, takže přímo na server (mimo Cloudflare) se nedá. A Kolomapa sama
+Stejně jako `sales.ksprehledy.cz`, `projekty.ksprehledy.cz` a Cyklo & Ski mapa: kdo otevře Kolomapu, přihlásí se
+u Cloudflare firemním e-mailem (tým Cloudflare Zero Trust `bold-dust-a2b5`), jinak se nedostane dál. A Kolomapa sama
 ověřuje podpis Cloudflare u každého požadavku: bez platného přihlášení pro e-mail `@koloshop.cz` vrátí 403, heslo ani
-jména Cyklo & Ski mapy už neplatí.
+jména Cyklo & Ski mapy už neplatí – ani kdo by šel přímo na server mimo Cloudflare, se nedostane dál.
+
+### Na 37.27.203.154 (stav od 7. 10. 2026): proxy Cloudflare + Origin certifikát Cyklo & Ski mapy
+
+Na serveru je to už připravené z nasazení Cyklo & Ski mapy: `kolomapa.ksprehledy.cz` má v Cloudflare oranžový
+mráček (proxy), aplikace Cloudflare Access pokrývá `mapa.ksprehledy.cz` i `kolomapa.ksprehledy.cz` (jedna aplikace,
+jeden AUD tag) a Caddy podává Cloudflare Origin certifikát (`CSM_CLOUDFLARE=1`, `/opt/caddy-origin`) všem webům, které
+pokrývá – i Kolomapě, takže obnova certifikátu za proxy není problém. Zbývá zapnout ověřování v Kolomapě:
+
+```bash
+KOLOMAPA_CF_ACCESS_EMAILS=@koloshop.cz bash /root/Doma/kolomapa/deploy/docker/nasadit.sh
+```
+
+Skript zjistí tým a AUD z přesměrování na přihlášení, zapíše je do `/root/kolomapa.env`, vypne heslo i opis jmen
+Cyklo & Ski mapy a na konci ověří: `zvenku: … chce přihlášení Cloudflare Access`, `certifikát na serveru: … Cloudflare
+… (Cloudflare Origin – za proxy v pořádku)` a `přímo na server mimo Cloudflare: 403`. Kdyby Origin certifikát
+Kolomapu nepokrýval (vypíše `POZOR: certifikát … Let's Encrypt`), vytvořte v Cloudflare Origin certifikát pro
+`*.ksprehledy.cz` a nasaďte ho přes Cyklo & Ski mapu (její NASAZENI.md), nebo použijte tunel níže.
+
+### Jinde (server bez Origin certifikátu): Cloudflare tunel
+
+Kolomapa jde ven **jen Cloudflare tunelem** – Caddy na serveru její doménu nezná, takže přímo na server (mimo
+Cloudflare) se nedá a o certifikát se stará Cloudflare.
 
 V Cloudflare (dash.cloudflare.com → Zero Trust; názvy položek se mohou mírně lišit):
 
@@ -114,9 +135,8 @@ V mapě je pak vpravo nahoře přihlášený e-mail a **Odhlásit**. Odebrat př
 `KOLOMAPA_CF_ACCESS_*`, smazat `/root/kolomapa-tunel.env`, `docker rm -f kolomapa-tunel`, vrátit záznam A a
 `nasadit.sh`.
 
-Proč tunel a ne jen oranžový mráček u záznamu A: za proxy Cloudflare by Caddy neuměla obnovit certifikát Let's Encrypt
-(za ~2 měsíce by web spadl na chybu 526) a server by zůstal dostupný i přímo přes IP. Kdo přesto zvolí mráček, stačí
-bez tokenu tunelu: `KOLOMAPA_CF_ACCESS_EMAILS=@koloshop.cz bash …/nasadit.sh` – ověřování v Kolomapě funguje stejně.
+Proxy (oranžový mráček) bez tunelu potřebuje Cloudflare Origin certifikát: za proxy by Caddy neuměla obnovit
+certifikát Let's Encrypt (za ~2 měsíce by web spadl na chybu 526). Ověřování v Kolomapě funguje v obou variantách stejně.
 
 ## Přihlášení – stejná jména a hesla jako Cyklo & Ski mapa (bez Cloudflare Access)
 
