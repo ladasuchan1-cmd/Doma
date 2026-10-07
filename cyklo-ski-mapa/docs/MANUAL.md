@@ -15,7 +15,7 @@ stránku [SHRNUTI.md](SHRNUTI.md).
 - U změn stavu oslovení se ukládá **e-mail**, kdo je udělal (sloupec „Upravil“).
 - Nový kolega s firemním e-mailem se dostane dovnitř sám, nikdo mu účet zakládat nemusí.
 - Bez přihlášení není vidět nic – odkaz na místo proto funguje jen kolegovi s e-mailem Koloshopu.
-- Dokud správce přihlášení přes Cloudflare nezapne (NASAZENI.md), platí původní jméno a heslo od správce.
+- Do 7. 10. 2026 se přihlašovalo jménem a heslem aplikace – ta už neplatí.
 
 ## 2. Co je na obrazovce
 
