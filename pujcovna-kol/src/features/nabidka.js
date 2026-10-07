@@ -193,11 +193,17 @@ function loadModely() {
 }
 
 /** Konfigurace pro požadavek (loguje přes ctx.log, aby záznam nesl request id). */
+// konfigurace s nákupní cenou tříd z flotily (domain.nakupTridZFlotily), přepočet jen při změně ceníku nebo kola-modely.json
+let flotilaMemo = { src: null, mtime: null, config: null };
+
 function configFor(ctx) {
   if (ctx && ctx.app && ctx.app.log) loader.setLog(ctx.app.log);
   const st = loader.get();
   if (!st.config && ctx && ctx.log && st.error) ctx.log.warn('Nabídka: konfigurace cen není k dispozici', { error: st.error });
-  return st;
+  if (!st.config) return st;
+  const m = loadModely();
+  if (flotilaMemo.src !== st.config || flotilaMemo.mtime !== m.mtime) flotilaMemo = { src: st.config, mtime: m.mtime, config: domain.nakupTridZFlotily(st.config, m.modely) };
+  return { ...st, config: flotilaMemo.config };
 }
 
 // ---------------------------------------------------------------------------------------------------------

@@ -182,6 +182,8 @@ Sazby za jedno kolo podle současných veřejných hodnot a **UKÁZKOVÝCH náku
 | E-kolo středový motor | 64 000 | 88 000 | 26 500 | 47 000 | 1 675 | 1 952 | 3 904 | 96 772 | 27,3 % | 33,9 % |
 
 Nákupní ceny v tabulce jsou **ukázkové** z `config/nabidka.interni.example.json`; skutečné jsou pouze v interním souboru na serveru.
+**Řádek e-kola platí pro ceník do 6. 10. 2026** (prodejní 88 000 Kč). Od 7. 10. 2026 je prodejní cena třídy e-kolo 51 000 Kč
+(průměr flotily, viz 2b) a zůstatková po 36 m 15 300 Kč; ukázková nákupní v `nabidka.interni.example.json` je 40 000 Kč.
 („36 splátek + odkup“ = 36 × splátka + zůstatková hodnota, např. 36 × 535 + 8 000 = 27 260; marže pronájmu = (36 splátek + odkup − nákupní) / (36 splátek + odkup).)
 
 Pronájem na 36 m s odkupem stojí klienta ≈ 1,1× kupní ceny (27 260 / 25 000 = 1,09×, 54 556 / 50 000 = 1,09×, 96 772 / 88 000 = 1,10×) – trh (KoloNaOperák: e-kolo 59 999 Kč → 3 075 Kč/měs na 24 m,
@@ -202,9 +204,18 @@ cena výrobce vč. DPH, odkaz, velikosti, popis, ceník půjčovny pro demo). Do
 | Superior Racer 20 (dětské) | 10 990 Kč | 10 990 Kč |
 
 Nákupní ceny modelů jsou (stejně jako u tříd) jen v interním souboru mimo git (blok `modely`, vzor v `config/nabidka.interni.example.json`).
-**Pozor na rozpor s prodejními cenami tříd:** veřejná cena těchto e-kol bez DPH vychází na ≈ 44–63 tis. Kč, což je výrazně POD prodejní cenou
-třídy „ekolo“ v konfigurátoru (88 000 Kč bez DPH). Prodejní ceny tříd je proto třeba sladit se skutečnou flotilou (viz otevřené rozhodnutí 11 v sekci 8);
-do té doby jsou výpočty v sekci 3 ilustrativní.
+**Prodejní cena třídy e-kolo = průměr flotily (od 7. 10. 2026).** Pět e-kol výše (bez dětského) má průměrnou aktuální cenu výrobce
+61 590 Kč s DPH → 50 901 Kč bez DPH; třída „ekolo“ proto počítá s **51 000 Kč** (dřív návrh 88 000 Kč, což bylo o ≈ 70 % víc než skutečná
+flotila) a zůstatkovou 15 300 Kč (30 %). **Zlom v číslech:** všechno, co stojí na ceně e-kola – pronájem, zkouška, koupě, kauce, odkup,
+návratnost i marže – vychází od 7. 10. 2026 nižší; poptávky odeslané dřív a scénáře v sekci 3 počítají se starou cenou a s novými
+nejsou srovnatelné. Při změně flotily nebo cen výrobce se průměr přepočítá ručně (`tridyKol.ekolo.prodejniCena` a `zustatkova36m`).
+
+**Nákupní cena třídy = průměr nákupních cen flotily** (přepínač `tridyNakupZFlotily: true` v `config/nabidka.json`, od 7. 10. 2026):
+mají-li všechny modely třídy (`tridaNabidky`) nákupní cenu v interním souboru (`modely`), počítá třída s jejich prostým průměrem
+(`nakupTridZFlotily`, uplatní se v `configFor` při každém načtení ceníku nebo `kola-modely.json`). Cena třídy v interním souboru
+(`tridyKol`) pak platí jen pro třídy bez modelů – dnes „základní“ a „trek“. Důvod: stará cena třídy e-kolo v interním souboru
+patřila k prodejní 88 000 Kč a s 51 000 Kč by dávala ztrátu; průměr flotily drží marži třídy u skutečných kol. Interní tabulka
+tříd u takové ceny píše „průměr flotily“. Bez přepínače (testovací fixtura) se chová jako dřív.
 
 ---
 
@@ -362,7 +373,8 @@ námi schválené díly, sezónní prohlídka do 15. 4. a po 15. 10., servisní 
 8. Vlastní doména klienta u šablony (`klient.cz` místo subdomény) – za příplatek, nebo jen v „na míru“.
 9. Hranice pro povinné GPS lokátory (návrh od 20 kol / u všech e-kol).
 10. Pojištění: v ceně pronájmu (jako KoloNaOperák) nebo doplněk.
-11. Sladění prodejních cen tříd se skutečnou flotilou: veřejná cena konkrétních e-kol bez DPH (≈ 44–63 tis. Kč, viz 2b) je výrazně pod prodejní cenou třídy „ekolo“ (88 000 Kč); rozhodnout, zda snížit prodejní ceny tříd, nebo flotilu složit z dražších modelů, a pak přepočítat scénáře.
+11. ~~Sladění prodejních cen tříd se skutečnou flotilou~~ – **rozhodnuto 7. 10. 2026:** třída e-kolo = průměr flotily 51 000 Kč bez DPH (viz 2b).
+    Třídy „základní“ a „trek“ zatím nemají ve flotile žádný model – jejich ceny (25 000 / 50 000 Kč) zůstávají návrhem.
 
 ---
 
@@ -416,9 +428,9 @@ sazba DPH, pokryté dny), aby šlo číslo doložit; e-mail poptávky má řáde
 „…vyděláte za zkoušku (4 měsíce, 120 dní sezóny) X Kč“ a místo dalších let věta, že po zkoušce se rozhodne podle skutečné vytíženosti.
 
 Příklad (veřejný `config/nabidka.json`, penzion 2 trek + 3 e-kola, pronájem 36 m, web šablona, správa sami, vlastní servis, bez
-doplňků, výchozí vstupy, plátce DPH): tržby 155 348 Kč (263 výpůjčních dní), náklady 1. roku 131 820 Kč → **+23 528 Kč**, další roky
-**+38 528 Kč** ročně, bod zvratu 224 výpůjčních dní (30 % vytíženosti); trek se zaplatí za 39 výpůjček a pak vydělá 5 496 Kč za sezónu,
-e-kolo za 35 výpůjček a pak 13 508 Kč.
+doplňků, výchozí vstupy, plátce DPH): tržby 155 348 Kč (263 výpůjčních dní), náklady 1. roku 99 744 Kč → **+55 604 Kč**, další roky
+**+70 604 Kč** ročně, bod zvratu 169 výpůjčních dní (23 % vytíženosti); trek se zaplatí za 39 výpůjček a pak vydělá 5 496 Kč za sezónu,
+e-kolo za 21 výpůjček a pak 24 200 Kč. (S cenou e-kola 88 000 Kč do 6. 10. 2026 vycházelo +23 528 Kč, další roky +38 528 Kč.)
 
 **Co se nezapočítává:** náklady na vlastní obsluhu (recepce, výdej, mytí kol), provize platební brány a rezervačního poplatku,
 spotřební díly u vlastního servisu, pojištění mimo doplněk, vratná kauce (není náklad), odkup kol na konci pronájmu ani prodejní
@@ -447,7 +459,7 @@ elektrokol Superior a Rock Machine (`config/nabidka.json` → `modelovePriklady`
 
 Výpočet (`modelovePriklady` v `src/domain/nabidka.js`) používá **stejný `compute()` jako konfigurátor**, jen místo třídy „ekolo“
 dosadí modely příkladu: prodejní cena modelu = aktuální veřejná cena výrobce / 1,21, zůstatková po 36 m stejným podílem jako třída
-e-kol (26 500 / 88 000), nákupní cena z interního souboru (`modely`), chybí-li, odhad prodejní × (1 − práh marže). Modely se
+e-kol (15 300 / 51 000 = 30 %), nákupní cena z interního souboru (`modely`), chybí-li, odhad prodejní × (1 − práh marže). Modely se
 pro výpočet sloučí do jedné třídy s váženým průměrem cen – výpočet je v cenách lineární, rozdíl proti součtu po modelech je jen
 v zaokrouhlení na celé Kč za kolo. Každý příklad má tři varianty se stejnými službami (web ze šablony, vlastní správa a servis,
 bez doplňků) a návratnost s výchozím odhadem z `navratnost` (150 dní, 35 %, 890 Kč/den za e-kolo):
@@ -460,9 +472,9 @@ Interně (jen správce platformy) má každý příklad tabulku **naše tržby a
 4 měsíce (kola zůstávají naše – ex-demo prodej), pronájem za 36 měsíců (marže nad anuitou, náklad kapitálu je náklad), koupě
 = marže z kol jednorázově + web po dobu 36 měsíců; pod tím nákupní ceny modelů (označené „odhad“, když v interním souboru chybí).
 
-**Pozor – příklady a konfigurátor se liší:** příklady počítají s cenami skutečných modelů (≈ 44–63 tis. Kč bez DPH), konfigurátor
-s cenou třídy „ekolo“ 88 000 Kč (otevřené rozhodnutí 11, sekce 8). Dokud se ceny tříd nesladí s flotilou, vyjde stejný počet
-e-kol v konfigurátoru dráž než v příkladu.
+**Příklady a konfigurátor se shodují:** cena třídy e-kolo je od 7. 10. 2026 průměr flotily (sekce 2b), takže stejný počet e-kol
+vyjde v konfigurátoru stejně nebo velmi blízko příkladu (např. Hotel, 10 e-kol, pronájem 36 m: 12 940 Kč měsíčně v obou). Malý rozdíl
+zůstává tam, kde příklad složí dražší nebo levnější modely, než je průměr.
 
 **Verdikt nahoře v souhrnu.** Nad cenami je jednovětá odpověď na „Vyplatí se to?“ z existující kalkulačky (sekce 9, nic se
 nepřepočítává jinak): „Ano, vyplatí se“ / „Vyplatí se od druhého roku“ / „Takhle se … nevyplatí“, jedno rozhodující číslo

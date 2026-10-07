@@ -5,6 +5,7 @@
     "zastupneCeny": true,
     "poznamka": "Veřejný ceník nabídky – JEDINÝ zdroj veřejných cen konfigurátoru (vzorce viz docs/NABIDKA-MODEL.md, sekce Výpočty). Částky v Kč bez haléřů, bez DPH. NÁKUPNÍ CENY KOL SEM NEPATŘÍ (validace je odmítne): čtou se jen z interního souboru mimo git (PK_NABIDKA_INTERNI, výchozí $PK_DATA/nabidka.interni.json; vzor config/nabidka.interni.example.json). Prodejní ceny, zůstatkové hodnoty, náklad kapitálu, ceny webu, správy, servisu, doplňků a interní náklady jsou NÁVRH K POTVRZENÍ – proto zastupneCeny: true. Financování pronájmu z vlastního kapitálu (rocniUrok = náklad vlastního kapitálu); dodavatelské financování je budoucí varianta."
   },
+  "tridyNakupZFlotily": true,
   "tridyKol": [
     {
       "id": "zakladni",
@@ -23,9 +24,9 @@
     {
       "id": "ekolo",
       "nazev": "Trekové e-kolo (středový motor)",
-      "prodejniCena": 88000,
-      "zustatkova36m": 26500,
-      "popis": "Středový motor Bosch/Shimano/Yamaha, baterie 500–750 Wh, hydraulické brzdy, nosič, osvětlení. Prodejní cena = návrh (marže 20,5 %), zůstatková po 36 m = návrh 30 % (degradace baterie)."
+      "prodejniCena": 51000,
+      "zustatkova36m": 15300,
+      "popis": "Středový motor Bosch/Shimano, baterie 500–630 Wh, hydraulické brzdy, nosič, osvětlení – např. Superior eXP 6.4, eWAY 6.4, Rock Machine Crossride e400, eBlizzard 30. Prodejní cena = průměr aktuálních cen výrobce těchto pěti modelů bez DPH (61 590 Kč s DPH → 50 901 Kč, zaokrouhleno; od 7. 10. 2026, dřív návrh 88 000 Kč), zůstatková po 36 m = návrh 30 % (degradace baterie)."
     }
   ],
   "mnozstevniSlevy": [

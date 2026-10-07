@@ -3,7 +3,7 @@
   "tridyKol": {
     "zakladni": { "nakupniCena": 18000 },
     "trek": { "nakupniCena": 36000 },
-    "ekolo": { "nakupniCena": 64000 }
+    "ekolo": { "nakupniCena": 40000 }
   },
   "modely": {
     "superior-exp-6-4-steps": { "nakupniCena": 33000 },

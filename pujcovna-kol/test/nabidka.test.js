@@ -560,7 +560,9 @@ test('množstevní stupně: sleva na pronájem, koupi a zkoušku, kauce a záloh
 
 test('množstevní stupně: s ukázkovými nákupními cenami drží každá kombinace marži nad prahem', () => {
   const realRaw = JSON.parse(fs.readFileSync(feature.DEFAULT_CONFIG_PATH, 'utf8'));
-  const cfg = domain.validateConfig(realRaw, rawInterni).config;
+  // nákupní cena třídy = průměr nákupních cen modelů flotily (jako na serveru přes configFor), ne stará cena třídy ze souboru
+  const cfg = domain.nakupTridZFlotily(domain.validateConfig(realRaw, rawInterni).config, JSON.parse(fs.readFileSync(feature.MODELY_PATH, 'utf8')).modely);
+  assert.equal(cfg.tridyKol.find((t) => t.id === 'ekolo').nakupniZdroj, 'flotila');
   let low = [];
   for (const n of [2, 4, 5, 10, 20, 50]) for (const trida of ['zakladni', 'trek', 'ekolo']) for (const porizeni of ['koupe', 'pronajem24', 'pronajem36', 'zkouska']) for (const web of ['zadny', 'sablona', 'namiru']) for (const servis of ['vlastni', 'partner']) {
     const r = domain.compute(domain.normalizeInput({ [trida]: n, porizeni, web, servis }, cfg), cfg);

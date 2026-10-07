@@ -275,6 +275,7 @@ function validateConfig(raw, interniRaw = null) {
     navratnost,
     modelovePriklady: priklady,
     naDomluvu,
+    tridyNakupZFlotily: raw.tridyNakupZFlotily === true,
     interni: {
       prahMarzeProcent: pct(i.prahMarzeProcent),
       nakladyHostingMesicne: r0(i.nakladyHostingMesicne),
@@ -425,7 +426,7 @@ function compute(input, config) {
   const tridyById = Object.fromEntries(config.tridyKol.map((t) => [t.id, t]));
   // veřejná část (kola[]) bez nákupních cen – ty jen v interni.kola / interni.nakupniCelkem
   const kola = TRIDY.filter((id) => input.kola[id] > 0).map((id) => ({ id, nazev: tridyById[id].nazev, pocet: input.kola[id], prodejniCena: tridyById[id].prodejniCena, prodejniCelkem: tridyById[id].prodejniCena * input.kola[id] }));
-  const kolaInterni = kola.map((k) => ({ id: k.id, pocet: k.pocet, nakupniCena: tridyById[k.id].nakupniCena, nakupniCelkem: tridyById[k.id].nakupniCena * k.pocet, odvozena: !!tridyById[k.id].nakupniCenaOdvozena }));
+  const kolaInterni = kola.map((k) => ({ id: k.id, pocet: k.pocet, nakupniCena: tridyById[k.id].nakupniCena, nakupniCelkem: tridyById[k.id].nakupniCena * k.pocet, odvozena: !!tridyById[k.id].nakupniCenaOdvozena, zdroj: tridyById[k.id].nakupniZdroj || null }));
   const pocetKol = sum(kola, 'pocet');
   const pocetEkol = input.kola.ekolo;
   const prodejniCelkem = sum(kola, 'prodejniCelkem');
@@ -866,6 +867,25 @@ function modelovePriklady(config, modely, { dph } = {}) {
   return out;
 }
 
+/**
+ * Nákupní cena třídy = průměr nákupních cen modelů flotily té třídy (config/kola-modely.json → tridaNabidky), mají-li
+ * všechny modely třídy nákupní cenu v interním souboru (`modely`). Prodejní cena třídy je průměr cen výrobce téže flotily
+ * (config/nabidka.json), takže marže třídy pak odpovídá skutečným kolům; samostatná cena třídy v interním souboru (`tridyKol`)
+ * zůstává jen pro třídy bez modelů. Zapíná se v ceníku (`tridyNakupZFlotily: true`); bez něj vrací konfiguraci beze změny.
+ * Vrací novou konfiguraci (vstup nemění); `T.nakupniZdroj` = 'flotila' | 'soubor' | 'odhad'.
+ */
+function nakupTridZFlotily(config, modely) {
+  if (!config || !config.tridyNakupZFlotily) return config;
+  const nakup = (config && config.interni && config.interni.modelyNakup) || {};
+  const has = (slug) => Object.prototype.hasOwnProperty.call(nakup, slug);
+  const tridyKol = config.tridyKol.map((t) => {
+    const ms = (Array.isArray(modely) ? modely : []).filter((m) => m && m.tridaNabidky === t.id);
+    if (ms.length && ms.every((m) => has(m.slug))) return { ...t, nakupniCena: r0(ms.reduce((a, m) => a + nakup[m.slug], 0) / ms.length), nakupniCenaOdvozena: false, nakupniZdroj: 'flotila' };
+    return { ...t, nakupniZdroj: t.nakupniCenaOdvozena ? 'odhad' : 'soubor' };
+  });
+  return { ...config, tridyKol, meta: { ...config.meta, nakupniCenyOdvozene: tridyKol.some((t) => t.nakupniCenaOdvozena) } };
+}
+
 /** Modelové příklady bez interních čísel (pro veřejnost). */
 function verejnePriklady(priklady) {
   return (priklady || []).map(({ interni, ...rest }) => rest);
@@ -911,6 +931,7 @@ module.exports = {
   modelyInterni,
   modelovePriklady,
   verejnePriklady,
+  nakupTridZFlotily,
   stupenPro,
   availableDoplnky,
   pct,
