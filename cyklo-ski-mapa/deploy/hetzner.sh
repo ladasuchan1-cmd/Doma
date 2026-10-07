@@ -21,7 +21,8 @@
 # (/opt/zalohy-cyklo-ski-mapa), CSM_USERS (uživatelé pro instalaci bez dotazu; nebo CSM_USERS_B64 = totéž v base64,
 # bez starostí s uvozovkami), CSM_VETEV (větev repa pro první klon a kontrola při aktualizaci), CSM_UFW=0
 # (nenastavovat firewall), CSM_CLOUDFLARE=1|0 + CSM_ORIGIN_CERT_B64 / CSM_ORIGIN_KEY_B64 (Cloudflare před serverem,
-# viz synchronizuj_cloudflare; soubory v /opt/caddy-origin), CSM_STARY_DEPLOY (odkud převzít .env při
+# viz synchronizuj_cloudflare; soubory v /opt/caddy-origin), CSM_ACCESS_AUD / CSM_ACCESS_TEAM / CSM_ACCESS_DOMENY
+# (přihlášení přes Cloudflare Access, viz synchronizuj_access), CSM_STARY_DEPLOY (odkud převzít .env při
 # první instalaci do nového místa; /opt/Doma/cyklo-ski-mapa/deploy).
 #
 # Běží i bez repa na disku – skript lze poslat přes SSH ze stdin (první instalace z GitHub Actions):
@@ -34,6 +35,7 @@ if [ "$(id -u)" != 0 ]; then
     exec sudo -n env CSM_USERS="${CSM_USERS:-}" CSM_USERS_B64="${CSM_USERS_B64:-}" CSM_DOMAIN="${CSM_DOMAIN:-}" CSM_REPO_DIR="${CSM_REPO_DIR:-}" \
       CSM_COMPOSE="${CSM_COMPOSE:-}" CSM_ZALOHY="${CSM_ZALOHY:-}" CSM_VETEV="${CSM_VETEV:-}" CSM_UFW="${CSM_UFW:-}" CSM_CRON="${CSM_CRON:-}" \
       CSM_CLOUDFLARE="${CSM_CLOUDFLARE:-}" CSM_ORIGIN_CERT_B64="${CSM_ORIGIN_CERT_B64:-}" CSM_ORIGIN_KEY_B64="${CSM_ORIGIN_KEY_B64:-}" \
+      CSM_ACCESS_AUD="${CSM_ACCESS_AUD:-}" CSM_ACCESS_TEAM="${CSM_ACCESS_TEAM:-}" CSM_ACCESS_DOMENY="${CSM_ACCESS_DOMENY:-}" \
       CSM_STARY_DEPLOY="${CSM_STARY_DEPLOY:-}" \
       bash "${BASH_SOURCE[0]}" "$@"
   fi
@@ -88,12 +90,54 @@ synchronizuj_env() {
   fi
 }
 
+# Nastaví (nebo s prázdnou hodnotou smaže) proměnnou v .env. Vrací 0, když se něco změnilo.
+nastav_env() {
+  local env="$DEPLOY_DIR/.env" k="$1" v="${2:-}"
+  if [ "$(sed -n "s/^$k=//p" "$env" | head -1)" = "$v" ] && { [ -n "$v" ] || ! grep -q "^$k=" "$env"; }; then return 1; fi
+  grep -v "^$k=" "$env" > "$env.tmp" || true
+  if [ -n "$v" ]; then printf '%s=%s\n' "$k" "$v" >> "$env.tmp"; fi
+  mv "$env.tmp" "$env" && chmod 600 "$env"
+  return 0
+}
+
+# Přihlášení přes Cloudflare Access (NASAZENI.md, oddíl „Přihlášení přes Cloudflare Access“): CSM_ACCESS_AUD z GitHubu
+# (Application Audience tag aplikace v Zero Trust) zapne v aplikaci kontrolu tokenu Access – do mapy se pak dostane jen
+# e-mail, který pustí pravidlo v Cloudflare (a CSM_ACCESS_DOMENY), a ani obejití Cloudflare nepomůže. Hodnota „0“ ho
+# vypne (zpět jména a hesla aplikace), prázdná nic nemění. Před zapnutím se ověří, že Cloudflare na doméně opravdu
+# žádá přihlášení Access – jinak by aplikace, která bez tokenu nikoho nepustí, zamkla všechny.
+synchronizuj_access() {
+  local env="$DEPLOY_DIR/.env" aud="${CSM_ACCESS_AUD:-}" tym="${CSM_ACCESS_TEAM:-}" domeny="${CSM_ACCESS_DOMENY:-}" d kam zmena=0
+  [ -f "$env" ] && [ -n "$aud" ] || return 0
+  if [ "$aud" = 0 ]; then
+    for k in CF_ACCESS_AUD CF_ACCESS_TEAM_DOMAIN CF_ACCESS_DOMENY; do nastav_env "$k" "" && zmena=1; done
+    if [ "$zmena" = 1 ]; then echo "→ Přihlášení přes Cloudflare Access vypnuto – platí zase jména a hesla aplikace (CSM_USERS)."; fi
+    return 0
+  fi
+  [ -n "$tym" ] || chyba "CSM_ACCESS_AUD je vyplněné, ale chybí tým Access (CSM_ACCESS_TEAM, např. tym.cloudflareaccess.com)."
+  tym="${tym#https://}"; tym="${tym%%/*}"
+  case "$tym" in *.cloudflareaccess.com) ;; *) tym="$tym.cloudflareaccess.com" ;; esac
+  d="$(domena)"
+  kam="$(curl -sS -o /dev/null -w '%{redirect_url}' -m 15 "https://$d/" 2>/dev/null || true)"
+  case "$kam" in
+    "https://$tym/cdn-cgi/access/login/"*) ;;
+    *) chyba "CSM_ACCESS_AUD je vyplněné, ale https://$d/ zatím nevede na přihlášení Cloudflare Access týmu $tym (přesměrování: ${kam:-žádné}). V Zero Trust nejdřív vytvořte aplikaci pro $d – jinak by se do mapy nedostal nikdo. Nic se nezměnilo." ;;
+  esac
+  nastav_env CF_ACCESS_TEAM_DOMAIN "$tym" && zmena=1
+  nastav_env CF_ACCESS_AUD "$aud" && zmena=1
+  nastav_env CF_ACCESS_DOMENY "$domeny" && zmena=1
+  if [ "$zmena" = 1 ]; then echo "→ Přihlášení přes Cloudflare Access zapnuto (tým $tym${domeny:+, jen e-maily @${domeny//,/ @}}); jména a hesla aplikace už neplatí."; fi
+  return 0
+}
+
+# Je zapnuté přihlášení přes Cloudflare Access? (podle .env)
+access_zapnuty() { grep -q '^CF_ACCESS_AUD=.' "$DEPLOY_DIR/.env" 2>/dev/null; }
+
 # Čeká, až aplikace v kontejneru odpoví na /api/health (a hlásí zapisovatelnou datovou složku).
 cekej_na_app() {
   local i
   for i in $(seq 1 60); do
     if compose exec -T app wget -qO- http://127.0.0.1:8090/api/health >/dev/null 2>&1; then
-      compose logs --tail 20 app 2>/dev/null | grep -o 'Přihlášení zapnuté, uživatelé: .*' | tail -1 || true
+      compose logs --tail 20 app 2>/dev/null | grep -o -E 'Přihlášení (zapnuté|přes Cloudflare Access).*' | tail -1 || true
       return 0
     fi
     sleep 1
@@ -109,7 +153,20 @@ cekej_na_web() {
   d="$(domena)"
   [ -n "$d" ] || return 0
   for i in $(seq 1 90); do
-    if curl -fsS -m 5 "https://$d/api/health" >/dev/null 2>&1; then
+    if access_zapnuty; then
+      # Za Cloudflare Access odpoví web přesměrováním na přihlášení; ověří se i to, že server sám bez tokenu
+      # Access nikoho nepustí (požadavek přímo na Caddy, mimo Cloudflare).
+      local kam prime
+      kam="$(curl -sS -o /dev/null -w '%{redirect_url}' -m 5 "https://$d/" 2>/dev/null || true)"
+      case "$kam" in
+        https://*.cloudflareaccess.com/cdn-cgi/access/login/*)
+          prime="$(curl -k -sS -o /dev/null -w '%{http_code}' -m 5 --resolve "$d:443:127.0.0.1" "https://$d/" 2>/dev/null || true)"
+          echo "Web běží za Cloudflare Access: https://$d vede na přihlášení $(printf %s "$kam" | cut -d/ -f3); přímo na serveru bez přihlášení HTTP $prime$([ "$prime" = 403 ] && echo ' (odmítnuto, správně)')."
+          [ "$prime" = 403 ] || echo "VAROVÁNÍ: server bez tokenu Access neodpověděl 403 – zkontrolujte, že aplikace běží v režimu Access (log aplikace)." >&2
+          return 0
+          ;;
+      esac
+    elif curl -fsS -m 5 "https://$d/api/health" >/dev/null 2>&1; then
       echo "Web běží: https://$d  –  $(curl -fsS -m 5 "https://$d/api/health")"
       return 0
     fi
@@ -193,6 +250,7 @@ instalace() {
   vytvor_env "${d:-$(domena)}"
   [ -n "$d" ] && export CSM_DOMAIN="${CSM_DOMAIN:-$d}"
   synchronizuj_env
+  synchronizuj_access
   synchronizuj_cloudflare
   over_caddyfile
   echo "→ Stavím a spouštím (aplikace + Caddy)…"
@@ -436,6 +494,7 @@ aktualizace() {
   hlidej_misto
   zkontroluj_vetev
   synchronizuj_env
+  synchronizuj_access
   synchronizuj_cloudflare
   over_caddyfile
   # předchozí verze pro cestu zpět – před buildem, než se přepíše tag latest

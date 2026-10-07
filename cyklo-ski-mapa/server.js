@@ -15,6 +15,10 @@
 //   CSM_SESSION_DAYS    platnost přihlášení ve dnech (30)
 //   CSM_TRUST_PROXY=1   za reverzní proxy (Caddy/nginx): cookie Secure podle X-Forwarded-Proto, IP z X-Forwarded-For
 //   CSM_TOKEN           Bearer token pro externí skripty na /api (bez přihlášení)
+//   CF_ACCESS_TEAM_DOMAIN + CF_ACCESS_AUD  přihlášení přes Cloudflare Access místo jmen a hesel: aplikace přijme jen
+//                       požadavek s platným tokenem Access (hlavička Cf-Access-Jwt-Assertion), i při obejití Cloudflare;
+//                       kdo změnu udělal = e-mail z tokenu. Stejné proměnné jako R01 Sales (core/cfaccess.py).
+//   CF_ACCESS_DOMENY    povolené domény e-mailů, např. koloshop.cz (pojistka k pravidlu v Cloudflare Access)
 //
 // API: GET /api/stav · PUT /api/stav (sloučení) · GET/PUT/DELETE /api/stav/<id> · GET /api/me · GET /api/health
 // Bez nastaveného hesla ani uživatelů se při startu vygeneruje náhodné heslo a vypíše do konzole.
@@ -33,6 +37,17 @@ const TOKEN = process.env.CSM_TOKEN || '';
 const TRUST_PROXY = process.env.CSM_TRUST_PROXY === '1';
 const SESSION_DAYS = Math.max(1, Number(process.env.CSM_SESSION_DAYS || 30));
 const AUTH_ON = process.env.CSM_AUTH !== '0';
+// Cloudflare Access (viz výše a NASAZENI.md, oddíl „Přihlášení přes Cloudflare Access“)
+const ACCESS_TEAM = (() => {
+  let d = String(process.env.CF_ACCESS_TEAM_DOMAIN || '').trim().replace(/^https?:\/\//, '').replace(/\/+$/, '');
+  if (d && !d.endsWith('.cloudflareaccess.com')) d += '.cloudflareaccess.com';
+  return d;
+})();
+const ACCESS_AUD = String(process.env.CF_ACCESS_AUD || '').split(',').map((x) => x.trim()).filter(Boolean);
+const ACCESS_DOMENY = String(process.env.CF_ACCESS_DOMENY || '').split(',').map((x) => x.trim().toLowerCase().replace(/^@/, '')).filter(Boolean);
+const ACCESS_ON = AUTH_ON && Boolean(ACCESS_TEAM && ACCESS_AUD.length);
+// adresa klíčů jde přepsat jen kvůli testům; v provozu vždy klíče týmu Access
+const ACCESS_CERTS_URL = process.env.CF_ACCESS_CERTS_URL || (ACCESS_TEAM ? `https://${ACCESS_TEAM}/cdn-cgi/access/certs` : '');
 const MAX_BODY = 2 * 1024 * 1024;
 const COOKIE = 'csm_session';
 const APP_VERSION = process.env.APP_VERSION || '';
@@ -66,7 +81,7 @@ function parseUsers(src) {
 
 const USERS = parseUsers(process.env.CSM_USERS);
 let GENERATED_PASSWORD = null;
-if (AUTH_ON && !USERS.size) {
+if (AUTH_ON && !ACCESS_ON && !USERS.size) {
   if (process.env.CSM_PASSWORD) USERS.set(process.env.CSM_USER || 'tým', process.env.CSM_PASSWORD);
   else {
     GENERATED_PASSWORD = crypto.randomBytes(9).toString('base64url');
@@ -265,12 +280,7 @@ function safeNext(v) {
 }
 
 // ---------------------------------------------------------------- přihlášení
-function loginPage(opts) {
-  const o = opts || {};
-  return `<!doctype html>
-<html lang="cs"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="color-scheme" content="light dark">
-<title>Přihlášení – Cyklo &amp; Ski mapa</title><link rel="icon" href="/favicon.svg" type="image/svg+xml">
-<style>
+const PAGE_STYLE = `<style>
 :root{color-scheme:light dark;--bg:#eef1f5;--surface:#fff;--text:#15181d;--muted:#6f7784;--border:#c9cfd8;--primary:#1f5fbf;--danger:#c42f2f}
 @media (prefers-color-scheme:dark){:root{--bg:#0f1216;--surface:#171b21;--text:#e8ebf0;--muted:#858e9b;--border:#3a434f;--primary:#5b9cf5;--danger:#ef6b6b}}
 body{margin:0;min-height:100vh;display:flex;align-items:center;justify-content:center;font:15px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;background:var(--bg);color:var(--text)}
@@ -280,7 +290,26 @@ label{display:block;font-size:12.5px;color:var(--muted);margin:10px 0 4px}
 input{width:100%;box-sizing:border-box;padding:9px 11px;border:1px solid var(--border);border-radius:8px;background:var(--surface);color:var(--text);font:inherit}
 button{margin-top:16px;width:100%;padding:10px;border:0;border-radius:8px;background:var(--primary);color:#fff;font:inherit;font-weight:600;cursor:pointer}
 .err{color:var(--danger);font-size:13px;margin:10px 0 0}
-</style></head><body>
+</style>`;
+
+// Bez platného tokenu Cloudflare Access (přímý přístup na server, jiná aplikace, e-mail mimo Koloshop…).
+function accessPage() {
+  return `<!doctype html>
+<html lang="cs"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="color-scheme" content="light dark">
+<title>Přístup odmítnut – Cyklo &amp; Ski mapa</title><link rel="icon" href="/favicon.svg" type="image/svg+xml">
+${PAGE_STYLE}</head><body>
+<form method="get" action="/">
+<h1>🚲⛷️ Cyklo &amp; Ski mapa</h1><p>Přístup jen přes přihlášení Cloudflare${ACCESS_DOMENY.length ? ' e-mailem ' + esc(ACCESS_DOMENY.map((d) => '@' + d).join(', ')) : ''}. Otevřete mapu na její adrese a přihlaste se e-mailem; jiný e-mail ani přímý přístup na server nestačí.</p>
+<button type="submit">Zkusit znovu</button>
+</form></body></html>`;
+}
+
+function loginPage(opts) {
+  const o = opts || {};
+  return `<!doctype html>
+<html lang="cs"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="color-scheme" content="light dark">
+<title>Přihlášení – Cyklo &amp; Ski mapa</title><link rel="icon" href="/favicon.svg" type="image/svg+xml">
+${PAGE_STYLE}</head><body>
 <form method="post" action="/login" autocomplete="on">
 <h1>🚲⛷️ Cyklo &amp; Ski mapa</h1><p>Přihlaste se – kontakty a stav oslovení jsou interní.</p>
 <input type="hidden" name="next" value="${esc(o.next || '/')}">
@@ -311,10 +340,92 @@ function handleLogout(req, res) {
   return redirect(res, '/login', { 'Set-Cookie': cookieHeader('', req, 0) });
 }
 
-// kdo volá: session, Bearer token (uživatel „api“) nebo nic
-function identify(req) {
+// ---------------------------------------------------------------- Cloudflare Access
+// Veřejné klíče týmu Access: cache 10 minut; neznámý kid (rotace klíčů) = nové stažení, nejvýš jednou za 10 s.
+// Když stažení selže, platí poslední známé klíče – raději než pustit kohokoli dovnitř.
+const jwks = { keys: [], ts: 0, pokus: 0, bezi: null };
+async function accessKeys(vynutit) {
+  const now = Date.now();
+  if (!vynutit && jwks.keys.length && now - jwks.ts < 10 * 60000) return jwks.keys;
+  if (!jwks.bezi) {
+    if (now - jwks.pokus < 10000) return jwks.keys; // nejvýš jedno stažení za 10 s (rotace, výpadek, podvržené kid)
+    jwks.pokus = now;
+    jwks.bezi = (async () => {
+      try {
+        const res = await fetch(ACCESS_CERTS_URL, { signal: AbortSignal.timeout(5000) });
+        if (!res.ok) throw new Error('HTTP ' + res.status);
+        const keys = ((await res.json()).keys || []).filter((k) => k && k.kty === 'RSA' && k.kid && k.n && k.e);
+        if (!keys.length) throw new Error('žádné klíče RSA');
+        jwks.keys = keys;
+        jwks.ts = Date.now();
+      } catch (e) {
+        console.error(`Cloudflare Access: klíče z ${ACCESS_CERTS_URL} se nepodařilo stáhnout (${e.message}) – platí poslední známé (${jwks.keys.length}).`);
+      } finally {
+        jwks.bezi = null;
+      }
+    })();
+  }
+  await jwks.bezi;
+  return jwks.keys;
+}
+
+// Ověří token Access (RS256): podpis klíčem týmu, vydavatel = tým, aplikace (aud), platnost, e-mail a jeho doména.
+// Vrací { email, exp }, jinak vyhodí chybu s důvodem. Ověřené tokeny se do vypršení pamatují.
+const accessCache = new Map();
+async function verifyAccess(token) {
+  const nyni = Math.floor(Date.now() / 1000);
+  const znamy = accessCache.get(token);
+  if (znamy && znamy.exp + 30 >= nyni) return znamy;
+  const casti = String(token || '').split('.');
+  if (casti.length !== 3) throw new Error('špatný formát tokenu');
+  let hlava, obsah;
+  try {
+    hlava = JSON.parse(Buffer.from(casti[0], 'base64url').toString('utf8'));
+    obsah = JSON.parse(Buffer.from(casti[1], 'base64url').toString('utf8'));
+  } catch (_e) {
+    throw new Error('token nejde přečíst');
+  }
+  if (hlava.alg !== 'RS256') throw new Error('nečekaný algoritmus podpisu');
+  let jwk = (await accessKeys(false)).find((k) => k.kid === hlava.kid);
+  if (!jwk) jwk = (await accessKeys(true)).find((k) => k.kid === hlava.kid);
+  if (!jwk) throw new Error('neznámý podpisový klíč (kid)');
+  const klic = crypto.createPublicKey({ key: { kty: 'RSA', n: jwk.n, e: jwk.e }, format: 'jwk' });
+  if (!crypto.verify('RSA-SHA256', Buffer.from(casti[0] + '.' + casti[1]), klic, Buffer.from(casti[2], 'base64url'))) throw new Error('podpis nesouhlasí');
+  if (typeof obsah.exp !== 'number' || nyni > obsah.exp + 30) throw new Error('token vypršel');
+  if (typeof obsah.nbf === 'number' && nyni < obsah.nbf - 30) throw new Error('token ještě neplatí');
+  if (String(obsah.iss || '').replace(/\/+$/, '') !== 'https://' + ACCESS_TEAM) throw new Error('token vydal jiný tým Access (iss)');
+  const aud = Array.isArray(obsah.aud) ? obsah.aud : [obsah.aud];
+  if (!aud.some((a) => ACCESS_AUD.includes(a))) throw new Error('token je pro jinou aplikaci (aud)');
+  const email = String(obsah.email || '').trim().toLowerCase();
+  if (!email) throw new Error('token bez e-mailu');
+  if (ACCESS_DOMENY.length && !ACCESS_DOMENY.some((d) => email.endsWith('@' + d))) throw new Error('e-mail mimo povolené domény');
+  const vysledek = { email, exp: obsah.exp };
+  if (accessCache.size > 1000) accessCache.clear();
+  accessCache.set(token, vysledek);
+  return vysledek;
+}
+
+let accessLog = 0;
+function accessOdmitnuto(req, url, e) {
+  if (Date.now() - accessLog < 5000) return; // přímé pokusy obejít Cloudflare nesmí zahltit log
+  accessLog = Date.now();
+  console.error(`Cloudflare Access odmítnuto (${url.pathname}, ${clientIp(req)}): ${e.message}`);
+}
+
+// kdo volá: token Cloudflare Access / session, Bearer token (uživatel „api“) nebo nic
+async function identify(req, url) {
   if (!AUTH_ON) return { user: '', via: 'off' };
   if (TOKEN && req.headers.authorization === 'Bearer ' + TOKEN) return { user: 'api', via: 'token' };
+  if (ACCESS_ON) {
+    const token = req.headers['cf-access-jwt-assertion'];
+    if (!token) return null;
+    try {
+      return { user: (await verifyAccess(String(token))).email, via: 'access' };
+    } catch (e) {
+      accessOdmitnuto(req, url, e);
+      return null;
+    }
+  }
   const s = readSession(req);
   return s ? { user: s.user, via: 'session' } : null;
 }
@@ -326,7 +437,7 @@ async function handleApi(req, res, url, who) {
     return send(res, zapis ? 200 : 503, { ok: zapis, zaznamu: Object.keys(stav).length, zapis, verze: APP_VERSION || undefined, ...(zapis ? {} : { chyba: 'Do složky se stavem (' + path.dirname(STAV_FILE) + ') nejde zapisovat' }) });
   }
   if (!who) return send(res, 401, { chyba: 'Nepřihlášeno' });
-  if (url.pathname === '/api/me') return send(res, 200, { jmeno: who.user, prihlaseni: AUTH_ON, verze: APP_VERSION || undefined });
+  if (url.pathname === '/api/me') return send(res, 200, { jmeno: who.user, prihlaseni: AUTH_ON, pres: ACCESS_ON ? 'cloudflare-access' : AUTH_ON ? 'heslo' : 'vypnuto', verze: APP_VERSION || undefined });
   if (url.pathname === '/api/stav') {
     if (req.method === 'GET') return send(res, 200, stavLib.exportJson(stav));
     if (req.method === 'PUT' || req.method === 'POST') {
@@ -402,13 +513,20 @@ function isPublic(p) {
 const server = http.createServer(async (req, res) => {
   const url = new URL(req.url, 'http://localhost');
   try {
-    if (url.pathname === '/login' && AUTH_ON) return await handleLogin(req, res, url);
-    if (url.pathname === '/logout') return handleLogout(req, res);
-    const who = identify(req);
+    if (ACCESS_ON) {
+      // přihlašuje Cloudflare Access: vlastní formulář se nepoužívá, odhlášení ukončí relaci Access
+      if (url.pathname === '/login') return redirect(res, safeNext(url.searchParams.get('next')));
+      if (url.pathname === '/logout') return redirect(res, '/cdn-cgi/access/logout');
+    } else {
+      if (url.pathname === '/login' && AUTH_ON) return await handleLogin(req, res, url);
+      if (url.pathname === '/logout') return handleLogout(req, res);
+    }
+    const who = await identify(req, url);
     if (url.pathname.startsWith('/api/')) return await handleApi(req, res, url, who);
     if (req.method !== 'GET' && req.method !== 'HEAD') return send(res, 405, { chyba: 'Nepodporovaná metoda' });
     if (!who && !isPublic(url.pathname)) {
       if (/\.(js|css|png|svg|json|map)$/.test(url.pathname)) return send(res, 401, 'Nepřihlášeno', 'text/plain; charset=utf-8');
+      if (ACCESS_ON) return send(res, 403, accessPage(), 'text/html; charset=utf-8');
       return redirect(res, '/login?next=' + encodeURIComponent(url.pathname + url.search));
     }
     if (url.pathname === '/login') return redirect(res, '/'); // přihlášení vypnuté
@@ -423,6 +541,7 @@ if (require.main === module) {
     console.log(`Cyklo & Ski mapa běží na http://localhost:${PORT}  (stav oslovení: ${STAV_FILE}, ${Object.keys(stav).length} záznamů${APP_VERSION ? ', verze ' + APP_VERSION : ''})`);
     if (!dataWritable()) console.error(`CHYBA: do složky ${path.dirname(STAV_FILE)} nejde zapisovat – stav oslovení by se po restartu ztratil (práva / vlastník svazku).`);
     if (!AUTH_ON) console.log('Přihlášení je VYPNUTÉ (CSM_AUTH=0) – jen pro vývoj nebo vnitřní síť.');
+    else if (ACCESS_ON) console.log(`Přihlášení přes Cloudflare Access: tým ${ACCESS_TEAM}, aplikace …${ACCESS_AUD.map((a) => a.slice(-8)).join(', …')}, e-maily ${ACCESS_DOMENY.length ? ACCESS_DOMENY.map((d) => '@' + d).join(', ') : 'podle pravidla v Cloudflare'}`);
     else if (GENERATED_PASSWORD) console.log(`Není nastavené CSM_USERS ani CSM_PASSWORD – dočasné heslo pro uživatele „tým“: ${GENERATED_PASSWORD}\n(při každém startu jiné; nastavte ho v .env)`);
     else console.log(`Přihlášení zapnuté, uživatelé: ${[...USERS.keys()].join(', ')}`);
   });
@@ -436,4 +555,4 @@ if (require.main === module) {
   process.on('SIGTERM', stop);
 }
 
-module.exports = { server, handleApi, loadStav, writeStav, parseUsers, safeNext, STAV_FILE, AUTH_ON };
+module.exports = { server, handleApi, loadStav, writeStav, parseUsers, safeNext, verifyAccess, STAV_FILE, AUTH_ON, ACCESS_ON };
