@@ -7,13 +7,15 @@ stránku [SHRNUTI.md](SHRNUTI.md).
 ## 1. Přihlášení a odhlášení
 
 - Adresa aplikace: **https://cyklomapa.ksprehledy.cz**.
-- Jméno a heslo dostanete od správce. Na velikosti písmen ve **jméně** nezáleží, v **hesle** ano.
-- Přihlášení platí **30 dní** v daném prohlížeči. Odhlášení: tlačítko vedle vašeho jména vpravo nahoře.
-- Po **10 špatných pokusech** se vaše adresa na 15 minut zablokuje („Příliš mnoho pokusů“) – počkejte, nehádejte.
-- Zapomenuté heslo nastaví správce (hesla jsou v nastavení GitHubu, viz NASAZENI.md); staré heslo přestane platit
-  hned po nasazení.
-- Bez přihlášení není vidět nic kromě přihlašovacího formuláře – odkaz na místo proto funguje jen kolegovi,
-  který má účet.
+- **Přihlašuje Cloudflare e-mailem Koloshopu** (od 7. 10. 2026). Po otevření adresy se ukáže přihlašovací stránka
+  Cloudflare: přihlaste se svým e-mailem **@koloshop.cz** podle toho, co stránka nabídne (obvykle kód poslaný
+  na e-mail). Jiný e-mail neprojde a jméno s heslem aplikace už nefungují.
+- Přihlášení platí podle nastavení v Cloudflare (obvykle týden), pak se Cloudflare zeptá znovu.
+  Odhlášení: tlačítko vedle vašeho e-mailu vpravo nahoře.
+- U změn stavu oslovení se ukládá **e-mail**, kdo je udělal (sloupec „Upravil“).
+- Nový kolega s firemním e-mailem se dostane dovnitř sám, nikdo mu účet zakládat nemusí.
+- Bez přihlášení není vidět nic – odkaz na místo proto funguje jen kolegovi s e-mailem Koloshopu.
+- Dokud správce přihlášení přes Cloudflare nezapne (NASAZENI.md), platí původní jméno a heslo od správce.
 
 ## 2. Co je na obrazovce
 

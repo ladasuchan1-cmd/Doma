@@ -11,7 +11,10 @@
 #                      Origin certifikát, PEM). Variables: CSM_HETZNER_DOMAIN (doména webu, propisuje se na server),
 #                      CSM_HETZNER_DIR (výchozí /opt/cyklo-ski-mapa/Doma/cyklo-ski-mapa – vlastní klon mapy, /opt/Doma
 #                      patří dalším projektům), CSM_CLOUDFLARE (1 = doména je za Cloudflare proxy → Caddy použije Origin
-#                      certifikát; 0 = zpět na Let's Encrypt; prázdné = beze změny). Postup: NASAZENI.md.
+#                      certifikát; 0 = zpět na Let's Encrypt; prázdné = beze změny), CSM_ACCESS_AUD (Application Audience tag
+#                      aplikace v Cloudflare Zero Trust → přihlášení přes Cloudflare Access e-mailem; 0 = zpět jména a hesla),
+#                      volitelně CSM_ACCESS_TEAM (výchozí bold-dust-a2b5) a CSM_ACCESS_DOMENY (výchozí koloshop.cz).
+#                      Postup: NASAZENI.md.
 #   CSM_DEPLOY = 1   → job `deploy`: self-hosted runner na serveru s labelem `cyklo-ski-mapa` spustí deploy.sh
 #                      (server bez veřejné adresy, jako u R01 Sales)
 # Bez proměnných by joby čekaly na neexistující runner / padaly na chybějících secrets. Postup: cyklo-ski-mapa/NASAZENI.md.
@@ -67,6 +70,9 @@ jobs:
           ORIGIN_CERT: ${{ secrets.CSM_ORIGIN_CERT }}
           ORIGIN_KEY: ${{ secrets.CSM_ORIGIN_KEY }}
           CLOUDFLARE: ${{ vars.CSM_CLOUDFLARE }}
+          ACCESS_AUD: ${{ vars.CSM_ACCESS_AUD }}
+          ACCESS_TEAM: ${{ vars.CSM_ACCESS_TEAM || 'bold-dust-a2b5' }}
+          ACCESS_DOMENY: ${{ vars.CSM_ACCESS_DOMENY || 'koloshop.cz' }}
           DOMAIN: ${{ vars.CSM_HETZNER_DOMAIN }}
           DIR: ${{ vars.CSM_HETZNER_DIR }}
           BRANCH: ${{ github.ref_name }}
@@ -116,6 +122,10 @@ jobs:
             rm -f "$RUNNER_TEMP/origin.key"
           fi
           [ -n "$CLOUDFLARE" ] && echo "CSM_CLOUDFLARE=$CLOUDFLARE (1 = Origin certifikát, 0 = Let's Encrypt)"
+          case "$ACCESS_AUD$ACCESS_TEAM$ACCESS_DOMENY" in *[!A-Za-z0-9.,_-]*) echo "CSM_ACCESS_* smí obsahovat jen písmena, číslice, tečky, čárky, - a _."; exit 1 ;; esac
+          if [ -n "$ACCESS_AUD" ]; then
+            echo "CSM_ACCESS_AUD=…${ACCESS_AUD: -8} (tým $ACCESS_TEAM, e-maily @$ACCESS_DOMENY; 0 = vypnout)"
+          fi
           # Skript se posílá přes stdin z právě nasazovaného commitu: kdyby se spouštěl ten na serveru, běžela by
           # jeho předchozí verze (soubor se aktualizuje až uvnitř běhu) a změny ve skriptu by platily o nasazení později.
           # Citlivé hodnoty (hesla, klíč Origin certifikátu) jdou stdinem před skriptem, ne v příkazové řádce – tu na
@@ -123,7 +133,7 @@ jobs:
           spust() { # $1… = příkaz skriptu
             { printf 'export CSM_USERS_B64=%q CSM_ORIGIN_CERT_B64=%q CSM_ORIGIN_KEY_B64=%q\n' "$USERS_B64" "$CERT_B64" "$KEY_B64"
               cat cyklo-ski-mapa/deploy/hetzner.sh; } \
-              | ssh_cmd "$SUDO env CSM_DOMAIN='$DOMAIN' CSM_REPO_DIR='$REPO_DIR' CSM_VETEV='$BRANCH' CSM_CLOUDFLARE='$CLOUDFLARE' bash -s -- $*"
+              | ssh_cmd "$SUDO env CSM_DOMAIN='$DOMAIN' CSM_REPO_DIR='$REPO_DIR' CSM_VETEV='$BRANCH' CSM_CLOUDFLARE='$CLOUDFLARE' CSM_ACCESS_AUD='$ACCESS_AUD' CSM_ACCESS_TEAM='$ACCESS_TEAM' CSM_ACCESS_DOMENY='$ACCESS_DOMENY' bash -s -- $*"
           }
           if ssh_cmd "$SUDO test -f '$APP/deploy/.env'"; then
             echo "→ Aplikace je nainstalovaná – aktualizuji (uživatelé a doména podle nastavení GitHubu, jsou-li vyplněné)."

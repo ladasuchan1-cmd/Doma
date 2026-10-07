@@ -51,7 +51,8 @@ CSM_AUTH=0 npm start                               # bez přihlášení (jen vý
 
 Aplikace otevřená přes server vyžaduje přihlášení, sloučí lokální a serverový stav a každou změnu posílá na server
 i se jménem, kdo ji udělal; ostatní ji uvidí po obnovení stránky. Proměnné popisuje `.env.example`
-(`CSM_USERS` / `CSM_PASSWORD`, `CSM_SESSION_DAYS`, `CSM_TRUST_PROXY`, `CSM_TOKEN`, `CSM_SECRET`, `CSM_STAV`, `PORT`).
+(`CSM_USERS` / `CSM_PASSWORD`, `CSM_SESSION_DAYS`, `CSM_TRUST_PROXY`, `CSM_TOKEN`, `CSM_SECRET`, `CSM_STAV`, `PORT`,
+pro přihlášení přes Cloudflare Access `CF_ACCESS_TEAM_DOMAIN`, `CF_ACCESS_AUD`, `CF_ACCESS_DOMENY` – viz NASAZENI.md).
 
 **Nasazení jako web** popisuje **[NASAZENI.md](NASAZENI.md)**: Hetzner (Docker Compose + Caddy s automatickým
 HTTPS, skript `deploy/hetzner.sh` pro instalaci, aktualizace, zálohy a návrat zpět, nasazení z GitHubu přes SSH),

@@ -73,7 +73,7 @@ dotkne složky `cyklo-ski-mapa/`, proběhnou testy a pak se přes SSH na serveru
      `jmeno:heslo;jmeno2:heslo2` (přihlášení do aplikace; jména nerozlišují velikost písmen), volitelně `HETZNER_PORT`.
    - **Variables**: `CSM_HETZNER` = `1` (zapíná job), `CSM_HETZNER_DOMAIN` = doména webu,
      volitelně `CSM_HETZNER_DIR` (výchozí `/opt/cyklo-ski-mapa/Doma/cyklo-ski-mapa`), `CSM_CLOUDFLARE` (viz oddíl
-     Cloudflare).
+     Cloudflare), `CSM_ACCESS_AUD` (přihlášení e-mailem Koloshopu, viz oddíl Cloudflare Access).
    - **Uživatelé i doména se při každém nasazení propíší na server** (do `deploy/.env`). Změna hesla nebo nový
      kolega = upravit secret `HETZNER_USERS` a spustit workflow (Actions → „Cyklo & Ski mapa“ → Run workflow);
      nová doména = změnit variable `CSM_HETZNER_DOMAIN` (po nastavení DNS) a spustit workflow.
@@ -240,13 +240,50 @@ přes Cloudflare a server je zvenčí vidět jen pro Cloudflare. Co to pro aplik
 6. **Firewall (volitelně):** když jsou všechny weby za proxy, lze porty 80/443 omezit jen na adresy Cloudflare
    (Hetzner Cloud Firewall) – server pak zvenčí neodpovídá vůbec.
 
+## Přihlášení přes Cloudflare Access – e-mail Koloshopu (od 7. 10. 2026)
+
+Do mapy se dostane jen člověk s e-mailem **@koloshop.cz**, kterého pustí Cloudflare Access – stejně jako
+u R01 Sales. Jména a hesla aplikace (`HETZNER_USERS`) se v tomto režimu nepoužívají a přihlásit se jimi nejde.
+
+**Jak to funguje.** Cloudflare Access stojí před webem: nepřihlášenému vrátí svou přihlašovací stránku (tým
+`bold-dust-a2b5`). Přihlášenému přidá Cloudflare ke každému požadavku na server podepsaný token
+(`Cf-Access-Jwt-Assertion`). Aplikace ho ověří – podpis klíčem týmu Access (stahuje
+`https://bold-dust-a2b5.cloudflareaccess.com/cdn-cgi/access/certs`, při rotaci klíčů znovu), vydavatele, aplikaci
+(AUD), platnost a doménu e-mailu – a bez platného tokenu nepustí nikoho, ani při obejití Cloudflare přímo na adresu
+serveru (stránka 403, API 401). Kdo změnu udělal, je e-mail z tokenu. Veřejné zůstává jen `/api/health` (kontrola
+kontejneru). Ověření odpovídá `core/cfaccess.py` v R01 Sales, stejné jsou i názvy proměnných v `.env`
+(`CF_ACCESS_TEAM_DOMAIN`, `CF_ACCESS_AUD`; navíc `CF_ACCESS_DOMENY` jako pojistka k pravidlu v Cloudflare).
+
+**Zapnutí:**
+1. Cloudflare → **Zero Trust → Access controls → Applications → Create new application → Self-hosted and
+   private → Add public hostname** `cyklomapa.ksprehledy.cz`. Pravidlo (policy): **Allow**, Include **Emails ending
+   in** `@koloshop.cz` – nebo stávající pravidlo pro Koloshop z R01 Sales. Přihlašovací metody a délku relace
+   (Session Duration, např. 1 týden) podle zvyklosti. Uložit.
+2. V téže aplikaci **Configure → Additional settings** zkopírovat **Application Audience (AUD) Tag**.
+3. GitHub → Settings → Secrets and variables → Actions → **Variables**: `CSM_ACCESS_AUD` = AUD tag. Volitelně
+   `CSM_ACCESS_TEAM` (výchozí `bold-dust-a2b5`) a `CSM_ACCESS_DOMENY` (výchozí `koloshop.cz`, víc domén čárkou).
+4. Actions → „Cyklo & Ski mapa“ → Run workflow. Skript nejdřív ověří, že `https://cyklomapa.ksprehledy.cz/`
+   opravdu vede na přihlášení Access tohoto týmu; jinak skončí chybou a nic nezmění (aplikace by bez tokenu zamkla
+   všechny). Pak zapíše `CF_ACCESS_*` do `.env`, aplikace se restartuje a skript ověří, že server sám bez tokenu
+   odpovídá 403.
+
+**Vypnutí:** variable `CSM_ACCESS_AUD` = `0` a Run workflow – platí zase jména a hesla (`HETZNER_USERS`). Aplikaci
+v Zero Trust pak smažte, jinak se přihlašuje dvakrát.
+
+**Noví a odcházející kolegové:** nikam se nepřidávají – pravidlo „Emails ending in @koloshop.cz“ pustí každého
+s firemním e-mailem. Odchod = zrušení firemního e-mailu nebo výjimka v pravidle Access.
+
+**Skripty s `CSM_TOKEN`** (Bearer) aplikace pustí dál, přes Cloudflare je ale zastaví Access – fungují jen přímo
+na serveru (`curl -k --resolve cyklomapa.ksprehledy.cz:443:127.0.0.1 …`) nebo se service tokenem Access.
+
 ## Provoz
 
 - **Záloha stavu**: `stav.json` v datové složce (JSON, atomický zápis). Stačí ho kopírovat; obnova = nahradit
   soubor a restartovat kontejner. Alternativně z aplikace tlačítkem **Stav oslovení → Uložit zálohu**,
   nebo skriptem: `curl -H "Authorization: Bearer $CSM_TOKEN" https://mapa.vase-domena.cz/api/stav > zaloha.json`.
-- **Uživatelé**: změna `CSM_USERS` v `.env` + `bash deploy.sh` (nebo `docker restart cyklo-ski-mapa`).
-  Odebraný uživatel přestane platit okamžitě, i když má cookie.
+- **Uživatelé**: s Cloudflare Access (od 7. 10. 2026) je určuje pravidlo v Zero Trust – e-maily @koloshop.cz,
+  viz oddíl výše. Bez něj `CSM_USERS` v `.env` (na Hetzneru secret `HETZNER_USERS`) + nasazení; odebraný
+  uživatel přestane platit okamžitě, i když má cookie.
 - **Obnova dat (trasy, místa, weby)**: workflow **„Cyklo & Ski mapa – obnova dat“** běží 1. den v měsíci,
   commitne nová `data/*.js` do hlavní větve a spustí testy + nasazení. Jde pustit i ručně (Actions → Run workflow,
   volitelně bez průchodu webů). Lokálně: `npm run build-data && npm run enrich`.

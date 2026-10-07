@@ -60,8 +60,8 @@ není, v mapě není.
    je uložený zvlášť a vázaný na trvalé identifikátory míst z OpenStreetMap.
 2. **Aplikace (kód)** se nasazuje sama po každém sloučení změny do hlavní větve repozitáře: GitHub spustí testy
    a přes SSH aktualizuje server na Hetzneru (≈ 2–3 minuty). Když nová verze nenaběhne, skript se sám vrátí
-   k předchozí. **Uživatelé a doména** se nastavují v GitHubu (secret `HETZNER_USERS`, variable
-   `CSM_HETZNER_DOMAIN`) a propíší se na server při každém nasazení.
+   k předchozí. **Doména a přihlašování** se nastavují v GitHubu (variables `CSM_HETZNER_DOMAIN`,
+   `CSM_ACCESS_AUD`) a propíší se na server při každém nasazení.
 3. **Stav oslovení** se ukládá okamžitě při každém zaškrtnutí – na server i do prohlížeče. Kolegové změny vidí
    po obnovení stránky. Server dělá **denní zálohu ve 2:30** (drží 60 posledních), ručně jde záloha stáhnout
    tlačítkem **Stav oslovení → Uložit zálohu (JSON)**.
@@ -72,7 +72,7 @@ v OpenStreetMap (odkaz je u každého místa); do mapy se dostane s příští m
 
 ## Jak s tím pracovat (postup pro obchodníka)
 
-1. **Přihlášení** na https://cyklomapa.ksprehledy.cz jménem a heslem od správce; přihlášení platí 30 dní,
+1. **Přihlášení** na https://cyklomapa.ksprehledy.cz e-mailem **@koloshop.cz** přes Cloudflare (od 7. 10. 2026);
    odhlášení je vpravo nahoře.
 2. **Oblast**: klik na kraj, pak na okres (nebo výběr v liště nahoře); zpět drobečkovou navigací. Hledání názvu,
    obce nebo trasy – pole nahoře, klávesa `/`.
@@ -94,9 +94,10 @@ v OpenStreetMap (odkaz je u každého místa); do mapy se dostane s příští m
   proxy**: server má Cloudflare Origin certifikát platný do roku 2041, takže se nic neobnovuje, a zvenčí
   s ním mluví jen Cloudflare. Případná další změna domény = nový záznam v Cloudflare (oranžový mrak) + změna
   variable `CSM_HETZNER_DOMAIN` v GitHubu + Run workflow.
-- **Kdo se dostane dovnitř:** jen přihlášení uživatelé. Hesla jsou v GitHub secretu `HETZNER_USERS`; přidání
-  nebo změna = upravit secret a spustit workflow „Cyklo & Ski mapa“. Bez přihlášení je vidět jen přihlašovací
-  formulář, po 10 špatných pokusech se adresa na 15 minut zablokuje.
+- **Kdo se dostane dovnitř:** jen lidé s e-mailem **@koloshop.cz**, které pustí Cloudflare Access (od 7. 10. 2026,
+  stejně jako R01 Sales; dřív jména a hesla). Aplikace ověřuje podepsaný token Cloudflare u každého požadavku,
+  takže nepomůže ani přímý přístup na server mimo Cloudflare. U změn se ukládá e-mail, kdo je udělal. Nový kolega
+  s firemním e-mailem se dostane dovnitř sám.
 - **Co je veřejné a co ne:** kód a mapová data jsou ve veřejném repozitáři na GitHubu (jsou to veřejná data
   z OSM). **Stav oslovení, poznámky a ruční kontakty** jsou jen na serveru v souboru `stav.json` (Docker volume),
   do repozitáře nikdy nejdou.
