@@ -165,26 +165,62 @@ Výsledek: 2 694 PSČ, každé s polohou, okresem, obcí a kódem obce RÚIAN. *
 hlavní PSČ a **počet obyvatel** – z GeoNames, sídlo stejného jména jako obec ležící v ní (součet za ČR
 10,3 mil.). Počty jsou z GeoNames, ne z ČSÚ, proto jsou „na 1 000 obyvatel“ v aplikaci **orientační**.
 
-## 8. Objednávky
+## 8. Objednávky a zákazníci
 
-Zpracovávají se **v prohlížeči** (`lib/objednavky.js`); na server se posílají jen součty podle PSČ. Server
-(`validovat`) u každé položky přijme jen PSČ, počet a částku – položku s čímkoli dalším odmítne i s celým
-souborem – a jinak uloží jen období, popis, název souboru, kdo a kdy nahrál a počty vynechaných (max. 20 000 PSČ).
+Zpracovávají se **v prohlížeči** (`lib/objednavky.js`) – z exportu e-shopu (CSV / XLSX) nebo z tabulky vložené
+ze schránky (Excel, i kontingenční tabulky); na server se posílají jen součty podle PSČ. Server (`validovat`)
+u každé položky přijme jen PSČ, počet objednávek, počet zákazníků, počet aktivních zákazníků a částku – položku
+s čímkoli dalším odmítne i s celým souborem – a jinak uloží jen seznam veličin, období, popis, zdroj, kdo a kdy
+nahrál a počty vynechaných (max. 20 000 PSČ). Starší data jen s objednávkami (verze 1) se čtou dál.
 
-1. **Záhlaví**: v prvních 15 řádcích se hledá řádek se sloupcem PSČ nebo obce. Rozpoznávají se názvy bez
+1. **Tabulky a záhlaví**: v prvních 60 řádcích se hledají záhlaví tabulek. Řádek se rozdělí na úseky podle
+   prázdných sloupců (prázdných i ve 20 řádcích pod ním) – tak se najdou i **dvě tabulky vedle sebe**, každá
+   může mít záhlaví na jiném řádku. Záhlaví úseku musí mít aspoň dvě vyplněné buňky, sloupec PSČ nebo obce
+   a ještě další rozpoznaný sloupec; nesmí obsahovat buňku delší než 60 znaků (nadpis „… dle Země / Obce / PSČ“),
+   hodnotu filtru „(Vše)“ / „(Více položek)“ ani číslo (datový řádek, kromě roku). Rozpoznávají se názvy bez
    diakritiky a velikosti písmen: PSČ / ZIP / postcode, město / obec / city, země / stát / country, datum,
-   celkem / částka / cena / total, počet, stav / status, číslo objednávky / order / doklad. Je-li sloupců víc,
-   má přednost **doručovací** adresa před fakturační.
-2. **Řádky**: stav obsahující storno / zrušeno / cancel / vráceno / refund / nevyzvednuto / nezaplaceno /
-   odmítnuto / smazáno = **storno**; země jiná než Česko nebo PSČ začínající 0, 8 či 9 (slovenská) = **zahraničí**.
-   Obojí se vynechá (u exportu po položkách jednou za objednávku).
-3. **Po objednávkách**: s číslem objednávky se řádky se stejným číslem počítají jako jedna objednávka; částka
-   se sečte, pokud se na řádcích liší (položky), a vezme jednou, pokud se opakuje (celková cena na každém řádku).
-4. **Hotový přehled**: soubor s PSČ a sloupcem počtu (bez čísel objednávek) se bere jako součty.
-5. **Přiřazení**: PSČ z CZ formátu (5 číslic, první 1–7). Neznámé PSČ → PSČ se stejnými prvními třemi číslicemi;
-   řádek jen s obcí → hlavní PSČ obce stejného jména (největší).
+   celkem / částka / cena / hodnota / total, počet / objednávek, zákazníků / customers, aktivních / active,
+   stav / status, číslo objednávky / order / doklad; „průměr…“ se nepočítá. Je-li sloupců víc, má přednost
+   **doručovací** adresa před fakturační. Sloupec s počtem nebo částkou musí v datech obsahovat čísla (sloupec
+   „Zákazník“ se jménem není počet). Sloupec **Celkový součet** křížové tabulky (roky ve sloupcích) se bere jako
+   počet toho, co uvádí popisek nad tabulkou („Počet objednávek“, „… zákazníků“).
+2. **Řádky součtů**: popisek končící na „Celkem“ / „Total“ („Praha Celkem“, „CZ Celkem“) je mezisoučet a vynechá
+   se; „Celkový součet“ v prvním sloupci tabulky ji ukončí a jeho hodnota slouží ke **kontrole** (součet načtených
+   řádků se s ním musí shodovat). Mezisoučet nad skupinou (řádek obce s prázdným PSČ, pod ním PSČ bez popisku obce)
+   se také vynechá.
+3. **Kompaktní forma**: prázdný vnější popisek (skupina, země, obec) v hotovém přehledu znamená „stejný jako
+   o řádek výš“; poslední (vnitřní) popisek, typicky PSČ, se nedoplňuje. „(neuvedeno)“, „(prázdné)“, „-“ a buňky
+   bez písmen a číslic se berou jako prázdné.
+4. **Export po objednávkách**: stav obsahující storno / zrušeno / cancel / vráceno / refund / nevyzvednuto /
+   nezaplaceno / odmítnuto / smazáno = **storno** (vynechá se). S číslem objednávky se řádky se stejným číslem
+   počítají jako jedna objednávka; částka se sečte, pokud se na řádcích liší (položky), a vezme jednou, pokud se
+   opakuje (celková cena na každém řádku). Tabulka se sloupcem počtu (objednávek, zákazníků, aktivních) bez čísel
+   objednávek a data se bere jako **hotový přehled** a sčítá se.
+5. **Dvě tabulky vedle sebe** (obce bez PSČ + rozpad velkých měst podle PSČ, se stejnou veličinou): obce, které
+   jsou v rozpadu podle PSČ, se vezmou odtud a z tabulky obcí se vynechají; ostatní obce z tabulky obcí. Spojí se
+   jen veličiny obsažené v obou tabulkách. Když se součet obce v tabulce obcí liší od součtu jejích řádků v rozpadu
+   o víc než 0,5 % (jiné filtry), aplikace upozorní.
+6. **Přiřazení k českým PSČ** (s PSČ z dat GeoNames, kap. 7):
+   - PSČ 5 číslic začínající 1–7 (i „CZ-11000“) → to PSČ. PSČ začínající 0, 8, 9, polské NN-NNN a s předponou
+     státu (SK-, D-, A-, PL-) → **zahraničí**.
+   - Země jiná než Česko → **zahraničí**, ledaže PSČ (i opravené, viz níž) patří české obci téhož jména – typicky
+     sloupec „Země (odhad)“ s AT u „Praha | 1200“.
+   - **4místné PSČ**: zkusí se doplnit nula („4601“ → 460 01, pak 460 10); přijme se, když obec PSČ sedí s názvem
+     obce v řádku (bez názvu: když všechny kandidáty patří jedné obci). Jinak podle názvu obce; neznámá obec
+     se 4místným PSČ (Wien 1020) → zahraničí.
+   - Neznámé české PSČ (P. O. Box, nové, německé v českém tvaru) → podle názvu obce; zahraniční název → zahraničí;
+     bez názvu nebo s názvem obce, která sedí, → PSČ se stejnými prvními třemi číslicemi; jinak nepřiřazeno.
+   - **Jen název obce**: nejdřív seznam zahraničních měst (velká města SK, AT, DE, PL a další, rozlišeno
+     s diakritikou – „Modra“ ≠ „Modrá“; zapsané bez diakritiky se porovnají i bez ní) a obce, které se v datech
+     objevují jen se zahraničním PSČ → zahraničí; jinak hlavní PSČ české obce stejného jména (největší).
+     Rozumí se „Praha 6 - Dejvice“, „Prague 6“, „Hlavní město Praha“, „Teplice (okres …)“, „…, Česká republika“,
+     „Polička-Město“ a části měst nad 20 000 obyvatel („Ostrava-Poruba“, „Liberec XXV“), ne však okresy
+     („Brno-venkov“, „Praha-východ“) ani obce s předložkou („Most pri Bratislave“).
+   Zahraniční města s malým českým jmenovcem (Košice u Tábora, Žilina u Kladna, Senec, Trnava, Stupava, Hlohovec,
+   Komárno) se bez PSČ počítají do zahraničí; s platným českým PSČ do české obce.
 
-Obce se z PSČ sčítají podle kódu obce RÚIAN; poloha obce = vážený průměr jejích PSČ.
+Obce se z PSČ sčítají podle kódu obce RÚIAN; poloha obce = vážený průměr jejích PSČ. V mapě se počítá zvolená
+veličina (objednávky, zákazníci, nebo aktivní zákazníci); detail obce ukáže i ostatní nahrané.
 
 ## 9. Pokrytí, bílá místa, skóre partnera
 
@@ -192,9 +228,9 @@ Obce se z PSČ sčítají podle kódu obce RÚIAN; poloha obce = vážený prům
   místo typu „naše prodejna“).
 - **Okruh** R (5–50 km, výchozí 15 km) nastavuje uživatel; vzdálenosti jsou vzdušné (haversine) přes mřížkový
   index.
-- **Poptávka u místa** = součet objednávek z PSČ do R km.
+- **Poptávka u místa** = součet zvolené veličiny (objednávek, zákazníků nebo aktivních zákazníků) z PSČ do R km.
 - **Obec pokrytá** = nejbližší pokrývající místo do R km. **Bílé místo** = obec s alespoň N objednávkami
-  (výchozí 5) bez pokrytí v okruhu.
+  (zákazníky) – výchozí 5 – bez pokrytí v okruhu.
 - **Kandidát na partnera**: prodejna, servis, půjčovna, bazar nebo firma z ARES, která není partnerem,
   neodmítla, není skrytá, není sportovní řetězec ani naše prodejna.
 
@@ -231,3 +267,4 @@ vhodnější než velká; filtr velikosti se dá použít zvlášť.
 | Datum | Změna |
 |---|---|
 | 7. 10. 2026 | První verze: OSM (8 dotazů), ARES podle 39 slov, IČO z OSM / webu / názvu / odhadu, velikost podle obratu nebo kategorie zaměstnanců ČSÚ, PSČ → obec podle hranic obcí RÚIAN a hlasování, skóre partnera 50 / 20 / 20 / 10. |
+| 7. 10. 2026 | Import tabulek vložených z Excelu (kontingenční tabulky: nadpis a filtry, řádky Celkem, dvě tabulky vedle sebe, křížová tabulka, kompaktní forma), veličiny zákazníci a aktivní zákazníci, oprava 4místných PSČ, zahraniční města podle názvu, kontrola proti „Celkovému součtu“. Neznámé PSČ s nesouhlasícím názvem obce se už nepřiřazuje podle prvních tří číslic. |

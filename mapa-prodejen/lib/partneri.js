@@ -72,7 +72,7 @@
     const slozky = [];
     const maxN = Math.max(1, x.maxPoptavka || 0);
     const pop = Math.round(50 * Math.sqrt(Math.min(1, (x.poptavka || 0) / maxN)));
-    slozky.push({ key: 'poptavka', label: 'Objednávky v okolí', body: pop, max: 50 });
+    slozky.push({ key: 'poptavka', label: x.popisek || 'Objednávky v okolí', body: pop, max: 50 });
     const sv = x.servis === true ? 20 : x.servis === false ? 0 : 8;
     slozky.push({ key: 'servis', label: x.servis === true ? 'Dělá servis' : x.servis === false ? 'Servis nedělá' : 'Servis neznámý', body: sv, max: 20 });
     let pok = 20;

@@ -1,8 +1,8 @@
 # Mapa prodejen a servisů kol – manuál pro obchodní tým
 
-Jak najít prodejny a servisy kol, poznat jejich velikost, nahrát objednávky z e-shopu, najít města bez partnera
-a vést evidenci oslovení. Odkud jsou data a jak se počítají, popisuje [METODIKA.md](METODIKA.md); provoz serveru
-[../NASAZENI.md](../NASAZENI.md).
+Jak najít prodejny a servisy kol, poznat jejich velikost, nahrát objednávky a zákazníky (tabulka z Excelu nebo
+export e-shopu), najít města bez partnera a vést evidenci oslovení. Odkud jsou data a jak se počítají, popisuje
+[METODIKA.md](METODIKA.md); provoz serveru [../NASAZENI.md](../NASAZENI.md).
 
 ## 1. Přihlášení
 
@@ -91,39 +91,82 @@ Klik na tečku, řádek seznamu nebo v tabulce. Obsahuje:
 - **Hledat na webu**: Google, Firmy.cz, Mapy.cz, ARES, **Justice – účetní závěrky**, Kurzy.cz;
 - **Spolupráce**: evidence oslovení (kap. 9).
 
-## 7. Nahrání objednávek (tlačítko Objednávky)
+## 7. Objednávky a zákazníci (tlačítko Objednávky)
 
-1. Vyexportujte objednávky z e-shopu nebo z POHODY – **CSV** (oddělovač `;` nebo `,`, UTF-8 i Windows-1250) nebo
-   **XLSX** (první list). Starý `.xls` uložte v Excelu jako `.xlsx`.
-2. **Vybrat soubor…** – aplikace najde záhlaví a sloupce sama: **PSČ** (přednost má doručovací adresa), případně
-   **obec / město**, dále **datum**, **částka**, **stav**, **země** a **číslo objednávky**. Když něco nesedí,
-   opravte to v rozbalovacích seznamech – výsledek se hned přepočítá.
-3. Zkontrolujte **Výsledek**: počet přiřazených objednávek, počet PSČ, kolik je bez PSČ, **do zahraničí**
-   a **storno** (obojí se vynechá), období a obce s nejvíce objednávkami.
-4. Dejte popis (např. „e-shop 2024–2025“) a **Uložit pro tým**. Nové nahrání nahradí předchozí.
+Do mapy jde dostat **objednávky, zákazníky nebo aktivní zákazníky** (a hodnotu objednávek v Kč) dvěma způsoby:
+
+**A) Tabulka z Excelu (kontingenční tabulka) – vložit ze schránky**
+
+1. V Excelu nastavte filtry kontingenční tabulky (rok, země, skupina…) a označte **celou tabulku** – klidně
+   i s nadpisem a filtry nad ní a klidně **obě tabulky vedle sebe** (obce vlevo, rozpad velkých měst podle PSČ
+   vpravo). **Ctrl+C**.
+2. V mapě **Objednávky** → klikněte do pole **„Sem vložte tabulku z Excelu“** → **Ctrl+V**. Náhled se ukáže hned.
+3. Aplikace sama najde záhlaví (přeskočí nadpis, popisky a řádky filtrů typu „Země | (Vše)“) a sloupce:
+   **obec**, **PSČ**, **země**, **Zákazníků**, **Aktivních** / **Z toho aktivních**, **Objednávek** /
+   **Počet objednávek**, **Hodnota (Kč)**. Sloupec „Průměrná objednávka“ se nepočítá. U křížové tabulky (roky ve
+   sloupcích) se vezme sloupec **Celkový součet**.
+4. Řádky **„Praha Celkem“**, **„CZ Celkem“** a **„Celkový součet“** se nesčítají – a „Celkový součet“ slouží jako
+   **kontrola**: v náhledu je ✓ „součet řádků = řádek Celkový součet“, nebo ⚠ s rozdílem, když se něco nenačetlo.
+5. **Dvě tabulky vedle sebe** (obce + „Rozpad velkých měst dle PSČ“): výchozí je **Obě tabulky dohromady** –
+   velká města se vezmou podle PSČ z pravé tabulky a z levé tabulky se vynechají (nepočítají se dvakrát), ostatní
+   obce se vezmou z levé. Když tabulky nesedí (jiné filtry vlevo a vpravo), náhled upozorní – nastavte stejné
+   filtry v obou, nebo vyberte **Jen tabulka …**.
+6. Popis se předvyplní nadpisem tabulky; **Uložit pro tým**. Nové nahrání nahradí předchozí.
+
+Rozložení kontingenční tabulky, které se čte nejlépe (Excel → **Návrh**): **Rozložení sestavy → Zobrazit ve formě
+tabulky** a **Opakovat všechny popisky položek**, **Souhrny → Nezobrazovat souhrny**. Nevadí ale ani kompaktní
+forma (obec jen u prvního řádku skupiny – doplní se), ani mezisoučty „… Celkem“ (vynechají se). Nepoužívejte
+rozložení „kompaktní“ s jedním sloupcem **Popisky řádků**, ve kterém jsou obce i PSČ pod sebou – tam aplikace
+obec od PSČ nerozliší.
+
+**B) Export z e-shopu nebo z POHODY – soubor**
+
+1. Vyexportujte objednávky – **CSV** (oddělovač `;`, `,` nebo tabulátor, UTF-8 i Windows-1250) nebo **XLSX**
+   (první list). Starý `.xls` uložte v Excelu jako `.xlsx`.
+2. **Vybrat soubor…** – sloupce se najdou samy: **PSČ** (přednost má doručovací adresa), **obec / město**,
+   **datum**, **částka**, **stav**, **země** a **číslo objednávky**.
+3. Stav jako „stornováno“, „zrušeno“, „vráceno“, „nevyzvednuto“, „nezaplaceno“ se nepočítá. **Export po položkách**
+   (jeden řádek = jedna položka) nevadí, když je v souboru číslo objednávky – počítá se po objednávkách.
+
+**Náhled – co kontrolovat:** kolik se přiřadilo k obcím (u každé veličiny zvlášť), kolik **PSČ a obcí**, kolik je
+**zahraničí** (vynechá se), **nepřiřazeno** (bez obce a PSČ – „(neuvedeno)“ – a neznámé obce, vypsané jménem),
+**opravená PSČ** a **podle názvu obce**. Když nějaký sloupec nesedí, rozbalte **Sloupce tabulky … – opravit**
+a vyberte ho ručně; výsledek se hned přepočítá.
+
+Jak se řádky přiřazují k obcím:
+
+- **PSČ** má přednost před názvem obce. Česká PSČ začínají 1–7; slovenská (0, 8, 9), polská (`02-972`) a s předponou
+  státu (`SK-…`, `D-…`) jdou do zahraničí, stejně jako řádky se zemí jinou než CZ.
+- **4místné PSČ** („1200“ u Prahy, „4601“ u Liberce – chybí nula) se opraví na české, **když sedí název obce**;
+  tak se zachrání i řádky, kde Excel odhadl zemi podle tvaru PSČ (sloupec „Země (odhad)“ = AT, ale obec Praha).
+  „Wien 1020“ zůstane v zahraničí.
+- Řádek **jen s názvem obce** (bez PSČ) se přiřadí k hlavnímu PSČ obce; rozumí se i „Praha 6 - Dejvice“,
+  „Hlavní město Praha“, „Ostrava-Poruba“, „Liberec XXV“, „Teplice (okres Teplice)“. **„Brno-venkov“** nebo
+  „Praha-východ“ jsou okresy, ne obce – zůstanou nepřiřazené.
+- **Zahraniční města** podle názvu: Bratislava, Košice, Žilina, Trnava, Senec, Wien, Berlin, München, Warszawa
+  a další velká města – i ta, která mají v Česku malou obec stejného jména (Košice u Tábora, Žilina u Kladna).
+  Slovenská „Modra“ a moravská „Modrá“ se rozliší podle diakritiky. Řádek s českým PSČ jde vždy do české obce.
+- Neznámé PSČ (P. O. Box, nové) se přiřadí podle názvu obce, jinak k PSČ se stejnými prvními třemi číslicemi.
 
 Dobré vědět:
 
-- **Soukromí:** soubor se zpracuje jen ve vašem prohlížeči. Na server jdou jen **součty podle PSČ** (počet
-  a částka) – žádná jména, adresy, e-maily ani čísla objednávek.
-- **Export po položkách** (jeden řádek = jedna položka) nevadí, když je v souboru číslo objednávky – počítá se
-  po objednávkách.
-- Stav jako „stornováno“, „zrušeno“, „vráceno“, „nevyzvednuto“, „nezaplaceno“ se nepočítá.
-- Jde nahrát i hotový přehled **„PSČ; počet“** (např. z kontingenční tabulky).
-- Neznámé PSČ (P. O. Box, nové) se přiřadí k PSČ se stejnými prvními třemi číslicemi; řádek jen s názvem obce
-  k hlavnímu PSČ obce.
-- **Stáhnout součty (CSV)** dá přehled PSČ – obec – okres – počet – částka; **Smazat objednávky** je smaže pro
-  celý tým.
+- **Soukromí:** tabulka i soubor se zpracují jen ve vašem prohlížeči. Na server jdou jen **součty podle PSČ**
+  (počty objednávek / zákazníků / aktivních a částka) – žádná jména, adresy, e-maily ani čísla objednávek.
+- Názvy obcí z tabulky se nikde nevykreslí jako HTML (ani když v datech e-shopu je podvržený kód).
+- **Stáhnout součty (CSV)** dá přehled PSČ – obec – okres – počty – částka; **Smazat nahrané** je smaže pro celý tým.
 
 Po uložení se zapnou vrstvy v levém panelu:
 
-- **Obce podle počtu objednávek** – oranžové bubliny (plocha ~ počet). Na úrovni ČR je 250 obcí s nejvíce
-  objednávkami a všechna bílá místa, v kraji a okrese všechny.
-- **Kraje / okresy podle objednávek** – obarvení, volitelně **na 1 000 obyvatel** (orientačně).
+- **Počítat v mapě** (když tabulka obsahovala víc veličin): **Objednávky**, **Zákazníci** nebo **Aktivní
+  zákazníci**. Podle výběru se kreslí bubliny, barví kraje, hledají bílá místa a počítá skóre partnerů; popisky
+  v celé aplikaci se přepnou („zákazníků do 15 km“).
+- **Obce podle počtu …** – oranžové bubliny (plocha ~ počet). Na úrovni ČR je 250 obcí s nejvyšším počtem
+  a všechna bílá místa, v kraji a okrese všechny.
+- **Kraje / okresy podle …** – obarvení, volitelně **na 1 000 obyvatel** (orientačně).
 - **Okruh partnera / poptávky** (5–50 km, výchozí 15 km) – jak daleko jsou zákazníci ochotni jet; podle něj se
   počítá poptávka u prodejny, pokrytí obcí partnery a bílá místa.
-- **Bílé místo = obec s aspoň N objednávkami** (výchozí 5) **bez partnera ani naší prodejny v okruhu** –
-  bublina s červeným přerušovaným okrajem.
+- **Bílé místo = obec s aspoň N objednávkami / zákazníky** (výchozí 5) **bez partnera ani naší prodejny
+  v okruhu** – bublina s červeným přerušovaným okrajem.
 
 ## 8. Záložka Města
 
@@ -131,7 +174,8 @@ Obce seřazené **podle počtu objednávek**, **jen bílá místa** nebo **na 1 
 obyvatel). U obce je okres, částka, objednávky na 1 000 obyvatel, zda je do okruhu partner (a jak daleko),
 a kolik prodejen a servisů je v okruhu.
 
-**Detail obce**: počet a podíl objednávek, částka, objednávky na 1 000 obyvatel, vzdálenost k nejbližšímu
+**Detail obce**: počet a podíl (objednávek nebo zákazníků podle volby vlevo), ostatní nahrané veličiny
+(např. zákazníci, aktivní zákazníci), hodnota objednávek, počet na 1 000 obyvatel, vzdálenost k nejbližšímu
 partnerovi nebo naší prodejně a **seznam prodejen a servisů v okruhu** – partneři nahoře, ostatní podle skóre.
 To je seznam, koho v dané oblasti oslovit.
 
@@ -212,7 +256,8 @@ chybí, přidejte přes **+ Místo** s typem „Naše prodejna / pobočka“.
 ## 15. Doporučený postup hledání partnerů
 
 1. **Data → Naše firma** – nastavit IČO, ať se naše prodejny počítají jako pokrytí.
-2. **Objednávky** – nahrát export za poslední 1–2 roky (doručovací PSČ, stav, číslo objednávky).
+2. **Objednávky** – vložit tabulku z Excelu (obce / PSČ s počty objednávek nebo zákazníků) nebo nahrát export
+   za poslední 1–2 roky (doručovací PSČ, stav, číslo objednávky).
 3. Záložka **Města** → **jen bílá místa**: obce s objednávkami bez partnera v okruhu. Okruh nastavit podle toho,
    kam jsou zákazníci ochotni jet (město 10–15 km, venkov 20–30 km).
 4. Detail bílé obce → prodejny a servisy v okruhu → otevřít nejlepší kandidáty, ověřit IČO a velikost,
@@ -236,3 +281,9 @@ chybí, přidejte přes **+ Místo** s typem „Naše prodejna / pobočka“.
   spolupráce, objednávky, přidaná místa a obraty obnova nemění.
 - **Uvidí kolegové moje objednávky?** Ano, součty podle PSČ jsou společné pro tým (nahrává se jeden soubor
   za firmu). Osobní údaje zákazníků se na server nedostanou.
+- **Po vložení tabulky z Excelu je hodně „nepřiřazeno“.** Podívejte se na seznam v náhledu: „bez obce i PSČ
+  (neuvedeno)“ jsou zákazníci bez adresy v e-shopu – do mapy dát nejdou. Neznámé obce bývají překlepy, adresy
+  napsané do pole obce nebo testovací záznamy. Když je ⚠ u kontrolního součtu, nenačetly se některé řádky –
+  rozbalte „Sloupce tabulky“ a zkontrolujte, který sloupec je obec, PSČ a počet.
+- **Chci mapu zákazníků i objednávek.** Vložte tabulku, která má obojí (např. Zákazníků, Aktivních, Objednávek,
+  Hodnota) – mezi veličinami pak přepínáte vlevo v **Počítat v mapě** bez nového nahrání.

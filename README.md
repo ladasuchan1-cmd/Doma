@@ -94,8 +94,9 @@ Dokumentace: [shrnutí na 1 stránku](cyklo-ski-mapa/docs/SHRNUTI.md) · [manuá
 Složka [`mapa-prodejen/`](mapa-prodejen/README.md) obsahuje **Mapu prodejen a servisů kol** pro
 **mapa.ksprehledy.cz** – interaktivní mapu ČR (kraje → okresy) se všemi prodejnami, servisy, půjčovnami a bazary kol
 z OpenStreetMap a s firmami z ARES, rozdělenými podle **velikosti** (obrat, jinak kategorie počtu zaměstnanců od ČSÚ).
-Po nahrání exportu objednávek z e-shopu (zpracuje se v prohlížeči, na server jdou jen součty podle PSČ) ukáže obce
-podle počtu objednávek, **bílá místa** bez partnera a kandidáty na partnery seřazené podle skóre, s evidencí
+Po vložení tabulky z Excelu (i kontingenční) nebo exportu objednávek z e-shopu (zpracuje se v prohlížeči, na server
+jdou jen součty podle PSČ) ukáže obce podle počtu objednávek či zákazníků, **bílá místa** bez partnera a kandidáty
+na partnery seřazené podle skóre, s evidencí
 oslovení pro celý tým. Běží na serveru Cyklo & Ski mapy za její Caddy. Spuštění: `cd mapa-prodejen && MP_AUTH=0 npm start`.
 
 Dokumentace: [manuál pro obchodní tým](mapa-prodejen/docs/MANUAL.md) · [metodika dat](mapa-prodejen/docs/METODIKA.md)

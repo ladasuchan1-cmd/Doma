@@ -22,6 +22,17 @@ test('parse – detekce oddělovače a parseObjects (hlavička s otazníky ze SP
   assert.deepStrictEqual(csv.parseObjects(''), []);
 });
 
+test('detekce oddělovače z víc řádků – tabulka z Excelu s nadpisem, středník s desetinnou čárkou', () => {
+  assert.strictEqual(csv.detectSeparator('Objednávky dle měst, rok 2025\nObec\tPočet\nPraha\t5\nBrno\t3'), '\t');
+  assert.strictEqual(csv.detectSeparator('PSČ;Částka\n16000;1234,50\n15000;99,90'), ';');
+  assert.strictEqual(csv.detectSeparator('a,b\n1,2'), ',');
+});
+
+test('parse – uvozovky uprostřed pole jsou obyčejný znak (text vložený z Excelu)', () => {
+  assert.deepStrictEqual(csv.parse('Obec\tPozn\nPraha\t5" kolo\nBrno\tx', '\t'), [['Obec', 'Pozn'], ['Praha', '5" kolo'], ['Brno', 'x']]);
+  assert.deepStrictEqual(csv.parse('a\t"b\tc"\t"""d"""', '\t'), [['a', 'b\tc', '"d"']]);
+});
+
 test('parse – poslední řádek bez ukončení a prázdná pole', () => {
   assert.deepStrictEqual(csv.parse('a,b\n,\n1,2'), [['a', 'b'], ['', ''], ['1', '2']]);
 });

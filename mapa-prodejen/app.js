@@ -53,6 +53,8 @@
     const n = objLib.fold(v[3]);
     if (!obecKPsc.has(n)) obecKPsc.set(n, k);
   }
+  // města, u kterých se v tabulkách píše i část („Ostrava-Poruba“, „Praha 6 - Dejvice“, „Liberec XXV“)
+  const velkaMesta = new Set(obceData.filter((o) => o[4] >= 20000).map((o) => objLib.fold(o[0])));
 
   const norm = (s) =>
     String(s || '')
@@ -112,7 +114,7 @@
       q: '',
     },
     barva: 'velikost',
-    obj: { bubliny: true, choropleth: true, naObyv: false, radiusKm: 15, minN: 5, jenBezPartnera: false, jenServis: false },
+    obj: { bubliny: true, choropleth: true, naObyv: false, radiusKm: 15, minN: 5, jenBezPartnera: false, jenServis: false, metrika: null },
     sort: 'nazev',
     mestaSort: 'n',
     listLimit: 150,
@@ -123,7 +125,7 @@
     obraty: {}, // IČO → { obrat, rok, zdroj, kdo, upraveno }
     firmyServer: {}, // IČO → firma dohledaná na serveru (ruční IČO)
     nastaveni: { naseIco: [] },
-    objednavky: null, // dataset součtů podle PSČ
+    objednavky: null, // dataset součtů podle PSČ (objednávky, zákazníci, aktivní zákazníci, částka)
     server: { on: false, user: '', registry: false },
     saveTimers: new Map(),
     pick: null, // výběr polohy v mapě pro nové místo
@@ -338,26 +340,56 @@
   }
 
   // ================================================================== objednávky, poptávka, partneři
-  let obj = { body: [], grid: null, obce: [], obecByKey: new Map(), poOkresech: new Map(), poKrajich: new Map(), celkem: 0, nezname: 0, kryti: [], krytiGrid: null, maxPop: 1 };
+  // Co se v mapě počítá: objednávky, zákazníci nebo aktivní zákazníci (podle toho, co tabulka obsahovala).
+  function metrikyDat() {
+    return state.objednavky ? objLib.metrikyDatasetu(state.objednavky) : ['n'];
+  }
+  function metrika() {
+    const m = metrikyDat();
+    return m.includes(state.obj.metrika) ? state.obj.metrika : m[0];
+  }
+  // popisky vybrané veličiny: nadpis „Zákazníci“, mn „zákazníků“, instr „zákazníky“, kratce „zák.“
+  function J() {
+    return objLib.METRIKA[metrika()];
+  }
+  function popisDatasetu(d) {
+    const casti = objLib.metrikyDatasetu(d).map((k) => `${fmtN(objLib.soucetDatasetu(d, k))} ${objLib.METRIKA[k].mn}`);
+    if (d.castky) casti.push(vel.fmtObrat(objLib.soucetDatasetu(d, 'kc')));
+    return `${casti.join(', ')} z ${fmtN(d.mista.length)} PSČ`;
+  }
+
+  let obj = { body: [], grid: null, obce: [], obecByKey: new Map(), vse: new Map(), poOkresech: new Map(), poKrajich: new Map(), celkem: 0, nezname: 0, kryti: [], krytiGrid: null, maxPop: 1 };
 
   function prepocitejObjednavky() {
     const d = state.objednavky;
-    obj = { body: [], grid: null, obce: [], obecByKey: new Map(), poOkresech: new Map(), poKrajich: new Map(), celkem: 0, nezname: 0, kryti: [], krytiGrid: null, maxPop: 1 };
+    obj = { body: [], grid: null, obce: [], obecByKey: new Map(), vse: new Map(), poOkresech: new Map(), poKrajich: new Map(), celkem: 0, nezname: 0, kryti: [], krytiGrid: null, maxPop: 1 };
     if (d && Array.isArray(d.mista)) {
+      const k = metrika();
+      const mista = [];
       for (const x of d.mista) {
         const p = pscData[x.psc];
+        const v = Number(x[k]) || 0;
+        if (p) {
+          // všechny veličiny po obcích (detail obce ukáže objednávky i zákazníky)
+          const key = par.obecKey(p);
+          const t = obj.vse.get(key) || { n: 0, zak: 0, akt: 0, kc: 0 };
+          for (const m of ['n', 'zak', 'akt', 'kc']) t[m] += Number(x[m]) || 0;
+          obj.vse.set(key, t);
+        }
+        if (v <= 0) continue;
         if (!p) {
-          obj.nezname += x.n;
+          obj.nezname += v;
           continue;
         }
-        obj.body.push({ psc: x.psc, lat: p[0], lon: p[1], okres: p[2], n: x.n, kc: x.kc || 0 });
-        obj.celkem += x.n;
-        obj.poOkresech.set(p[2], (obj.poOkresech.get(p[2]) || 0) + x.n);
+        mista.push({ psc: x.psc, n: v, kc: x.kc || 0 });
+        obj.body.push({ psc: x.psc, lat: p[0], lon: p[1], okres: p[2], n: v, kc: x.kc || 0 });
+        obj.celkem += v;
+        obj.poOkresech.set(p[2], (obj.poOkresech.get(p[2]) || 0) + v);
         const kr = krajOkresu(p[2]);
-        obj.poKrajich.set(kr, (obj.poKrajich.get(kr) || 0) + x.n);
+        obj.poKrajich.set(kr, (obj.poKrajich.get(kr) || 0) + v);
       }
       obj.grid = par.mrizka(obj.body);
-      const o = par.obce(d.mista, pscData);
+      const o = par.obce(mista, pscData);
       obj.obce = o.obce.map((x) => ({ ...x, kraj: krajOkresu(x.okres), pop: popObce.get(x.key) || 0 }));
       obj.obecByKey = new Map(obj.obce.map((x) => [x.key, x]));
     }
@@ -400,7 +432,7 @@
     }
     const k = kontakt(m);
     const s = sluzba(m, 'servis');
-    return par.skore({ poptavka: m._pop ? m._pop.n : 0, maxPoptavka: obj.maxPop, servis: s.ano, partnerKm, radiusKm: R, email: Boolean(k.email), telefon: Boolean(k.telefon) });
+    return par.skore({ poptavka: m._pop ? m._pop.n : 0, maxPoptavka: obj.maxPop, popisek: J().nadpis + ' v okolí', servis: s.ano, partnerKm, radiusKm: R, email: Boolean(k.email), telefon: Boolean(k.telefon) });
   }
 
   // ================================================================== filtrování
@@ -570,7 +602,7 @@
     const parts = [`${fmtN(countFor(level, kod))} míst ve výběru`];
     if (state.objednavky && obj.celkem) {
       const n = level === 'kraj' ? obj.poKrajich.get(kod) || 0 : obj.poOkresech.get(kod) || 0;
-      parts.push(`${fmtN(n)} objednávek (${fmtPct(n / obj.celkem)})`);
+      parts.push(`${fmtN(n)} ${J().mn} (${fmtPct(n / obj.celkem)})`);
       if (state.obj.naObyv) parts.push(`${objHodnota(level, kod).toFixed(1).replace('.', ',')} na 1 000 obyvatel (orientačně)`);
     }
     return parts.join('<br>');
@@ -591,7 +623,7 @@
       const short = level === 'kraj' ? f.properties.nazev.replace(/ kraj$/, '').replace(/^Kraj /, '') : f.properties.nazev;
       const n = countFor(level, f.properties.kod);
       const o = state.objednavky && obj.celkem ? (level === 'kraj' ? obj.poKrajich.get(f.properties.kod) : obj.poOkresech.get(f.properties.kod)) || 0 : null;
-      const icon = L.divIcon({ className: 'area-label', html: `<div class="lbl">${esc(short)}<small>${fmtN(n)} míst${o != null ? ' · ' + fmtN(o) + ' obj.' : ''}</small></div>`, iconSize: [140, 30], iconAnchor: [70, 15] });
+      const icon = L.divIcon({ className: 'area-label', html: `<div class="lbl">${esc(short)}<small>${fmtN(n)} míst${o != null ? ' · ' + fmtN(o) + ' ' + J().kratce : ''}</small></div>`, iconSize: [140, 30], iconAnchor: [70, 15] });
       labelsLayer.addLayer(L.marker(f.properties.stred, { icon, interactive: false, keyboard: false }));
     }
   }
@@ -625,7 +657,7 @@
     let mk = markerCache.get(m.id);
     if (!mk) {
       mk = L.circleMarker([m.lat, m.lon], stylMista(m));
-      mk.bindTooltip(() => `<b>${esc(m.nazev)}</b><br>${esc(TYP[m._typ].one)} · ${esc(VEL[m._vel.key].label)}${m.obec ? ' · ' + esc(m.obec) : ''}${state.objednavky && m._pop && m._pop.n ? '<br>' + fmtN(m._pop.n) + ' objednávek do ' + state.obj.radiusKm + ' km' : ''}`);
+      mk.bindTooltip(() => `<b>${esc(m.nazev)}</b><br>${esc(TYP[m._typ].one)} · ${esc(VEL[m._vel.key].label)}${m.obec ? ' · ' + esc(m.obec) : ''}${state.objednavky && m._pop && m._pop.n ? '<br>' + fmtN(m._pop.n) + ' ' + J().mn + ' do ' + state.obj.radiusKm + ' km' : ''}`);
       mk.on('click', () => select('misto', m.id, false));
       markerCache.set(m.id, mk);
     }
@@ -678,7 +710,7 @@
       const bila = bilaObec;
       const sel = state.selected && state.selected.type === 'obec' && state.selected.id === o.key;
       const c = L.circleMarker([o.lat, o.lon], { renderer: canvas, radius: r, color: bila ? '#c92a2a' : '#c2410c', weight: sel ? 3 : bila ? 1.6 : 0.8, dashArray: bila ? '3 3' : null, fillColor: '#f76707', fillOpacity: 0.28, opacity: 0.9 });
-      c.bindTooltip(`<b>${esc(o.nazev)}</b> (${esc(okresName(o.okres))})<br>${fmtN(o.n)} objednávek${o.kc ? ' · ' + esc(vel.fmtObrat(o.kc)) : ''}${o.pop >= 1000 ? '<br>' + ((o.n / o.pop) * 1000).toFixed(1).replace('.', ',') + ' na 1 000 obyvatel' : ''}<br>${o.pokryto ? 'partner / naše prodejna do ' + state.obj.radiusKm + ' km' : '<b style="color:#c92a2a">bez partnera do ' + state.obj.radiusKm + ' km</b>'}`, { sticky: true });
+      c.bindTooltip(`<b>${esc(o.nazev)}</b> (${esc(okresName(o.okres))})<br>${fmtN(o.n)} ${J().mn}${o.kc ? ' · ' + esc(vel.fmtObrat(o.kc)) : ''}${o.pop >= 1000 ? '<br>' + ((o.n / o.pop) * 1000).toFixed(1).replace('.', ',') + ' na 1 000 obyvatel' : ''}<br>${o.pokryto ? 'partner / naše prodejna do ' + state.obj.radiusKm + ' km' : '<b style="color:#c92a2a">bez partnera do ' + state.obj.radiusKm + ' km</b>'}`, { sticky: true });
       c.on('click', () => select('obec', o.key, false));
       objLayer.addLayer(c);
     }
@@ -813,7 +845,7 @@
     if (os) os.addEventListener('change', (e) => setScope(state.scope.kraj, e.target.value ? Number(e.target.value) : null));
     const ml = $('#meta-line');
     const d = state.objednavky;
-    ml.textContent = (meta.vytvoreno ? `data k ${new Date(meta.vytvoreno).toLocaleDateString('cs-CZ')}` : '') + (d ? ` · objednávky ${d.od && d.do ? fmtDate(d.od) + '–' + fmtDate(d.do) : fmtN(d.objednavek)}` : '');
+    ml.textContent = (meta.vytvoreno ? `data k ${new Date(meta.vytvoreno).toLocaleDateString('cs-CZ')}` : '') + (d ? ` · ${J().nadpis.toLowerCase()} ${d.od && d.do ? fmtDate(d.od) + '–' + fmtDate(d.do) : fmtN(objLib.soucetDatasetu(d, metrika()))}` : '');
   }
   function crumb(label, current, onClick) {
     return { html: `<button type="button" class="crumb" ${current ? 'aria-current="page"' : ''}>${esc(label)}</button>`, onClick: current ? null : onClick };
@@ -832,7 +864,7 @@
     items.push('<span class="item"><span class="odznak partner" style="position:static">★</span>partner</span>');
     if (mista.some((m) => m._typ === 'nase')) items.push('<span class="item"><span class="odznak nase" style="position:static">⌂</span>naše prodejna</span>');
     if (state.objednavky && (state.obj.bubliny || state.obj.choropleth)) {
-      items.push('<span class="item"><span class="swatch dot" style="background:#f7670755;border:1px solid #c2410c"></span>objednávky v obci</span>');
+      items.push(`<span class="item"><span class="swatch dot" style="background:#f7670755;border:1px solid #c2410c"></span>${esc(J().nadpis.toLowerCase())} v obci</span>`);
       items.push(`<span class="item"><span class="swatch dot" style="background:#f7670733;border:1.5px dashed #c92a2a"></span>bez partnera do ${state.obj.radiusKm} km</span>`);
     }
     el.innerHTML = items.join('');
@@ -926,16 +958,19 @@
     const el = $('#fg-obj');
     const d = state.objednavky;
     if (!d) {
-      el.innerHTML = `<h3>Objednávky</h3><div class="muted small">Zatím nenahrané. Tlačítkem <b>Objednávky</b> nahrajte export z e-shopu – mapa ukáže obce podle počtu objednávek a seřadí kandidáty na partnery.</div>`;
+      el.innerHTML = `<h3>Objednávky a zákazníci</h3><div class="muted small">Zatím nenahrané. Tlačítkem <b>Objednávky</b> vložte tabulku z Excelu (i kontingenční) nebo nahrajte export z e-shopu – mapa ukáže obce podle počtu objednávek či zákazníků a seřadí kandidáty na partnery.</div>`;
       return;
     }
     const o = state.obj;
-    el.innerHTML = `<h3>Objednávky (${fmtN(obj.celkem)})</h3>
-      <label class="check"><input type="checkbox" id="o-bubliny" ${o.bubliny ? 'checked' : ''}><span class="swatch dot" style="background:#f7670788;border:1px solid #c2410c"></span>Obce podle počtu objednávek</label>
-      <label class="check"><input type="checkbox" id="o-choro" ${o.choropleth ? 'checked' : ''}><span class="swatch" style="background:linear-gradient(90deg,${SKALA.join(',')})"></span>Kraje / okresy podle objednávek</label>
+    const j = J();
+    const volby = metrikyDat();
+    el.innerHTML = `<h3>${esc(j.nadpis)} (${fmtN(obj.celkem)})</h3>
+      ${volby.length > 1 ? `<label class="small muted" for="o-metrika">Počítat v mapě</label><select class="select" id="o-metrika" style="margin-bottom:6px">${volby.map((k) => `<option value="${k}" ${k === metrika() ? 'selected' : ''}>${esc(objLib.METRIKA[k].nadpis)} (${fmtN(objLib.soucetDatasetu(d, k))})</option>`).join('')}</select>` : ''}
+      <label class="check"><input type="checkbox" id="o-bubliny" ${o.bubliny ? 'checked' : ''}><span class="swatch dot" style="background:#f7670788;border:1px solid #c2410c"></span>Obce podle počtu ${esc(j.mn)}</label>
+      <label class="check"><input type="checkbox" id="o-choro" ${o.choropleth ? 'checked' : ''}><span class="swatch" style="background:linear-gradient(90deg,${SKALA.join(',')})"></span>Kraje / okresy podle ${esc(j.mn)}</label>
       <label class="check sub small"><input type="checkbox" id="o-obyv" ${o.naObyv ? 'checked' : ''}>na 1 000 obyvatel (orientačně)</label>
       <div class="stack-sm" style="margin-top:8px"><label class="small">Okruh partnera / poptávky: <b id="o-r-val">${o.radiusKm}</b> km</label><input type="range" class="range" id="o-r" min="5" max="50" step="5" value="${o.radiusKm}"></div>
-      <div class="stack-sm" style="margin-top:6px"><label class="small">Bílé místo = obec s aspoň <b id="o-min-val">${o.minN}</b> objednávkami bez partnera v okruhu</label><input type="range" class="range" id="o-min" min="1" max="50" step="1" value="${o.minN}"></div>`;
+      <div class="stack-sm" style="margin-top:6px"><label class="small">Bílé místo = obec s aspoň <b id="o-min-val">${o.minN}</b> ${esc(j.instr)} bez partnera v okruhu</label><input type="range" class="range" id="o-min" min="1" max="50" step="1" value="${o.minN}"></div>`;
   }
 
   function onFilterChange(e) {
@@ -952,7 +987,11 @@
     else if (t.id === 'o-bubliny') state.obj.bubliny = t.checked;
     else if (t.id === 'o-choro') state.obj.choropleth = t.checked;
     else if (t.id === 'o-obyv') state.obj.naObyv = t.checked;
-    else if (t.id === 'o-r') {
+    else if (t.id === 'o-metrika') {
+      state.obj.metrika = t.value;
+      prepocitejObjednavky();
+      markerCache.clear();
+    } else if (t.id === 'o-r') {
       state.obj.radiusKm = Number(t.value);
       prepocitejPokryti();
       markerCache.clear();
@@ -1033,7 +1072,7 @@
     let html = `<div class="toolbar"><select class="select" id="sort-sel" aria-label="Řazení">
         <option value="nazev">podle názvu</option>
         <option value="velikost">podle velikosti</option>
-        <option value="poptavka" ${state.objednavky ? '' : 'disabled'}>podle objednávek v okolí</option>
+        <option value="poptavka" ${state.objednavky ? '' : 'disabled'}>podle ${esc(J().mn)} v okolí</option>
         <option value="skore" ${state.objednavky ? '' : 'disabled'}>podle skóre partnera</option>
         <option value="stav">podle stavu spolupráce</option>
         <option value="typ">podle typu</option>
@@ -1086,7 +1125,7 @@
   function mistoRow(m, extra) {
     const sel = state.selected && state.selected.type === 'misto' && state.selected.id === m.id;
     const sub = [TYP[m._typ].one, m.obec || okresName(m.okres), m._firma && m._firma.nazev && norm(m._firma.nazev) !== norm(m.nazev) ? m._firma.nazev : null].filter(Boolean).join(' · ');
-    const right = extra != null ? extra : state.objednavky && m._pop ? `${fmtN(m._pop.n)} obj.` : '';
+    const right = extra != null ? extra : state.objednavky && m._pop ? `${fmtN(m._pop.n)} ${J().kratce}` : '';
     return `<div class="list-item${sel ? ' sel' : ''}" data-type="misto" data-id="${esc(m.id)}">
       <span class="dot${m.zdroj === 'ares' ? ' sq' : ''}" style="background:${barvaMista(m)}"></span>
       <span class="name">${esc(m.nazev)}</span>
@@ -1109,7 +1148,7 @@
       <label class="check small"><input type="checkbox" id="p-bez" ${state.obj.jenBezPartnera ? 'checked' : ''}>jen bez partnera do ${R} km</label>
       <label class="check small"><input type="checkbox" id="p-servis" ${state.obj.jenServis ? 'checked' : ''}>jen se servisem</label>
       <span class="muted small">${fmtN(items.length)} kandidátů · ${fmtN(partneri)} partnerů</span></div>`;
-    if (!state.objednavky) html += `<div class="callout small" style="margin:10px 12px">Bez objednávek se řadí jen podle servisu, kontaktu a pokrytí. Nahrajte objednávky (tlačítko <b>Objednávky</b>) – skóre pak zohlední poptávku do ${R} km.</div>`;
+    if (!state.objednavky) html += `<div class="callout small" style="margin:10px 12px">Bez objednávek se řadí jen podle servisu, kontaktu a pokrytí. Nahrajte objednávky nebo zákazníky (tlačítko <b>Objednávky</b>) – skóre pak zohlední poptávku do ${R} km.</div>`;
     if (!items.length) html += emptyHtml('Žádní kandidáti – upravte filtry.');
     items.slice(0, state.listLimit).forEach((m, i) => {
       const sk = m._skore;
@@ -1118,13 +1157,13 @@
         <span class="rank">${i + 1}</span>
         <span class="name">${esc(m.nazev)}</span>
         <span class="dist"><b>${sk.body}</b> b.</span>
-        <span class="sub">${esc([TYP[m._typ].one, m.obec || okresName(m.okres)].filter(Boolean).join(' · '))}${state.objednavky ? ` · ${fmtN(m._pop.n)} obj. do ${R} km` : ''}</span>
+        <span class="sub">${esc([TYP[m._typ].one, m.obec || okresName(m.okres)].filter(Boolean).join(' · '))}${state.objednavky ? ` · ${fmtN(m._pop.n)} ${J().kratce} do ${R} km` : ''}</span>
         <span class="skbar">${bar}</span>
         <span class="badges">${velBadge(m)}${slBadges(m)}${stavBadges(m.id)}${m._faze ? '' : `<button type="button" class="btn btn-sm" data-akce="vytipovat" data-id="${esc(m.id)}">Vytipovat</button>`}</span>
       </div>`;
     });
     html += moreBtn(items.length);
-    html += `<div class="muted small" style="padding:10px 12px">Skóre (0–100): objednávky do ${R} km (50 b.), servis (20 b.), žádný partner ani naše prodejna v okolí (20 b.), kontakt (10 b.). Okruh nastavíte vlevo v části Objednávky. Partner = stav „Partner – spolupráce domluvena“.</div>`;
+    html += `<div class="muted small" style="padding:10px 12px">Skóre (0–100): ${esc(J().nadpis.toLowerCase())} do ${R} km (50 b.), servis (20 b.), žádný partner ani naše prodejna v okolí (20 b.), kontakt (10 b.). Okruh nastavíte vlevo v části Objednávky. Partner = stav „Partner – spolupráce domluvena“.</div>`;
     list.innerHTML = html;
     $('#p-bez').addEventListener('change', (e) => {
       state.obj.jenBezPartnera = e.target.checked;
@@ -1142,7 +1181,7 @@
     const list = $('#side-list');
     const R = state.obj.radiusKm;
     if (!state.objednavky) {
-      list.innerHTML = `<div class="empty">Objednávky zatím nejsou nahrané.<br><br><button type="button" class="btn btn-primary" id="mesta-nahrat">Nahrát objednávky</button><br><br><span class="small">Stačí export z e-shopu (CSV nebo XLSX) se sloupcem PSČ nebo město. Na server se ukládají jen součty podle PSČ.</span></div>`;
+      list.innerHTML = `<div class="empty">Objednávky ani zákazníci zatím nejsou nahraní.<br><br><button type="button" class="btn btn-primary" id="mesta-nahrat">Nahrát objednávky / zákazníky</button><br><br><span class="small">Vložte tabulku z Excelu (i kontingenční, obce nebo PSČ s počty) nebo export z e-shopu (CSV, XLSX). Na server se ukládají jen součty podle PSČ.</span></div>`;
       $('#mesta-nahrat').addEventListener('click', openObjModal);
       return;
     }
@@ -1152,10 +1191,10 @@
     if (s === 'naObyv') items = items.filter((o) => o.pop >= 1000).sort((a, b) => b.n / b.pop - a.n / a.pop);
     const celkem = items.reduce((a, o) => a + o.n, 0);
     let html = `<div class="toolbar"><select class="select" id="mesta-sort">
-      <option value="n">podle počtu objednávek</option>
+      <option value="n">podle počtu ${esc(J().mn)}</option>
       <option value="bila">jen bílá místa (bez partnera do ${R} km)</option>
       <option value="naObyv">na 1 000 obyvatel (obce nad 1 000 obyv.)</option>
-    </select><span class="muted small">${fmtN(items.length)} obcí · ${fmtN(celkem)} obj.</span></div>`;
+    </select><span class="muted small">${fmtN(items.length)} obcí · ${fmtN(celkem)} ${esc(J().kratce)}</span></div>`;
     if (!items.length) html += emptyHtml('Žádné obce.');
     for (const o of items.slice(0, state.listLimit)) {
       const sel = state.selected && state.selected.type === 'obec' && state.selected.id === o.key;
@@ -1163,7 +1202,7 @@
       html += `<div class="list-item${sel ? ' sel' : ''}" data-type="obec" data-id="${esc(o.key)}">
         <span class="dot" style="background:${o.pokryto ? '#f76707' : '#c92a2a'}"></span>
         <span class="name">${esc(o.nazev)}</span>
-        <span class="dist"><b>${fmtN(o.n)}</b> obj.</span>
+        <span class="dist"><b>${fmtN(o.n)}</b> ${esc(J().kratce)}</span>
         <span class="sub">${esc(okresName(o.okres))}${o.kc ? ' · ' + esc(vel.fmtObrat(o.kc)) : ''}${o.pop >= 1000 ? ' · ' + ((o.n / o.pop) * 1000).toFixed(1).replace('.', ',') + ' / 1 000 obyv.' : ''}</span>
         <span class="badges">${o.pokryto ? `<span class="badge ok">partner ${fmtKm(o.partnerKm * 1000)}</span>` : `<span class="badge danger">bez partnera do ${R} km</span>`}<span class="badge">${fmtN(kolem)} prodejen/servisů do ${R} km</span></span>
       </div>`;
@@ -1250,7 +1289,7 @@
       </dl>
       ${m.zdroj === 'vlastni' ? `<div class="row" style="margin-top:8px"><button type="button" class="btn btn-sm" id="v-upravit">Upravit místo</button><button type="button" class="btn btn-sm btn-ghost" id="v-smazat">Smazat místo</button></div>` : ''}
       <div class="section"><h3>Firma a velikost</h3>${firmaHtml(m)}</div>
-      ${state.objednavky ? `<div class="section"><h3>Objednávky v okolí (do ${state.obj.radiusKm} km)</h3>${okoliObjHtml(m)}</div>` : ''}
+      ${state.objednavky ? `<div class="section"><h3>${esc(J().nadpis)} v okolí (do ${state.obj.radiusKm} km)</h3>${okoliObjHtml(m)}</div>` : ''}
       <div class="section"><h3>Další prodejny a servisy do 5 km</h3>${konkurenceHtml(m)}</div>
       <div class="section"><h3>Z webu (automaticky)</h3>${webHtml(m, w)}</div>
       <div class="section"><h3>Hledat na webu</h3>${searchLinks(m)}</div>
@@ -1368,7 +1407,7 @@
     }
     const top = [...obce].sort((a, b) => b[1] - a[1]).slice(0, 6);
     const sk = m._skore;
-    return `<div class="row" style="gap:16px;flex-wrap:wrap"><div class="stat"><b>${fmtN(n)}</b><span>objednávek (${fmtPct(n / Math.max(1, obj.celkem))} všech)</span></div>${kc ? `<div class="stat"><b>${esc(vel.fmtObrat(kc))}</b><span>za objednávky</span></div>` : ''}<div class="stat"><b>${sk.body}</b><span>skóre partnera</span></div></div>
+    return `<div class="row" style="gap:16px;flex-wrap:wrap"><div class="stat"><b>${fmtN(n)}</b><span>${esc(J().mn)} (${fmtPct(n / Math.max(1, obj.celkem))} všech)</span></div>${kc ? `<div class="stat"><b>${esc(vel.fmtObrat(kc))}</b><span>za objednávky</span></div>` : ''}<div class="stat"><b>${sk.body}</b><span>skóre partnera</span></div></div>
       ${top.length ? `<div class="small" style="margin-top:6px">${top.map(([key, c]) => `<a href="#" data-go-type="obec" data-go-id="${esc(key)}">${esc(nazvy.get(key))}</a> ${fmtN(c)}`).join(' · ')}</div>` : ''}
       <ul class="near-list small" style="margin-top:6px">${sk.slozky.map((s) => `<li><span>${esc(s.label)}</span><span class="nowrap">${s.body} / ${s.max} b.</span></li>`).join('')}</ul>`;
   }
@@ -1481,8 +1520,9 @@
       <div class="detail-head"><h2>${esc(o.nazev)}</h2>${backBtn()}</div>
       <div class="muted small" style="margin-bottom:8px">${esc(okresName(o.okres))} · ${esc(krajName(o.kraj))} · PSČ ${esc(o.psc.slice(0, 8).join(', '))}${o.psc.length > 8 ? ' …' : ''}</div>
       <div class="summary">
-        <div class="stat"><b>${fmtN(o.n)}</b><span>objednávek (${fmtPct(o.n / Math.max(1, obj.celkem))})</span></div>
-        ${o.kc ? `<div class="stat"><b>${esc(vel.fmtObrat(o.kc))}</b><span>za objednávky</span></div>` : ''}
+        <div class="stat"><b>${fmtN(o.n)}</b><span>${esc(J().mn)} (${fmtPct(o.n / Math.max(1, obj.celkem))})</span></div>
+        ${metrikyDat().filter((k) => k !== metrika()).map((k) => `<div class="stat"><b>${fmtN((obj.vse.get(o.key) || {})[k])}</b><span>${esc(objLib.METRIKA[k].mn)}</span></div>`).join('')}
+        ${o.kc ? `<div class="stat"><b>${esc(vel.fmtObrat(o.kc))}</b><span>hodnota objednávek</span></div>` : ''}
         ${popTxt}
         <div class="stat"><b style="color:${o.pokryto ? 'var(--success)' : 'var(--danger)'}">${o.partnerKm != null ? fmtKm(o.partnerKm * 1000) : '—'}</b><span>k nejbližšímu partnerovi / naší prodejně</span></div>
       </div>
@@ -1516,7 +1556,7 @@
     { key: 'web', label: 'Web', get: (m) => kontakt(m).web },
     ...SLUZBY.map((s) => ({ key: 'sl_' + s.key, label: s.label, get: (m) => ANO(sluzba(m, s.key).ano) })),
     { key: 'znacky', label: 'Značky', get: (m) => m._znacky.join(', '), wrap: true },
-    { key: 'poptavka', label: 'Objednávky v okolí', get: (m) => (state.objednavky && m._pop ? String(m._pop.n) : ''), sortGet: (m) => (m._pop ? m._pop.n : 0) },
+    { key: 'poptavka', get label() { return J().nadpis + ' v okolí'; }, get: (m) => (state.objednavky && m._pop ? String(m._pop.n) : ''), sortGet: (m) => (m._pop ? m._pop.n : 0) },
     { key: 'skore', label: 'Skóre partnera', get: (m) => String(m._skore ? m._skore.body : ''), sortGet: (m) => (m._skore ? m._skore.body : 0) },
     ...stavLib.STAVY.map((s) => ({ key: s.key, label: s.label, stav: true, get: (m) => (state.stav[m.id] && state.stav[m.id][s.key] ? 'ano' + (state.stav[m.id].datumy[s.key] ? ' (' + fmtDate(state.stav[m.id].datumy[s.key]) + ')' : '') : ''), sortGet: (m) => (state.stav[m.id] && state.stav[m.id][s.key] ? 0 : 1) })),
     { key: 'spoluprace', label: 'Typ spolupráce', get: (m) => { const r = state.stav[m.id]; const s = r && stavLib.SPOLUPRACE.find((x) => x.key === r.spoluprace); return s && s.key ? s.label : ''; } },
@@ -1600,15 +1640,28 @@
   function openObjModal() {
     const d = state.objednavky;
     const body = `
-      ${d ? `<div class="callout small" style="margin-bottom:10px"><b>Nahráno:</b> ${fmtN(d.objednavek)} objednávek z ${fmtN(d.mista.length)} PSČ${d.od && d.do ? `, období ${esc(fmtDate(d.od))} – ${esc(fmtDate(d.do))}` : ''}${d.soubor ? `, soubor ${esc(d.soubor)}` : ''}${d.kdo ? `, nahrál(a) ${esc(d.kdo)}` : ''}${d.nahrano ? ' ' + esc(fmtDateTime(d.nahrano)) : ''}.${d.nezarazeno ? ` Nepřiřazeno ${fmtN(d.nezarazeno)}.` : ''}${d.zahranici ? ` Do zahraničí ${fmtN(d.zahranici)} (vynechány).` : ''}${d.storno ? ` Stornováno ${fmtN(d.storno)} (vynechány).` : ''}</div>` : ''}
-      <p class="small">Export objednávek z e-shopu nebo z POHODY – <b>CSV</b> (oddělovač ; nebo ,) nebo <b>XLSX</b>. Stačí sloupec <b>PSČ</b> (doručovací adresy), případně <b>město</b>. Pomůže i datum, částka, stav (stornované se vynechají) a číslo objednávky (export po položkách se počítá po objednávkách). Jde nahrát i hotový přehled „PSČ; počet“.</p>
-      <div class="callout small"><b>Soukromí:</b> soubor se zpracuje jen v tomto prohlížeči. Na server se pošlou jen součty podle PSČ (počet a částka) – žádná jména, adresy, e-maily ani čísla objednávek.</div>
-      <div class="row" style="flex-wrap:wrap;gap:8px;margin:12px 0">
-        <label class="btn btn-primary">Vybrat soubor… <input type="file" id="obj-file" accept=".csv,.txt,.xlsx,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" hidden></label>
-        ${d ? '<button type="button" class="btn" id="obj-csv">Stáhnout součty (CSV)</button><button type="button" class="btn btn-ghost" id="obj-del">Smazat objednávky</button>' : ''}
+      ${d ? `<div class="callout small" style="margin-bottom:10px"><b>Nahráno:</b> ${esc(popisDatasetu(d))}${d.nazev ? ` – „${esc(d.nazev)}“` : ''}${d.od && d.do ? `, období ${esc(fmtDate(d.od))} – ${esc(fmtDate(d.do))}` : ''}${d.soubor && d.soubor !== d.nazev ? `, zdroj ${esc(d.soubor)}` : ''}${d.kdo ? `, nahrál(a) ${esc(d.kdo)}` : ''}${d.nahrano ? ' ' + esc(fmtDateTime(d.nahrano)) : ''}.${d.nezarazeno ? ` Nepřiřazeno ${fmtN(d.nezarazeno)}.` : ''}${d.zahranici ? ` Zahraničí ${fmtN(d.zahranici)} (vynecháno).` : ''}${d.storno ? ` Stornováno ${fmtN(d.storno)} (vynecháno).` : ''}</div>` : ''}
+      <p class="small"><b>Tabulka z Excelu:</b> označte ji celou – i s nadpisem a filtry kontingenční tabulky, klidně obě tabulky vedle sebe – <b>Ctrl+C</b> a sem <b>Ctrl+V</b>. Stačí sloupec <b>PSČ</b> nebo <b>obec</b> a počty: objednávek, zákazníků nebo aktivních zákazníků, případně hodnota v Kč. <b>Export z e-shopu</b> nebo z POHODY (CSV, XLSX) nahrajte tlačítkem – stačí PSČ doručovací adresy, pomůže datum, částka, stav (storna se vynechají) a číslo objednávky.</p>
+      <textarea class="input mono" id="obj-paste" rows="4" wrap="off" spellcheck="false" aria-label="Vložit tabulku z Excelu" placeholder="Sem vložte tabulku z Excelu (Ctrl+V)…"></textarea>
+      <div class="row" style="flex-wrap:wrap;gap:8px;margin:8px 0 10px">
+        <button type="button" class="btn" id="obj-paste-ok">Načíst vloženou tabulku</button>
+        <label class="btn btn-primary">Vybrat soubor… <input type="file" id="obj-file" accept=".csv,.txt,.tsv,.xlsx,text/csv,text/tab-separated-values,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" hidden></label>
+        ${d ? '<button type="button" class="btn" id="obj-csv">Stáhnout součty (CSV)</button><button type="button" class="btn btn-ghost" id="obj-del">Smazat nahrané</button>' : ''}
       </div>
+      <div class="callout small"><b>Soukromí:</b> tabulka se zpracuje jen v tomto prohlížeči. Na server se pošlou jen součty podle PSČ (počty a částka) – žádná jména, adresy, e-maily ani čísla objednávek.</div>
       <div id="obj-preview"></div>`;
-    const md = openModal('Objednávky z e-shopu', body, 'wide');
+    const md = openModal('Objednávky a zákazníci', body, 'wide');
+    const ta = $('#obj-paste', md.el);
+    const nactiVlozene = () => {
+      const text = ta.value;
+      if (!text.trim()) {
+        $('#obj-preview', md.el).innerHTML = '<div class="callout warn" style="margin-top:10px">Pole je prázdné – v Excelu tabulku označte, Ctrl+C a sem Ctrl+V.</div>';
+        return;
+      }
+      objNahled(md, 'vloženo ze schránky', csvLib.parse(text, text.includes('\t') ? '\t' : undefined));
+    };
+    ta.addEventListener('paste', () => setTimeout(nactiVlozene, 0));
+    $('#obj-paste-ok', md.el).addEventListener('click', nactiVlozene);
     $('#obj-file', md.el).addEventListener('change', async (e) => {
       const file = e.target.files[0];
       if (!file) return;
@@ -1621,16 +1674,17 @@
     });
     const csvB = $('#obj-csv', md.el);
     if (csvB) csvB.addEventListener('click', () => {
-      const rows = [['PSČ', 'Obec', 'Okres', 'Počet objednávek', 'Částka (Kč)']];
+      const met = objLib.metrikyDatasetu(d);
+      const rows = [['PSČ', 'Obec', 'Okres', ...met.map((k) => objLib.METRIKA[k].nadpis), ...(d.castky ? ['Částka (Kč)'] : [])]];
       for (const x of d.mista) {
         const p = pscData[x.psc];
-        rows.push([x.psc, p ? p[3] : '', p ? okresName(p[2]) : '', String(x.n), String(x.kc || '')]);
+        rows.push([x.psc, p ? p[3] : '', p ? okresName(p[2]) : '', ...met.map((k) => String(x[k] || 0)), ...(d.castky ? [String(x.kc || 0)] : [])]);
       }
       download(`objednavky-psc-${new Date().toISOString().slice(0, 10)}.csv`, csvLib.serialize(rows), 'text/csv;charset=utf-8');
     });
     const delB = $('#obj-del', md.el);
     if (delB) delB.addEventListener('click', async () => {
-      if (!confirm('Smazat nahrané objednávky (pro celý tým)?')) return;
+      if (!confirm('Smazat nahrané objednávky / zákazníky (pro celý tým)?')) return;
       try {
         if (state.server.on) await api('DELETE', 'api/objednavky');
         else lsSet(LS.obj, null);
@@ -1661,37 +1715,101 @@
     return csvLib.parse(text);
   }
 
-  function objNahled(md, soubor, rows) {
-    const det = objLib.detectColumns(rows);
+  // Náhled importu: nalezené tabulky (u dvou vedle sebe volba „obě dohromady“ / jen jedna), sloupce k opravě,
+  // výsledek po přiřazení k obcím, kontrolní součty proti řádku „Celkový součet“ a seznam nepřiřazených obcí.
+  function objNahled(md, zdroj, rows) {
     const el = $('#obj-preview', md.el);
-    if (det.hlavicka < 0) {
-      el.innerHTML = `<div class="callout warn">V souboru jsem nenašel sloupec s PSČ ani s městem (hledám v prvních 15 řádcích záhlaví jako „PSČ“, „Dodací PSČ“, „Město“, „Obec“, „ZIP“). Vyberte sloupce ručně:</div>`;
-      det.hlavicka = 0;
-      det.nazvy = (rows[0] || []).map((x) => String(x == null ? '' : x));
+    let bloky = objLib.rozpoznat(rows);
+    const rucne = !bloky.length;
+    if (rucne) {
+      // záhlaví se nenašlo – sloupce se vyberou ručně, první řádek = záhlaví
+      const sirka = Math.max(1, ...rows.slice(0, 50).map((r) => (r ? r.length : 0)));
+      bloky = [{ index: 0, hlavicka: 0, od: 0, do: sirka - 1, sloupce: {}, nazvy: Array.from({ length: sirka }, (_, i) => String((rows[0] || [])[i] == null ? '' : rows[0][i])), ciselne: new Set(), maPsc: false }];
     }
-    const sl = { ...det.sloupce };
-    const fields = Object.entries(objLib.SLOUPCE);
-    const opts = (sel) => `<option value="">—</option>${det.nazvy.map((n, i) => `<option value="${i}" ${sel === i ? 'selected' : ''}>${esc(n || 'sloupec ' + (i + 1))}</option>`).join('')}`;
-    const prepocet = () => {
-      const souhrn = objLib.secti(rows, sl, { odRadku: det.hlavicka + 1 });
-      const prir = objLib.priradit(souhrn, pscData, obecKPsc);
-      const ds = objLib.dataset(prir, souhrn, { soubor, kdo: state.server.user });
-      const top = par.obce(ds.mista, pscData).obce.slice(0, 10);
-      $('#obj-souhrn', md.el).innerHTML = `
-        <div class="summary" style="grid-template-columns:repeat(3,1fr)">
-          <div class="stat"><b>${fmtN(ds.objednavek)}</b><span>objednávek přiřazeno</span></div>
-          <div class="stat"><b>${fmtN(ds.mista.length)}</b><span>PSČ</span></div>
-          <div class="stat"><b>${fmtN(ds.nezarazeno)}</b><span>bez PSČ / neznámé</span></div>
-          <div class="stat"><b>${fmtN(souhrn.zahranici)}</b><span>do zahraničí (vynechány)</span></div>
-          <div class="stat"><b>${fmtN(souhrn.storno)}</b><span>storno (vynechány)</span></div>
-          <div class="stat"><b>${ds.od && ds.do ? esc(fmtDate(ds.od)) + '–' + esc(fmtDate(ds.do)) : '—'}</b><span>období</span></div>
+    const sloupce = Object.fromEntries(bloky.map((b) => [b.index, { ...b.sloupce }]));
+    let volba = null;
+    let otevreno = rucne; // rozbalená volba sloupců zůstane rozbalená i po překreslení
+    const nadpis = objLib.nadpisTabulky(rows, rucne ? [] : bloky) || zdroj.replace(/\.[^.]+$/, '');
+    const pis = objLib.pismeno;
+    const rozsah = (b) => (b.od === b.do ? pis(b.od) : `${pis(b.od)}–${pis(b.do)}`);
+    const popisBloku = (b) => {
+      const sl = sloupce[b.index];
+      return ['mesto', 'psc', 'pocet', 'zak', 'akt', 'castka'].filter((k) => sl[k] != null).map((k) => b.nazvy[sl[k] - b.od] || objLib.SLOUPCE[k].label).join(' · ');
+    };
+    const vyberHtml = (b) => {
+      const sl = sloupce[b.index];
+      const opts = (sel) => `<option value="">—</option>${b.nazvy.map((n, i) => `<option value="${b.od + i}" ${sel === b.od + i ? 'selected' : ''}>${esc(pis(b.od + i))}: ${esc(trunc(n || '(bez názvu)', 28))}</option>`).join('')}`;
+      return `<div class="map-grid" style="margin-top:6px">${Object.entries(objLib.SLOUPCE).map(([k, def]) => `<label class="small">${esc(def.label)}<select class="select" data-blok="${b.index}" data-sl="${k}">${opts(sl[k])}</select></label>`).join('')}</div>`;
+    };
+    // počty ve všech veličinách tabulky: „9 749 obj. · 30 939 zák.“
+    const vic = (e, met) => met.map((k) => `${fmtN(Math.round(e[k] || 0))} ${objLib.METRIKA[k].kratce}`).join(' · ');
+    const render = () => {
+      for (const b of bloky) b.maPsc = sloupce[b.index].psc != null;
+      const r = objLib.zpracovat(rows, { bloky, volba, sloupce, pscData, obecIndex: obecKPsc, velkaMesta, meta: { soubor: zdroj, kdo: state.server.user } });
+      volba = r.volba;
+      const pouzite = volba === 'spojit' ? bloky : [bloky[volba]];
+      const ds = r.dataset;
+      const prir = r.prirazeno;
+      const met = r.souhrn.metriky;
+      const hl = met[0];
+      const j = objLib.METRIKA[hl];
+      const obce = par.obce(ds.mista.map((x) => ({ psc: x.psc, n: x[hl] || 0, kc: x.kc || 0 })).filter((x) => x.n > 0), pscData).obce;
+      const stat = (b, s) => `<div class="stat"><b>${b}</b><span>${s}</span></div>`;
+      const stats = [
+        ...met.map((k) => stat(fmtN(objLib.soucetDatasetu(ds, k)), `${esc(objLib.METRIKA[k].mn)} přiřazeno k obcím`)),
+        ds.castky ? stat(esc(vel.fmtObrat(objLib.soucetDatasetu(ds, 'kc'))), 'hodnota objednávek') : '',
+        stat(fmtN(ds.mista.length), `PSČ · ${fmtN(obce.length)} obcí`),
+        stat(esc(vic(prir.zahranici, met)), 'zahraničí (vynecháno)'),
+        stat(esc(vic(prir.nezarazeno, met)), 'nepřiřazeno (bez obce / neznámá obec)'),
+        prir.opraveno[hl] ? stat(esc(vic(prir.opraveno, met)), 'opravená PSČ (4 číslice, chybná země)') : '',
+        prir.podleNazvu[hl] ? stat(esc(vic(prir.podleNazvu, met)), 'podle názvu obce (bez PSČ)') : '',
+        r.souhrn.storno && r.souhrn.storno.n ? stat(fmtN(r.souhrn.storno.n), 'storno (vynecháno)') : '',
+        ds.od && ds.do ? stat(esc(fmtDate(ds.od)) + '–' + esc(fmtDate(ds.do)), 'období') : '',
+      ].filter(Boolean);
+      const kde = (k) => (k.blok === 'spojeno' ? 'Obě tabulky dohromady' : `Tabulka ${rozsah(bloky[k.blok])}`);
+      const kontroly = r.kontroly
+        .map((k) => (k.ok
+          ? `<div class="small" style="color:var(--success)">✓ ${esc(kde(k))}: součet řádků ${fmtN(k.radky)} = řádek „Celkový součet“ (${esc(objLib.METRIKA[k.metrika].mn)})</div>`
+          : `<div class="callout warn small" style="margin-top:6px">⚠ ${esc(kde(k))}: součet řádků ${fmtN(k.radky)} ≠ „Celkový součet“ ${fmtN(k.celkem)} (${esc(objLib.METRIKA[k.metrika].mn)}). Zkontrolujte sloupce, případně vyberte jen jednu tabulku.</div>`))
+        .join('');
+      const nepr = prir.neprirazene.filter((x) => x.nazev && x[hl]);
+      const bez = prir.neprirazene.find((x) => !x.nazev);
+      const radioTab = bloky.length > 1
+        ? `<div class="stack-sm">${r.lzeSpojit ? `<label class="check"><input type="radio" name="obj-volba" value="spojit" ${volba === 'spojit' ? 'checked' : ''}>Obě tabulky dohromady (doporučeno) – obce z tabulky ${esc(rozsah(bloky.find((b) => !b.maPsc)))}, velká města rozepsaná podle PSČ z tabulky ${esc(rozsah(bloky.find((b) => b.maPsc)))}</label>` : ''}
+            ${bloky.map((b) => `<label class="check"><input type="radio" name="obj-volba" value="${b.index}" ${volba === b.index ? 'checked' : ''}>Jen tabulka ${esc(rozsah(b))}: ${esc(popisBloku(b)) || '—'}</label>`).join('')}</div>`
+        : `<div class="small">${rucne ? '' : `Tabulka ve sloupcích ${esc(rozsah(bloky[0]))}, záhlaví na řádku ${bloky[0].hlavicka + 1}: ${esc(popisBloku(bloky[0]))}`}</div>`;
+      el.innerHTML = `
+        <div class="section"><h3>Tabulka (${fmtN(r.souhrn.radku)} řádků s daty)</h3>
+          ${rucne ? '<div class="callout warn small">Nenašel jsem záhlaví se sloupcem PSČ nebo obec (hledám „PSČ“, „Dodací PSČ“, „Obec“, „Město“, „ZIP“ v prvních 60 řádcích). Vyberte sloupce ručně – první řádek se bere jako záhlaví.</div>' : ''}
+          ${radioTab}
+          ${pouzite.map((b) => `<details ${otevreno ? 'open' : ''} style="margin-top:6px"><summary class="small">Sloupce tabulky ${esc(rozsah(b))} – rozpoznáno podle záhlaví, opravte, když nesedí</summary>${vyberHtml(b)}</details>`).join('')}
+          ${volba === 'spojit' && r.prekryto ? `<div class="small muted" style="margin-top:6px">Města rozepsaná podle PSČ (${fmtN(r.prekryto)}) se z tabulky obcí nepočítají, aby nebyla dvakrát.</div>` : ''}
         </div>
-        ${souhrn.sectene ? '<div class="small muted" style="margin-top:6px">Soubor vypadá jako hotový přehled (PSČ + počet objednávek).</div>' : ''}
-        ${top.length ? `<div class="small" style="margin-top:8px"><b>Nejvíc objednávek:</b> ${top.map((o) => `${esc(o.nazev)} ${fmtN(o.n)}`).join(' · ')}</div>` : ''}
-        <div class="row" style="margin-top:12px;gap:8px;flex-wrap:wrap">
-          <button type="button" class="btn btn-primary" id="obj-save" ${ds.objednavek ? '' : 'disabled'}>${state.server.on ? 'Uložit pro tým' : 'Uložit v tomto prohlížeči'}</button>
-          <input class="input" id="obj-nazev" style="width:220px" placeholder="popis, např. e-shop 2024–2025" value="${esc(soubor.replace(/\.[^.]+$/, ''))}">
+        <div class="section"><h3>Výsledek</h3>
+          <div class="summary" style="grid-template-columns:repeat(3,1fr)">${stats.join('')}</div>
+          <div style="margin-top:8px">${kontroly}</div>
+          ${r.rozdily.length ? `<div class="callout warn small" style="margin-top:6px">⚠ Levá a pravá tabulka nesedí (jiné filtry?): ${r.rozdily.slice(0, 8).map((x) => `${esc(x.nazev)} ${fmtN(x.obec)} × ${fmtN(x.psc)}`).join(' · ')}. Nastavte v obou tabulkách stejné filtry, nebo vyberte jen jednu tabulku.</div>` : ''}
+          ${bez || nepr.length ? `<div class="small" style="margin-top:8px"><b>Nepřiřazeno:</b> ${bez ? `bez obce i PSČ (neuvedeno) ${esc(vic(bez, met))}` : ''}${bez && nepr.length ? ' · ' : ''}${nepr.length ? 'neznámé obce: ' + nepr.slice(0, 25).map((x) => `${esc(trunc(x.nazev, 40))} ${fmtN(x[hl])}`).join(' · ') + (nepr.length > 25 ? ' …' : '') : ''}</div>` : ''}
+          ${obce.length ? `<div class="small" style="margin-top:8px"><b>Nejvíc ${esc(j.mn)}:</b> ${obce.slice(0, 10).map((o) => `${esc(o.nazev)} ${fmtN(o.n)}`).join(' · ')}</div>` : ''}
+          <div class="row" style="margin-top:12px;gap:8px;flex-wrap:wrap">
+            <button type="button" class="btn btn-primary" id="obj-save" ${ds.mista.length ? '' : 'disabled'}>${state.server.on ? 'Uložit pro tým' : 'Uložit v tomto prohlížeči'}</button>
+            <input class="input" id="obj-nazev" style="width:320px;max-width:100%" placeholder="popis, např. zákazníci 2025" value="${esc(nadpis)}">
+          </div>
+          <div class="small muted" style="margin-top:6px">Uložení nahradí dosud nahraná data. V mapě pak vlevo přepnete, co se počítá${met.length > 1 ? ` (${esc(met.map((k) => objLib.METRIKA[k].nadpis.toLowerCase()).join(', '))})` : ''}.</div>
         </div>`;
+      el.querySelectorAll('details').forEach((dt) => dt.addEventListener('toggle', () => {
+        otevreno = dt.open;
+      }));
+      el.querySelectorAll('input[name="obj-volba"]').forEach((i) => i.addEventListener('change', () => {
+        volba = i.value === 'spojit' ? 'spojit' : Number(i.value);
+        render();
+      }));
+      el.querySelectorAll('select[data-sl]').forEach((s) => s.addEventListener('change', () => {
+        const sl = sloupce[Number(s.dataset.blok)];
+        if (s.value === '') delete sl[s.dataset.sl];
+        else sl[s.dataset.sl] = Number(s.value);
+        render();
+      }));
       $('#obj-save', md.el).addEventListener('click', async () => {
         ds.nazev = $('#obj-nazev', md.el).value;
         try {
@@ -1706,24 +1824,13 @@
           state.tab = 'mesta';
           renderAll();
           writeHash();
-          toast(`Uloženo ${fmtN(ds.objednavek)} objednávek z ${fmtN(ds.mista.length)} PSČ.`);
+          toast(`Uloženo: ${popisDatasetu(ds)}.`);
         } catch (err) {
           toast('Uložení selhalo: ' + err.message);
         }
       });
     };
-    el.innerHTML = `
-      <div class="section"><h3>Sloupce (${fmtN(rows.length - det.hlavicka - 1)} řádků)</h3>
-        <div class="map-grid">${fields.map(([k, def]) => `<label class="small">${esc(def.label)}<select class="select" data-sl="${k}">${opts(sl[k])}</select></label>`).join('')}</div>
-        <div class="small muted" style="margin-top:6px">Rozpoznáno automaticky podle záhlaví – opravte, když nesedí. Ukázka prvního řádku: ${esc((rows[det.hlavicka + 1] || []).slice(0, 8).map((x) => trunc(String(x == null ? '' : x), 20)).join(' | '))}</div>
-      </div>
-      <div class="section"><h3>Výsledek</h3><div id="obj-souhrn"></div></div>`;
-    el.querySelectorAll('select[data-sl]').forEach((s) => s.addEventListener('change', () => {
-      if (s.value === '') delete sl[s.dataset.sl];
-      else sl[s.dataset.sl] = Number(s.value);
-      prepocet();
-    }));
-    prepocet();
+    render();
   }
 
   // ================================================================== RUČNĚ PŘIDANÁ MÍSTA
@@ -2080,7 +2187,7 @@
     return window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
   }
   function saveUi() {
-    lsSet(LS.ui, { barva: state.barva, sort: state.sort, radiusKm: state.obj.radiusKm, minN: state.obj.minN, bubliny: state.obj.bubliny, choropleth: state.obj.choropleth, naObyv: state.obj.naObyv });
+    lsSet(LS.ui, { barva: state.barva, sort: state.sort, radiusKm: state.obj.radiusKm, minN: state.obj.minN, bubliny: state.obj.bubliny, choropleth: state.obj.choropleth, naObyv: state.obj.naObyv, metrika: state.obj.metrika });
   }
   function loadUi() {
     const u = lsGet(LS.ui);
@@ -2090,6 +2197,7 @@
     if (u.radiusKm >= 5 && u.radiusKm <= 50) state.obj.radiusKm = u.radiusKm;
     if (u.minN >= 1 && u.minN <= 50) state.obj.minN = u.minN;
     for (const k of ['bubliny', 'choropleth', 'naObyv']) if (typeof u[k] === 'boolean') state.obj[k] = u[k];
+    if (objLib.METRIKA[u.metrika]) state.obj.metrika = u.metrika;
   }
 
   // ================================================================== start

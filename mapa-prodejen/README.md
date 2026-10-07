@@ -5,9 +5,10 @@ Obchodní nástroj na **https://mapa.ksprehledy.cz**: **interaktivní mapa ČR (
 v názvu. Každé místo má **velikost firmy** (podle obratu, jinak podle počtu zaměstnanců z ARES / ČSÚ), kontakty,
 nabízené služby (servis, e-kola, půjčovna, bazar, e-shop) a značky kol z webu. Nad tím:
 
-- **Objednávky z e-shopu podle obcí** – export (CSV / XLSX) se zpracuje v prohlížeči, na server jdou jen součty
-  podle PSČ. Mapa ukáže obce a okresy podle počtu objednávek a **bílá místa** – obce s objednávkami, kde není
-  partner ani naše prodejna.
+- **Objednávky a zákazníci podle obcí** – tabulka vložená z Excelu (i kontingenční: nadpis a filtry, řádky
+  Celkem, dvě tabulky vedle sebe) nebo export z e-shopu (CSV / XLSX) se zpracuje v prohlížeči, na server jdou jen
+  součty podle PSČ (objednávky, zákazníci, aktivní zákazníci, částka). Mapa ukáže obce a okresy podle zvolené
+  veličiny a **bílá místa** – obce s objednávkami či zákazníky, kde není partner ani naše prodejna.
 - **Hledání partnerů** – kandidáti seřazení podle **skóre 0–100** (objednávky v okolí, servis, nepokryté
   okolí, kontakt) a **evidence spolupráce**: vytipováno → osloveno → voláno → schůzka → partner / nemá zájem,
   typ spolupráce (servis, výdejní místo, prodej), kontaktní osoba, poznámka – sdílené pro celý tým.
@@ -28,7 +29,7 @@ nabízené služby (servis, e-kola, půjčovna, bazar, e-shop) a značky kol z w
 
 | Pro koho | Kde |
 |---|---|
-| Obchodní tým | [docs/MANUAL.md](docs/MANUAL.md) – ovládání, velikost firem, nahrání objednávek, města a bílá místa, partneři a skóre, evidence spolupráce, export |
+| Obchodní tým | [docs/MANUAL.md](docs/MANUAL.md) – ovládání, velikost firem, objednávky a zákazníci (vložení tabulky z Excelu), města a bílá místa, partneři a skóre, evidence spolupráce, export |
 | Kdo chce rozumět datům | [docs/METODIKA.md](docs/METODIKA.md) – zdroje a dotazy, výběr firem z ARES, párování IČO, velikost, PSČ → obec, výpočet skóre, omezení |
 | Správce serveru | [NASAZENI.md](NASAZENI.md) – zapnutí nasazení z GitHubu, uživatelé, Cloudflare, zálohy, návrat zpět |
 

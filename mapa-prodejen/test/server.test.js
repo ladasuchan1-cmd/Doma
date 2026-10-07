@@ -88,7 +88,12 @@ test('stav spolupráce: záznam s autorem, neplatné id, sloučení, smazání',
 });
 
 test('objednávky: jen součty podle PSČ, osobní údaje se odmítnou', async () => {
-  let res = await json('PUT', '/api/objednavky', { mista: [{ psc: '60200', n: 12, kc: 34000 }, { psc: '11000', n: 5 }], od: '2025-01-01', do: '2025-12-31', soubor: 'export.csv' });
+  // zákazníci a aktivní zákazníci z tabulky vložené z Excelu (bez objednávek)
+  let res = await json('PUT', '/api/objednavky', { metriky: ['zak', 'akt'], mista: [{ psc: '16000', zak: 40, akt: 3, kc: 0 }], soubor: 'vloženo ze schránky' });
+  assert.deepStrictEqual(await res.json(), { ok: true, objednavek: 0, psc: 1 });
+  const z = await (await json('GET', '/api/objednavky', undefined, { 'Accept-Encoding': 'identity' })).json();
+  assert.deepStrictEqual([z.metriky, z.zakazniku, z.aktivnich, z.mista], [['zak', 'akt'], 40, 3, [{ psc: '16000', zak: 40, akt: 3, kc: 0 }]]);
+  res = await json('PUT', '/api/objednavky', { mista: [{ psc: '60200', n: 12, kc: 34000 }, { psc: '11000', n: 5 }], od: '2025-01-01', do: '2025-12-31', soubor: 'export.csv' });
   assert.deepStrictEqual(await res.json(), { ok: true, objednavek: 17, psc: 2 });
   res = await json('PUT', '/api/objednavky', { mista: [{ psc: '60200', n: 1, email: 'jan@x.cz' }] });
   assert.strictEqual(res.status, 400);

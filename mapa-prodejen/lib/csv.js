@@ -33,7 +33,8 @@
         i++;
         continue;
       }
-      if (c === '"') {
+      // uvozovky otevírají pole jen na jeho začátku; uprostřed jsou obyčejný znak (5" kolo, text vložený z Excelu)
+      if (c === '"' && field === '') {
         inQuotes = true;
         i++;
         continue;
@@ -66,13 +67,11 @@
     return rows;
   }
 
+  // Podle prvních řádků (nad tabulkou vloženou z Excelu může být nadpis bez oddělovačů): vyhraje znak, který je
+  // na nejvíc řádcích; při shodě tabulátor (z Excelu), pak středník, pak čárka (bývá i v číslech a textu).
   function detectSeparator(text) {
-    const head = text.slice(0, text.indexOf('\n') < 0 ? text.length : text.indexOf('\n'));
-    const counts = [
-      [',', (head.match(/,/g) || []).length],
-      [';', (head.match(/;/g) || []).length],
-      ['\t', (head.match(/\t/g) || []).length],
-    ];
+    const lines = text.split('\n', 40).filter((l) => l.trim() !== '');
+    const counts = ['\t', ';', ','].map((sep) => [sep, lines.filter((l) => l.includes(sep)).length]);
     counts.sort((a, b) => b[1] - a[1]);
     return counts[0][1] > 0 ? counts[0][0] : ',';
   }

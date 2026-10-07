@@ -39,6 +39,8 @@ test('poptávka: součet objednávek do okruhu', () => {
 test('skóre: složky a součet 0–100', () => {
   const max = p.skore({ poptavka: 100, maxPoptavka: 100, servis: true, partnerKm: null, radiusKm: 15, email: true, telefon: true });
   assert.strictEqual(max.body, 100);
+  assert.strictEqual(max.slozky[0].label, 'Objednávky v okolí');
+  assert.strictEqual(p.skore({ poptavka: 1, maxPoptavka: 1, popisek: 'Zákazníci v okolí' }).slozky[0].label, 'Zákazníci v okolí');
   assert.deepStrictEqual(max.slozky.map((s) => s.key), ['poptavka', 'servis', 'pokryti', 'kontakt']);
   const min = p.skore({ poptavka: 0, maxPoptavka: 100, servis: false, partnerKm: 0, radiusKm: 15 });
   assert.strictEqual(min.body, 0);
