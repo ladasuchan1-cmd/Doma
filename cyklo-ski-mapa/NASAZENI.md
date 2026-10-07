@@ -200,3 +200,12 @@ Caddy stejně jako ve variantě A (`reverse_proxy 127.0.0.1:8091`). Aktualizace:
   CSP, bez indexace mimo přihlášení (bez přihlášení je vidět jen přihlašovací formulář). Hesla jsou
   v `.env` v otevřené podobě jako u R01 Sales – soubor patří jen uživateli (`chmod 600`).
 - **Verze** se nepíše ručně: `deploy.sh` ji počítá z gitu (`v<datum>-<hash>`) a je v `/api/health`.
+- **Další weby na témže serveru (od 7. 10. 2026).** Caddy mapy drží porty 80/443 pro celý server, proto ji
+  využívají i další projekty z tohoto repa: **Půjčovna kol** (bloky v `/opt/caddy-extra/*.caddy`, zapisuje
+  `pujcovna-kol/deploy/vedle-mapy.sh`; adresář je připojený v `docker-compose.yml`) a **Kolomapa**
+  (`/config/sites/*.caddy` ve svazku `caddy_config`). Oba adresáře `Caddyfile` importuje – prázdné nevadí.
+  Řádky jsou v repu proto, aby je nasazení mapy nesmazalo a weby ostatních projektů nespadly.
+- **Sdílený klon `/opt/Doma`.** Druhé projekty si v něm přepínají svou větev, takže `hetzner.sh aktualizace`
+  rychloposouvá tu větev, která je právě vytažená. Nasazení z GitHubu proto předává `CSM_VETEV` (nasazovanou
+  větev): když je na serveru jiná větev a složka `cyklo-ski-mapa` se v nich liší, nasazení **skončí chybou**
+  místo tichého nasazení cizího kódu – řešením je sloučit větve. Větev na serveru skript nikdy nepřepíná.

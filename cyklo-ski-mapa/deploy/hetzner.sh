@@ -179,6 +179,28 @@ instalace() {
   echo "Hotovo. Další krok: v GitHubu nastavit automatické nasazení (NASAZENI.md)."
 }
 
+# Klon $REPO_DIR může sdílet víc projektů (Půjčovna kol, Kolomapa) a na serveru pak bývá vytažená jejich větev.
+# Větev se tu nepřepíná – druhý projekt by přišel o své soubory i cron – ale nasadit se smí jen tehdy, když má
+# nasazovaná větev (CSM_VETEV z GitHub Actions) stejnou aplikaci jako to, co je na disku. Jinak by se
+# tiše nasadil cizí kód a změny z hlavní větve by na web nikdy nedošly.
+zkontroluj_vetev() {
+  [ -n "${CSM_VETEV:-}" ] || return 0
+  local vytazena slozka
+  vytazena="$(git -C "$REPO_DIR" branch --show-current 2>/dev/null || true)"
+  [ -n "$vytazena" ] && [ "$vytazena" != "$CSM_VETEV" ] || return 0
+  slozka="$(realpath --relative-to="$REPO_DIR" "$APP_DIR")"
+  git -C "$REPO_DIR" fetch -q origin "$CSM_VETEV" || chyba "větev $CSM_VETEV na GitHubu není."
+  # Srovnává se to, co doběhne na server: obsah image (podle .dockerignore bez cache/, test/, tools/, deploy/)
+  # bez dokumentace, plus compose a Caddyfile. Samotný hetzner.sh přichází ze stdin z nasazované větve.
+  local vyluky=(":(exclude)$slozka/cache" ":(exclude)$slozka/test" ":(exclude)$slozka/tools" ":(exclude)$slozka/deploy" ":(exclude)$slozka/docs" ":(exclude)$slozka/*.md")
+  if git -C "$REPO_DIR" diff --quiet "origin/$CSM_VETEV" HEAD -- "$slozka" "${vyluky[@]}" \
+     && git -C "$REPO_DIR" diff --quiet "origin/$CSM_VETEV" HEAD -- "$slozka/deploy/${CSM_COMPOSE:-docker-compose.yml}" "$slozka/deploy/Caddyfile"; then
+    echo "→ Na serveru je vytažená větev $vytazena (sdílený klon s dalším projektem); nasazovaná $CSM_VETEV má stejnou aplikaci – pokračuji."
+  else
+    chyba "na serveru je vytažená větev $vytazena, nasazuje se $CSM_VETEV a složka $slozka se v nich liší – nasadil by se cizí kód. Slučte větev $vytazena do $CSM_VETEV (nebo naopak), pak nasazení zopakujte."
+  fi
+}
+
 aktualizace() {
   [ -d "$APP_DIR" ] || chyba "není nainstalováno ($APP_DIR chybí) – spusťte nejdřív: hetzner.sh instalace DOMENA"
   if [ -n "$(git -C "$REPO_DIR" status --porcelain 2>/dev/null)" ]; then
@@ -192,6 +214,7 @@ aktualizace() {
       echo "VAROVÁNÍ: aktualizace z GitHubu nešla rychloposunem – stavím aktuálně vytažený stav."
     fi
   fi
+  zkontroluj_vetev
   synchronizuj_env
   # předchozí verze pro cestu zpět – před buildem, než se přepíše tag latest
   if docker image inspect "$IMAGE:latest" >/dev/null 2>&1; then docker tag "$IMAGE:latest" "$IMAGE:predchozi"; fi
