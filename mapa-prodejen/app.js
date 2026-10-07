@@ -43,18 +43,9 @@
   const popOkresu = new Map();
   for (const o of obceData) popOkresu.set(o[1], (popOkresu.get(o[1]) || 0) + (o[4] || 0));
   const popObce = new Map(obceData.map((o) => [o[6] ? String(o[6]) : o[0] + '|' + o[1], o[4]]));
-  // název obce → PSČ (pro objednávky jen s názvem obce): největší sídlo daného jména
-  const obecKPsc = new Map();
-  for (const o of obceData) {
-    const k = objLib.fold(o[0]);
-    if (o[5] && !obecKPsc.has(k)) obecKPsc.set(k, o[5]);
-  }
-  for (const [k, v] of Object.entries(pscData)) {
-    const n = objLib.fold(v[3]);
-    if (!obecKPsc.has(n)) obecKPsc.set(n, k);
-  }
-  // města, u kterých se v tabulkách píše i část („Ostrava-Poruba“, „Praha 6 - Dejvice“, „Liberec XXV“)
-  const velkaMesta = new Set(obceData.filter((o) => o[4] >= 20000).map((o) => objLib.fold(o[0])));
+  // obce podle názvu (pro objednávky jen s názvem obce): jmenovci, části názvů, zkratky, vodítka „u Brna“;
+  // index si sám vede i města, u kterých se píše část („Ostrava-Poruba“, „Praha 6 - Dejvice“, „Liberec XXV“)
+  const obecIndex = objLib.indexObci(obceData, pscData);
 
   const norm = (s) =>
     String(s || '')
@@ -1745,7 +1736,7 @@
     const vic = (e, met) => met.map((k) => `${fmtN(Math.round(e[k] || 0))} ${objLib.METRIKA[k].kratce}`).join(' · ');
     const render = () => {
       for (const b of bloky) b.maPsc = sloupce[b.index].psc != null;
-      const r = objLib.zpracovat(rows, { bloky, volba, sloupce, pscData, obecIndex: obecKPsc, velkaMesta, meta: { soubor: zdroj, kdo: state.server.user } });
+      const r = objLib.zpracovat(rows, { bloky, volba, sloupce, pscData, obecIndex, meta: { soubor: zdroj, kdo: state.server.user } });
       volba = r.volba;
       const pouzite = volba === 'spojit' ? bloky : [bloky[volba]];
       const ds = r.dataset;

@@ -140,11 +140,30 @@ Jak se řádky přiřazují k obcím:
 - **4místné PSČ** („1200“ u Prahy, „4601“ u Liberce – chybí nula) se opraví na české, **když sedí název obce**;
   tak se zachrání i řádky, kde Excel odhadl zemi podle tvaru PSČ (sloupec „Země (odhad)“ = AT, ale obec Praha).
   „Wien 1020“ zůstane v zahraničí.
-- Řádek **jen s názvem obce** (bez PSČ) se přiřadí k hlavnímu PSČ obce; rozumí se i „Praha 6 - Dejvice“,
-  „Hlavní město Praha“, „Ostrava-Poruba“, „Liberec XXV“, „Teplice (okres Teplice)“. **„Brno-venkov“** nebo
-  „Praha-východ“ jsou okresy, ne obce – zůstanou nepřiřazené.
+- Řádek **jen s názvem obce** (bez PSČ) se přiřadí k hlavnímu PSČ obce. Import rozumí i tomu, jak lidé obce píšou
+  do adres:
+  - starší a poštovní přívlastky – „Říčany u Prahy“, „Zábřeh na Moravě“, „Hlinsko v Čechách“, „Ostrov nad Ohří“;
+  - zkratky – „Frenštát p.R.“, „Č. Budějovice“, „Uh.Hradiště“, „Ústí n/L“, „Kralupy n. Vlt.“;
+  - část názvu se spojovníkem a začátek názvu – „Brandýs nad Labem“, „Stará Boleslav“, „Frenštát“, „Dvůr Králové“;
+  - část obce, číslo obvodu a adresa – „Husinec - Řež“, „Sušice II“, „Studené 55, Jílové u Prahy“, „Holásky, Brno“,
+    „Zbraslav-Praha“ (pražská čtvrť, ne Zbraslav u Brna), „Praha 6 - Dejvice“, „Ostrava-Poruba“, „Moravská
+    Ostrava“, „Liberec XXV“, „Teplice (okres Teplice)“;
+  - okres a pošta – „Kozmice okr. Benešov“, „Ruda, pošta Nové Strašecí“; překlep v přívlastku („Rožnov pod
+    Rahoštěm“).
+
+  Obcí stejného jména je v Česku hodně (14 Nových Vsí, 6 Ostrovů). Rozhoduje vodítko v názvu: „Říčany u Brna“ jsou
+  jiné Říčany než „u Prahy“, „okr. Benešov“ určuje okres. Pomůže i oblast („v Čechách“, „na Moravě“, „ve
+  Slezsku“) nebo řeka, podle obcí, které ji mají v názvu („Ostrov nad Ohří“ je ten u Klášterce nad Ohří). Jinak se
+  bere největší obec toho jména. Kde vodítko chybí a obcí je víc, import nehádá a obec nechá v **nepřiřazeno**
+  („Staré Město pod Sněžníkem“ – v Česku je pět Starých Měst). **„Brno-venkov“** a „Praha-západ“ jsou okresy,
+  ne obce – zůstanou nepřiřazené.
 - **Zahraniční města** podle názvu: Bratislava, Košice, Žilina, Trnava, Senec, Wien, Berlin, München, Warszawa
-  a další velká města – i ta, která mají v Česku malou obec stejného jména (Košice u Tábora, Žilina u Kladna).
+  a další velká města, i ta, která mají v Česku malou obec stejného jména (Košice u Tábora, Žilina u Kladna).
+  Poznají se i jako součást názvu („Košice - Peres“, „Bratislava V“). Do zahraničí jdou také názvy:
+  - s písmeny, která čeština nemá (ľ, ô, ä, ö, ü, ł …);
+  - se slovenským tvarem („Moravany nad Váhom“, „Výčapy-Opatovce“, „Horné Orešany“, „… pri …“);
+  - se zemí v názvu („Bratislava Slovensko“, „Cesena, Italy“).
+
   Slovenská „Modra“ a moravská „Modrá“ se rozliší podle diakritiky. Řádek s českým PSČ jde vždy do české obce.
 - Neznámé PSČ (P. O. Box, nové) se přiřadí podle názvu obce, jinak k PSČ se stejnými prvními třemi číslicemi.
 
@@ -281,9 +300,14 @@ chybí, přidejte přes **+ Místo** s typem „Naše prodejna / pobočka“.
   spolupráce, objednávky, přidaná místa a obraty obnova nemění.
 - **Uvidí kolegové moje objednávky?** Ano, součty podle PSČ jsou společné pro tým (nahrává se jeden soubor
   za firmu). Osobní údaje zákazníků se na server nedostanou.
-- **Po vložení tabulky z Excelu je hodně „nepřiřazeno“.** Podívejte se na seznam v náhledu: „bez obce i PSČ
-  (neuvedeno)“ jsou zákazníci bez adresy v e-shopu – do mapy dát nejdou. Neznámé obce bývají překlepy, adresy
-  napsané do pole obce nebo testovací záznamy. Když je ⚠ u kontrolního součtu, nenačetly se některé řádky –
-  rozbalte „Sloupce tabulky“ a zkontrolujte, který sloupec je obec, PSČ a počet.
+- **Po vložení tabulky z Excelu je hodně „nepřiřazeno“.** Podívejte se na seznam v náhledu. „Bez obce i PSČ
+  (neuvedeno)“ jsou zákazníci bez adresy v e-shopu – do mapy dát nejdou. Mezi neznámými obcemi bývají:
+  - slovenské vesnice bez slovenských písmen („Lipany“, „Trstená“);
+  - překlepy, testovací a vymyšlené záznamy („doplnit“, „Mesto“);
+  - jmenovci bez vodítka („Staré Město pod Sněžníkem“).
+
+  Takovou obec v tabulce opravte nebo doplňte PSČ, tabulku vložte znovu a součty se přepočítají. Když je ⚠
+  u kontrolního součtu, nenačetly se některé řádky – rozbalte „Sloupce tabulky“ a zkontrolujte, který sloupec je
+  obec, PSČ a počet.
 - **Chci mapu zákazníků i objednávek.** Vložte tabulku, která má obojí (např. Zákazníků, Aktivních, Objednávek,
   Hodnota) – mezi veličinami pak přepínáte vlevo v **Počítat v mapě** bez nového nahrání.

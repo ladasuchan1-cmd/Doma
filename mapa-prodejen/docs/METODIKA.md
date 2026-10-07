@@ -210,12 +210,64 @@ nahrál a počty vynechaných (max. 20 000 PSČ). Starší data jen s objednávk
      se 4místným PSČ (Wien 1020) → zahraničí.
    - Neznámé české PSČ (P. O. Box, nové, německé v českém tvaru) → podle názvu obce; zahraniční název → zahraničí;
      bez názvu nebo s názvem obce, která sedí, → PSČ se stejnými prvními třemi číslicemi; jinak nepřiřazeno.
-   - **Jen název obce**: nejdřív seznam zahraničních měst (velká města SK, AT, DE, PL a další, rozlišeno
-     s diakritikou – „Modra“ ≠ „Modrá“; zapsané bez diakritiky se porovnají i bez ní) a obce, které se v datech
-     objevují jen se zahraničním PSČ → zahraničí; jinak hlavní PSČ české obce stejného jména (největší).
-     Rozumí se „Praha 6 - Dejvice“, „Prague 6“, „Hlavní město Praha“, „Teplice (okres …)“, „…, Česká republika“,
-     „Polička-Město“ a části měst nad 20 000 obyvatel („Ostrava-Poruba“, „Liberec XXV“), ne však okresy
-     („Brno-venkov“, „Praha-východ“) ani obce s předložkou („Most pri Bratislave“).
+   - **Jen název obce** → hlavní PSČ české obce (index obcí `indexObci` z dat obcí a PSČ, hledání `najdiObec`),
+     postupně:
+     1. **Zahraničí**:
+        - seznam zahraničních měst (velká města SK, AT, DE, PL a další). Rozlišuje se s diakritikou („Modra“ ≠
+          „Modrá“), zapsané bez diakritiky se porovnají i bez ní. Platí i pro část názvu („Košice - Peres“,
+          „Bratislava V“);
+        - písmeno mimo českou abecedu (ľ, ô, ä, ö, ü, ß, ł …), ne však rozbité kódování („MÄ?sto“);
+        - slovenské tvary: „pri“, „na Ostrove“, název na „-ovce“ (ne vodítko „u Bílovce“), Horné / Dolné / Nižné /
+          Vyšné, „nad / pod …om“, slovenské řeky („nad Nitrou“, „nad Žitavou“ …);
+        - země v názvu („Slovensko“, „Italy“);
+        - obce, které se v datech objevují jen se zahraničním PSČ.
+     2. **Přesně** (bez diakritiky a velikosti písmen), největší ze jmenovců:
+        - celý název; bez „(okres …)“, „, Česká republika“, „-Město“;
+        - bez předpony „obec“, „město“, „pošta“, „p.“; bez čísla obvodu („Sušice II“, „Tišnov 3“);
+        - zdvojený název („HodonínHodonín“); „Veselí/Lužnicí“ = Veselí nad Lužnicí;
+        - Praha s obvodem („Praha 6 - Dejvice“, „Prague 6“, „Hlavní město Praha“);
+        - části měst nad 20 000 obyvatel („Ostrava-Poruba“, „Brno Sever“, „Liberec XXV“). Ne však okresy
+          („Brno-venkov“, „Praha-západ“, „Plzeň-jih“) a obce s předložkou („Most pri Bratislave“);
+        - „Moravská / Slezská Ostrava“.
+     3. **Víc částí** (čárka, pomlčka, lomítko, závorka; úřední název se spojovníkem jako „Brumov-Bylnice“ vcelku):
+        - leží-li první obec do 15 km od další, platí první (další je okolí);
+        - jinak velké město (první je jeho čtvrť: „Zbraslav-Praha“, „Holásky, Brno“);
+        - obec za ulicí s číslem domu („Studené 55, Jílové u Prahy“);
+        - za pomlčkou další, je-li aspoň 2× větší (menší bývá její částí: „Střelná-Košťany“);
+        - jinak první – z jejích jmenovců ta nejblíž další části;
+        - část, která obcí není („Husinec - Řež“), se přeskočí. „Okres Beroun“ omezí okres, „Praha-západ“ okolí
+          Prahy (do 40 km).
+     4. **Zkratky a začátky názvů**:
+        - slovo s tečkou či lomítkem nebo jednopísmenné je začátek slova („Frenštát p.R.“, „Č. Budějovice“, „Ústí
+          n/L“, „Val. Mez.“);
+        - část úředního názvu se spojovníkem („Stará Boleslav“, „Místek“);
+        - začátek názvu, po kterém v úředním názvu následuje předložka („Frenštát“, „Dvůr Králové“, „Jablonec“) – jen
+          obce od 2 000 obyvatel;
+        - sedí-li víc různých obcí, největší, jen je-li aspoň 5× větší než druhá („Jablonec“ → Jablonec nad Nisou,
+          „Hodkovice“ nic).
+     5. **Bez přívlastku** „u …“, „nad …“, „pod …“, „na …“, „v(e) …“, „okr. …“, „pošta …“ (základ musí sedět
+        přesně, zkouší se od nejdelšího):
+        - jediný úřední název se stejným začátkem a podobným přívlastkem (překlep do 2 znaků, useknutý, s částí obce
+          za ním: „Rožnov pod Rahoštěm“, „Nové Město nad Met“) → ten;
+        - vodítko „u Y“, „pošta Y“: Y se najde i ve 2. pádě („Prahy“, „Brna“, „Českých Budějovic“, „Plzně“,
+          „Havlíčkova Brodu“) i jako zkratka s převahou („Rým.“ → Rýmařov). Ze jmenovců vyhraje nejvyšší váha
+          obyvatelé × e^(−d / 5 km), nejdál 20 km od Y; od velkého města víc, 20 + 10 × log₁₀(obyvatel / 10 000) km,
+          od Prahy 41 km;
+        - „okr. Y“: obec v okrese pojmenovaném po Y (u „Praha-západ“ do 40 km od Prahy);
+        - oblast → největší obec v ní:
+          - „v Čechách“, „v Podkrkonoší“, „v Krkonoších“, „v Jizerských / Orlických horách“, „v Podještědí“ –
+            okresy 31xx–36xx;
+          - „na Moravě“, „na Hané“, „na Valašsku“, „na Slovácku“, „v Moravském krasu“ – 37xx–38xx;
+          - „ve Slezsku“, „nad Olší“ – Bruntál, Frýdek-Místek, Karviná, Nový Jičín, Opava, Ostrava, Jeseník;
+        - jiný přívlastek („nad Ohří“) → jmenovec do 25 km od obcí, které mají tentýž přívlastek v úředním názvu
+          (tam řeka teče), s vahou jako výš;
+        - jinak jediná obec toho jména, a jen když žádný úřední název se stejným začátkem a předložkou neexistuje.
+     6. Jinak **nepřiřazeno**.
+
+     **Ověření** proběhlo na ploché tabulce zákazníků se sloupci obec i PSČ: 141 000 zákazníků, 9 190 dvojic obec –
+     PSČ. Obec nalezená jen podle názvu se porovnala s polohou PSČ. Nové tvary přiřadily 2 230 dříve nenalezených
+     zákazníků: 96 % z nich do 10 km od jejich PSČ, 3,5 % do 25 km. Nesouhlasících (nad 25 km) přibylo 16, jsou to
+     hlavně jmenovci bez vodítka („Zvole 216“).
    Zahraniční města s malým českým jmenovcem (Košice u Tábora, Žilina u Kladna, Senec, Trnava, Stupava, Hlohovec,
    Komárno) se bez PSČ počítají do zahraničí; s platným českým PSČ do české obce.
 
@@ -260,6 +312,10 @@ vhodnější než velká; filtr velikosti se dá použít zvlášť.
   podmínkách); 26 % webů se načíst nepodařilo.
 - **PSČ → obec**: PSČ pokrývá i okolní obce, objednávky z vesnice se tak započtou obci s poštou. U pěti PSČ větších
   měst je hlavní obec jiná, než by čekal člověk (souřadnice GeoNames); na součty za okres to nemá vliv.
+- **Obec jen podle názvu**: u jmenovců bez vodítka („Zvole“, „Milovice“) se bere největší obec toho jména, což
+  nemusí sedět. Slovenské vesnice bez slovenských písmen a tvarů („Lipany“, „Trstená“) zůstanou nepřiřazené, ne
+  v zahraničí (seznam slovenských obcí v datech není). Části obcí, které nejsou samy obcí („Polanka nad Odrou“),
+  se přiřadí, jen když je v názvu i obec („Zbraslav-Praha“).
 - **Vzdálenosti** jsou vzdušnou čarou, ne po silnici.
 
 ## 11. Změny metodiky
@@ -268,3 +324,4 @@ vhodnější než velká; filtr velikosti se dá použít zvlášť.
 |---|---|
 | 7. 10. 2026 | První verze: OSM (8 dotazů), ARES podle 39 slov, IČO z OSM / webu / názvu / odhadu, velikost podle obratu nebo kategorie zaměstnanců ČSÚ, PSČ → obec podle hranic obcí RÚIAN a hlasování, skóre partnera 50 / 20 / 20 / 10. |
 | 7. 10. 2026 | Import tabulek vložených z Excelu (kontingenční tabulky: nadpis a filtry, řádky Celkem, dvě tabulky vedle sebe, křížová tabulka, kompaktní forma), veličiny zákazníci a aktivní zákazníci, oprava 4místných PSČ, zahraniční města podle názvu, kontrola proti „Celkovému součtu“. Neznámé PSČ s nesouhlasícím názvem obce se už nepřiřazuje podle prvních tří číslic. |
+| 7. 10. 2026 | Obec podle názvu i v tvarech z adres: přívlastky („u Prahy“, „na Moravě“, „nad Ohří“), zkratky („p.R.“, „n/L“), části názvů se spojovníkem a začátky názvů, části obcí a adresy, okres a pošta. Jmenovce rozliší vodítko, oblast a řeka. Slovenské tvary, cizí písmena a země v názvu jdou do zahraničí. Na tabulce zákazníků podle obcí je o 2 370 přiřazených zákazníků víc a o 1 960 víc v zahraničí, nepřiřazených s názvem obce ubylo z 13 200 na 8 900. |

@@ -6,7 +6,13 @@ const assert = require('node:assert');
 const o = require('../lib/objednavky.js');
 const csv = require('../lib/csv.js');
 const fx = require('./fixtures/excel-tabulky.js');
+const obce = require('./fixtures/obce.js');
 
+const IX = o.indexObci(obce.OBCE, null);
+const obec = (n) => {
+  const z = o.najdiZaznamObce(n, IX);
+  return z ? `${z.nazev} ${z.okres}` : null;
+};
 const zpracuj = (text, opts) => o.zpracovat(csv.parse(text), { pscData: fx.PSC, obecIndex: fx.OBCE, velkaMesta: fx.VELKA, meta: { nahrano: '2026-01-01T00:00:00.000Z' }, ...opts });
 const misto = (ds, psc) => ds.mista.find((x) => x.psc === psc);
 
@@ -82,6 +88,78 @@ test('obec podle názvu – části velkých měst, okresy, zahraniční města 
   assert.strictEqual(najdi('Most pri Bratislave'), null); // slovenská obec, ne Most
   for (const n of ['Košice', 'Kosice', 'Žilina', 'Modra', 'Brezno', 'Wien', 'Berlin', 'Warszawa', 'Komárno']) assert.ok(o.jeCiziMesto(n), n);
   for (const n of ['Modrá', 'Březno', 'Praha', 'Kolín', 'Most']) assert.ok(!o.jeCiziMesto(n), n);
+});
+
+test('obec podle názvu – starší a poštovní přívlastky, vodítko „u …“, okres, oblast, řeka', () => {
+  assert.strictEqual(obec('Říčany u Prahy'), 'Říčany 3209');
+  assert.strictEqual(obec('Říčany u Brna'), 'Říčany 3703'); // jmenovec u Brna, ne větší Říčany u Prahy
+  assert.strictEqual(obec('Jesenice u Prahy'), 'Jesenice 3210');
+  assert.strictEqual(obec('Roztoky u Křivoklátu'), 'Roztoky 3212'); // ta blízko vodítka, i když je menší
+  assert.strictEqual(obec('Zbýšov u Brna'), 'Zbýšov 3703'); // dva Zbýšovy skoro stejně daleko od Brna → větší
+  assert.strictEqual(obec('Hranice u Aše'), 'Hranice 3402');
+  assert.strictEqual(obec('Vřesina u Bílovce'), 'Vřesina 3807');
+  assert.strictEqual(obec('Benešov u Prahy'), 'Benešov 3201'); // 37 km od středu Prahy
+  assert.strictEqual(obec('Kozmice okr. Benešov'), 'Kozmice 3201');
+  assert.strictEqual(obec('Zábřeh na Moravě'), 'Zábřeh 3809');
+  assert.strictEqual(obec('Hlinsko v Čechách'), 'Hlinsko 3603');
+  assert.strictEqual(obec('Ostrov nad Ohří'), 'Ostrov 3403'); // ze šesti Ostrovů ten u obcí „nad Ohří“
+  assert.strictEqual(obec('Rožnov pod Rahoštěm'), 'Rožnov pod Radhoštěm 3810'); // překlep, ne Rožnov u Náchoda
+  // bez vodítka se nehádá: pět Starých Měst; Polanka nad Odrou je část Ostravy, ne Polánka u Plzně
+  assert.strictEqual(obec('Staré Město pod Sněžníkem'), null);
+  assert.strictEqual(obec('Polanka nad Odrou'), null);
+});
+
+test('obec podle názvu – zkratky, část názvu se spojovníkem, začátek názvu', () => {
+  assert.strictEqual(obec('Frenštát p.R.'), 'Frenštát pod Radhoštěm 3804');
+  assert.strictEqual(obec('Č. Budějovice'), 'České Budějovice 3301');
+  assert.strictEqual(obec('Uh.Hradiště'), 'Uherské Hradiště 3711');
+  assert.strictEqual(obec('Ústí n/L'), 'Ústí nad Labem 3510'); // ne Ústí nad Orlicí
+  assert.strictEqual(obec('Jablonec n.N.'), 'Jablonec nad Nisou 3504');
+  assert.strictEqual(obec('Brandýs n/L'), 'Brandýs nad Labem-Stará Boleslav 3209');
+  assert.strictEqual(obec('Brandýs nad Labem'), 'Brandýs nad Labem-Stará Boleslav 3209');
+  assert.strictEqual(obec('Stará Boleslav'), 'Brandýs nad Labem-Stará Boleslav 3209');
+  assert.strictEqual(obec('Morkovice'), 'Morkovice-Slížany 3708');
+  assert.strictEqual(obec('Frenštát'), 'Frenštát pod Radhoštěm 3804');
+  assert.strictEqual(obec('Jablonec'), 'Jablonec nad Nisou 3504'); // 23× větší než Jablonec nad Jizerou
+  assert.strictEqual(obec('Jakubov'), null); // jen začátek názvu vesnice (Jakubov u Moravských Budějovic) – nehádá
+});
+
+test('obec podle názvu – část obce, číslo obvodu, adresa, čtvrť velkého města, okres', () => {
+  assert.strictEqual(obec('Husinec - Řež'), 'Husinec 3209');
+  assert.strictEqual(obec('Sušice II'), 'Sušice 3404');
+  assert.strictEqual(obec('Tišnov3'), 'Tišnov 3703');
+  assert.strictEqual(obec('obec Tišnov'), 'Tišnov 3703');
+  assert.strictEqual(obec('TišnovTišnov'), 'Tišnov 3703');
+  assert.strictEqual(obec('Nová Ves I -Ohrada'), 'Nová Ves I 3204'); // „I“ patří k úřednímu názvu
+  assert.strictEqual(obec('Zbraslav-Praha'), 'Praha 3100'); // pražská čtvrť, ne Zbraslav u Brna
+  assert.strictEqual(obec('Holásky, Brno'), 'Brno 3702');
+  assert.strictEqual(obec('Studené 55, Jílové u Prahy'), 'Jílové u Prahy 3210'); // ulice s číslem, obec za čárkou
+  assert.strictEqual(obec('Jesenice, Praha-západ'), 'Jesenice 3210');
+  assert.strictEqual(obec('Moravská Ostrava'), 'Ostrava 3807');
+  assert.strictEqual(obec('Ostrava Jih'), 'Ostrava 3807'); // obvod Ostravy (okres „Ostrava-jih“ neexistuje)
+  assert.strictEqual(obec('Praha-západ'), null); // okres, ne obec
+  assert.strictEqual(obec('Brno-venkov'), null);
+});
+
+test('obec podle názvu – slovenské a zahraniční tvary jdou do zahraničí, české ne', () => {
+  for (const n of ['Moravany nad Váhom', 'Výčapy-Opatovce', 'Horné Orešany', 'Košice - Peres', 'Bratislava V', 'Martin-Priekopa', 'Divina, okres Žilina', 'Nitra Slovensko', 'Wien - Liesing', 'Gütersloh']) {
+    assert.ok(o.jeCiziMesto(n), n);
+  }
+  // „u Bílovce“ je český 2. pád, „Trnava u Zlína“ česká Trnava, „MÄ?sto“ rozbité kódování slova „Město“
+  for (const n of ['Vřesina u Bílovce', 'Trnava u Zlína', 'Říčany u Prahy', 'Ostrava-Poruba', 'MÄ?sto']) assert.ok(!o.jeCiziMesto(n), n);
+  assert.strictEqual(obec('Moravany nad Váhom'), null); // ani přímé hledání z něj neudělá moravské Moravany
+  assert.strictEqual(obec('Trnava u Zlína'), 'Trnava 3705');
+});
+
+test('tabulka jen s obcemi – nové tvary názvů se přiřadí k PSČ, slovenské do zahraničí, nejisté zůstanou', () => {
+  const text = ['Obec;Zákazníků', 'Říčany u Prahy;5', 'Frenštát p.R.;3', 'Stará Boleslav;2', 'Moravany nad Váhom;4', 'Staré Město pod Sněžníkem;1'].join('\n');
+  const p = o.zpracovat(csv.parse(text), { obecIndex: IX, meta: { nahrano: 'x' } }).prirazeno;
+  assert.strictEqual(p.psc['25101'].zak, 5);
+  assert.strictEqual(p.psc['74401'].zak, 3);
+  assert.strictEqual(p.psc['25001'].zak, 2);
+  assert.strictEqual(p.podleNazvu.zak, 10);
+  assert.strictEqual(p.zahranici.zak, 4);
+  assert.deepStrictEqual(p.neprirazene.map((x) => [x.nazev, x.zak]), [['Staré Město pod Sněžníkem', 1]]);
 });
 
 test('export po objednávkách: položky, storno a zahraničí po objednávkách, částka jednou za objednávku', () => {

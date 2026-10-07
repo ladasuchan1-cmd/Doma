@@ -82,7 +82,8 @@ Stav k 7. 10. 2026: **1 210 míst** (763 prodejen, 14 servisů, 57 půjčoven, 1
 index.html, app.js, styles.css   aplikace (bez buildu, běžné skripty – funguje i z file://)
 login.js, favicon.svg            přihlašovací stránka
 lib/velikost.js                  kategorie velikosti (obrat / zaměstnanci ČSÚ), čtení obratu „45 mil“
-lib/objednavky.js                rozpoznání sloupců exportu, součty podle PSČ, storno, zahraničí, kontrola dat pro server
+lib/objednavky.js                rozpoznání sloupců a tabulek, součty podle PSČ, storno, zahraničí, obce podle názvu
+                                 (přívlastky „u Prahy“, zkratky „p.R.“, jmenovci), kontrola dat pro server
 lib/partneri.js                  vzdálenosti, mřížkový index, poptávka v okruhu, skóre partnera, obce, bílá místa
 lib/stav.js                      evidence spolupráce (stavy, typ spolupráce, sloučení, import/export, efektivní kontakt)
 lib/vlastni.js                   ručně přidaná místa a obraty (kontrola IČO, polohy, polí)
@@ -99,7 +100,8 @@ test/                            node --test (knihovny, server, konzistence dat)
 ```
 
 ```bash
-npm test      # 73 testů: knihovny, XLSX, server (přihlášení, API, uložení, ochrana cest), konzistence dat
+npm test      # 88 testů: knihovny, XLSX, import tabulek a hledání obcí, server (přihlášení, API, uložení,
+              # ochrana cest), konzistence dat
 ```
 
 ## Omezení
