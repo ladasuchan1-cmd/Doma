@@ -198,17 +198,27 @@ přes Cloudflare a server je zvenčí vidět jen pro Cloudflare. Co to pro aplik
    `CSM_ORIGIN_CERT`, soukromý klíč do `CSM_ORIGIN_KEY` (celé PEM od řádku BEGIN po END; klíč nikam jinam).
    Nasazení oba ověří (platný pár; vypíše platnost a hostnames) a uloží je na server do `/opt/caddy-origin/`
    (Caddy je vidí jako `/etc/caddy/origin`). V Cloudflare → SSL/TLS → Overview musí být režim **Full (strict)**.
-2. **Proxy zapnout u všech záznamů domény najednou.** Origin certifikát pro `*.ksprehledy.cz` použije Caddy pro
-   všechny weby na serveru, tedy i pro Půjčovnu kol, a prohlížeče mu bez Cloudflare nevěří. Nejdřív proto oranžový
-   mrak u `cyklomapa` i u hostů Půjčovny kol (`ksprehledy.cz`, `www`, `outdoor`, `sport`, `family`) – do té doby
-   běží dál Let's Encrypt a nic se nemění.
-3. **Zapnutí:** variable `CSM_CLOUDFLARE` = `1` a Run workflow. Skript ověří, že doména už nemíří přímo na server
-   (jinak skončí chybou), zapíše `/opt/caddy-origin/tls.caddy` a Caddy znovu načte. Hodnota `0` vrátí Let's Encrypt
-   (až po vypnutí proxy); prázdná proměnná nic nemění. Ruční běh skriptu na serveru nastavení nepřepíná.
-4. **Skutečné IP adresy.** Za proxy vidí server adresy Cloudflare; Caddy jim důvěřuje (`trusted_proxies`
-   v `Caddyfile`) a předává aplikaci adresu klienta z `X-Forwarded-For`. Brzda přihlášení (10 pokusů / 15 min)
-   i logy tak fungují po uživatelích, ne po celém Cloudflare. Seznam adres je v Caddyfile, Cloudflare ho mění
-   zřídka (https://www.cloudflare.com/ips).
+2. **Proxy zapnout u všech webů na serveru, které certifikát pokrývá.** Jakmile Caddy Origin certifikát načte,
+   podá ho každému svému webu v `ksprehledy.cz` – i Půjčovně kol – a Let's Encrypt pro ně přestane obnovovat
+   (ověřeno na Caddy 2.11). Prohlížeče Origin certifikátu bez Cloudflare nevěří. Nejdřív proto oranžový mrak
+   u `cyklomapa` i u hostů Půjčovny kol: 7. 10. 2026 vedou `outdoor`, `sport` a `family` přímo na server (DNS only),
+   `ksprehledy.cz` a `www` už jsou za proxy. Do zapnutí běží dál Let's Encrypt a nic se nemění.
+3. **Zapnutí:** variable `CSM_CLOUDFLARE` = `1` a Run workflow. Skript projde všechny weby sdílené Caddy (blok mapy
+   i importy dalších projektů), a pokud některý pokrytý certifikátem vede DNS pořád přímo na server, skončí chybou
+   s jejich jmény – nic nezapne. Jinak zapíše `/opt/caddy-origin/tls.caddy`, ověří konfiguraci a Caddy znovu načte.
+   Hodnota `0` vrátí Let's Encrypt (až po vypnutí proxy); prázdná proměnná nic nemění. Ruční běh skriptu na serveru
+   nastavení nepřepíná. **Po zapnutí** musí být za proxy i každý nový web v `ksprehledy.cz` na tomto serveru
+   (např. web klienta Půjčovny kol) – jinak dostane Origin certifikát a prohlížeče ho odmítnou.
+4. **Skutečné IP adresy.** Za proxy vidí server adresy Cloudflare. Caddy hlavičkám s adresou klienta věří jen od
+   adres Cloudflare (`trusted_proxies` v `Caddyfile`) a adresu bere z `CF-Connecting-IP`, kterou Cloudflare vždy
+   přepíše. Aplikaci pak pošle v `X-Forwarded-For` jedinou adresu (`header_up X-Forwarded-For {client_ip}`),
+   protože brzda přihlášení bere první adresu z té hlavičky. Bez toho by si útočník mohl adresu vymyslet a brzdu
+   (10 pokusů / 15 min) obejít. Ověřeno 7. 10. 2026 na Caddy 2.11 se skutečnou aplikací: přes Cloudflare dostane
+   aplikace adresu návštěvníka, při přímém spojení vždy adresu spojení, podvržené hlavičky se zahodí a jedenáctý
+   pokus skončí 429. Seznam adres Cloudflare je v Caddyfile, Cloudflare ho mění zřídka
+   (https://www.cloudflare.com/ips). Ostatní weby na sdílené Caddy (Půjčovna kol) dostávají za Cloudflare
+   v `X-Forwarded-For` celý řetězec; pokud podle adresy něco omezují, patří do jejich bloku stejný
+   `header_up X-Forwarded-For {client_ip}`.
 5. **Nastavení Cloudflare, která aplikaci vadí:** Rocket Loader, Email Address Obfuscation a Auto Minify vypnout
    – aplikace má přísnou CSP a cizí skripty blokuje, e-maily v datech by obfuskace přepsala. Cloudflare Access
    na `cyklomapa` nezapínat, aplikace má vlastní přihlášení. Cache: statické soubory posílá aplikace jako
@@ -243,6 +253,11 @@ přes Cloudflare a server je zvenčí vidět jen pro Cloudflare. Co to pro aplik
   `deploy`. Skript `pujcovna-kol/deploy/vedle-mapy.sh` na Caddy mapy sahá přes jméno projektu, takže funguje dál;
   `.env` v `/opt/Doma/cyklo-ski-mapa/deploy` už ale není ten platný. Nasazení z GitHubu navíc předává `CSM_VETEV`:
   kdyby v klonu byla jiná větev s odlišnou aplikací, skončí chybou místo tichého nasazení cizího kódu.
-- **Caddy se po každém nasazení znovu načte** (`caddy validate` + `caddy reload`): Compose změnu `Caddyfile`
-  ani souborů v `/opt/caddy-origin` sám nepozná. Neplatný Caddyfile Caddy nepoloží – běží dál se starou
-  konfigurací a nasazení skončí chybou s výpisem.
+- **Caddy při nasazení (od 7. 10. 2026).** Nový `Caddyfile` se ještě před nasazením ověří v dočasném kontejneru
+  se všemi importy (bloky Půjčovny kol a Kolomapy, Origin certifikát). Neprojde-li, nasazení skončí chybou
+  a weby běží beze změny. Po nasazení se Caddy načte znovu: `Caddyfile` je do kontejneru připojený jako soubor
+  a git ho při aktualizaci nahradí novým, takže běžící Caddy ho reloadem nenačte. Když se změnil, skript Caddy
+  restartuje, a to znamená pár sekund výpadku všech webů na serveru. Změnám v `/opt/caddy-origin` stačí reload.
+- **Staré místo `/opt/Doma/cyklo-ski-mapa` už nespouštějte.** Skript pouštěný ze starého klonu by kontejnery
+  projektu `deploy` přestavěl z cizí větve; nová verze skriptu to pozná a skončí chybou s cestou ke správnému
+  místu. Ruční příkazy: `sudo bash /opt/cyklo-ski-mapa/Doma/cyklo-ski-mapa/deploy/hetzner.sh stav | log | …`.

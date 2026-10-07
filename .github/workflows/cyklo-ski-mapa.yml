@@ -118,14 +118,21 @@ jobs:
           [ -n "$CLOUDFLARE" ] && echo "CSM_CLOUDFLARE=$CLOUDFLARE (1 = Origin certifikát, 0 = Let's Encrypt)"
           # Skript se posílá přes stdin z právě nasazovaného commitu: kdyby se spouštěl ten na serveru, běžela by
           # jeho předchozí verze (soubor se aktualizuje až uvnitř běhu) a změny ve skriptu by platily o nasazení později.
+          # Citlivé hodnoty (hesla, klíč Origin certifikátu) jdou stdinem před skriptem, ne v příkazové řádce – tu na
+          # serveru po dobu běhu vidí `ps` každého uživatele.
+          spust() { # $1… = příkaz skriptu
+            { printf 'export CSM_USERS_B64=%q CSM_ORIGIN_CERT_B64=%q CSM_ORIGIN_KEY_B64=%q\n' "$USERS_B64" "$CERT_B64" "$KEY_B64"
+              cat cyklo-ski-mapa/deploy/hetzner.sh; } \
+              | ssh_cmd "$SUDO env CSM_DOMAIN='$DOMAIN' CSM_REPO_DIR='$REPO_DIR' CSM_VETEV='$BRANCH' CSM_CLOUDFLARE='$CLOUDFLARE' bash -s -- $*"
+          }
           if ssh_cmd "$SUDO test -f '$APP/deploy/.env'"; then
             echo "→ Aplikace je nainstalovaná – aktualizuji (uživatelé a doména podle nastavení GitHubu, jsou-li vyplněné)."
-            ssh_cmd "$SUDO env CSM_USERS_B64='$USERS_B64' CSM_DOMAIN='$DOMAIN' CSM_REPO_DIR='$REPO_DIR' CSM_VETEV='$BRANCH' CSM_CLOUDFLARE='$CLOUDFLARE' CSM_ORIGIN_CERT_B64='$CERT_B64' CSM_ORIGIN_KEY_B64='$KEY_B64' bash -s -- aktualizace" < cyklo-ski-mapa/deploy/hetzner.sh
+            spust aktualizace
           else
             echo "→ V $APP aplikace není – instalace (běží-li už mapa ze sdíleného klonu /opt/Doma, převezme se její nastavení i data)."
             test -n "$DOMAIN" || { echo "První instalace potřebuje variable CSM_HETZNER_DOMAIN (doména webu)."; exit 1; }
             test -n "$USERS" || { echo "První instalace potřebuje secret HETZNER_USERS (jmeno:heslo;jmeno2:heslo2)."; exit 1; }
-            ssh_cmd "$SUDO env CSM_USERS_B64='$USERS_B64' CSM_REPO_DIR='$REPO_DIR' CSM_VETEV='$BRANCH' CSM_CLOUDFLARE='$CLOUDFLARE' CSM_ORIGIN_CERT_B64='$CERT_B64' CSM_ORIGIN_KEY_B64='$KEY_B64' bash -s -- instalace '$DOMAIN'" < cyklo-ski-mapa/deploy/hetzner.sh
+            spust instalace "'$DOMAIN'"
           fi
 
   # Interní server bez veřejné adresy (self-hosted runner), jako u R01 Sales.

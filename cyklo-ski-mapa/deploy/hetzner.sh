@@ -21,7 +21,7 @@
 # (/opt/zalohy-cyklo-ski-mapa), CSM_USERS (uživatelé pro instalaci bez dotazu; nebo CSM_USERS_B64 = totéž v base64,
 # bez starostí s uvozovkami), CSM_VETEV (větev repa pro první klon a kontrola při aktualizaci), CSM_UFW=0
 # (nenastavovat firewall), CSM_CLOUDFLARE=1|0 + CSM_ORIGIN_CERT_B64 / CSM_ORIGIN_KEY_B64 (Cloudflare před serverem,
-# viz synchronizuj_cloudflare; CSM_ORIGIN_DIR = /opt/caddy-origin), CSM_STARY_DEPLOY (odkud převzít .env při
+# viz synchronizuj_cloudflare; soubory v /opt/caddy-origin), CSM_STARY_DEPLOY (odkud převzít .env při
 # první instalaci do nového místa; /opt/Doma/cyklo-ski-mapa/deploy).
 #
 # Běží i bez repa na disku – skript lze poslat přes SSH ze stdin (první instalace z GitHub Actions):
@@ -34,7 +34,7 @@ if [ "$(id -u)" != 0 ]; then
     exec sudo -n env CSM_USERS="${CSM_USERS:-}" CSM_USERS_B64="${CSM_USERS_B64:-}" CSM_DOMAIN="${CSM_DOMAIN:-}" CSM_REPO_DIR="${CSM_REPO_DIR:-}" \
       CSM_COMPOSE="${CSM_COMPOSE:-}" CSM_ZALOHY="${CSM_ZALOHY:-}" CSM_VETEV="${CSM_VETEV:-}" CSM_UFW="${CSM_UFW:-}" CSM_CRON="${CSM_CRON:-}" \
       CSM_CLOUDFLARE="${CSM_CLOUDFLARE:-}" CSM_ORIGIN_CERT_B64="${CSM_ORIGIN_CERT_B64:-}" CSM_ORIGIN_KEY_B64="${CSM_ORIGIN_KEY_B64:-}" \
-      CSM_ORIGIN_DIR="${CSM_ORIGIN_DIR:-}" CSM_STARY_DEPLOY="${CSM_STARY_DEPLOY:-}" \
+      CSM_STARY_DEPLOY="${CSM_STARY_DEPLOY:-}" \
       bash "${BASH_SOURCE[0]}" "$@"
   fi
   echo "CHYBA: spusťte jako root nebo přes sudo (sudo bash $0 …)." >&2
@@ -59,8 +59,11 @@ DEPLOY_DIR="$APP_DIR/deploy"
 COMPOSE_FILE="${CSM_COMPOSE:-docker-compose.yml}"
 ZALOHY="${CSM_ZALOHY:-/opt/zalohy-cyklo-ski-mapa}"
 IMAGE=cyklo-ski-mapa
-ORIGIN_DIR="${CSM_ORIGIN_DIR:-/opt/caddy-origin}"
+# Adresáře připojené do Caddy (pevně v docker-compose.yml): Origin certifikát a bloky dalších webů na serveru.
+ORIGIN_DIR=/opt/caddy-origin
+CADDY_EXTRA=/opt/caddy-extra
 CADDY_ZMENA=0
+TLS_NOVY=0
 
 compose() { (cd "$DEPLOY_DIR" && docker compose -f "$COMPOSE_FILE" "$@"); }
 
@@ -191,9 +194,18 @@ instalace() {
   [ -n "$d" ] && export CSM_DOMAIN="${CSM_DOMAIN:-$d}"
   synchronizuj_env
   synchronizuj_cloudflare
+  over_caddyfile
   echo "→ Stavím a spouštím (aplikace + Caddy)…"
+  # Běží-li aplikace už odjinud (převzetí z původního místa), zůstane její image jako cesta zpět.
+  if docker image inspect "$IMAGE:latest" >/dev/null 2>&1; then docker tag "$IMAGE:latest" "$IMAGE:predchozi"; fi
   APP_VERSION="$(verze_z_gitu)" compose up -d --build
-  cekej_na_app
+  if ! cekej_na_app; then
+    if docker image inspect "$IMAGE:predchozi" >/dev/null 2>&1; then
+      echo "CHYBA: nová verze neodpovídá – vracím předchozí." >&2
+      zpet
+    fi
+    exit 1
+  fi
   nacti_caddy
   cekej_na_web || true
   mkdir -p "$ZALOHY"
@@ -214,18 +226,60 @@ prevezmi_stare_nastaveni() {
   echo "→ Převzato nastavení z $stary/.env (původní nasazení ve sdíleném klonu); kontejnery a data pokračují."
 }
 
-# Míří doména přes Cloudflare? Když se její adresa shoduje s adresou tohoto serveru, proxy zapnutá není.
-domena_pres_cloudflare() {
-  local d ip adresy vlastni
-  d="$(domena)"
-  [ -n "$d" ] || return 1
-  adresy="$(getent ahosts "$d" 2>/dev/null | awk '{print $1}' | sort -u)"
-  [ -n "$adresy" ] || return 1
-  vlastni=" $(hostname -I 2>/dev/null | tr '\n' ' ') "
-  for ip in $adresy; do
-    case "$vlastni" in *" $ip "*) return 1 ;; esac
+# Dočasný kontejner Caddy se stejnými soubory jako ostrý: Caddyfile z disku (tj. ten, který se právě nasazuje),
+# bloky dalších webů (/opt/caddy-extra, /config/sites ze svazku) a Origin certifikát. Návratový kód 3 = compose
+# nemá vlastní Caddy (varianta caddy-externi) – kontroly se pak přeskočí.
+caddy_docasne() {
+  local image volby=()
+  image="$(sed -n 's/^[[:space:]]*image:[[:space:]]*\(caddy[^[:space:]]*\).*/\1/p' "$DEPLOY_DIR/$COMPOSE_FILE" | head -1)"
+  [ -n "$image" ] || return 3
+  mkdir -p "$CADDY_EXTRA" "$ORIGIN_DIR"
+  volby=(-e "DOMAIN=$(domena)" -v "$DEPLOY_DIR/Caddyfile:/etc/caddy/Caddyfile:ro"
+    -v "$CADDY_EXTRA:/etc/caddy/extra:ro" -v "$ORIGIN_DIR:/etc/caddy/origin:ro")
+  if docker volume inspect deploy_caddy_config >/dev/null 2>&1; then volby+=(-v deploy_caddy_config:/config:ro); fi
+  docker run --rm "${volby[@]}" "$image" caddy "$@" --config /etc/caddy/Caddyfile --adapter caddyfile
+}
+
+# Hostitelé všech webů na sdílené Caddy (náš blok i importy dalších projektů), z adaptované konfigurace.
+hosty_caddy() {
+  { caddy_docasne adapt 2>/dev/null || true; } | grep -o '"host":\[[^]]*\]' | grep -o '"[^"]*"' | tr -d '"' | grep -vx 'host' | sort -u || true
+}
+
+# Názvy (SAN) z certifikátu, jeden na řádek.
+sany_certifikatu() {
+  openssl x509 -noout -text -in "$1" 2>/dev/null | grep -A1 'Subject Alternative Name' | tail -n 1 \
+    | tr ',' '\n' | sed -n 's/^[[:space:]]*DNS:[[:space:]]*//p'
+}
+
+# Pokrývá certifikát host? $1 = host, další argumenty = názvy z certifikátu (*.domena.cz kryje právě jednu úroveň).
+pokryva_cert() {
+  local h="$1" s suf z
+  shift
+  for s in "$@"; do
+    [ "$h" = "$s" ] && return 0
+    case "$s" in
+      '*.'*)
+        suf="${s#\*.}"
+        case "$h" in
+          *".$suf")
+            z="${h%".$suf"}"
+            case "$z" in '' | *.*) ;; *) return 0 ;; esac
+            ;;
+        esac
+        ;;
+    esac
   done
-  return 0
+  return 1
+}
+
+# Vede DNS hostu přímo na tento server (záznam „DNS only“)? Za proxy Cloudflare vede na adresy Cloudflare.
+miri_na_server() {
+  local ip vlastni
+  vlastni=" $(hostname -I 2>/dev/null | tr '\n' ' ') "
+  for ip in $(getent ahosts "$1" 2>/dev/null | awk '{print $1}' | sort -u); do
+    case "$vlastni" in *" $ip "*) return 0 ;; esac
+  done
+  return 1
 }
 
 # Cloudflare před serverem (NASAZENI.md, oddíl „Cloudflare před serverem“): Origin certifikát ze secrets GitHubu se
@@ -257,11 +311,23 @@ synchronizuj_cloudflare() {
   case "${CSM_CLOUDFLARE:-}" in
     1)
       [ -s "$cert" ] && [ -s "$key" ] || chyba "CSM_CLOUDFLARE=1, ale na serveru není Origin certifikát – vyplňte secrets CSM_ORIGIN_CERT a CSM_ORIGIN_KEY."
-      domena_pres_cloudflare || chyba "CSM_CLOUDFLARE=1, ale $(domena) zatím míří přímo na tento server (DNS only). Nejdřív v Cloudflare zapněte proxy (oranžový mrak) u všech záznamů domény, pak nasazení zopakujte – jinak by prohlížeče dostaly nedůvěryhodný Origin certifikát."
+      local sany=() h prime=""
+      mapfile -t sany < <(sany_certifikatu "$cert")
+      [ "${#sany[@]}" -gt 0 ] || chyba "Origin certifikát v $cert nemá žádné názvy (SAN)."
+      pokryva_cert "$(domena)" "${sany[@]}" || chyba "Origin certifikát nepokrývá $(domena) (pokrývá: ${sany[*]}) – vytvořte v Cloudflare certifikát, který ji zahrnuje."
+      # Caddy podá Origin certifikát každému svému webu, který pokrývá – i Půjčovně kol a dalším projektům na serveru
+      # (a Let's Encrypt pro ně přestane obnovovat). Prohlížeče mu věří jen přes Cloudflare, proto musí být za proxy všechny.
+      while read -r h; do
+        case "$h" in '' | *'*'*) continue ;; esac
+        pokryva_cert "$h" "${sany[@]}" || continue
+        if miri_na_server "$h"; then prime="$prime $h"; fi
+      done < <({ domena; hosty_caddy; } | sort -u)
+      [ -z "$prime" ] || chyba "CSM_CLOUDFLARE=1, ale tyto weby na serveru pokrývá Origin certifikát a jejich DNS zatím vede přímo sem (DNS only):$prime. Bez Cloudflare by jim prohlížeče nevěřily. V Cloudflare u nich zapněte proxy (oranžový mrak), počkejte ~5 minut a nasazení zopakujte."
       if [ "$(cat "$tls" 2>/dev/null)" != "$radek" ]; then
         printf '%s\n' "$radek" > "$tls.tmp" && mv "$tls.tmp" "$tls"
+        TLS_NOVY=1
         CADDY_ZMENA=1
-        echo "→ Cloudflare zapnuto: Caddy použije Origin certifikát (Let's Encrypt se pro doménu nepoužije)."
+        echo "→ Cloudflare zapnuto: Caddy použije Origin certifikát pro weby, které pokrývá (Let's Encrypt pro ně skončí)."
       fi
       ;;
     0)
@@ -274,23 +340,62 @@ synchronizuj_cloudflare() {
   esac
 }
 
-# Změny Caddyfile (z gitu) a souborů v $ORIGIN_DIR Compose nepozná – Caddy se po každém nasazení znovu načte.
-# Neplatná konfigurace Caddy nepoloží: validate ji odmítne a běží dál ta stará; nasazení pak skončí chybou, ať je to vidět.
+# Nový Caddyfile se ověří v dočasném kontejneru ještě před nasazením (se všemi importy). Kdyby byl neplatný a Caddy
+# se s ním spustila, spadly by všechny weby na serveru (i Půjčovna kol a Kolomapa); takhle běží dál ty stávající.
+over_caddyfile() {
+  local vystup rc=0
+  vystup="$(caddy_docasne validate 2>&1)" || rc=$?
+  [ "$rc" = 3 ] && return 0
+  if [ "$rc" != 0 ]; then
+    printf '%s\n' "$vystup" | grep -v '"level":"info"' | tail -15 >&2
+    if [ "$TLS_NOVY" = 1 ]; then
+      rm -f "$ORIGIN_DIR/tls.caddy"
+      echo "→ Zapnutí Origin certifikátu vráceno (tls.caddy odstraněn)." >&2
+    fi
+    chyba "konfigurace Caddy neprošla kontrolou – nic se nenasadilo, weby běží beze změny."
+  fi
+  echo "→ Konfigurace Caddy ověřena (dočasný kontejner, včetně webů dalších projektů)."
+}
+
+# Po nasazení se Caddy načte znovu – Compose změnu Caddyfile ani /opt/caddy-origin sám nepozná. Caddyfile je do
+# kontejneru připojený jako soubor a git ho při aktualizaci nahradí novým (jiný inode): běžící kontejner pak vidí
+# pořád ten starý a reload nestačí, je potřeba restart (pár sekund výpadek všech webů na serveru). Změnám
+# v adresářích /opt/caddy-origin a /opt/caddy-extra reload stačí.
 nacti_caddy() {
   local id
   id="$(compose ps -q caddy 2>/dev/null || true)"
   [ -n "$id" ] || return 0
-  if ! docker exec "$id" caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile >/dev/null 2>&1; then
-    echo "CHYBA: Caddyfile není platný – Caddy běží dál se starou konfigurací. Výpis:" >&2
-    docker exec "$id" caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile 2>&1 | tail -20 >&2
-    exit 1
+  if ! docker exec "$id" cat /etc/caddy/Caddyfile 2>/dev/null | cmp -s - "$DEPLOY_DIR/Caddyfile"; then
+    echo "→ Caddyfile se změnil – restartuji Caddy (pár sekund výpadek webů na serveru)…"
+    compose restart caddy >/dev/null
+    id="$(compose ps -q caddy 2>/dev/null || true)"
+    if [ -n "$id" ] && ! docker exec "$id" cat /etc/caddy/Caddyfile 2>/dev/null | cmp -s - "$DEPLOY_DIR/Caddyfile"; then
+      compose up -d --force-recreate --no-deps caddy >/dev/null
+    fi
+    return 0
   fi
   if ! docker exec "$id" caddy reload --config /etc/caddy/Caddyfile --adapter caddyfile >/dev/null 2>&1; then
     echo "VAROVÁNÍ: reload Caddy selhal – restartuji kontejner." >&2
-    compose restart caddy
+    compose restart caddy >/dev/null
+  elif [ "$CADDY_ZMENA" = 1 ]; then
+    echo "→ Caddy znovu načtena s novým nastavením."
   fi
-  if [ "$CADDY_ZMENA" = 1 ]; then echo "→ Caddy znovu načtena s novým nastavením."; fi
   return 0
+}
+
+# Mapa běží z jednoho místa (kontejnery projektu „deploy“). Skript puštěný odjinud – např. ze starého sdíleného
+# klonu /opt/Doma – by je přestavěl z cizí větve, proto se porovná s místem, ze kterého aplikace běží teď.
+hlidej_misto() {
+  local id wd stary="${CSM_STARY_DEPLOY:-/opt/Doma/cyklo-ski-mapa/deploy}"
+  id="$(compose ps -q app 2>/dev/null || true)"
+  [ -n "$id" ] || return 0
+  wd="$(docker inspect -f '{{ index .Config.Labels "com.docker.compose.project.working_dir" }}' "$id" 2>/dev/null || true)"
+  if [ -z "$wd" ] || [ "$wd" = "$DEPLOY_DIR" ]; then return 0; fi
+  if [ "$wd" = "$stary" ]; then
+    echo "→ Aplikace zatím běží z původního místa $wd – přebírám ji do $DEPLOY_DIR."
+    return 0
+  fi
+  chyba "aplikace běží z $wd, tento skript je z $DEPLOY_DIR – nejspíš starý klon. Použijte: sudo bash $wd/hetzner.sh … (nebo nasazení z GitHubu)."
 }
 
 # Klon $REPO_DIR může sdílet víc projektů (Půjčovna kol, Kolomapa) a na serveru pak bývá vytažená jejich větev.
@@ -328,9 +433,11 @@ aktualizace() {
       echo "VAROVÁNÍ: aktualizace z GitHubu nešla rychloposunem – stavím aktuálně vytažený stav."
     fi
   fi
+  hlidej_misto
   zkontroluj_vetev
   synchronizuj_env
   synchronizuj_cloudflare
+  over_caddyfile
   # předchozí verze pro cestu zpět – před buildem, než se přepíše tag latest
   if docker image inspect "$IMAGE:latest" >/dev/null 2>&1; then docker tag "$IMAGE:latest" "$IMAGE:predchozi"; fi
   echo "→ Stavím a spouštím…"
@@ -347,6 +454,7 @@ aktualizace() {
 }
 
 zpet() {
+  hlidej_misto
   docker image inspect "$IMAGE:predchozi" >/dev/null 2>&1 || chyba "žádná předchozí verze ($IMAGE:predchozi) není uložená."
   echo "→ Vracím předchozí verzi…"
   docker tag "$IMAGE:predchozi" "$IMAGE:latest"
