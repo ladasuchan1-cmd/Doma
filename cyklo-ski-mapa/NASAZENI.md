@@ -195,8 +195,8 @@ přes Cloudflare a server je zvenčí vidět jen pro Cloudflare. Co to pro aplik
 > **Stav od 7. 10. 2026: zapnuto.** Za proxy jsou všechny weby na serveru – `cyklomapa`, weby Půjčovny kol
 > (`outdoor`, `sport`, `family`, `www`; `ksprehledy.cz` je za Cloudflare Access) a `kolomapa` (projekt Kolomapa).
 > Variable `CSM_CLOUDFLARE` = `1`, Caddy používá Origin certifikát (`*.ksprehledy.cz`, platí do 3. 10. 2041),
-> Let's Encrypt se pro tyto weby už neobnovuje. Do té doby měla každá doména certifikát od Let's Encrypt
-> a vedla přímo na server.
+> Let's Encrypt se pro tyto weby už neobnovuje. Rocket Loader i Email Address Obfuscation jsou pro celou zónu
+> vypnuté. Do té doby měla každá doména certifikát od Let's Encrypt a vedla přímo na server.
 
 1. **Origin certifikát.** Caddy si normálně bere certifikát od Let's Encrypt přímým ověřením serveru; za proxy
    je to nespolehlivé. Místo něj se použije Cloudflare Origin certifikát: Cloudflare → SSL/TLS → Origin Server →
@@ -230,9 +230,10 @@ přes Cloudflare a server je zvenčí vidět jen pro Cloudflare. Co to pro aplik
    návštěvníka; oprava je stejný `header_up X-Forwarded-For {client_ip}` v jejím bloku (projekt Půjčovny kol).
 5. **Nastavení Cloudflare:** **Rocket Loader** (Speed → Settings → Content Optimization) musí být vypnutý – přepisuje
    skripty na stránkách a přísná CSP aplikace by je zablokovala; je vypnutý výchozím stavem (ověřeno 7. 10. 2026).
-   **Email Address Obfuscation** (Security → Settings, filtr *Client-side abuse*) je výchozím stavem zapnutá:
-   mapu neovlivní (e-maily jsou v datech, ne v HTML), ale na webech Půjčovny kol Cloudflare v HTML nahrazuje
-   e-maily textem „[email protected]“ a dekóduje je až svým skriptem v prohlížeči – doporučeno vypnout.
+   **Email Address Obfuscation** (Security → Settings, filtr *Client-side abuse*) je výchozím stavem zapnutá,
+   pro `ksprehledy.cz` je od 7. 10. 2026 vypnutá. Mapu neovlivní (e-maily jsou v datech, ne v HTML), ale na webech
+   Půjčovny kol Cloudflare v HTML nahrazoval e-maily textem „[email protected]“ a dekódoval je až svým skriptem
+   v prohlížeči.
    Auto Minify Cloudflare v roce 2024 zrušil. Cloudflare Access na `cyklomapa` nezapínat, aplikace má vlastní
    přihlášení. Cache: statické soubory posílá aplikace jako
    `Cache-Control: private`, Cloudflare je tedy neukládá a nepodá je nepřihlášeným; po měsíční obnově dat nic nevisí.
