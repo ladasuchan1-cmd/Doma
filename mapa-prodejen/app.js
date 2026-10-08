@@ -1631,12 +1631,12 @@
   function openObjModal() {
     const d = state.objednavky;
     const body = `
-      ${d ? `<div class="callout small" style="margin-bottom:10px"><b>Nahráno:</b> ${esc(popisDatasetu(d))}${d.nazev ? ` – „${esc(d.nazev)}“` : ''}${d.od && d.do ? `, období ${esc(fmtDate(d.od))} – ${esc(fmtDate(d.do))}` : ''}${d.soubor && d.soubor !== d.nazev ? `, zdroj ${esc(d.soubor)}` : ''}${d.kdo ? `, nahrál(a) ${esc(d.kdo)}` : ''}${d.nahrano ? ' ' + esc(fmtDateTime(d.nahrano)) : ''}.${d.nezarazeno ? ` Nepřiřazeno ${fmtN(d.nezarazeno)}.` : ''}${d.zahranici ? ` Zahraničí ${fmtN(d.zahranici)} (vynecháno).` : ''}${d.storno ? ` Stornováno ${fmtN(d.storno)} (vynecháno).` : ''}</div>` : ''}
-      <p class="small"><b>Tabulka z Excelu:</b> označte ji celou – i s nadpisem a filtry kontingenční tabulky, klidně obě tabulky vedle sebe – <b>Ctrl+C</b> a sem <b>Ctrl+V</b>. Stačí sloupec <b>PSČ</b> nebo <b>obec</b> a počty: objednávek, zákazníků nebo aktivních zákazníků, případně hodnota v Kč. <b>Export z e-shopu</b> nebo z POHODY (CSV, XLSX) nahrajte tlačítkem – stačí PSČ doručovací adresy, pomůže datum, částka, stav (storna se vynechají) a číslo objednávky.</p>
+      ${d ? `<div class="callout small" style="margin-bottom:10px"><b>Nahráno:</b> ${esc(popisDatasetu(d))}${d.nazev ? ` – „${esc(d.nazev)}“` : ''}${d.od && d.do ? `, období ${esc(fmtDate(d.od))} – ${esc(fmtDate(d.do))}` : ''}${d.soubor && d.soubor !== d.nazev ? `, zdroj ${esc(d.soubor)}` : ''}${d.kdo ? `, nahrál(a) ${esc(d.kdo)}` : ''}${d.nahrano ? ' ' + esc(fmtDateTime(d.nahrano)) : ''}.${d.nezarazeno ? ` Nepřiřazeno ${fmtN(d.nezarazeno)}.` : ''}${d.zahranici ? ` Zahraničí ${fmtN(d.zahranici)} (vynecháno).` : ''}${d.storno ? ` Stornováno ${fmtN(d.storno)} (vynecháno).` : ''}${d.nepreneseno ? ` Nepřeneseno ${fmtN(d.nepreneseno)} (vynecháno).` : ''}</div>` : ''}
+      <p class="small"><b>Tabulka z Excelu:</b> označte ji celou – i s nadpisem a filtry kontingenční tabulky, klidně obě tabulky vedle sebe – <b>Ctrl+C</b> a sem <b>Ctrl+V</b>. Stačí sloupec <b>PSČ</b> nebo <b>obec</b> a počty: objednávek, zákazníků nebo aktivních zákazníků, případně hodnota v Kč. <b>Export z e-shopu</b> nebo z POHODY (CSV, XLSX) nahrajte tlačítkem – stačí PSČ doručovací adresy, pomůže číslo objednávky, datum, částka, stav (storna se vynechají) a Přeneseno. Víc souborů (např. rok 2025 a 2026) vyberte najednou – sečtou se a stejná objednávka se počítá jednou.</p>
       <textarea class="input mono" id="obj-paste" rows="4" wrap="off" spellcheck="false" aria-label="Vložit tabulku z Excelu" placeholder="Sem vložte tabulku z Excelu (Ctrl+V)…"></textarea>
       <div class="row" style="flex-wrap:wrap;gap:8px;margin:8px 0 10px">
         <button type="button" class="btn" id="obj-paste-ok">Načíst vloženou tabulku</button>
-        <label class="btn btn-primary">Vybrat soubor… <input type="file" id="obj-file" accept=".csv,.txt,.tsv,.xlsx,text/csv,text/tab-separated-values,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" hidden></label>
+        <label class="btn btn-primary">Vybrat soubory… <input type="file" id="obj-file" multiple accept=".csv,.txt,.tsv,.xlsx,text/csv,text/tab-separated-values,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" hidden></label>
         ${d ? '<button type="button" class="btn" id="obj-csv">Stáhnout součty (CSV)</button><button type="button" class="btn btn-ghost" id="obj-del">Smazat nahrané</button>' : ''}
       </div>
       <div class="callout small"><b>Soukromí:</b> tabulka se zpracuje jen v tomto prohlížeči. Na server se pošlou jen součty podle PSČ (počty a částka) – žádná jména, adresy, e-maily ani čísla objednávek.</div>
@@ -1654,13 +1654,22 @@
     ta.addEventListener('paste', () => setTimeout(nactiVlozene, 0));
     $('#obj-paste-ok', md.el).addEventListener('click', nactiVlozene);
     $('#obj-file', md.el).addEventListener('change', async (e) => {
-      const file = e.target.files[0];
-      if (!file) return;
+      const files = [...e.target.files];
+      if (!files.length) return;
+      const el = $('#obj-preview', md.el);
+      el.innerHTML = `<div class="small muted" style="margin-top:10px">Načítám ${files.length > 1 ? `soubory (${files.length})` : 'soubor'}…</div>`;
       try {
-        const rows = await nactiTabulku(file);
-        objNahled(md, file.name, rows);
+        if (files.length === 1) {
+          objNahled(md, files[0].name, await nactiTabulku(files[0]));
+          return;
+        }
+        const tabulky = [];
+        for (const f of files) tabulky.push({ nazev: f.name, rows: await nactiTabulku(f) });
+        const sp = objLib.spojitTabulky(tabulky);
+        if (sp.chyba) throw new Error(sp.chyba);
+        objNahled(md, files.map((f) => f.name.replace(/\.[^.]+$/, '')).join(' + '), sp.rows, `Spojeno ze ${sp.soubory} souborů do jedné tabulky – sloupce podle záhlaví každého souboru`);
       } catch (err) {
-        $('#obj-preview', md.el).innerHTML = `<div class="callout warn">${esc(err.message)}</div>`;
+        el.innerHTML = `<div class="callout warn">${esc(err.message)}</div>`;
       }
     });
     const csvB = $('#obj-csv', md.el);
@@ -1708,7 +1717,8 @@
 
   // Náhled importu: nalezené tabulky (u dvou vedle sebe volba „obě dohromady“ / jen jedna), sloupce k opravě,
   // výsledek po přiřazení k obcím, kontrolní součty proti řádku „Celkový součet“ a seznam nepřiřazených obcí.
-  function objNahled(md, zdroj, rows) {
+  // spojeno = popis tabulky spojené z víc souborů (místo „Tabulka ve sloupcích…“).
+  function objNahled(md, zdroj, rows, spojeno) {
     const el = $('#obj-preview', md.el);
     let bloky = objLib.rozpoznat(rows);
     const rucne = !bloky.length;
@@ -1719,13 +1729,14 @@
     }
     const sloupce = Object.fromEntries(bloky.map((b) => [b.index, { ...b.sloupce }]));
     let volba = null;
+    let jenPrenesene = false; // objednávky s Přeneseno = ne vynechat
     let otevreno = rucne; // rozbalená volba sloupců zůstane rozbalená i po překreslení
     const nadpis = objLib.nadpisTabulky(rows, rucne ? [] : bloky) || zdroj.replace(/\.[^.]+$/, '');
     const pis = objLib.pismeno;
     const rozsah = (b) => (b.od === b.do ? pis(b.od) : `${pis(b.od)}–${pis(b.do)}`);
     const popisBloku = (b) => {
       const sl = sloupce[b.index];
-      return ['mesto', 'psc', 'pocet', 'zak', 'akt', 'castka'].filter((k) => sl[k] != null).map((k) => b.nazvy[sl[k] - b.od] || objLib.SLOUPCE[k].label).join(' · ');
+      return ['mesto', 'psc', 'zeme', 'pocet', 'zak', 'akt', 'castka', 'prenes', 'id'].filter((k) => sl[k] != null).map((k) => b.nazvy[sl[k] - b.od] || objLib.SLOUPCE[k].label).join(' · ');
     };
     const vyberHtml = (b) => {
       const sl = sloupce[b.index];
@@ -1736,7 +1747,7 @@
     const vic = (e, met) => met.map((k) => `${fmtN(Math.round(e[k] || 0))} ${objLib.METRIKA[k].kratce}`).join(' · ');
     const render = () => {
       for (const b of bloky) b.maPsc = sloupce[b.index].psc != null;
-      const r = objLib.zpracovat(rows, { bloky, volba, sloupce, pscData, obecIndex, meta: { soubor: zdroj, kdo: state.server.user } });
+      const r = objLib.zpracovat(rows, { bloky, volba, sloupce, pscData, obecIndex, jenPrenesene, meta: { soubor: zdroj, kdo: state.server.user } });
       volba = r.volba;
       const pouzite = volba === 'spojit' ? bloky : [bloky[volba]];
       const ds = r.dataset;
@@ -1755,6 +1766,8 @@
         prir.opraveno[hl] ? stat(esc(vic(prir.opraveno, met)), 'opravená PSČ (4 číslice, chybná země)') : '',
         prir.podleNazvu[hl] ? stat(esc(vic(prir.podleNazvu, met)), 'podle názvu obce (bez PSČ)') : '',
         r.souhrn.storno && r.souhrn.storno.n ? stat(fmtN(r.souhrn.storno.n), 'storno (vynecháno)') : '',
+        r.souhrn.kopie ? stat(fmtN(r.souhrn.kopie), 'kopie téže objednávky (počítá se jednou)') : '',
+        r.souhrn.nepreneseno && r.souhrn.nepreneseno.n ? stat(fmtN(r.souhrn.nepreneseno.n), jenPrenesene ? 'nepřeneseno (vynecháno)' : 'z toho nepřeneseno (započteno)') : '',
         ds.od && ds.do ? stat(esc(fmtDate(ds.od)) + '–' + esc(fmtDate(ds.do)), 'období') : '',
       ].filter(Boolean);
       const kde = (k) => (k.blok === 'spojeno' ? 'Obě tabulky dohromady' : `Tabulka ${rozsah(bloky[k.blok])}`);
@@ -1768,12 +1781,13 @@
       const radioTab = bloky.length > 1
         ? `<div class="stack-sm">${r.lzeSpojit ? `<label class="check"><input type="radio" name="obj-volba" value="spojit" ${volba === 'spojit' ? 'checked' : ''}>Obě tabulky dohromady (doporučeno) – obce z tabulky ${esc(rozsah(bloky.find((b) => !b.maPsc)))}, velká města rozepsaná podle PSČ z tabulky ${esc(rozsah(bloky.find((b) => b.maPsc)))}</label>` : ''}
             ${bloky.map((b) => `<label class="check"><input type="radio" name="obj-volba" value="${b.index}" ${volba === b.index ? 'checked' : ''}>Jen tabulka ${esc(rozsah(b))}: ${esc(popisBloku(b)) || '—'}</label>`).join('')}</div>`
-        : `<div class="small">${rucne ? '' : `Tabulka ve sloupcích ${esc(rozsah(bloky[0]))}, záhlaví na řádku ${bloky[0].hlavicka + 1}: ${esc(popisBloku(bloky[0]))}`}</div>`;
+        : `<div class="small">${rucne ? '' : spojeno ? `${esc(spojeno)}: ${esc(popisBloku(bloky[0]))}` : `Tabulka ve sloupcích ${esc(rozsah(bloky[0]))}, záhlaví na řádku ${bloky[0].hlavicka + 1}: ${esc(popisBloku(bloky[0]))}`}</div>`;
       el.innerHTML = `
         <div class="section"><h3>Tabulka (${fmtN(r.souhrn.radku)} řádků s daty)</h3>
           ${rucne ? '<div class="callout warn small">Nenašel jsem záhlaví se sloupcem PSČ nebo obec (hledám „PSČ“, „Dodací PSČ“, „Obec“, „Město“, „ZIP“ v prvních 60 řádcích). Vyberte sloupce ručně – první řádek se bere jako záhlaví.</div>' : ''}
           ${radioTab}
           ${pouzite.map((b) => `<details ${otevreno ? 'open' : ''} style="margin-top:6px"><summary class="small">Sloupce tabulky ${esc(rozsah(b))} – rozpoznáno podle záhlaví, opravte, když nesedí</summary>${vyberHtml(b)}</details>`).join('')}
+          ${pouzite.some((b) => sloupce[b.index].prenes != null) ? `<label class="check small" style="margin-top:6px"><input type="checkbox" id="obj-jen-prenesene" ${jenPrenesene ? 'checked' : ''}>Jen přenesené (vyřízené) objednávky – nepřenesené vynechat</label>` : ''}
           ${volba === 'spojit' && r.prekryto ? `<div class="small muted" style="margin-top:6px">Města rozepsaná podle PSČ (${fmtN(r.prekryto)}) se z tabulky obcí nepočítají, aby nebyla dvakrát.</div>` : ''}
         </div>
         <div class="section"><h3>Výsledek</h3>
@@ -1795,6 +1809,11 @@
         volba = i.value === 'spojit' ? 'spojit' : Number(i.value);
         render();
       }));
+      const jp = $('#obj-jen-prenesene', el);
+      if (jp) jp.addEventListener('change', () => {
+        jenPrenesene = jp.checked;
+        render();
+      });
       el.querySelectorAll('select[data-sl]').forEach((s) => s.addEventListener('change', () => {
         const sl = sloupce[Number(s.dataset.blok)];
         if (s.value === '') delete sl[s.dataset.sl];

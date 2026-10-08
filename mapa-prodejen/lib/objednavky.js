@@ -51,7 +51,9 @@
     zak: { re: /\b(zakaznik\w*|customers?|klient\w*)\b/, label: 'Počet zákazníků' },
     akt: { re: /\b(aktivni\w*|active)\b/, label: 'Aktivní zákazníci' },
     stav: { re: /\b(stav|status)\b/, label: 'Stav' },
-    id: { re: /\b(cislo objednavky|c objednavky|objednavka|order|order id|order number|kod objednavky|doklad|cislo dokladu|id)\b/, label: 'Číslo objednávky' },
+    prenes: { re: /\b(preneseno|prenesena|prenesene|vyrizeno|vyrizena|vyrizene)\b/, label: 'Přeneseno (vyřízeno)' },
+    // „Číslo“ samotné = číslo dokladu v exportu objednávek z POHODY
+    id: { re: /\b(cislo objednavky|c objednavky|cislo obj|objednavka|order|order id|order number|kod objednavky|doklad|cislo dokladu|id)\b|^cislo$/, label: 'Číslo objednávky' },
   };
   const DORUCENI = /\b(dodaci|doruc\w*|dodani|shipping|delivery|ship|prijemce)\b/;
   const FAKTURACE = /\b(fakturac\w*|billing|invoice|platce)\b/;
@@ -176,6 +178,24 @@
     return `${Y}-${String(M).padStart(2, '0')}-${String(D).padStart(2, '0')}`;
   }
 
+  // Číslo objednávky bez přípony pobočky: POHODA objednávku přenesenou na pobočku zapíše znovu s příponou
+  // („202602031“ → „202602031PHA“, „…BM“, „…LI“). Jiná čísla („WSAT2600001“, „26TEP00001“) zůstávají.
+  function zakladCisla(id) {
+    const m = /^(\d{6,})[A-Za-z]{1,4}$/.exec(id);
+    return m ? m[1] : id;
+  }
+
+  // Přeneseno / vyřízeno: true, false, nebo null (neuvedeno). Z XLSX přijde „ano“ / „ne“, z Excelu přes schránku
+  // PRAVDA / NEPRAVDA, z CSV i TRUE / FALSE nebo 1 / 0.
+  function jePreneseno(v) {
+    if (v === true || v === 1) return true;
+    if (v === false || v === 0) return false;
+    const f = fold(v);
+    if (/^(ano|a|true|pravda|yes|y|1|x)$/.test(f)) return true;
+    if (/^(ne|n|false|nepravda|no|0)$/.test(f)) return false;
+    return null;
+  }
+
   const STORNO = /storn|zrusen|cancel|vracen|refund|nevyzvednut|nezaplacen|odmitnut|smazan/;
   // řádek součtu: „Celkem“, „Praha Celkem“, „CZ Celkem“, „Celkový součet“, „Grand Total“
   const CELKEM = /(^|\s)(celkem|celkovy soucet|soucet|total|grand total|subtotal|mezisoucet)$/;
@@ -219,7 +239,7 @@
     const konec = blok.do == null ? Math.max(-1, ...metricke, ...mista) : blok.do;
     for (let c = blok.od; c <= konec; c++) {
       if (metricke.has(c)) break;
-      if ([sl.id, sl.datum, sl.stav].includes(c)) continue;
+      if ([sl.id, sl.datum, sl.stav, sl.prenes].includes(c)) continue;
       if (mista.includes(c)) {
         out.push(c);
         continue;
@@ -347,7 +367,8 @@
   // Sečte řádky jedné tabulky. rows = pole řádků (pole buněk), sl = mapování sloupců (absolutní indexy).
   // opts: odRadku (první datový řádek), od / do (sloupce tabulky), popisky (sloupce s popisky), zemeOdhad.
   // Hotový přehled (sloupec s počtem, bez čísla objednávky a data) se sčítá; export po objednávkách se počítá
-  // po objednávkách (řádky jedné objednávky podle čísla objednávky jednou).
+  // po objednávkách (řádky jedné objednávky podle čísla objednávky jednou). opts.jenPrenesene: objednávky
+  // s Přeneseno = ne (nevyřízené) se vynechají; jinak se jen spočítají.
   function secti(rows, sl, opts) {
     const o = opts || {};
     const start = o.odRadku == null ? 1 : o.odRadku;
@@ -365,6 +386,9 @@
       zaznamy: new Map(), // klíč → { zeme, forma, kod, mesto, mk, n, zak, akt, kc }
       bezAdresy: nula(),
       storno: nula(),
+      kopie: 0, // řádky vynechané jako kopie téže objednávky
+      nepreneseno: nula(), // objednávky s Přeneseno = ne
+      jenPrenesene: Boolean(o.jenPrenesene),
       soucet: nula(), // součet započtených řádků (na kontrolu s řádkem „Celkový součet“)
       celkovySoucet: null,
       skupiny: new Map(), // obec → součet všech jejích řádků (rozpad velkých měst podle PSČ)
@@ -377,6 +401,32 @@
       for (let c = od; c <= Math.min(doo, row.length - 1); c++) if (text(row[c]) !== '') return true;
       return false;
     };
+    const idOf = (row) => (sl.id != null ? text(cell(row, 'id')) : '');
+    // Kopie téže objednávky (stejné číslo bez přípony pobočky, nebo řádky lišící se jen příznakem Přeneseno) se
+    // počítají jednou – z řádku přeneseného s adresou, pak přeneseného, pak s adresou, jinak z prvního. Bez sloupce
+    // Přeneseno zůstávají řádky položek se stejným číslem (sečtou se níž), vynechají se jen kopie s jiným číslem.
+    const kopie = new Set();
+    if (!sectene && sl.id != null) {
+      const skupiny = new Map(); // základ čísla → indexy řádků
+      for (let r = start; r < rows.length; r++) {
+        if (!rows[r] || !vBloku(rows[r])) continue;
+        const id = idOf(rows[r]);
+        if (!id) continue;
+        const z = zakladCisla(id);
+        const g = skupiny.get(z);
+        if (g) g.push(r);
+        else skupiny.set(z, [r]);
+      }
+      const prenes = sl.prenes != null;
+      const body = (row) => (prenes && jePreneseno(cell(row, 'prenes')) ? 2 : 0) + (!jePrazdne(cell(row, 'psc')) || !jePrazdne(cell(row, 'mesto')) ? 1 : 0);
+      for (const g of skupiny.values()) {
+        if (g.length < 2) continue;
+        let vybrany = g[0];
+        for (const r of g) if (body(rows[r]) > body(rows[vybrany])) vybrany = r;
+        const id = idOf(rows[vybrany]);
+        for (const r of g) if (r !== vybrany && (prenes || idOf(rows[r]) !== id)) kopie.add(r);
+      }
+    }
     const cislo = (row, key) => {
       if (sl[key] == null) return 0;
       const v = normCastka(row[sl[key]]);
@@ -406,7 +456,6 @@
     const posledni = new Map();
     const videne = new Map(); // id objednávky → { klic, prvni, stejna, duplicitni }
     const vynechane = new Set();
-    const idOf = (row) => (sl.id != null ? text(cell(row, 'id')) : '');
     const zaznamy = out.zaznamy;
     const pridej = (klic, z, e) => {
       let t = zaznamy.get(klic);
@@ -415,6 +464,10 @@
     };
     for (let r = start; r < rows.length; r++) {
       if (!rows[r] || !vBloku(rows[r])) continue;
+      if (kopie.has(r)) {
+        out.kopie++;
+        continue;
+      }
       const row = plnit.length ? rows[r].slice() : rows[r]; // doplňování popisků nesmí měnit vstup
       const tc = celkem(row);
       if (tc) {
@@ -448,6 +501,10 @@
             out.storno.n++;
           }
           continue;
+        }
+        if (sl.prenes != null && jePreneseno(cell(row, 'prenes')) === false) {
+          out.nepreneseno.n++;
+          if (out.jenPrenesene) continue;
         }
         e = { n: 1, zak: 0, akt: 0, kc: 0 };
       }
@@ -542,6 +599,9 @@
       zaznamy: new Map(),
       bezAdresy: nula(),
       storno: nula(),
+      kopie: 0,
+      nepreneseno: nula(),
+      jenPrenesene: souhrny.some((s) => s.jenPrenesene),
       soucet: nula(),
       celkovySoucet: null,
       skupiny: new Map(),
@@ -591,6 +651,8 @@
     }
     for (const s of souhrny) {
       out.radku += s.radku;
+      out.kopie += s.kopie || 0;
+      if (s.nepreneseno) pricti(out.nepreneseno, s.nepreneseno);
       for (const [mk, ev] of s.dukaz) {
         const t = out.dukaz.get(mk) || { cz: 0, cizi: 0 };
         t.cz += ev.cz;
@@ -1313,6 +1375,7 @@
       nezarazeno: Math.round(prirazeno.nezarazeno[hlavni] || 0),
       zahranici: Math.round(prirazeno.zahranici[hlavni] || 0),
       storno: Math.round((souhrn.storno && souhrn.storno.n) || 0),
+      nepreneseno: souhrn.jenPrenesene && souhrn.nepreneseno ? Math.round(souhrn.nepreneseno.n) : 0, // vynechané
       mista,
     };
   }
@@ -1362,14 +1425,50 @@
         nezarazeno: num(obj.nezarazeno),
         zahranici: num(obj.zahranici),
         storno: num(obj.storno),
+        nepreneseno: num(obj.nepreneseno),
         mista,
       },
     };
   }
 
+  // ------------------------------------------------------------------ víc souborů najednou
+  // Exporty po objednávkách z víc souborů (např. 2025 a 2026, každý s jiným pořadím sloupců) → jedna tabulka se
+  // společným záhlavím. Z každého souboru se vezme první tabulka; řádky součtů se vynechají. Kopie téže objednávky
+  // se pak počítají jednou i napříč soubory. Přehledy s počty se takto spojovat nedají (počítaly by se dvakrát).
+  // tabulky = [{ nazev, rows }] → { rows, soubory } | { chyba }
+  const SPOLECNE_SLOUPCE = [['id', 'Číslo objednávky'], ['datum', 'Datum'], ['psc', 'PSČ'], ['mesto', 'Obec'], ['zeme', 'Země'], ['castka', 'Celkem'], ['stav', 'Stav'], ['prenes', 'Přeneseno']];
+  function spojitTabulky(tabulky) {
+    const casti = [];
+    for (const t of tabulky) {
+      const b = rozpoznat(t.rows)[0];
+      if (!b) return { chyba: `V souboru ${t.nazev} jsem nenašel záhlaví se sloupcem PSČ nebo obec.` };
+      if (METRIKY.some((m) => b.sloupce[m.sloupec] != null)) {
+        return { chyba: `${t.nazev} je přehled s počty – víc souborů najednou umím jen u exportu po objednávkách. Přehledy nahrajte po jednom.` };
+      }
+      casti.push({ t, b });
+    }
+    const klice = SPOLECNE_SLOUPCE.filter(([k]) => casti.some((c) => c.b.sloupce[k] != null));
+    const rows = [klice.map(([, nazev]) => nazev)];
+    for (const { t, b } of casti) {
+      const sl = b.sloupce;
+      for (let r = b.hlavicka + 1; r < t.rows.length; r++) {
+        const row = t.rows[r];
+        if (!row) continue;
+        const out = klice.map(([k]) => (sl[k] == null ? null : row[sl[k]]));
+        if (out.every((v) => text(v) === '')) continue;
+        // řádek součtu na konci exportu („Celkem“ bez adresy) by ukončil čtení dalšího souboru
+        const prvni = row.slice(b.od, b.do + 1).find((v) => text(v) !== '');
+        if (CELKEM.test(fold(prvni)) && jePrazdne(row[sl.psc]) && jePrazdne(row[sl.mesto])) continue;
+        rows.push(out);
+      }
+    }
+    return { rows, soubory: casti.length };
+  }
+
   // ------------------------------------------------------------------ celé zpracování (pro náhled v aplikaci)
   // rows → tabulky → součty → (spojení dvou tabulek) → přiřazení k PSČ → dataset + kontroly.
-  // opts: pscData, obecIndex, velkaMesta, volba ('spojit' | index tabulky), sloupce ({ index: mapování }), meta.
+  // opts: pscData, obecIndex, velkaMesta, volba ('spojit' | index tabulky), sloupce ({ index: mapování }), meta,
+  // jenPrenesene (vynechat objednávky s Přeneseno = ne).
   function zpracovat(rows, opts) {
     const o = opts || {};
     const bloky = o.bloky || rozpoznat(rows);
@@ -1384,7 +1483,7 @@
     const vybrane = volba === 'spojit' ? bloky : [bloky[volba] || bloky[0]];
     const souhrny = vybrane.map((b) => {
       const sl = slBloku(b);
-      const s = secti(rows, sl, { odRadku: b.hlavicka + 1, od: b.od, do: b.do, popisky: popiskyBloku(b, sl), zemeOdhad: b.zemeOdhad });
+      const s = secti(rows, sl, { odRadku: b.hlavicka + 1, od: b.od, do: b.do, popisky: popiskyBloku(b, sl), zemeOdhad: b.zemeOdhad, jenPrenesene: o.jenPrenesene });
       s.blok = b.index;
       return s;
     });
@@ -1434,8 +1533,11 @@
     jeCesko,
     normCastka,
     normDatum,
+    zakladCisla,
+    jePreneseno,
     secti,
     spojit,
+    spojitTabulky,
     indexObci,
     najdiObec,
     najdiZaznamObce,

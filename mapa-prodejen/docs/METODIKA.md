@@ -183,7 +183,8 @@ nahrál a počty vynechaných (max. 20 000 PSČ). Starší data jen s objednávk
    hodnotu filtru „(Vše)“ / „(Více položek)“ ani číslo (datový řádek, kromě roku). Rozpoznávají se názvy bez
    diakritiky a velikosti písmen: PSČ / ZIP / postcode, město / obec / city, země / stát / country, datum,
    celkem / částka / cena / hodnota / total, počet / objednávek, zákazníků / customers, aktivních / active,
-   stav / status, číslo objednávky / order / doklad; „průměr…“ se nepočítá. Je-li sloupců víc, má přednost
+   stav / status, přeneseno / vyřízeno, číslo objednávky / order / doklad i samotné „Číslo“ (POHODA); „průměr…“
+   se nepočítá. Je-li sloupců víc, má přednost
    **doručovací** adresa před fakturační. Sloupec s počtem nebo částkou musí v datech obsahovat čísla (sloupec
    „Zákazník“ se jménem není počet). Sloupec **Celkový součet** křížové tabulky (roky ve sloupcích) se bere jako
    počet toho, co uvádí popisek nad tabulkou („Počet objednávek“, „… zákazníků“).
@@ -199,6 +200,23 @@ nahrál a počty vynechaných (max. 20 000 PSČ). Starší data jen s objednávk
    počítají jako jedna objednávka; částka se sečte, pokud se na řádcích liší (položky), a vezme jednou, pokud se
    opakuje (celková cena na každém řádku). Tabulka se sloupcem počtu (objednávek, zákazníků, aktivních) bez čísel
    objednávek a data se bere jako **hotový přehled** a sčítá se.
+   - **Kopie téže objednávky**: číslo z aspoň 6 číslic s příponou 1–4 písmen je kopie objednávky bez přípony –
+     POHODA objednávku přenesenou na pobočku zapíše znovu („202602031“ → „202602031PHA“, „…BM“, „…LI“). Jiné tvary
+     („WSAT2600001“, „26TEP00001“) jsou samostatné doklady. Ze skupiny řádků jedné objednávky se počítá jeden – ten
+     s Přeneseno = ano a adresou, pak s Přeneseno = ano, pak s adresou, jinak první; částka i adresa jsou z něj
+     (u 9 % kopií se částka liší). Má-li export sloupec **Přeneseno**, je to seznam dokladů a i řádky se stejným
+     číslem, které se liší jen v Přeneseno, se počítají jednou; bez něj zůstávají řádky se stejným číslem
+     položkami (viz výš) a vynechají se jen kopie s příponou.
+   - **Přeneseno = ne** (ne / nepravda / false / 0) – objednávka nebyla přenesena do dalšího dokladu: zrušená,
+     nezaplacená, předobjednávka nebo zatím nevyřízená. Počítá se a náhled ukáže kolik; volbou „Jen přenesené“ se
+     vynechá a počet vynechaných se uloží k datům (`nepreneseno`).
+   - **Víc souborů** (`spojitTabulky`): z každého souboru se vezme první tabulka a její sloupce se podle záhlaví
+     přeskládají pod společné záhlaví (číslo, datum, PSČ, obec, země, částka, stav, přeneseno); řádky součtů bez
+     adresy se vynechají. Kopie se pak hledají i napříč soubory. Přehledy s počty se takto nespojují (počítaly by
+     se dvakrát).
+   - Na exportech z POHODY 2025 a 2026 (174 497 a 129 481 řádků): 25 380 a 16 124 kopií, tj. 149 117 a 113 357
+     objednávek; nepřeneseno 14 641 a 10 414. Částka „Celkem“ je v Kč i u dokladů v EUR a PLN (medián 1 222 Kč
+     proti 1 246 Kč u dokladů v Kč), sloupec „Cizí měna“ se proto nepoužívá.
 5. **Dvě tabulky vedle sebe** (obce bez PSČ + rozpad velkých měst podle PSČ, se stejnou veličinou): obce, které
    jsou v rozpadu podle PSČ, se vezmou odtud a z tabulky obcí se vynechají; ostatní obce z tabulky obcí. Spojí se
    jen veličiny obsažené v obou tabulkách. Když se součet obce v tabulce obcí liší od součtu jejích řádků v rozpadu
@@ -329,3 +347,4 @@ vhodnější než velká; filtr velikosti se dá použít zvlášť.
 | 7. 10. 2026 | Import tabulek vložených z Excelu (kontingenční tabulky: nadpis a filtry, řádky Celkem, dvě tabulky vedle sebe, křížová tabulka, kompaktní forma), veličiny zákazníci a aktivní zákazníci, oprava 4místných PSČ, zahraniční města podle názvu, kontrola proti „Celkovému součtu“. Neznámé PSČ s nesouhlasícím názvem obce se už nepřiřazuje podle prvních tří číslic. |
 | 7. 10. 2026 | Obec podle názvu i v tvarech z adres: přívlastky („u Prahy“, „na Moravě“, „nad Ohří“), zkratky („p.R.“, „n/L“), části názvů se spojovníkem a začátky názvů, části obcí a adresy, okres a pošta. Jmenovce rozliší vodítko, oblast a řeka. Slovenské tvary, cizí písmena a země v názvu jdou do zahraničí. Na tabulce zákazníků podle obcí je o 2 370 přiřazených zákazníků víc a o 1 960 víc v zahraničí, nepřiřazených s názvem obce ubylo z 13 200 na 8 900. |
 | 7. 10. 2026 | Pražská PSČ 153 00 (Radotín), 156 00 (Zbraslav) a 197 00 (Kbely) patří Praze. Dřív je chybné souřadnice v GeoNames přiřadily Olbramovicím, Dolnímu Dvořišti a Čížkovu. Čížkov, Nové Mitrovice, Louňová a Olbramovice mají místo pražského PSČ svoje. |
+| 8. 10. 2026 | Export objednávek z POHODY: sloupec „Číslo“ = číslo objednávky, „Přeneseno“; kopie objednávky s příponou pobočky (PHA, BM, LI) a řádky lišící se jen v Přeneseno se počítají jednou; volba „Jen přenesené“. Víc souborů najednou (např. 2025 a 2026) se spojí do jedné tabulky. Dřív se kopie počítaly dvakrát (2025: 174 497 místo 149 117 objednávek). |

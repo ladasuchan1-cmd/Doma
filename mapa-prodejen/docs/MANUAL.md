@@ -123,10 +123,28 @@ obec od PSČ nerozliší.
 
 1. Vyexportujte objednávky – **CSV** (oddělovač `;`, `,` nebo tabulátor, UTF-8 i Windows-1250) nebo **XLSX**
    (první list). Starý `.xls` uložte v Excelu jako `.xlsx`.
-2. **Vybrat soubor…** – sloupce se najdou samy: **PSČ** (přednost má doručovací adresa), **obec / město**,
-   **datum**, **částka**, **stav**, **země** a **číslo objednávky**.
+2. **Vybrat soubory…** – sloupce se najdou samy: **PSČ** (přednost má doručovací adresa), **obec / město**,
+   **datum**, **částka**, **stav**, **země**, **číslo objednávky** (i jen „Číslo“) a **Přeneseno**.
 3. Stav jako „stornováno“, „zrušeno“, „vráceno“, „nevyzvednuto“, „nezaplaceno“ se nepočítá. **Export po položkách**
    (jeden řádek = jedna položka) nevadí, když je v souboru číslo objednávky – počítá se po objednávkách.
+4. **Víc souborů najednou** (např. `2025.xlsx` a `2026.xlsx`): v okně výběru označte všechny (Ctrl / Shift).
+   Sečtou se do jedné tabulky; nevadí, když má každý soubor sloupce v jiném pořadí. Takto jde spojit jen export po
+   objednávkách – přehledy s počty (kontingenční tabulky) nahrajte po jednom.
+
+**Export objednávek z POHODY** (sloupce Číslo, Celkem, Přeneseno, Obec, PSČ, Země, případně Cizí měna, Ceny,
+RefZeme):
+
+- Objednávka přenesená na pobočku je v exportu dvakrát – podruhé s příponou pobočky (`202602031` a `202602031PHA`,
+  také `…BM`, `…LI`) a liší se jen v **Přeneseno**, někdy i částkou. **Počítá se jednou**, stejně jako řádky se
+  stejným číslem, které se liší jen v Přeneseno. Bere se řádek přenesený s adresou (pak přenesený, pak s adresou,
+  jinak první) – částka i adresa jsou z něj. V náhledu je počet **kopií téže objednávky**.
+- Jiné řady dokladů (`WSAT2600001` – prodej na prodejně, `26TEP00001`) se počítají každý zvlášť. Většinou nemají
+  adresu, takže jsou v **nepřiřazeno – bez obce i PSČ**, stejně jako objednávky s osobním odběrem bez adresy.
+- **Přeneseno = ne** (objednávka nebyla přenesena do dalšího dokladu – typicky zrušená, nezaplacená,
+  předobjednávka nebo zatím nevyřízená) se **počítá**; náhled ukáže, kolik jich je. Zaškrtnutím **Jen přenesené
+  (vyřízené) objednávky** se vynechají.
+- **Celkem** je v Kč i u objednávek v cizí měně (sloupec Cizí měna se nepoužívá). Sloupec Ceny (cenová skupina) se
+  zatím nepoužívá.
 
 **Náhled – co kontrolovat:** kolik se přiřadilo k obcím (u každé veličiny zvlášť), kolik **PSČ a obcí**, kolik je
 **zahraničí** (vynechá se), **nepřiřazeno** (bez obce a PSČ – „(neuvedeno)“ – a neznámé obce, vypsané jménem),

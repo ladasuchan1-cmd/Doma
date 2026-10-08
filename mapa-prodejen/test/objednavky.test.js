@@ -198,6 +198,89 @@ test('export po objednávkách: položky, storno a zahraničí po objednávkách
   assert.deepStrictEqual(ds.mista[0], { psc: '60200', n: 2, kc: 1800 });
 });
 
+// Export objednávek z POHODY (tvar podle skutečných exportů, data vymyšlená): Číslo, Celkem, Přeneseno, Obec, PSČ,
+// Země, Ceny. Objednávka přenesená na pobočku je tam podruhé s příponou (PHA, BM, LI); z XLSX přijde Přeneseno
+// jako „ano“ / „ne“.
+const PSC_POHODA = { 60200: [49.19, 16.61, 3702, 'Brno', 582786], 46001: [50.77, 15.05, 3505, 'Liberec', 563889] };
+const OBCE_POHODA = new Map([['brno', '60200'], ['liberec', '46001']]);
+const POHODA_2026 = [
+  ['Číslo', 'Cizí měna', 'Celkem', 'Přeneseno', 'Obec', 'PSČ', 'Země', 'Ceny'],
+  ['202602031', null, 1047, 'ne', 'Brno', '602 00', 'ČR', 'Prodejní'],
+  ['202602031PHA', null, 1047, 'ano', 'Brno', '602 00', 'ČR', 'Prodejní'], // kopie na pobočce
+  ['202602032', null, 500, 'ne', 'Brno', '602 00', 'ČR', 'Prodejní'],
+  ['202602032BM', null, 650, 'ano', 'Brno', '602 00', 'ČR', 'Prodejní'], // jiná částka → platí přenesená
+  ['202602033', null, 200, 'ne', null, null, 'ČR', 'Prodejní'],
+  ['202602033LI', null, 200, 'ano', 'Liberec', '460 01', 'ČR', 'Prodejní'], // adresu má jen kopie
+  ['202602034', null, 300, 'ne', 'Brno', '602 00', 'ČR', 'VIP CENY'], // nepřenesená, bez kopie
+  ['202602035', null, 100, 'ano', 'Brno', '602 00', 'ČR', 'Prodejní'],
+  ['202602035', null, 100, 'ne', 'Brno', '602 00', 'ČR', 'Prodejní'], // stejné číslo, liší se jen v Přeneseno
+  ['202602036', 'EUR', 1300, 'ano', 'Wien', '1030', 'AT', 'Prodejní'],
+  ['WSAT2600001', null, 2261, 'ano', null, null, 'ČR', 'Prodejní'], // prodej na prodejně bez adresy
+  ['26TEP00001', null, 450, 'ano', null, null, 'ČR', 'Prodejní'], // jiná řada dokladů – každý zvlášť
+  ['26TEP00002', null, 700, 'ano', null, null, 'ČR', 'Prodejní'],
+];
+
+test('export z POHODY: „Číslo“, kopie s příponou pobočky a řádky lišící se jen v Přeneseno se počítají jednou', () => {
+  assert.strictEqual(o.zakladCisla('202602031PHA'), '202602031');
+  assert.strictEqual(o.zakladCisla('202502029LI'), '202502029');
+  for (const c of ['WSAT2600001', '26TEP00001', '26PS0001', '12345A']) assert.strictEqual(o.zakladCisla(c), c);
+  for (const v of ['ano', 'PRAVDA', 'TRUE', '1', true, 1]) assert.strictEqual(o.jePreneseno(v), true, String(v));
+  for (const v of ['ne', 'NEPRAVDA', 'false', '0', false, 0]) assert.strictEqual(o.jePreneseno(v), false, String(v));
+  assert.strictEqual(o.jePreneseno(''), null);
+  const m = (cells) => o.mapHeader(cells.map(o.fold));
+  assert.deepStrictEqual(m(POHODA_2026[0]), { id: 0, castka: 2, prenes: 3, mesto: 4, psc: 5, zeme: 6 });
+  assert.deepStrictEqual(m(['Číslo', 'Celkem', 'Přeneseno', 'Ceny', 'RefZeme', 'Země', 'PSČ', 'Obec']), { id: 0, castka: 1, prenes: 2, zeme: 5, psc: 6, mesto: 7 });
+
+  const r = o.zpracovat(POHODA_2026, { pscData: PSC_POHODA, obecIndex: OBCE_POHODA });
+  const s = r.souhrn;
+  assert.strictEqual(s.kopie, 4);
+  assert.strictEqual(s.radku, 9);
+  assert.strictEqual(s.nepreneseno.n, 1); // 202602034 – ostatní mají přenesenou kopii
+  assert.deepStrictEqual(r.prirazeno.psc, { 60200: { n: 4, zak: 0, akt: 0, kc: 2097 }, 46001: { n: 1, zak: 0, akt: 0, kc: 200 } });
+  assert.strictEqual(r.prirazeno.zahranici.n, 1);
+  assert.strictEqual(s.bezAdresy.n, 3);
+  assert.strictEqual(r.dataset.nepreneseno, 0); // započteno, ne vynecháno
+
+  const jen = o.zpracovat(POHODA_2026, { pscData: PSC_POHODA, obecIndex: OBCE_POHODA, jenPrenesene: true });
+  assert.deepStrictEqual(jen.prirazeno.psc['60200'], { n: 3, zak: 0, akt: 0, kc: 1797 });
+  assert.strictEqual(jen.dataset.nepreneseno, 1);
+  assert.strictEqual(o.validovat(JSON.parse(JSON.stringify(jen.dataset))).data.nepreneseno, 1);
+
+  // export bez sloupce Přeneseno: řádky položek se stejným číslem se sečtou, kopie s příponou se vynechá
+  const rows = csv.parse('Číslo objednávky;PSČ;Celkem\n100100;602 00;500\n100100;602 00;300\n100200;602 00;400\n100200PHA;602 00;400\n');
+  const p = o.zpracovat(rows, { pscData: PSC_POHODA, obecIndex: OBCE_POHODA });
+  assert.deepStrictEqual(p.prirazeno.psc['60200'], { n: 2, zak: 0, akt: 0, kc: 1200 });
+  assert.strictEqual(p.souhrn.kopie, 1);
+});
+
+test('víc souborů najednou: jiné pořadí sloupců, řádek součtu, kopie napříč soubory; přehledy ne', () => {
+  const t2025 = [
+    ['Číslo', 'Celkem', 'Přeneseno', 'Ceny', 'RefZeme', 'Země', 'PSČ', 'Obec'],
+    ['202502026', 1897, 'ano', 'Prodejní', 6, 'ČR', '602 00', 'Brno'],
+    ['202502029', 248, 'ne', 'Prodejní', 6, 'ČR', '46001', 'Liberec'],
+    ['202502029LI', 248, 'ano', 'Prodejní', 6, 'ČR', '460 01', 'Liberec'],
+    ['Celkem', 2393, null, null, null, null, null, null],
+  ];
+  const t2026 = [
+    ['Číslo', 'Cizí měna', 'Celkem', 'Přeneseno', 'Obec', 'PSČ', 'Země', 'Ceny'],
+    ['202602027', null, 3, 'ne', 'Brno', '602 00', 'ČR', 'VIP CENY'],
+    ['202602029', 'EUR', 13951.06, 'ano', 'Wien', '1030', 'AT', 'Prodejní'],
+    ['202502029BM', null, 248, 'ne', 'Liberec', '460 01', 'ČR', 'Prodejní'], // kopie objednávky z druhého souboru
+  ];
+  const sp = o.spojitTabulky([{ nazev: '2025.xlsx', rows: t2025 }, { nazev: '2026.xlsx', rows: t2026 }]);
+  assert.strictEqual(sp.soubory, 2);
+  assert.deepStrictEqual(sp.rows[0], ['Číslo objednávky', 'PSČ', 'Obec', 'Země', 'Celkem', 'Přeneseno']);
+  assert.strictEqual(sp.rows.length, 7); // záhlaví + 3 + 3, bez řádku „Celkem“
+  assert.deepStrictEqual(sp.rows[4], ['202602027', '602 00', 'Brno', 'ČR', 3, 'ne']);
+  const r = o.zpracovat(sp.rows, { pscData: PSC_POHODA, obecIndex: OBCE_POHODA });
+  assert.deepStrictEqual(r.bloky[0].sloupce, { id: 0, psc: 1, mesto: 2, zeme: 3, castka: 4, prenes: 5 });
+  assert.strictEqual(r.souhrn.kopie, 2);
+  assert.deepStrictEqual(r.prirazeno.psc, { 60200: { n: 2, zak: 0, akt: 0, kc: 1900 }, 46001: { n: 1, zak: 0, akt: 0, kc: 248 } });
+  assert.strictEqual(r.prirazeno.zahranici.n, 1);
+  assert.match(o.spojitTabulky([{ nazev: 'prehled.xlsx', rows: [['PSČ', 'Počet objednávek'], ['602 00', 5]] }, { nazev: '2026.xlsx', rows: t2026 }]).chyba, /přehled s počty/);
+  assert.match(o.spojitTabulky([{ nazev: 'x.csv', rows: [['a', 'b'], ['1', '2']] }]).chyba, /nenašel záhlaví/);
+});
+
 test('hotový přehled PSČ; počet', () => {
   const rows = csv.parse('PSČ;Počet objednávek\n602 00;12\n110 00;30\n999 99;1\n');
   const d = o.detectColumns(rows);
