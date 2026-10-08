@@ -14,6 +14,7 @@ process.env.MP_TOKEN = 'token-pro-zalohy';
 process.env.MP_REGISTRY = '0';
 delete process.env.MP_AUTH;
 delete process.env.MP_TRUST_PROXY;
+delete process.env.ANTHROPIC_API_KEY;
 const { server, flushAll, parseUsers, safeNext } = require('../server.js');
 
 let base;
@@ -156,10 +157,41 @@ test('statika: aplikace ano, server, nástroje, data týmu ne', async () => {
   res = await get('/data/meta.js');
   assert.strictEqual(res.status, 200);
   assert.match(res.headers.get('cache-control'), /private/);
-  for (const p of ['/server.js', '/lib/ares.js', '/tools/build-data.js', '/test/server.test.js', '/deploy/server.sh', '/package.json', '/.env', '/cache/x', '/server-data/stav.json', '/%2e%2e/etc/passwd', '/README.md']) {
+  assert.strictEqual((await get('/lib/asistent.js')).status, 200);
+  for (const p of ['/server.js', '/lib/ares.js', '/lib/asistent-server.js', '/node_modules/@anthropic-ai/sdk/package.json', '/tools/build-data.js', '/test/server.test.js', '/deploy/server.sh', '/package.json', '/.env', '/cache/x', '/server-data/stav.json', '/%2e%2e/etc/passwd', '/README.md']) {
     assert.strictEqual((await get(p)).status, 404, p);
   }
   assert.strictEqual((await fetch(base + '/%E0%A4%A', { headers: { Cookie: cookie } })).status, 400);
+});
+
+test('asistent: bez klíče vypnutý (503), s klientem jedno kolo konverzace, kontrola zpráv, limit dotazů', async () => {
+  const asistentSrv = require('../lib/asistent-server.js');
+  assert.strictEqual((await (await json('GET', '/api/me')).json()).asistent, false);
+  const zprava = { messages: [{ role: 'user', content: [{ type: 'text', text: 'ukaž Jihomoravský kraj' }] }] };
+  assert.strictEqual((await json('POST', '/api/asistent', zprava)).status, 503);
+  const volani = [];
+  asistentSrv._nastavKlienta({ beta: { messages: { create: async (p) => {
+    volani.push(p);
+    return { model: p.model, stop_reason: 'tool_use', stop_details: null, content: [{ type: 'thinking', thinking: '', signature: 'sig' }, { type: 'tool_use', id: 'toolu_1', name: 'nastav_oblast', input: { uroven: 'kraj', nazev: 'Jihomoravský' } }], usage: { input_tokens: 10, output_tokens: 5 } };
+  } } } });
+  try {
+    assert.strictEqual((await (await json('GET', '/api/me')).json()).asistent, true);
+    let res = await json('POST', '/api/asistent', zprava);
+    assert.strictEqual(res.status, 200);
+    const j = await res.json();
+    assert.strictEqual(j.stop_reason, 'tool_use');
+    assert.deepStrictEqual(j.content[0], { type: 'thinking', thinking: '', signature: 'sig' });
+    assert.strictEqual(volani[0].model, 'claude-opus-5-5');
+    assert.deepStrictEqual(volani[0].messages, zprava.messages);
+    res = await json('POST', '/api/asistent', { messages: [{ role: 'assistant', content: [{ type: 'text', text: 'x' }] }] });
+    assert.strictEqual(res.status, 400);
+    assert.strictEqual((await json('GET', '/api/asistent')).status, 405);
+    let posledni;
+    for (let i = 0; i < 60; i++) posledni = await json('POST', '/api/asistent', zprava);
+    assert.strictEqual(posledni.status, 429);
+  } finally {
+    asistentSrv._nastavKlienta(null);
+  }
 });
 
 test('data týmu se uloží na disk ve formátu, který server znovu načte', async () => {

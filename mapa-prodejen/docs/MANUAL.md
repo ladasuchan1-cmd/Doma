@@ -17,7 +17,7 @@ export e-shopu), najít města bez partnera a vést evidenci oslovení. Odkud js
 
 | Část | Co tam je |
 |---|---|
-| Lišta nahoře | drobečková navigace **ČR › kraj › okres** s výběrem kraje a okresu, pole **hledání**, tlačítka **Tabulka**, **Objednávky**, **+ Místo**, **Data**, přepínač světlého a tmavého vzhledu (◐), odhlášení |
+| Lišta nahoře | drobečková navigace **ČR › kraj › okres** s výběrem kraje a okresu, pole **hledání**, tlačítka **✦ Asistent** (je-li zapnutý, kap. 16), **Tabulka**, **Objednávky**, **+ Místo**, **Data**, přepínač světlého a tmavého vzhledu (◐), odhlášení |
 | Levý panel | souhrn výběru (počet míst, s IČO, se servisem, partneři, vytipováno, osloveno) a **filtry**; po nahrání objednávek i jejich vrstvy a nastavení okruhu |
 | Mapa | hranice krajů a okresů, místa jako barevné tečky, ★ partner, ⌂ naše prodejna, po nahrání objednávek bubliny obcí a obarvení krajů / okresů |
 | Pravý panel | záložky **Místa** · **Partneři** · **Města** s počty a **detail** vybraného místa nebo obce |
@@ -305,7 +305,35 @@ chybí, přidejte přes **+ Místo** s typem „Naše prodejna / pobočka“.
    jeho okolí přestane být bílým místem a ostatní kandidáti v okolí klesnou ve skóre.
 7. Barva **podle spolupráce** + filtr **Rozpracované** = přehled rozjednaných míst na poradu.
 
-## 16. Časté otázky
+## 16. Asistent (tlačítko ✦ Asistent)
+
+Asistent je Claude od Anthropicu napojený na mapu: napíšete česky, co chcete vidět nebo zjistit, a on mapu
+nastaví a z dat v mapě odpoví. Tlačítko je vidět, jen když je asistent na serveru zapnutý (NASAZENI.md).
+
+Co umí – příklady:
+
+- **oblast** – „ukaž Jihomoravský kraj“, „okres Brno-venkov“, „zpátky celá republika“;
+- **filtry** – „jen servisy s e-koly“, „prodejny se značkou Specialized“, „rozpracovaná místa“, „zruš filtry“;
+- **objednávky** – „okruh 25 km“, „bílé místo od 10 objednávek“, „počítej zákazníky“, „vypni bubliny“;
+- **zobrazení** – záložka Partneři nebo Města, „jen bílá místa“, „kandidáti se servisem“, tabulka, barva podle
+  spolupráce;
+- **hledání** – „najdi Hodonín“, „najdi Cyklo Eliáš“, IČO; u obcí stejného jména pomůže okres („Nová Ves,
+  okres Brno-venkov“);
+- **čísla a seznamy** – „kde máme nejvíc objednávek bez partnera?“, „deset nejlepších kandidátů v kraji“,
+  „objednávky po okresech“, „kolik je v okrese partnerů a vytipovaných?“.
+
+Asistent **nemění data týmu** – stav spolupráce, místa ani objednávky zapisujete vy. Čísla bere vždy z mapy
+(počítá je aplikace pro aktuální oblast a filtry), nevymýšlí si je. Pod odpovědí jsou zelené řádky ✓ s tím, co
+na mapě změnil.
+
+- **Nová** začne novou konverzaci (asistent zapomene předchozí dotazy). Po chybě začne konverzace znovu sama.
+- Odpověď trvá obvykle několik sekund; jedna otázka jsou 1–3 dotazy na Claude API. Limit je 60 dotazů za
+  10 minut a 600 za den na uživatele.
+- **Co odchází do Claude API (Anthropic):** váš dotaz, popis nastavení mapy a výsledky z mapy – názvy a obce
+  prodejen, počty a hodnoty objednávek po obcích. Žádná jména, adresy ani e-maily zákazníků. Klíč API je jen na
+  serveru.
+
+## 17. Časté otázky
 
 - **Proč je tolik firem „Neznámá“?** Většina prodejen z OpenStreetMap nemá IČO a na jejich webu se ho nepodařilo
   spolehlivě najít. Doplňte IČO v detailu – velikost se dohledá v ARES okamžitě.
@@ -314,6 +342,7 @@ chybí, přidejte přes **+ Místo** s typem „Naše prodejna / pobočka“.
 - **Prodejna v mapě chybí.** Data jsou z OpenStreetMap a z firem s koly v obchodním jméně. Přidejte ji přes
   **+ Místo**; nejlépe i do OpenStreetMap (projeví se při příští měsíční obnově).
 - **Místo není prodejna (zavřeno, jiný obor).** Skrýt v části Spolupráce.
+- **Nevidím tlačítko Asistent.** Asistent je zapnutý, jen když má server klíč Claude API (NASAZENI.md).
 - **Data k jakému dni?** Pod názvem aplikace vlevo nahoře („data k …“); obnovují se 1. den v měsíci. Stav
   spolupráce, objednávky, přidaná místa a obraty obnova nemění.
 - **Uvidí kolegové moje objednávky?** Ano, součty podle PSČ jsou společné pro tým (nahrává se jeden soubor

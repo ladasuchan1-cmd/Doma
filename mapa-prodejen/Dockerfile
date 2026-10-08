@@ -15,6 +15,9 @@ ENV PORT=8094
 ENV MP_DATA=/data
 
 WORKDIR /app
+# Závislosti (Claude SDK pro asistenta mapy) zvlášť – při změně kódu se nestahují znovu.
+COPY package.json package-lock.json ./
+RUN npm ci --omit=dev --no-audit --no-fund && npm cache clean --force
 COPY . .
 RUN mkdir -p /data && chown -R node:node /app /data
 USER node

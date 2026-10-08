@@ -18,9 +18,11 @@
 //   MP_TRUST_PROXY=1    za reverzní proxy (Caddy): cookie Secure podle X-Forwarded-Proto, IP z X-Forwarded-For
 //   MP_TOKEN            Bearer token pro skripty (zálohy) na /api bez přihlášení
 //   MP_REGISTRY=0       nedohledávat v ARES / RÚIAN (server bez přístupu ven)
+//   ANTHROPIC_API_KEY   klíč Claude API – zapne asistenta mapy; MP_AI_MODEL (claude-opus-5-5), MP_AI_EFFORT (low)
 //
 // API: /api/health · /api/me · /api/stav[/<id>] · /api/objednavky · /api/mista[/<id>] · /api/obraty[/<ico>] · /api/nastaveni
 //      · /api/firmy · /api/firma/<ico> (ARES + RES + souřadnice sídla) · /api/geokoduj?q=adresa (RÚIAN)
+//      · /api/asistent (POST – jedno kolo konverzace s asistentem přes Claude API)
 
 const http = require('node:http');
 const fs = require('node:fs');
@@ -32,6 +34,7 @@ const objLib = require('./lib/objednavky.js');
 const vlastni = require('./lib/vlastni.js');
 const velikost = require('./lib/velikost.js');
 const registry = require('./lib/ares.js');
+const asistent = require('./lib/asistent-server.js');
 
 const ROOT = __dirname;
 const PORT = Number(process.env.PORT || 8094);
@@ -181,6 +184,20 @@ function noteFailure(ip) {
 
 // Brzda dotazů do ARES / RÚIAN: 60 za minutu na uživatele (registry nesmíme zahltit).
 const lookups = new Map();
+// Asistent (Claude API stojí peníze): 60 volání za 10 minut a 600 za den na uživatele. Jedna otázka bývá 2–3 volání.
+const asks = new Map();
+function tooManyAsks(user) {
+  const now = Date.now();
+  const arr = (asks.get(user) || []).filter((t) => now - t < 86400000);
+  if (arr.length >= 600 || arr.filter((t) => now - t < 600000).length >= 60) {
+    asks.set(user, arr);
+    return true;
+  }
+  arr.push(now);
+  asks.set(user, arr);
+  return false;
+}
+
 function tooManyLookups(user) {
   const now = Date.now();
   const arr = (lookups.get(user) || []).filter((t) => now - t < 60000);
@@ -451,7 +468,27 @@ async function handleApi(req, res, url, who) {
     });
   }
   if (!who) return send(res, 401, { chyba: 'Nepřihlášeno' });
-  if (p === '/api/me') return send(res, 200, { jmeno: who.user, prihlaseni: AUTH_ON, registry: REGISTRY_ON, verze: APP_VERSION || undefined });
+  if (p === '/api/me') return send(res, 200, { jmeno: who.user, prihlaseni: AUTH_ON, registry: REGISTRY_ON, asistent: asistent.nastaveni().zapnuto, verze: APP_VERSION || undefined });
+
+  // ---- asistent (Claude): prohlížeč posílá celou konverzaci, server přidá prompt a nástroje, drží klíč API
+  if (p === '/api/asistent') {
+    if (req.method !== 'POST') return send(res, 405, { chyba: 'Nepodporovaná metoda' });
+    if (!asistent.nastaveni().zapnuto) return send(res, 503, { chyba: 'Asistent není zapnutý – na serveru chybí klíč Claude API (ANTHROPIC_API_KEY).' });
+    if (tooManyAsks(who.user || clientIp(req))) return send(res, 429, { chyba: 'Příliš mnoho dotazů na asistenta – zkuste to za pár minut.' });
+    const body = await readJson(req);
+    const v = asistent.overZpravy(body && body.messages);
+    if (v.chyba) return send(res, 400, { chyba: v.chyba });
+    try {
+      const r = await asistent.zeptat(v.zpravy);
+      const u = r.usage || {};
+      console.log(`asistent: ${who.user || '-'} ${r.model} ${r.stop_reason} vstup ${u.input_tokens || 0} (+${u.cache_read_input_tokens || 0} z cache) výstup ${u.output_tokens || 0}`);
+      return send(res, 200, { content: r.content, stop_reason: r.stop_reason, stop_details: r.stop_details, model: r.model });
+    } catch (e) {
+      const c = asistent.chyba(e);
+      console.error('asistent: chyba', c.status, e && e.message ? e.message.slice(0, 300) : '');
+      return send(res, c.status, { chyba: c.chyba });
+    }
+  }
 
   // ---- stav spolupráce
   if (p === '/api/stav') {
@@ -632,7 +669,7 @@ async function handleApi(req, res, url, who) {
 
 // ---------------------------------------------------------------- statické soubory
 const BLOCKED = /^\/(cache|test|tools|node_modules|deploy|docs|server-data)\//;
-const BLOCKED_FILES = /^\/(server\.js|Dockerfile|package\.json|package-lock\.json|README\.md|NASAZENI\.md|lib\/ares\.js)$/;
+const BLOCKED_FILES = /^\/(server\.js|Dockerfile|package\.json|package-lock\.json|README\.md|NASAZENI\.md|lib\/ares\.js|lib\/asistent-server\.js)$/;
 
 function serveStatic(req, res, url) {
   let p;

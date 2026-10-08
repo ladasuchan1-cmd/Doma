@@ -23,6 +23,7 @@
       <nav class="crumbs" id="crumbs" aria-label="Oblast"></nav>
       <div class="top-actions">
         <input id="search" class="input search" type="search" placeholder="Hledat prodejnu, firmu, IČO, obec, značku…" autocomplete="off" aria-label="Hledat">
+        <button id="btn-ai" class="btn hidden" type="button" title="Asistent (Claude) – napište, co chcete na mapě vidět">✦ Asistent</button>
         <button id="btn-view" class="btn" type="button" title="Přepnout mapu / tabulku">Tabulka</button>
         <button id="btn-obj" class="btn" type="button" title="Vložit tabulku z Excelu (objednávky, zákazníci, aktivní zákazníci) nebo nahrát export z e-shopu (CSV / XLSX) – na server jdou jen součty podle PSČ">Objednávky</button>
         <button id="btn-add" class="btn" type="button" title="Přidat prodejnu, servis nebo naši pobočku, která v datech chybí">+ Místo</button>
@@ -51,6 +52,7 @@
     </div>
   </div>
 
+  <div id="ai-panel" class="ai-panel hidden" role="dialog" aria-label="Asistent"></div>
   <div id="toast" class="toast hidden" role="status"></div>
   <div id="modal-root"></div>
 
@@ -65,6 +67,7 @@
   <script src="lib/partneri.js"></script>
   <script src="lib/vlastni.js"></script>
   <script src="lib/xlsx.js"></script>
+  <script src="lib/asistent.js"></script>
   <script src="data/meta.js"></script>
   <script src="data/hranice.js"></script>
   <script src="data/mista.js"></script>

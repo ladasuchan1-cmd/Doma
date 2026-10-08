@@ -97,6 +97,15 @@ pripravit_env() {
     [ -n "$users" ] && krok "Uživatelé převzati z Cyklo & Ski mapy ($MAPA_ENV)."
   fi
   [ -n "$users" ] || chyba "nejsou uživatelé – nastavte v GitHubu secret MP_USERS (nebo HETZNER_USERS), formát jmeno:heslo;jmeno2:heslo2."
+  # Asistent mapy (Claude API): klíč jen z GitHubu (secret ANTHROPIC_API_KEY) – bez něj je asistent vypnutý.
+  local aiklic="" aimodel="${MP_AI_MODEL:-}" aieffort="${MP_AI_EFFORT:-}"
+  if [ -n "${MP_AI_KEY_B64:-}" ]; then aiklic="$(printf %s "$MP_AI_KEY_B64" | base64 -d | tr -d ' \r\n')"; fi
+  if [ -n "$aiklic" ] && ! [[ "$aiklic" =~ ^[A-Za-z0-9_-]{20,300}$ ]]; then
+    echo "VAROVÁNÍ: ANTHROPIC_API_KEY nemá tvar klíče Claude API – asistent zůstane vypnutý." >&2
+    aiklic=""
+  fi
+  [[ "$aimodel" =~ ^[a-z0-9.-]{3,60}$ ]] || aimodel=""
+  [[ "$aieffort" =~ ^(low|medium|high|xhigh|max)$ ]] || aieffort=""
   local secret=""
   [ -f "$ENV_FILE" ] && secret="$(sed -n 's/^MP_SECRET=//p' "$ENV_FILE" | head -1)"
   [ -n "$secret" ] || secret="$(od -An -N32 -tx1 /dev/urandom | tr -d ' \n')"
@@ -107,10 +116,15 @@ pripravit_env() {
     echo "MP_SECRET=$secret"
     echo "MP_SESSION_DAYS=30"
     echo "MP_TRUST_PROXY=1"
+    [ -n "$aiklic" ] && echo "ANTHROPIC_API_KEY=$aiklic"
+    [ -n "$aimodel" ] && echo "MP_AI_MODEL=$aimodel"
+    [ -n "$aieffort" ] && echo "MP_AI_EFFORT=$aieffort"
+    true
   } > "$ENV_FILE.tmp"
   mv "$ENV_FILE.tmp" "$ENV_FILE"
   chmod 600 "$ENV_FILE"
   umask 022
+  if [ -n "$aiklic" ]; then krok "Asistent mapy zapnutý (Claude API, model ${aimodel:-claude-opus-5-5})."; else krok "Asistent mapy vypnutý (v GitHubu není secret ANTHROPIC_API_KEY)."; fi
 }
 
 # Archiv vydání → /opt/mapa-prodejen/vydani/<commit>/ a odkaz /opt/mapa-prodejen/app na něj.

@@ -12,5 +12,8 @@
     "build-data": "node tools/build-data.js",
     "test": "node --test \"test/**/*.test.js\""
   },
-  "license": "MIT"
+  "license": "MIT",
+  "dependencies": {
+    "@anthropic-ai/sdk": "0.132.1"
+  }
 }

@@ -42,16 +42,17 @@ Nejjednodušší je otevřít `index.html` v prohlížeči – data jsou v `data
 potřeba jen na mapové podklady. Stav spolupráce, objednávky a ručně přidaná místa se pak ukládají jen do
 prohlížeče (localStorage) a nejde dohledávat v ARES.
 
-Pro tým a web slouží `server.js` (Node.js 22+, bez závislostí):
+Pro tým a web slouží `server.js` (Node.js 22+; jediná závislost je SDK Claude API pro asistenta):
 
 ```bash
 cd mapa-prodejen
+npm ci                                          # @anthropic-ai/sdk (asistent mapy)
 MP_USERS="lada:heslo;obchod:heslo2" npm start   # http://localhost:8094 – přihlášení, data týmu v ./server-data
 MP_AUTH=0 npm start                             # bez přihlášení (jen vývoj / vnitřní síť)
 ```
 
 Proměnné popisuje `.env.example` (`MP_USERS` / `MP_PASSWORD`, `MP_SESSION_DAYS`, `MP_TRUST_PROXY`, `MP_TOKEN`,
-`MP_SECRET`, `MP_DATA`, `MP_REGISTRY`, `PORT`). Server ukládá do `MP_DATA`: `stav.json` (spolupráce),
+`MP_SECRET`, `MP_DATA`, `MP_REGISTRY`, `PORT`; asistent `ANTHROPIC_API_KEY`, `MP_AI_MODEL`, `MP_AI_EFFORT`). Server ukládá do `MP_DATA`: `stav.json` (spolupráce),
 `objednavky.json` (součty podle PSČ), `mista.json` (ručně přidaná místa), `obraty.json`, `firmy.json`
 (firmy dohledané v ARES) a `nastaveni.json` (IČO naší firmy).
 
@@ -89,6 +90,9 @@ lib/partneri.js                  vzdálenosti, mřížkový index, poptávka v o
 lib/stav.js                      evidence spolupráce (stavy, typ spolupráce, sloučení, import/export, efektivní kontakt)
 lib/vlastni.js                   ručně přidaná místa a obraty (kontrola IČO, polohy, polí)
 lib/xlsx.js                      čtení XLSX bez knihoven (první list, sdílené řetězce, data)
+lib/asistent.js                  asistent mapy: systémový prompt, nástroje (oblast, filtry, objednávky, zobrazení,
+                                 najdi, zjisti) a kontrola jejich vstupu – sdílí prohlížeč i server
+lib/asistent-server.js           asistent na serveru: Claude API přes @anthropic-ai/sdk, kontrola konverzace, chyby
 lib/contacts.js                  e-maily, telefony, IČO, služby a značky z HTML webů
 lib/ares.js                      ARES, RES, RÚIAN (jen server a sestavení dat – do prohlížeče se neposílá)
 lib/geo.js, lib/csv.js           geometrie (bod v polygonu, vzdálenosti), CSV (Excel, BOM, ;)
@@ -101,8 +105,8 @@ test/                            node --test (knihovny, server, konzistence dat)
 ```
 
 ```bash
-npm test      # 90 testů: knihovny, XLSX, import tabulek a hledání obcí, server (přihlášení, API, uložení,
-              # ochrana cest), konzistence dat
+npm test      # 97 testů: knihovny, XLSX, import tabulek a hledání obcí, server (přihlášení, API, uložení,
+              # ochrana cest, asistent s falešným klientem Claude API), konzistence dat
 ```
 
 ## Omezení

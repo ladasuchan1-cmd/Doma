@@ -32,6 +32,32 @@ prohlížeč ──HTTPS──▶ Cloudflare (proxy) ──HTTPS, Origin cert─
 4. **Ověření.** <https://mapa.ksprehledy.cz> → přihlašovací stránka → mapa. Konec logu jobu vypíše
    `Web běží: https://mapa.ksprehledy.cz – {"ok":true,…,"verze":"v2026-10-07-abc1234"}`.
 
+## Asistent (Claude API) – volitelné
+
+Asistent v mapě (tlačítko **✦ Asistent**) posílá dotazy přes server do Claude API. Bez klíče je vypnutý a tlačítko
+se nezobrazí. Prohlížeč posílá konverzaci serveru, server k ní přidá systémový prompt a nástroje mapy (`lib/asistent.js`)
+a zavolá API přes oficiální SDK `@anthropic-ai/sdk` (`lib/asistent-server.js`); nástroje provádí prohlížeč.
+
+1. V **Claude Console** (platform.claude.com) založte pro firmu API klíč a nastavte měsíční limit útraty.
+2. GitHub → repo Doma → Settings → Secrets and variables → Actions:
+   - **Secrets**: `ANTHROPIC_API_KEY` = klíč (`sk-ant-…`).
+   - **Variables** (volitelně): `MP_AI_MODEL` – výchozí `claude-opus-5-5`, levnější `claude-haiku-5-5`;
+     `MP_AI_EFFORT` – jak moc model přemýšlí: `low` (výchozí, nejrychlejší), `medium`, `high`.
+3. Spustit nasazení (Actions → „Mapa prodejen“ → Run workflow). Log vypíše „Asistent mapy zapnutý …“.
+   Vypnutí: smazat secret a nasadit znovu.
+
+**Kolik to stojí (odhad):** prompt a nástroje mají asi 2 300 tokenů, odpověď s nízkým effortem stovky tokenů.
+S `claude-opus-5-5` (4 / 20 USD za milion tokenů vstupu / výstupu) vychází otázka (1–3 volání) zhruba na
+0,03–0,06 USD, 500 otázek měsíčně tedy na 15–30 USD; `claude-haiku-5-5` (0,10 / 0,50 USD) je asi 40× levnější.
+Server u každého volání loguje model, důvod konce a počty tokenů (bez obsahu konverzace):
+`docker logs mapa-prodejen 2>&1 | grep asistent`.
+
+**Pojistky:** 60 volání za 10 minut a 600 za den na uživatele; konverzace nejvýš 80 zpráv / 400 kB; od uživatele
+server přijme jen text a výsledky nástrojů (prompt ani nástroje podvrhnout nejde). U modelů Opus a Sonnet 5.5 je
+zapnutý `fallbacks: "default"` – když bezpečnostní filtr modelu dotaz odmítne, API ho zkusí na doporučeném záložním
+modelu. Image se staví s `npm ci` (jediná závislost aplikace je SDK); server potřebuje při nasazení přístup na
+registry.npmjs.org.
+
 ## Co nasazení dělá
 
 Workflow pošle na server archiv složky `mapa-prodejen` přesně z testovaného commitu
@@ -42,7 +68,8 @@ v base64 – ne v příkazové řádce). Na serveru se nic nestahuje z gitu a ne
    skončí chybou dřív, než cokoli změní – web by měl neplatný certifikát a nasazení cyklomapy by u něj také
    skončilo chybou (stejnou kontrolu dělá její `hetzner.sh`).
 2. Rozbalí vydání do `/opt/mapa-prodejen/vydani/<commit>/`, zapíše konfiguraci `/opt/mapa-prodejen/mapa-prodejen.env`
-   (uživatelé, klíč pro podpis cookie – ten se při dalších nasazeních zachová, takže se nikdo neodhlásí).
+   (uživatelé, klíč pro podpis cookie – ten se při dalších nasazeních zachová, takže se nikdo neodhlásí –
+   a klíč Claude API pro asistenta, je-li v GitHubu).
 3. Postaví image `mapa-prodejen:<commit>` a **vyzkouší ho ve vedlejším kontejneru** bez dat týmu. Když
    neodpoví, skončí chybou a ostrá verze běží dál beze změny.
 4. Předchozí image označí `mapa-prodejen:predchozi`, spustí novou verzi (svazek `mapa-prodejen-data`, kořen

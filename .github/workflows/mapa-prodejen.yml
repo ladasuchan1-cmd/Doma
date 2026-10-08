@@ -7,6 +7,7 @@
 # Server je tentýž jako u Cyklo & Ski mapy, proto se používají její secrets: HETZNER_HOST, HETZNER_SSH_KEY,
 # volitelně HETZNER_USER (výchozí root; jiný účet potřebuje sudo bez hesla) a HETZNER_PORT. Uživatelé aplikace:
 # secret MP_USERS (jmeno:heslo;…), jinak HETZNER_USERS – tedy stejná jména a hesla jako mapa cyklotras.
+# Asistent mapy (Claude API): secret ANTHROPIC_API_KEY; volitelně variables MP_AI_MODEL a MP_AI_EFFORT.
 # Variable MP_DOMAIN = doména webu (výchozí mapa.ksprehledy.cz). Postup: mapa-prodejen/NASAZENI.md.
 #
 # Runner pošle na server archiv složky mapa-prodejen z právě testovaného commitu a spustí deploy/server.sh nasadit
@@ -43,6 +44,9 @@ jobs:
         with:
           node-version: "22"
 
+      - name: Závislosti
+        run: npm ci --no-audit --no-fund
+
       - name: Testy knihoven, serveru a konzistence dat
         run: npm test
 
@@ -63,6 +67,9 @@ jobs:
           MP_USERS: ${{ secrets.MP_USERS }}
           HETZNER_USERS: ${{ secrets.HETZNER_USERS }}
           DOMAIN: ${{ vars.MP_DOMAIN }}
+          AI_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          AI_MODEL: ${{ vars.MP_AI_MODEL }}
+          AI_EFFORT: ${{ vars.MP_AI_EFFORT }}
         run: |
           test -n "$HOST" || { echo "Chybí secret HETZNER_HOST (stejný jako pro Cyklo & Ski mapu)"; exit 1; }
           test -n "$KEY" || { echo "Chybí secret HETZNER_SSH_KEY"; exit 1; }
@@ -83,6 +90,8 @@ jobs:
           USERS_B64="$(printf %s "$USERS" | base64 -w0)"
           [ -n "$USERS_B64" ] && echo "::add-mask::$USERS_B64"
           [ -n "$USERS" ] || echo "Secret MP_USERS ani HETZNER_USERS není – server převezme uživatele z Cyklo & Ski mapy."
+          AI_KEY_B64="$(printf %s "$AI_KEY" | base64 -w0)"
+          [ -n "$AI_KEY_B64" ] && echo "::add-mask::$AI_KEY_B64"
           SHA="$(git rev-parse HEAD)"
           VERZE="v$(git log -1 --format=%cd --date=format:%Y-%m-%d)-$(git rev-parse --short=7 HEAD)"
           DOM="${DOMAIN:-mapa.ksprehledy.cz}"
@@ -90,5 +99,5 @@ jobs:
           git archive --format=tar.gz HEAD mapa-prodejen \
             | ssh_cmd "$SUDO mkdir -p /opt/mapa-prodejen/vydani && $SUDO tee /opt/mapa-prodejen/vydani/$SHA.tar.gz >/dev/null"
           echo "→ Nasazuji na $DOM…"
-          { printf 'export MP_USERS_B64=%q\n' "$USERS_B64"; cat mapa-prodejen/deploy/server.sh; } \
+          { printf 'export MP_USERS_B64=%q\n' "$USERS_B64"; printf 'export MP_AI_KEY_B64=%q MP_AI_MODEL=%q MP_AI_EFFORT=%q\n' "$AI_KEY_B64" "$AI_MODEL" "$AI_EFFORT"; cat mapa-prodejen/deploy/server.sh; } \
             | ssh_cmd "$SUDO env MP_VYDANI='$SHA' MP_VERZE='$VERZE' MP_DOMENA='$DOM' bash -s -- nasadit"

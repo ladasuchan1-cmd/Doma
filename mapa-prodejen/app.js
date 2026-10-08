@@ -117,7 +117,7 @@
     firmyServer: {}, // IČO → firma dohledaná na serveru (ruční IČO)
     nastaveni: { naseIco: [] },
     objednavky: null, // dataset součtů podle PSČ (objednávky, zákazníci, aktivní zákazníci, částka)
-    server: { on: false, user: '', registry: false },
+    server: { on: false, user: '', registry: false, asistent: false },
     saveTimers: new Map(),
     pick: null, // výběr polohy v mapě pro nové místo
     cekaVyber: null, // výběr z adresy (#obec=…), který čeká na data ze serveru
@@ -172,6 +172,8 @@
       const me = await api('GET', 'api/me');
       state.server.user = me.jmeno || '';
       state.server.registry = Boolean(me.registry);
+      state.server.asistent = Boolean(me.asistent) && Boolean(aiLib);
+      $('#btn-ai').classList.toggle('hidden', !state.server.asistent);
       if (me.prihlaseni && me.jmeno) {
         $('#user-name').textContent = me.jmeno;
         $('#user-box').classList.remove('hidden');
@@ -2211,6 +2213,400 @@
   }
 
   // ================================================================== start
+  // ================================================================== ASISTENT (Claude) – ovládání mapy textem
+  // Prohlížeč drží celou konverzaci a jen k ní přidává (bloky odpovědi se posílají zpátky beze změny, i thinking);
+  // server (api/asistent) přidá systémový prompt a nástroje a zavolá Claude API. Nástroje se provádějí tady:
+  // mění zobrazení mapy a z dat v mapě počítají souhrny. Data týmu (stav, místa, objednávky) asistent nemění.
+  const aiLib = window.MP.asistent;
+  const ai = { hist: [], zobrazeni: [], bezi: false, postaven: false };
+  const BARVA_PODLE = { velikost: 'velikosti', typ: 'typu', stav: 'spolupráce' };
+  const AI_PRIKLADY = ['Bílá místa v Jihomoravském kraji', 'Jen servisy s e-koly v okrese Brno-venkov', 'Kde máme nejvíc objednávek bez partnera?', 'Najdi Hodonín a ukaž kandidáty kolem'];
+
+  function openAi() {
+    const el = $('#ai-panel');
+    if (!ai.postaven) {
+      el.innerHTML = `
+        <div class="ai-head"><b>✦ Asistent</b><span class="muted small">napište, co chcete na mapě vidět</span>
+          <button type="button" class="btn btn-sm btn-ghost" id="ai-nova" title="Začít novou konverzaci">Nová</button>
+          <button type="button" class="btn btn-sm btn-ghost" id="ai-zavrit" aria-label="Zavřít asistenta">×</button></div>
+        <div class="ai-zpravy" id="ai-zpravy" aria-live="polite"></div>
+        <form class="ai-vstup" id="ai-form">
+          <textarea id="ai-text" class="input" rows="2" maxlength="2000" placeholder="Např. „bílá místa v Jihomoravském kraji, okruh 20 km“" aria-label="Zpráva asistentovi"></textarea>
+          <button type="submit" class="btn btn-primary" id="ai-odeslat">Odeslat</button>
+        </form>
+        <div class="ai-pozn">Do Claude API (Anthropic) jde dotaz, nastavení mapy a výsledky z mapy – názvy prodejen a počty objednávek po obcích, žádná jména ani adresy zákazníků.</div>`;
+      ai.postaven = true;
+      $('#ai-zavrit', el).addEventListener('click', () => el.classList.add('hidden'));
+      $('#ai-nova', el).addEventListener('click', () => {
+        if (ai.bezi) return;
+        ai.hist = [];
+        ai.zobrazeni = [];
+        renderAi();
+      });
+      $('#ai-form', el).addEventListener('submit', (e) => {
+        e.preventDefault();
+        const t = $('#ai-text', el);
+        const text = t.value.trim();
+        if (!text || ai.bezi) return;
+        t.value = '';
+        aiPoslat(text);
+      });
+      $('#ai-text', el).addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' && !e.shiftKey) {
+          e.preventDefault();
+          $('#ai-form', el).requestSubmit();
+        }
+      });
+    }
+    el.classList.remove('hidden');
+    renderAi();
+    $('#ai-text', el).focus();
+  }
+
+  function renderAi() {
+    const box = $('#ai-zpravy');
+    if (!box) return;
+    if (!ai.zobrazeni.length && !ai.bezi) {
+      box.innerHTML = `<div class="ai-uvod small muted">Asistent nastaví oblast, filtry, vrstvy objednávek a záložky, najde obec nebo prodejnu a z dat v mapě spočítá, kde chybí partner. Zkuste:</div>
+        <div class="ai-priklady">${AI_PRIKLADY.map((p) => `<button type="button" class="btn btn-sm" data-ai-priklad="${esc(p)}">${esc(p)}</button>`).join('')}</div>`;
+      box.querySelectorAll('[data-ai-priklad]').forEach((b) => b.addEventListener('click', () => aiPoslat(b.dataset.aiPriklad)));
+    } else {
+      box.innerHTML = ai.zobrazeni.map((z) => `<div class="ai-msg ai-${z.kdo}">${z.kdo === 'akce' ? '✓ ' : ''}${esc(z.text).replace(/\n/g, '<br>')}</div>`).join('') + (ai.bezi ? '<div class="ai-msg ai-akce ai-bezi">přemýšlím…</div>' : '');
+    }
+    box.scrollTop = box.scrollHeight;
+    const b = $('#ai-odeslat');
+    if (b) b.disabled = ai.bezi;
+  }
+
+  async function aiApi(messages) {
+    const res = await fetch('api/asistent', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ messages }), signal: AbortSignal.timeout(100000) });
+    if (res.status === 401) throw new Error('Přihlášení vypršelo – obnovte stránku a přihlaste se.');
+    const j = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(j.chyba || 'Asistent neodpověděl (HTTP ' + res.status + ').');
+    return j;
+  }
+
+  // Jedna otázka: odpověď → provést nástroje → poslat výsledky → … až model odpoví bez nástrojů (nejvýš 8 kol).
+  async function aiPoslat(text) {
+    if (ai.bezi) return;
+    ai.bezi = true;
+    ai.zobrazeni.push({ kdo: 'ty', text });
+    ai.hist.push({ role: 'user', content: [{ type: 'text', text: `<stav_mapy>\n${popisStavu()}\n</stav_mapy>\n\n${text}` }] });
+    renderAi();
+    try {
+      for (let kolo = 0; ; kolo++) {
+        const r = await aiApi(ai.hist);
+        ai.hist.push({ role: 'assistant', content: r.content });
+        for (const b of r.content) if (b.type === 'text' && b.text.trim()) ai.zobrazeni.push({ kdo: 'ai', text: b.text.trim() });
+        if (r.stop_reason === 'refusal') throw new Error('Asistent dotaz odmítl – zkuste ho položit jinak.');
+        if (r.stop_reason === 'max_tokens') throw new Error('Odpověď byla příliš dlouhá – zkuste dotaz rozdělit.');
+        const nastroje = r.content.filter((b) => b.type === 'tool_use');
+        if (!nastroje.length) break;
+        if (kolo >= 7) throw new Error('Příliš mnoho kroků najednou – zkuste dotaz rozdělit.');
+        const vysledky = [];
+        for (const t of nastroje) {
+          const v = aiLib.overVstup(t.name, t.input);
+          let out;
+          try {
+            out = v.ok ? provedNastroj(t.name, t.input) : { text: v.chyba, chyba: true };
+          } catch (e) {
+            out = { text: 'Nástroj selhal: ' + e.message, chyba: true };
+          }
+          if (out.akce) ai.zobrazeni.push({ kdo: 'akce', text: out.akce });
+          vysledky.push(out.chyba ? { type: 'tool_result', tool_use_id: t.id, content: out.text, is_error: true } : { type: 'tool_result', tool_use_id: t.id, content: out.text });
+        }
+        ai.hist.push({ role: 'user', content: vysledky });
+        renderAi();
+      }
+    } catch (e) {
+      // nedokončené kolo by konverzaci rozbilo (zpráva bez odpovědi, nástroj bez výsledku) – začne se znovu
+      ai.zobrazeni.push({ kdo: 'chyba', text: e.message + ' Konverzace začne znovu.' });
+      ai.hist = [];
+    }
+    ai.bezi = false;
+    renderAi();
+  }
+
+  // Aktuální zobrazení pro model (jde na začátek každé otázky).
+  function popisStavu() {
+    const f = state.filters;
+    const v = visible();
+    const vsechny = (set, all) => (set.size === all.length ? 'všechny' : [...set].join(', ') || 'žádné');
+    const r = [];
+    r.push(`Oblast: ${state.scope.okres != null ? `okres ${okresName(state.scope.okres)} (${krajName(state.scope.kraj)})` : state.scope.kraj != null ? krajName(state.scope.kraj) : 'celá ČR'}`);
+    r.push(`Pohled: ${state.view === 'table' ? 'tabulka' : 'mapa'}; záložka ${state.tab}; barva značek podle ${BARVA_PODLE[state.barva]}`);
+    r.push(`Filtry: typy ${vsechny(f.typy, TYPY)}; velikosti ${vsechny(f.velikosti, vel.VELIKOSTI)}; služby ${[...f.sluzby].join(', ') || 'bez omezení'}; značka ${f.znacka || 'všechny'}; kontakt ${f.kontakt}; spolupráce ${f.stav}; hledání ${f.q || '–'}`);
+    r.push(`Ve výběru: ${v.mista.length} míst`);
+    const d = state.objednavky;
+    if (d) {
+      const o = state.obj;
+      r.push(`Objednávky: nahrané („${d.nazev || d.soubor || ''}“), v datech ${metrikyDat().map((k) => objLib.METRIKA[k].mn).join(', ')}; počítají se ${J().nadpis.toLowerCase()} (celkem ${fmtN(obj.celkem)}); okruh ${o.radiusKm} km; bílé místo od ${o.minN}; bubliny ${o.bubliny ? 'ano' : 'ne'}; kraje barvou ${o.choropleth ? 'ano' : 'ne'}${o.naObyv ? ' na 1 000 obyvatel' : ''}; Města: ${state.mestaSort}; Partneři: jen bez partnera ${o.jenBezPartnera ? 'ano' : 'ne'}, jen se servisem ${o.jenServis ? 'ano' : 'ne'}`);
+    } else r.push('Objednávky: nenahrané');
+    const s = state.selected;
+    if (s && s.type === 'misto' && mistoById.get(s.id)) r.push(`Vybráno: ${mistoById.get(s.id).nazev}`);
+    if (s && s.type === 'obec' && obj.obecByKey.get(s.id)) r.push(`Vybráno: obec ${obj.obecByKey.get(s.id).nazev}`);
+    return r.join('\n');
+  }
+
+  function provedNastroj(nazev, x) {
+    if (nazev === 'nastav_oblast') return aiOblast(x);
+    if (nazev === 'nastav_filtry') return aiFiltry(x);
+    if (nazev === 'nastav_objednavky') return aiObjednavky(x);
+    if (nazev === 'zobraz') return aiZobraz(x);
+    if (nazev === 'najdi') return aiNajdi(x);
+    if (nazev === 'zjisti') return aiZjisti(x);
+    return { text: 'Neznámý nástroj ' + nazev, chyba: true };
+  }
+
+  // Shoda názvu kraje / okresu s dotazem („Jihomoravském“, „kraj Vysočina“, „Brno venkov“, „Praha“): 0–3.
+  function shodaNazvu(dotaz, nazev) {
+    const ocisti = (s) => norm(s).replace(/[^a-z0-9]+/g, ' ').replace(/\b(kraj|kraji|kraje|okres|okrese|okresu|hlavni mesto|hl m)\b/g, ' ').replace(/\s+/g, ' ').trim();
+    const q = ocisti(dotaz);
+    const n = ocisti(nazev);
+    if (!q || !n) return 0;
+    if (q === n) return 3;
+    if (n.startsWith(q) || q.startsWith(n)) return 2;
+    const qw = q.split(' ');
+    const nw = n.split(' ');
+    // jiný pád („Jihomoravském“, „Vysočině“): stejný začátek a koncovka liší nejvýš o 4 znaky
+    if (qw.length === nw.length && qw.every((w, i) => Math.abs(w.length - nw[i].length) <= 4 && w.slice(0, Math.max(4, w.length - 3)) === nw[i].slice(0, Math.max(4, w.length - 3)))) return 1;
+    return 0;
+  }
+  function najdiOblast(dotaz, seznam) {
+    const s = seznam.map((f) => [f, shodaNazvu(dotaz, f.properties.nazev)]).filter(([, b]) => b > 0).sort((a, b) => b[1] - a[1]);
+    if (!s.length) return {};
+    if (s.length > 1 && s[0][1] === s[1][1]) return { vice: s.filter(([, b]) => b === s[0][1]).map(([f]) => f.properties.nazev) };
+    return { f: s[0][0] };
+  }
+
+  const mist = (n) => `${fmtN(n)} ${n === 1 ? 'místo' : n >= 2 && n <= 4 ? 'místa' : 'míst'}`;
+
+  function aiOblast(x) {
+    if (x.uroven === 'cr') {
+      setScope(null, null);
+      return { text: `Zobrazena celá ČR, ve výběru ${mist(visible().mista.length)}.`, akce: 'Oblast: celá ČR' };
+    }
+    if (!x.nazev) return { text: 'Chybí název kraje nebo okresu.', chyba: true };
+    const seznam = x.uroven === 'kraj' ? kraje : okresy;
+    const r = najdiOblast(x.nazev, seznam);
+    if (r.vice) return { text: `Názvu odpovídá víc možností: ${r.vice.join(', ')}. Vyberte jednu.`, chyba: true };
+    if (!r.f) return { text: `${x.uroven === 'kraj' ? 'Kraj' : 'Okres'} „${x.nazev}“ jsem nenašel. ${x.uroven === 'kraj' ? 'Kraje: ' + kraje.map((k) => k.properties.nazev).join(', ') : 'Zkuste název okresu (např. Brno-venkov, Praha-východ).'}`, chyba: true };
+    const p = r.f.properties;
+    if (x.uroven === 'kraj') setScope(p.kod, null);
+    else setScope(p.kraj, p.kod);
+    const nazev = x.uroven === 'kraj' ? p.nazev : `okres ${p.nazev}`;
+    return { text: `Zobrazen ${nazev}, ve výběru ${mist(visible().mista.length)}.`, akce: `Oblast: ${nazev}` };
+  }
+
+  function popisFiltru() {
+    const f = state.filters;
+    const casti = [];
+    if (f.typy.size !== TYPY.length) casti.push('typy ' + [...f.typy].map((k) => (TYP[k] ? TYP[k].label.toLowerCase() : k)).join(', '));
+    if (f.velikosti.size !== vel.VELIKOSTI.length) casti.push('velikost ' + [...f.velikosti].map((k) => (VEL[k] ? VEL[k].label.toLowerCase() : k)).join(', '));
+    if (f.sluzby.size) casti.push('musí nabízet ' + [...f.sluzby].map((k) => (SLUZBY.find((s) => s.key === k) || { label: k }).label.toLowerCase()).join(', '));
+    if (f.znacka) casti.push('značka ' + f.znacka);
+    if (f.kontakt !== 'vse') casti.push('kontakt ' + f.kontakt);
+    if (f.stav !== 'vse') casti.push('spolupráce ' + f.stav);
+    if (f.q) casti.push(`hledání „${$('#search').value || f.q}“`);
+    return casti.join('; ') || 'bez omezení (vše)';
+  }
+
+  function aiFiltry(x) {
+    const f = state.filters;
+    if (x.vychozi) {
+      f.typy = new Set(TYPY.map((t) => t.key));
+      f.velikosti = new Set(vel.VELIKOSTI.map((v) => v.key));
+      f.sluzby = new Set();
+      f.znacka = '';
+      f.kontakt = 'vse';
+      f.stav = 'vse';
+      f.q = '';
+      $('#search').value = '';
+    }
+    if (x.typy) f.typy = new Set(x.typy);
+    if (x.velikosti) f.velikosti = new Set(x.velikosti);
+    if (x.sluzby) f.sluzby = new Set(x.sluzby);
+    if (x.znacka != null) {
+      const z = x.znacka.trim() ? znackyVse.find(([n]) => norm(n) === norm(x.znacka.trim())) : null;
+      if (x.znacka.trim() && !z) return { text: `Značku „${x.znacka}“ v datech nemám. Nejčastější: ${znackyVse.slice(0, 15).map(([n]) => n).join(', ')}.`, chyba: true };
+      f.znacka = z ? z[0] : '';
+    }
+    if (x.kontakt) f.kontakt = x.kontakt;
+    if (x.spoluprace) f.stav = x.spoluprace;
+    if (x.hledat != null) {
+      f.q = norm(x.hledat.trim());
+      $('#search').value = x.hledat.trim();
+    }
+    state.listLimit = 150;
+    if (state.selected) state.selected = null;
+    renderAll();
+    writeHash();
+    const popis = popisFiltru();
+    return { text: `Filtry: ${popis}. Ve výběru ${mist(visible().mista.length)}.`, akce: 'Filtry: ' + popis };
+  }
+
+  function aiObjednavky(x) {
+    if (!state.objednavky) return { text: 'Objednávky nejsou nahrané – tým je nahraje tlačítkem Objednávky.', chyba: true };
+    const o = state.obj;
+    let prepocet = false;
+    let pokryti = false;
+    if (x.metrika) {
+      if (!metrikyDat().includes(x.metrika)) return { text: `V nahraných datech je jen: ${metrikyDat().map((k) => objLib.METRIKA[k].nadpis.toLowerCase()).join(', ')}.`, chyba: true };
+      o.metrika = x.metrika;
+      prepocet = true;
+    }
+    if (x.okruh_km != null) {
+      o.radiusKm = Math.min(50, Math.max(5, Math.round(x.okruh_km / 5) * 5));
+      pokryti = true;
+    }
+    if (x.min_pocet != null) o.minN = x.min_pocet;
+    if (x.bubliny != null) o.bubliny = x.bubliny;
+    if (x.kraje_barvou != null) o.choropleth = x.kraje_barvou;
+    if (x.na_obyvatele != null) o.naObyv = x.na_obyvatele;
+    if (prepocet) prepocitejObjednavky();
+    else if (pokryti) prepocitejPokryti();
+    if (prepocet || pokryti) markerCache.clear();
+    state.listLimit = 150;
+    saveUi();
+    renderAll();
+    const popis = `počítají se ${J().nadpis.toLowerCase()}, okruh ${o.radiusKm} km, bílé místo od ${o.minN} ${J().kratce}, bubliny ${o.bubliny ? 'ano' : 'ne'}, kraje barvou ${o.choropleth ? 'ano' : 'ne'}${o.naObyv ? ' (na 1 000 obyvatel)' : ''}`;
+    return { text: 'Objednávky: ' + popis + '.', akce: 'Objednávky: ' + popis };
+  }
+
+  function aiZobraz(x) {
+    const pred = state.tab;
+    if (x.zalozka) state.tab = x.zalozka;
+    if (x.mesta) {
+      state.mestaSort = { podle_poctu: 'n', bila_mista: 'bila', na_obyvatele: 'naObyv' }[x.mesta];
+      if (!x.zalozka) state.tab = 'mesta';
+    }
+    if (x.kandidati_bez_partnera != null || x.kandidati_se_servisem != null) {
+      if (x.kandidati_bez_partnera != null) state.obj.jenBezPartnera = x.kandidati_bez_partnera;
+      if (x.kandidati_se_servisem != null) state.obj.jenServis = x.kandidati_se_servisem;
+      if (!x.zalozka) state.tab = 'partneri';
+    }
+    if (x.pohled) state.view = x.pohled === 'tabulka' ? 'table' : 'map';
+    if (x.barva) {
+      state.barva = x.barva === 'spoluprace' ? 'stav' : x.barva;
+      markerCache.clear();
+    }
+    if (state.tab !== pred) state.selected = null;
+    state.listLimit = 150;
+    saveUi();
+    renderAll();
+    writeHash();
+    if (state.view === 'map') setTimeout(() => map.invalidateSize(), 50);
+    const zal = { mista: 'Místa', partneri: 'Partneři', mesta: 'Města' }[state.tab];
+    const popis = `záložka ${zal}${state.tab === 'mesta' ? ` (${{ n: 'podle počtu', bila: 'jen bílá místa', naObyv: 'na 1 000 obyvatel' }[state.mestaSort]})` : ''}, ${state.view === 'table' ? 'tabulka' : 'mapa'}, barva značek podle ${BARVA_PODLE[state.barva]}`;
+    return { text: 'Zobrazení: ' + popis + '.', akce: 'Zobrazení: ' + popis };
+  }
+
+  function aiNajdi(x) {
+    const dotaz = x.dotaz.trim();
+    const q = norm(dotaz);
+    if (!q) return { text: 'Prázdný dotaz.', chyba: true };
+    // IČO
+    if (/^\d{6,8}$/.test(dotaz)) {
+      const ico = dotaz.padStart(8, '0');
+      const m = mista.find((y) => y._ico === ico);
+      if (!m) return { text: `IČO ${ico} u žádného místa v mapě není.`, chyba: true };
+      select('misto', m.id);
+      return { text: `Nalezeno: ${m.nazev} (${TYP[m._typ].one}, ${m.obec || okresName(m.okres)}).`, akce: 'Detail: ' + m.nazev };
+    }
+    // obec (jmenovce rozliší okres / kraj z dotazu, jinak ta s nejvíc objednávkami, pak největší)
+    let obce = obceData.filter((o) => norm(o[0]) === q);
+    if (x.okres && obce.length > 1) {
+      const vOkrese = obce.filter((o) => shodaNazvu(x.okres, okresName(o[1])) > 0 || shodaNazvu(x.okres, krajName(krajOkresu(o[1]))) > 0);
+      if (vOkrese.length) obce = vOkrese;
+    }
+    if (obce.length) {
+      const klic = (o) => (o[6] ? String(o[6]) : o[0] + '|' + o[1]);
+      const pocet = (o) => (obj.obecByKey.get(klic(o)) || { n: 0 }).n;
+      obce.sort((a, b) => pocet(b) - pocet(a) || (b[4] || 0) - (a[4] || 0));
+      const o = obce[0];
+      const ob = obj.obecByKey.get(klic(o));
+      const R = state.obj.radiusKm;
+      const kolem = mista.filter((m) => jeKandidat(m) && par.km(o[2], o[3], m.lat, m.lon) <= R).length;
+      if (ob) select('obec', ob.key);
+      else {
+        if (!inScope(krajOkresu(o[1]), o[1])) state.scope = { kraj: krajOkresu(o[1]), okres: null };
+        map.setView([o[2], o[3]], Math.max(map.getZoom(), 11));
+        renderAll();
+        writeHash();
+      }
+      const dalsi = obce.slice(1, 6).map((y) => `${y[0]} (okres ${okresName(y[1])})`);
+      const info = ob ? `${fmtN(ob.n)} ${J().mn}${ob.pokryto ? `, partner do ${R} km` : `, bez partnera do ${R} km`}` : state.objednavky ? `bez ${J().mn}` : 'objednávky nenahrané';
+      return {
+        text: `Obec ${o[0]} (okres ${okresName(o[1])}, ${fmtN(o[4] || 0)} obyvatel): ${info}; kandidátů na partnera do ${R} km: ${kolem}.${dalsi.length ? ' Další obce tohoto jména: ' + dalsi.join(', ') + '.' : ''}`,
+        akce: `Obec: ${o[0]} (okres ${okresName(o[1])})`,
+      };
+    }
+    // místo podle názvu
+    const shody = mista.filter((m) => !m._skryto && norm(m.nazev).includes(q));
+    shody.sort((a, b) => (norm(b.nazev) === q) - (norm(a.nazev) === q) || a.nazev.length - b.nazev.length);
+    if (!shody.length) return { text: `„${dotaz}“ jsem nenašel mezi obcemi ani místy.`, chyba: true };
+    const m = shody[0];
+    select('misto', m.id);
+    const dalsi = shody.slice(1, 6).map((y) => `${y.nazev} (${y.obec || okresName(y.okres)})`);
+    return { text: `Nalezeno: ${m.nazev} (${TYP[m._typ].one}, ${m.obec || okresName(m.okres)}).${dalsi.length ? ' Další shody: ' + dalsi.join(', ') + '.' : ''}`, akce: 'Detail: ' + m.nazev };
+  }
+
+  function aiZjisti(x) {
+    const n = x.pocet || 10;
+    const R = state.obj.radiusKm;
+    const v = visible();
+    const oblast = state.scope.okres != null ? `okres ${okresName(state.scope.okres)}` : state.scope.kraj != null ? krajName(state.scope.kraj) : 'celá ČR';
+    const obceVOblasti = obj.obce.filter((o) => inScope(o.kraj, o.okres));
+    const bila = obceVOblasti.filter((o) => !o.pokryto && o.n >= state.obj.minN).sort((a, b) => b.n - a.n);
+    const jm = J();
+    const kolem = (o) => mista.filter((m) => jeKandidat(m) && par.km(o.lat, o.lon, m.lat, m.lon) <= R).length;
+    const radky = [];
+    if (x.co === 'prehled') {
+      const sum = stavLib.summary(Object.fromEntries(v.mista.filter((m) => state.stav[m.id]).map((m) => [m.id, state.stav[m.id]])));
+      radky.push(`Oblast: ${oblast}; filtry: ${popisFiltru()}.`);
+      radky.push(`Ve výběru ${mist(v.mista.length)}; s IČO ${v.mista.filter((m) => m._ico).length}; se servisem ${v.mista.filter((m) => sluzba(m, 'servis').ano === true).length}.`);
+      radky.push(`Spolupráce: partneři ${sum.partner}, vytipováno ${sum.vytipovano}, osloveno ${sum.osloveno}, voláno ${sum.volano}, schůzka ${sum.schuzka}, nemá zájem ${sum.odmitl}.`);
+      if (state.objednavky) {
+        const celkem = obceVOblasti.reduce((a, o) => a + o.n, 0);
+        radky.push(`${jm.nadpis} v oblasti: ${fmtN(celkem)} v ${obceVOblasti.length} obcích; bílých míst (bez partnera do ${R} km, aspoň ${state.obj.minN} ${jm.kratce}): ${bila.length} s ${fmtN(bila.reduce((a, o) => a + o.n, 0))} ${jm.mn}.`);
+        const top = obceVOblasti.slice().sort((a, b) => b.n - a.n).slice(0, 5);
+        if (top.length) radky.push('Nejvíc: ' + top.map((o) => `${o.nazev} ${fmtN(o.n)}`).join(', ') + '.');
+      } else radky.push('Objednávky nejsou nahrané.');
+    } else if (x.co === 'bila_mista' || x.co === 'mesta') {
+      if (!state.objednavky) return { text: 'Objednávky nejsou nahrané.', chyba: true };
+      const seznam = x.co === 'bila_mista' ? bila : obceVOblasti.slice().sort((a, b) => b.n - a.n);
+      radky.push(`${x.co === 'bila_mista' ? `Bílá místa (bez partnera ani naší prodejny do ${R} km, aspoň ${state.obj.minN} ${jm.kratce})` : `Obce podle počtu ${jm.mn}`} – ${oblast}: ${seznam.length} obcí.`);
+      for (const o of seznam.slice(0, n)) {
+        radky.push(`${o.nazev} (okres ${okresName(o.okres)}): ${fmtN(o.n)} ${jm.kratce}${o.kc ? ', ' + vel.fmtObrat(o.kc) : ''}; ${o.pokryto ? `partner ${fmtKm(o.partnerKm * 1000)}` : o.partnerKm != null ? `nejbližší partner ${fmtKm(o.partnerKm * 1000)}` : 'žádný partner v okolí'}; kandidátů do ${R} km: ${kolem(o)}`);
+      }
+    } else if (x.co === 'kandidati') {
+      let items = v.mista.filter(jeKandidat).filter((m) => m._faze !== 'partner');
+      if (state.obj.jenBezPartnera) items = items.filter((m) => !m._skore.slozky.some((s) => s.key === 'pokryti' && s.body < 20));
+      if (state.obj.jenServis) items = items.filter((m) => sluzba(m, 'servis').ano === true);
+      items.sort((a, b) => b._skore.body - a._skore.body || a.nazev.localeCompare(b.nazev, 'cs'));
+      radky.push(`Kandidáti na partnera – ${oblast}: ${items.length}${state.objednavky ? ` (poptávka = ${jm.mn} do ${R} km)` : ' (objednávky nenahrané, skóre bez poptávky)'}.`);
+      for (const m of items.slice(0, n)) {
+        const k = kontakt(m);
+        radky.push(`${m.nazev} (${TYP[m._typ].one}, ${m.obec || okresName(m.okres)}): ${m._skore.body} b.${state.objednavky ? `; ${fmtN(m._pop.n)} ${jm.kratce} do ${R} km` : ''}; servis ${sluzba(m, 'servis').ano === true ? 'ano' : sluzba(m, 'servis').ano === false ? 'ne' : '?'}; kontakt ${k.email || k.telefon ? 'ano' : 'ne'}; velikost ${VEL[m._vel.key].label.toLowerCase()}${m._faze ? '; stav ' + m._faze : ''}`);
+      }
+    } else if (x.co === 'oblasti') {
+      if (!state.objednavky) return { text: 'Objednávky nejsou nahrané.', chyba: true };
+      if (state.scope.okres != null) {
+        radky.push(`Okres ${okresName(state.scope.okres)} – obce podle počtu ${jm.mn}:`);
+        for (const o of obceVOblasti.slice().sort((a, b) => b.n - a.n).slice(0, n)) radky.push(`${o.nazev}: ${fmtN(o.n)}`);
+      } else if (state.scope.kraj != null) {
+        radky.push(`${krajName(state.scope.kraj)} – ${jm.mn} po okresech:`);
+        const ok = (okresyByKraj.get(state.scope.kraj) || []).map((f) => [f.properties.nazev, obj.poOkresech.get(f.properties.kod) || 0]).sort((a, b) => b[1] - a[1]);
+        for (const [nazev, pocet] of ok.slice(0, n)) radky.push(`${nazev}: ${fmtN(pocet)}`);
+      } else {
+        radky.push(`${jm.nadpis} po krajích:`);
+        const kr = kraje.map((f) => [f.properties.nazev, obj.poKrajich.get(f.properties.kod) || 0]).sort((a, b) => b[1] - a[1]);
+        for (const [nazev, pocet] of kr.slice(0, n)) radky.push(`${nazev}: ${fmtN(pocet)}`);
+      }
+    }
+    return { text: radky.join('\n') };
+  }
+
   function init() {
     applyTheme(lsGet(LS.theme) || null);
     loadUi();
@@ -2247,6 +2643,7 @@
       if (state.view === 'map') setTimeout(() => map.invalidateSize(), 50);
     });
     $('#btn-obj').addEventListener('click', openObjModal);
+    $('#btn-ai').addEventListener('click', () => ($('#ai-panel').classList.contains('hidden') ? openAi() : $('#ai-panel').classList.add('hidden')));
     $('#btn-add').addEventListener('click', () => openMistoModal(null, null));
     $('#btn-data').addEventListener('click', openDataModal);
     $('#btn-theme').addEventListener('click', () => applyTheme(currentTheme() === 'dark' ? 'light' : 'dark'));
@@ -2256,6 +2653,10 @@
         state.pick = null;
         $('#map-wrap').classList.remove('picking');
         openMistoModal(p.draft, p.id);
+        return;
+      }
+      if (e.key === 'Escape' && !$('#ai-panel').classList.contains('hidden') && $('#ai-panel').contains(document.activeElement)) {
+        $('#ai-panel').classList.add('hidden');
         return;
       }
       if (e.key === 'Escape' && state.selected && !$('#modal-root').firstElementChild) clearSelection();

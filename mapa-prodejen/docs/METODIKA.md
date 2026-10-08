@@ -1,7 +1,7 @@
 # Mapa prodejen a servisů kol – metodika dat
 
 Co je v datech, odkud to je, jak se to páruje a počítá a jak to číst. Platí pro data sestavená **7. 10. 2026**
-nástrojem `tools/build-data.js`. Změny metodiky se v tomto dokumentu **datují** (kap. 11), aby bylo jasné, od kdy
+nástrojem `tools/build-data.js`. Změny metodiky se v tomto dokumentu **datují** (kap. 12), aby bylo jasné, od kdy
 čísla nejsou srovnatelná se staršími. Ovládání popisuje [MANUAL.md](MANUAL.md).
 
 ## 1. Zdroje
@@ -339,7 +339,25 @@ vhodnější než velká; filtr velikosti se dá použít zvlášť.
   se přiřadí, jen když je v názvu i obec („Zbraslav-Praha“).
 - **Vzdálenosti** jsou vzdušnou čarou, ne po silnici.
 
-## 11. Změny metodiky
+## 11. Asistent (Claude)
+
+Asistent mapy je model Claude (Anthropic, výchozí `claude-opus-5-5`, nastavitelný na serveru) s pevným systémovým
+promptem a šesti nástroji (`lib/asistent.js`). Model sám nic nepočítá ani nemění: nástroje provádí aplikace
+v prohlížeči nad stejnými daty a výpočty jako ruční ovládání.
+
+- **nastav_oblast, nastav_filtry, nastav_objednavky, zobraz** – totéž, co tlačítka a filtry v aplikaci (oblast,
+  typy, velikosti, služby, značka, kontakt, stav spolupráce, hledání; veličina, okruh, práh bílého místa, vrstvy;
+  záložka, mapa / tabulka, barva, řazení). Hodnoty mimo číselníky aplikace odmítne a model dostane chybu.
+- **najdi** – obec podle přesného názvu (jmenovce rozliší okres či kraj z dotazu, jinak ta s nejvíc objednávkami,
+  pak největší), jinak místo podle názvu nebo IČO; přiblíží ho a otevře detail.
+- **zjisti** – souhrny pro aktuální oblast a filtry: počty míst a stavů spolupráce, bílá místa, obce podle počtu,
+  kandidáti podle skóre, objednávky po krajích / okresech. Stejné výpočty jako záložky Města a Partneři (kap. 9).
+
+Do Claude API jde dotaz uživatele, popis nastavení mapy a výsledky nástrojů (názvy a obce míst, počty a částky po
+obcích) – žádné osobní údaje zákazníků. Konverzace se jen přidává; odpovědi modelu (i bloky „thinking“) se posílají
+zpátky beze změny. Server přidává prompt a nástroje, kontroluje konverzaci a limity (NASAZENI.md).
+
+## 12. Změny metodiky
 
 | Datum | Změna |
 |---|---|
@@ -348,3 +366,4 @@ vhodnější než velká; filtr velikosti se dá použít zvlášť.
 | 7. 10. 2026 | Obec podle názvu i v tvarech z adres: přívlastky („u Prahy“, „na Moravě“, „nad Ohří“), zkratky („p.R.“, „n/L“), části názvů se spojovníkem a začátky názvů, části obcí a adresy, okres a pošta. Jmenovce rozliší vodítko, oblast a řeka. Slovenské tvary, cizí písmena a země v názvu jdou do zahraničí. Na tabulce zákazníků podle obcí je o 2 370 přiřazených zákazníků víc a o 1 960 víc v zahraničí, nepřiřazených s názvem obce ubylo z 13 200 na 8 900. |
 | 7. 10. 2026 | Pražská PSČ 153 00 (Radotín), 156 00 (Zbraslav) a 197 00 (Kbely) patří Praze. Dřív je chybné souřadnice v GeoNames přiřadily Olbramovicím, Dolnímu Dvořišti a Čížkovu. Čížkov, Nové Mitrovice, Louňová a Olbramovice mají místo pražského PSČ svoje. |
 | 8. 10. 2026 | Export objednávek z POHODY: sloupec „Číslo“ = číslo objednávky, „Přeneseno“; kopie objednávky s příponou pobočky (PHA, BM, LI) a řádky lišící se jen v Přeneseno se počítají jednou; volba „Jen přenesené“. Víc souborů najednou (např. 2025 a 2026) se spojí do jedné tabulky. Dřív se kopie počítaly dvakrát (2025: 174 497 místo 149 117 objednávek). |
+| 8. 10. 2026 | Asistent mapy (Claude): ovládá zobrazení a zjišťuje souhrny nástroji, které provádí aplikace; do Claude API nejdou osobní údaje zákazníků (kap. 11). |
