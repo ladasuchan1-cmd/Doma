@@ -236,6 +236,48 @@ const bridge = (state) => {
       await tc.close();
     }
 
+    // Každý snímek všech kvízů na menším telefonu (Samsung v Chromu): tlačítka nic nepřekrývá a obsah jde doposouvat
+    for (const [w, h] of [[384, 740], [740, 360]]) {
+      const pc = await browser.newContext({ viewport: { width: w, height: h }, deviceScaleFactor: 2.6, hasTouch: true, isMobile: true });
+      await pc.addInitScript(bridge, STATE);
+      const pp = await pc.newPage();
+      const bad = [];
+      for (const q of quizzes) {
+        await pp.goto(base + '/kviz/' + q.file + '#od-zacatku');
+        await pp.waitForSelector('.appback');
+        bad.push(...await pp.evaluate(() => {
+          const out = [];
+          for (let i = 0; i < slides.length; i++) {
+            idx = i; render();
+            const s = cur();
+            s.node.querySelector('.opts')?.classList.remove('hidden');
+            s.node.querySelector('.reveal')?.classList.add('on');
+            const m = document.getElementById('main');
+            for (const b of document.querySelectorAll('header button, footer button')) {
+              if (!b.offsetParent) continue;
+              const r = b.getBoundingClientRect(), hit = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2);
+              if (!hit || !b.contains(hit)) out.push(`${i}:${s.kind}:${b.id || b.className} zakryté`);
+            }
+            if (m.scrollHeight > m.clientHeight + 1 && !/auto|scroll/.test(getComputedStyle(m).overflowY)) out.push(`${i}:${s.kind}: obsah nejde posunout`);
+            if (m.scrollTop !== 0) out.push(`${i}:${s.kind}: snímek nezačíná nahoře`);
+            const c = s.node.firstElementChild.getBoundingClientRect(), mr = m.getBoundingClientRect();
+            if (c.top < mr.top - 1) out.push(`${i}:${s.kind}: začátek obsahu je mimo dosah`);
+            if (c.bottom > mr.top + m.scrollHeight + 1) out.push(`${i}:${s.kind}: konec obsahu je mimo dosah`);
+            m.scrollTop = m.scrollHeight;
+            if (document.documentElement.scrollWidth > innerWidth) out.push(`${i}:${s.kind}: vodorovné posouvání`);
+          }
+          return out;
+        }));
+      }
+      check(`všechny snímky ${w}×${h}: tlačítka jdou stisknout, obsah jde posunout`, bad.length === 0, bad.slice(0, 8).join(', '));
+      await pp.goto(base + '/kviz/kviz-boubin-01.html#od-zacatku'); await pp.waitForSelector('.appback');
+      await slideTo(pp, 's.kind==="sol" && s.name==="Historie"');
+      await shot(pp, `3x-${w}-reseni`);
+      await pp.evaluate(() => { const m = document.getElementById('main'); m.scrollTop = m.scrollHeight; });
+      await shot(pp, `3x-${w}-reseni-konec`);
+      await pc.close();
+    }
+
     // Všechny čtyři kvízy se otevřou bez chyb
     for (const q of quizzes) {
       const e2 = [];

@@ -8,7 +8,8 @@ button{-webkit-user-select:none;user-select:none;touch-action:manipulation}
 .appback b{color:var(--paper);font-size:18px;margin-right:6px}
 .keys.touch .key{font-size:13px}
 .scorebox{overflow-x:auto;max-width:100%}
-.slide.light{justify-self:stretch;align-self:stretch;width:auto;max-width:none}   /* pozadí okruhu přes celou plochu */
+/* Pozadí okruhu přes celou plochu; delší obsah snímek prodlouží (posouvá se), místo aby přetekl nahoru mimo dosah. */
+.slide.light{justify-self:stretch;align-self:start;width:auto;max-width:none;min-height:calc(100% + 52px)}
 
 /* Telefon na výšku a menší tablety */
 @media (max-width:760px){

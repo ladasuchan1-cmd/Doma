@@ -100,7 +100,7 @@
   /* Uložená pozice: kvíz pokračuje tam, kde skončil; #od-zacatku z menu začne znovu */
   const save = () => { try { localStorage.setItem(PKEY, JSON.stringify({i: idx, n: slides.length})); } catch(e){} };
   const origRender = render;
-  render = function(){ origRender(); refreshCurrent(); save(); };
+  render = function(){ origRender(); mainEl.scrollTop = 0; refreshCurrent(); save(); };
   if (location.hash === "#od-zacatku") { history.replaceState(null, "", location.pathname); idx = 0; }
   else {
     try { const p = JSON.parse(localStorage.getItem(PKEY) || "null"); if (p && p.i > 0 && p.i < slides.length) idx = p.i; } catch(e){}
