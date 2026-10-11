@@ -1,0 +1,113 @@
+/* Úpravy kvízu pro telefon a tablet. Vkládá je aplikace za původní styly, HTML kvízu zůstává beze změny. */
+html,body{-webkit-tap-highlight-color:transparent;overscroll-behavior:none}
+#stage{height:100vh;height:100dvh}
+main{overflow-y:auto;overflow-x:hidden;-webkit-overflow-scrolling:touch}
+button{-webkit-user-select:none;user-select:none;touch-action:manipulation}
+#btnFull{display:none}                       /* aplikace je v kvízu vždy přes celou obrazovku */
+.appback{flex:none;border-right:2px solid var(--line);padding:0 18px;font-size:15px;color:var(--muted)}
+.appback b{color:var(--paper);font-size:18px;margin-right:6px}
+.keys.touch .key{font-size:13px}
+.scorebox{overflow-x:auto;max-width:100%}
+.slide.light{justify-self:stretch;align-self:stretch;width:auto;max-width:none}   /* pozadí okruhu přes celou plochu */
+
+/* Telefon na výšku a menší tablety */
+@media (max-width:760px){
+  header{min-height:46px}
+  .appback{padding:0 12px}
+  .appback span{display:none}
+  .mark{padding:10px 12px;border-right:2px solid var(--line)}
+  .mark b{display:none}
+  .mark span{font-size:13px;white-space:nowrap}
+  .roundtag{padding:10px 12px;font-size:15px;min-width:0;flex:1 1 auto;border-right:0}
+  .roundtag i{width:24px;height:24px;margin-right:9px;flex:none}
+  .roundtag span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .counter{padding:10px 12px;font-size:13px;white-space:nowrap;flex:none}
+  #pickinfo{padding:8px 12px;font-size:13px}
+
+  main{padding:16px;place-items:start stretch}
+  .slide.on{margin-block:auto}
+  .slide.light{margin:-16px;padding:22px 18px;min-height:calc(100% + 32px)}
+
+  .big h1{font-size:clamp(32px,10vw,52px)}
+  .big p{margin-top:16px;font-size:16px}
+  .keys{margin-top:20px;gap:8px}
+  .key{padding:7px 10px;font-size:13px}
+  .qwrap{gap:18px}
+  .qtext{font-size:clamp(24px,7vw,34px);max-width:none}
+  .opts{gap:8px}
+  .opt{font-size:19px;padding:8px 0 8px 12px;gap:12px}
+  .hintlabel{font-size:13px;padding-top:10px}
+  .reveal{padding:12px 14px}
+  .reveal .t{font-size:22px}
+  .reveal .n{font-size:15px}
+  .reveal .e{font-size:15px}
+
+  .mediagrid{grid-template-columns:1fr;gap:14px}
+  .mediagrid .qtext{font-size:21px!important}
+  .play{width:72px;height:72px}
+  .play::after{border-left-width:23px;border-top-width:14px;border-bottom-width:14px;margin-left:6px}
+  .meter{height:64px}
+  @keyframes bump{0%,100%{height:12px}50%{height:60px}}
+  .cover .inner{gap:12px}
+  .cover p{font-size:13px;padding:0 12px}
+  .err{padding:12px}
+  .err div{font-size:13px;line-height:1.4}
+  .errbtns{flex-wrap:wrap;margin-top:10px;gap:8px}
+  .errbtns button{padding:9px 12px;font-size:13px;border-right:2px solid var(--line)}
+
+  .clock{font-size:clamp(90px,30vw,180px)}
+  .sol .row{gap:6px 12px;padding:10px 0}
+  .sol .a{font-size:17px}
+  .sol .e{grid-column:2/3;font-size:13px}
+  table.score{table-layout:fixed}
+  table.score th,table.score td{padding:8px 4px;font-size:15px}
+  table.score th{font-size:11px;overflow:hidden;text-overflow:clip}
+  table.score th:first-child{width:27%}
+  table.score th:last-child{width:15%}
+  table.score input{font-size:16px;min-width:0}
+  .tools{gap:8px}
+  .tools button{margin-right:0;padding:10px 12px}
+
+  /* Spodní lišta jako dvě řady velkých tlačítek */
+  footer{display:grid;grid-template-columns:repeat(4,1fr)}
+  footer button{padding:0 4px;min-height:52px;font-size:14px;border-right:2px solid var(--line);border-bottom:2px solid var(--line)}
+  footer button:nth-child(4){border-right:0}
+  #btnPrev,#btnNext{grid-column:span 2;border-bottom:0;font-size:16px}
+  #btnPrev{margin-left:0;border-right:2px solid var(--line)}
+  #btnNext{border-right:0;background:var(--ink-2)}
+  #btnPick{display:none}                    /* ukázky se načítají z menu nebo přímo z rámečku ukázky */
+}
+
+/* Telefon na šířku – málo místa na výšku */
+@media (max-height:500px) and (orientation:landscape){
+  header{min-height:40px}
+  .mark,.roundtag,.counter,.appback{padding-top:6px;padding-bottom:6px}
+  .mark b{display:none}
+  main{padding:12px 20px;place-items:start stretch}
+  .slide.on{margin-block:auto}
+  .slide.light{margin:-12px -20px;padding:14px 26px;min-height:calc(100% + 24px)}
+  .big h1{font-size:clamp(28px,6vw,44px)}
+  .big p{margin-top:10px;font-size:15px}
+  .keys{margin-top:12px}
+  .qwrap{gap:12px}
+  .qtext{font-size:clamp(20px,3.6vw,30px);max-width:none}
+  .opts{grid-template-columns:repeat(3,minmax(0,1fr));gap:6px 14px;max-width:none}
+  .opts .hintlabel{grid-column:1/-1}
+  .opt{font-size:17px;padding:5px 0 5px 12px}
+  .reveal{padding:10px 14px}
+  .reveal .t{font-size:20px}
+  .reveal .e{font-size:14px;margin-top:6px}
+  .mediagrid{grid-template-columns:minmax(0,1.15fr) minmax(0,1fr);gap:16px}
+  .mediagrid .qtext{font-size:18px!important}
+  .play{width:60px;height:60px}
+  .play::after{border-left-width:19px;border-top-width:12px;border-bottom-width:12px;margin-left:5px}
+  .meter{height:52px}
+  .cover p{font-size:12px}
+  .clock{font-size:clamp(70px,24vh,150px)}
+  footer{display:flex}
+  footer button{flex:1 1 auto;padding:0 8px;min-height:46px;font-size:14px;border-bottom:0}
+  footer button:nth-child(4){border-right:2px solid var(--line)}
+  #btnPrev,#btnNext{grid-column:auto;font-size:15px}
+  #btnPrev{margin-left:0;border-right:2px solid var(--line)}
+  #btnPick{display:none}
+}

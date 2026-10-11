@@ -89,6 +89,13 @@ e-mail → voláno → osobní návštěva, poznámka). Stačí otevřít `cyklo
 Dokumentace: [shrnutí na 1 stránku](cyklo-ski-mapa/docs/SHRNUTI.md) · [manuál pro obchodní tým](cyklo-ski-mapa/docs/MANUAL.md)
 · [metodika dat](cyklo-ski-mapa/docs/METODIKA.md) · [nasazení a provoz](cyklo-ski-mapa/NASAZENI.md).
 
+## Další projekt v repozitáři: Boubínský kvíz
+
+Složka [`kviz/`](kviz/README.md) obsahuje **Boubínský kvíz** – Android aplikaci se čtyřmi rodinnými kvízy
+(50 otázek, filmové a hudební ukázky, odpočet, řešení a skóre týmů). Původní HTML kvízy běží v aplikaci beze změny,
+přidává se jen úprava pro telefon (listování prstem, pozice se pamatuje). Ukázky se do aplikace nahrají jednou
+z Disku Google. APK sestavuje GitHub Actions (*Kvíz APK*), lokálně `cd kviz/android && ./gradlew assembleDebug`.
+
 ## Licence
 
 MIT

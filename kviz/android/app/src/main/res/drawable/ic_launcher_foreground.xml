@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Červený čtverec s otazníkem – stejný motiv jako číslo bloku v kvízu. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <path android:fillColor="#D6371F" android:pathData="M31,31h46v46h-46z" />
+    <path
+        android:pathData="M45.5,47.5a8.5,8.5 0,1 1,13.2 7.1c-2.9,1.9 -4.7,3.6 -4.7,6.9v1.5"
+        android:strokeWidth="5.5"
+        android:strokeColor="#FFFFFF"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round" />
+    <path android:fillColor="#FFFFFF" android:pathData="M54,70.5m-3.4,0a3.4,3.4 0,1 1,6.8 0a3.4,3.4 0,1 1,-6.8 0" />
+</vector>

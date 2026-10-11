@@ -1,0 +1,56 @@
+# Sestaví APK Boubínského kvízu (kviz/) na runnerech GitHubu a nabídne ho ke stažení
+# v záložce Actions → běh → Artifacts → boubinsky-kviz-apk.
+# Při pushnutí tagu kviz-v1.2.3 navíc vytvoří GitHub Release s APK (odkaz se dá otevřít rovnou v telefonu).
+name: Kvíz APK
+
+on:
+  push:
+    branches: ["**"]
+    tags: ["kviz-v*"]
+    paths:
+      - "kviz/**"
+      - ".github/workflows/kviz-android.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Android SDK
+        uses: android-actions/setup-android@v3
+        with:
+          packages: "platforms;android-34 build-tools;34.0.0 platform-tools"
+
+      - name: Gradle cache
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Testy párování ukázek a sestavení APK
+        working-directory: kviz/android
+        run: ./gradlew --no-daemon testDebugUnitTest assembleDebug
+
+      - name: Pojmenovat APK
+        run: cp kviz/android/app/build/outputs/apk/debug/app-debug.apk boubinsky-kviz.apk
+
+      - name: Nahrát APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: boubinsky-kviz-apk
+          path: boubinsky-kviz.apk
+          if-no-files-found: error
+
+      - name: Release při tagu
+        if: startsWith(github.ref, 'refs/tags/kviz-v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: boubinsky-kviz.apk

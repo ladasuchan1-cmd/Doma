@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Boubínské rodinné kvízování</title>
+<style>
+:root{--ink:#14161a;--ink-2:#1e2128;--paper:#f2efe9;--red:#d6371f;--ochre:#e5a50a;--line:#3a3f4a;--muted:#9aa1ad;--green:#4fbf7f;--warn:#ff6a52}
+*{box-sizing:border-box;margin:0;padding:0}
+html{-webkit-tap-highlight-color:transparent}
+body{background:var(--ink);color:var(--paper);font-family:"Helvetica Neue",Helvetica,Arial,sans-serif;font-size:16px;line-height:1.4}
+.wrap{max-width:780px;margin:0 auto;padding:30px 16px 48px}
+h1{font-size:clamp(34px,9vw,60px);line-height:.98;letter-spacing:-.035em;font-weight:700}
+h1 em{font-style:normal;display:block;color:var(--ochre)}
+.lead{margin-top:14px;color:var(--muted);max-width:60ch;line-height:1.5}
+h2{font-size:13px;letter-spacing:.09em;text-transform:uppercase;color:var(--muted);margin:34px 0 12px;font-weight:700}
+.box{border:2px solid var(--line);margin-bottom:14px}
+.quiz .top{display:flex;gap:14px;padding:16px 16px 12px;align-items:flex-start}
+.no{width:46px;height:46px;background:var(--red);color:#fff;display:grid;place-items:center;font-weight:700;font-size:21px;flex:none}
+.name{font-weight:700;font-size:20px;letter-spacing:-.02em}
+.rounds{color:var(--muted);font-size:13px;line-height:1.45;margin-top:4px}
+.chips{display:flex;flex-wrap:wrap;gap:8px;padding:0 16px 14px}
+.chip{font-size:13px;font-weight:700;padding:5px 10px;border:2px solid var(--line);color:var(--muted)}
+.chip.ok{color:var(--green);border-color:#2f6e4b}
+.chip.part{color:var(--ochre);border-color:#7d6a2f}
+.chip.none{color:var(--warn);border-color:#7a3226}
+.btns{display:flex;border-top:2px solid var(--line)}
+button{font:inherit;font-size:16px;font-weight:700;color:var(--paper);background:transparent;border:0;border-right:2px solid var(--line);
+  padding:14px 16px;min-height:54px;flex:1;cursor:pointer;touch-action:manipulation;-webkit-user-select:none;user-select:none}
+button:last-child{border-right:0}
+button.primary{background:var(--red)}
+button:active{background:var(--ink-2)}
+button.primary:active{background:#b92c17}
+button:disabled{color:#5b616d;background:transparent}
+.body{padding:16px;line-height:1.5}
+.status{font-size:19px;font-weight:700;letter-spacing:-.01em}
+.status span{color:var(--muted);font-weight:400;font-size:15px}
+.muted{color:var(--muted);font-size:15px;margin-top:8px}
+#prog{margin-top:14px}
+#prog .t{font-size:14px;color:var(--ochre)}
+.bar{height:8px;background:var(--ink-2);margin-top:8px}
+.bar span{display:block;height:100%;width:0;background:var(--ochre);transition:width .2s}
+#result{margin-top:14px;border-left:6px solid var(--ochre);padding:6px 0 6px 12px;font-size:15px}
+#result.ok{border-left-color:var(--green)}
+#result.bad{border-left-color:var(--warn)}
+details{border-top:2px solid var(--line)}
+summary{padding:15px 16px;font-weight:700;cursor:pointer;list-style:none;display:flex;justify-content:space-between}
+summary::after{content:"+";color:var(--muted)}
+details[open] summary::after{content:"–"}
+ol.how{padding:0 16px 16px 38px;color:var(--paper);font-size:15px;line-height:1.55}
+ol.how li{margin-bottom:8px}
+ol.how b{color:var(--ochre)}
+.tip{padding:0 16px 16px;color:var(--muted);font-size:14px;line-height:1.5}
+.clips{padding:0 16px 14px}
+.clips h3{font-size:14px;margin:12px 0 6px;color:var(--muted)}
+.clips ul{list-style:none;font-size:14px}
+.clips li{display:flex;gap:10px;padding:5px 0;border-bottom:1px solid var(--line);word-break:break-word}
+.clips li i{font-style:normal;font-weight:700;width:1.2em;flex:none}
+.clips li.y i{color:var(--green)}
+.clips li.n i{color:var(--warn)}
+.foot{margin-top:28px;color:#5b616d;font-size:13px;text-align:center}
+.nojs{padding:20px;border:2px solid var(--line);color:var(--muted)}
+.banner{margin-top:22px;border:2px solid #7d6a2f;display:flex;align-items:center;gap:12px;padding:0 0 0 14px}
+.banner p{flex:1;font-size:15px;color:var(--ochre);padding:10px 0}
+.banner button{flex:none;border-left:2px solid #7d6a2f;color:var(--ochre)}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Boubínské<em>rodinné kvízování</em></h1>
+  <p class="lead">Čtyři kvízy, v každém pět bloků po dvou okruzích a 50 otázek. Hraje se v týmech, telefon slouží jako prezentace
+    pro moderátora – otoč ho na šířku nebo ho zrcadli na televizi.</p>
+
+  <div class="banner" id="banner" hidden><p id="bannerText"></p><button id="bJump">Nahrát</button></div>
+
+  <h2>Kvízy</h2>
+  <div id="quizzes"><p class="nojs">Načítám…</p></div>
+
+  <h2>Ukázky z filmů a hudby</h2>
+  <section class="box" id="media">
+    <div class="body">
+      <div class="status" id="mstatus">–</div>
+      <p class="muted">Filmové a hudební ukázky nejsou součástí aplikace. Nahraj je jednou z Disku Google nebo z telefonu –
+        aplikace si je uloží a pak už fungují i bez internetu.</p>
+      <div id="prog" hidden><div class="t"></div><div class="bar"><span></span></div></div>
+      <div id="result" hidden></div>
+    </div>
+    <div class="btns">
+      <button class="primary" id="bFiles">Vybrat soubory</button>
+      <button id="bFolder">Vybrat složku</button>
+    </div>
+    <details id="howto">
+      <summary>Jak ukázky nahrát</summary>
+      <ol class="how">
+        <li>Klepni na <b>Vybrat soubory</b>.</li>
+        <li>Ve výběru otevři nabídku <b>☰</b> vlevo nahoře a zvol <b>Disk</b> (Disk Google).</li>
+        <li>Otevři složku <b>Kviz → videos</b>, podrž prst na prvním videu a pak klepnutím označ další
+          (případně v nabídce <b>⋮</b> zvol <b>Vybrat vše</b>). Potvrď tlačítkem <b>Vybrat</b>.</li>
+        <li>Aplikace si sama vybere soubory, které kvízy potřebují, a zkopíruje je. Totéž zopakuj pro složku <b>hudba</b>.</li>
+      </ol>
+      <p class="tip">Máš složku Kviz přímo v telefonu (třeba zkopírovanou z počítače)? Klepni na <b>Vybrat složku</b> a zvol ji –
+        aplikace projde i podsložky. Všech 40 ukázek má dohromady asi 210 MB – nahrávej přes Wi‑Fi a nech aplikaci
+        otevřenou, dokud nedoběhne. Kdyby se nahrávání přerušilo, stačí ho spustit znovu, hotové ukázky zůstanou.</p>
+    </details>
+    <details>
+      <summary>Seznam ukázek</summary>
+      <div class="clips" id="clips"></div>
+    </details>
+    <div class="btns"><button id="bDelete">Smazat ukázky z telefonu</button></div>
+  </section>
+
+  <p class="foot" id="foot"></p>
+</div>
+<script>
+const app = window.KvizApp;
+const $ = s => document.querySelector(s);
+const esc = s => String(s).replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const plural = (n,a,b,c) => n===1 ? a : (n>=2 && n<=4 ? b : c);
+const fmt = n => n >= 1048576 ? Math.round(n/1048576) + " MB" : Math.round(n/1024) + " kB";
+const pos = file => { try { return JSON.parse(localStorage.getItem("kviz-pos:" + file) || "null"); } catch(e) { return null; } };
+let total = 0;
+const open = (file, fromStart) => { location.href = "/kviz/" + encodeURIComponent(file) + (fromStart ? "#od-zacatku" : ""); };
+
+function render(){
+  if (!app) { $("#quizzes").innerHTML = '<p class="nojs">Tahle stránka běží jen v aplikaci Boubínský kvíz.</p>'; return; }
+  const st = JSON.parse(app.state());
+  $("#quizzes").innerHTML = st.quizzes.map((q, i) => {
+    const p = pos(q.file), started = p && p.i > 0;
+    const cls = q.have === q.total ? "ok" : (q.have ? "part" : "none");
+    const no = (q.title.match(/(\d+)\s*$/) || [0, i + 1])[1];
+    return `<section class="box quiz">
+      <div class="top"><div class="no">${esc(no)}</div><div>
+        <div class="name">Kvíz ${esc(no)}</div>
+        <div class="rounds">${esc(q.rounds.join(" · "))}</div></div></div>
+      <div class="chips">
+        ${q.total ? `<span class="chip ${cls}">Ukázky ${q.have}/${q.total}</span>` : ""}
+        ${started ? `<span class="chip">Rozehráno · snímek ${p.i + 1} z ${p.n}</span>` : ""}
+      </div>
+      <div class="btns">
+        <button class="primary" data-open="${esc(q.file)}">${started ? "Pokračovat" : "Hrát"}</button>
+        ${started ? `<button data-restart="${esc(q.file)}">Od začátku</button>` : ""}
+      </div></section>`;
+  }).join("");
+
+  const m = st.media;
+  total = m.total;
+  $("#mstatus").innerHTML = m.have === m.total
+    ? `Všech ${m.total} ukázek je v telefonu <span>· ${fmt(m.bytes)}</span>`
+    : `V telefonu je ${m.have} z ${m.total} ukázek${m.have ? ` <span>· ${fmt(m.bytes)}</span>` : ""}`;
+  $("#clips").innerHTML = st.quizzes.map((q, i) => `<h3>${esc(q.title)} · ${q.have}/${q.total}</h3><ul>${
+    q.clips.map(c => `<li class="${c.have ? "y" : "n"}"><i>${c.have ? "✓" : "✗"}</i><span>${esc(c.label)}</span></li>`).join("")}</ul>`).join("");
+  $("#banner").hidden = m.have === m.total;
+  $("#bannerText").textContent = m.have ? `Chybí ještě ${m.total - m.have} z ${m.total} ukázek z filmů a hudby.` : "Nejdřív nahraj ukázky z filmů a hudby.";
+  $("#bDelete").disabled = !m.have || st.busy;
+  $("#bFiles").disabled = $("#bFolder").disabled = st.busy;
+  if (!m.have && !sessionStorage.getItem("howto")) { $("#howto").open = true; sessionStorage.setItem("howto", "1"); }
+  if (st.busy) showProgress("Ukázky se nahrávají…", null);
+  $("#foot").textContent = "Boubínský kvíz " + app.version();
+}
+
+function showProgress(text, ratio){
+  $("#prog").hidden = false;
+  $("#prog .t").textContent = text;
+  $("#prog .bar span").style.width = ratio == null ? "0" : Math.round(ratio * 100) + "%";
+}
+
+window.kvizProgress = p => {
+  $("#result").hidden = true;
+  $("#bFiles").disabled = $("#bFolder").disabled = $("#bDelete").disabled = true;
+  if (p.message) return showProgress(p.message, null);
+  const part = p.size > 0 ? p.done / p.size : 0;
+  showProgress(`Kopíruji ${p.index} z ${p.count}: ${p.name}${p.size > 0 ? " · " + Math.round(part * 100) + " %" : " · " + fmt(p.done)}`,
+               (p.index - 1 + Math.min(1, part)) / p.count);
+};
+
+window.kvizImportDone = r => {
+  $("#prog").hidden = true;
+  const box = $("#result");
+  box.hidden = false;
+  box.className = "";
+  if (r.error) { box.className = "bad"; box.textContent = "Ukázky se nepodařilo nahrát: " + r.error; }
+  else if (r.deleted) { box.textContent = "Ukázky jsou smazané."; }
+  else {
+    const n = r.copied.length, miss = r.missing.length;
+    const lines = [];
+    lines.push(n ? `Nahráno ${n} ${plural(n,"ukázka","ukázky","ukázek")}.`
+                 : (r.kept ? "Vybrané ukázky už v aplikaci jsou." : "Ve vybraných souborech není žádná ukázka z kvízů."));
+    const similar = r.copied.filter(c => !c.exact);
+    if (similar.length) lines.push("Podle podobného názvu: " + similar.map(c => `${esc(c.from)} → ${esc(c.label)}`).join(", ") + ".");
+    if (r.unused) lines.push(`${r.unused} ${plural(r.unused,"vybraný soubor kvízy nepotřebují","vybrané soubory kvízy nepotřebují","vybraných souborů kvízy nepotřebují")} – přeskočeno.`);
+    if (r.failed.length) lines.push(`Nepodařilo se zkopírovat: ${r.failed.map(f => esc(f.label) + " (" + esc(f.error) + ")").join(", ")}.`);
+    lines.push(miss ? `Ještě chybí ${miss} z ${total} – které, ukazuje „Seznam ukázek“.` : "Všechny ukázky jsou připravené.");
+    box.className = miss || r.failed.length ? "" : "ok";
+    box.innerHTML = lines.join("<br>");
+  }
+  render();
+};
+
+document.addEventListener("click", e => {
+  const b = e.target.closest("button");
+  if (!b) return;
+  if (b.dataset.open) open(b.dataset.open, false);
+  else if (b.dataset.restart) open(b.dataset.restart, true);
+  else if (b.id === "bFiles") app.importFiles();
+  else if (b.id === "bFolder") app.importFolder();
+  else if (b.id === "bDelete") app.deleteMedia();
+  else if (b.id === "bJump") { $("#howto").open = true; $("#media").scrollIntoView({behavior: "smooth"}); }
+});
+render();
+</script>
+</body>
+</html>
