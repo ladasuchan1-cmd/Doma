@@ -1,5 +1,7 @@
 /* Propojení kvízu s aplikací: ukázky uložené v telefonu, listování prstem, uložená pozice a tlačítko Menu.
-   Běží za původním skriptem kvízu a používá jeho proměnné (slides, idx, cur, go, load, render). */
+   Běží za původním skriptem kvízu a používá jeho proměnné (slides, idx, cur, go, load, render, MEDIA).
+   V Android aplikaci mluví s window.KvizApp; ve webové verzi (kviz/artifact) bere ukázky z window.KVIZ_MEDIA
+   (normalizovaný název → adresa) a Menu vede na stránku, kterou si menu uložilo. */
 (function(){
   const app = window.KvizApp;
   const file = decodeURIComponent(location.pathname.split("/").pop());
@@ -11,13 +13,19 @@
   const back = document.createElement("button");
   back.className = "appback";
   back.innerHTML = "<b>‹</b><span>Menu</span>";
-  back.onclick = () => app ? app.exitQuiz() : (location.href = "/app/menu.html");
+  back.onclick = () => {
+    if (app) return app.exitQuiz();
+    let menu = "./";
+    try { menu = localStorage.getItem("kviz-menu") || menu; } catch(e){}
+    location.href = menu;
+  };
   document.querySelector("#stage > header").prepend(back);
 
   /* Ukázky: místo výběru složky v prohlížeči se otevře výběr souborů v telefonu a aplikace si je uloží */
   document.getElementById("btnPick").textContent = "Ukázky";
   document.querySelectorAll('[data-err="folder"]').forEach(b => b.textContent = "Načíst ukázky");
-  document.querySelectorAll(".err > div").forEach(d => { if (d.firstChild) d.firstChild.textContent = "Ukázka zatím není v telefonu. "; });
+  document.querySelectorAll(".err > div").forEach(d => { if (d.firstChild) d.firstChild.textContent = app ? "Ukázka zatím není v telefonu. " : "Ukázka tu zatím není. "; });
+  if (window.KVIZ_MEDIA) Object.entries(window.KVIZ_MEDIA).forEach(([k, url]) => { MEDIA[k] = {url, name: k}; });
   const pick = document.getElementById("pick"), one = document.getElementById("pickone");
   if (app) {
     pick.click = () => app.importFiles();

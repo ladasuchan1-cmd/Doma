@@ -4,12 +4,19 @@
 pět bloků po dvou okruzích, 50 otázek, filmové a hudební ukázky, odpočet času, řešení a tabulku skóre. Telefon slouží
 jako prezentace pro moderátora – dá se otočit na šířku nebo zrcadlit na televizi.
 
+Existuje ve dvou podobách se stejnými kvízy a stejnou mobilní úpravou:
+
+- **Webová verze bez instalace** – soukromá stránka na claude.ai s ukázkami nahranými přímo ve stránce; stačí otevřít
+  odkaz (viz [Webová verze](#webová-verze-bez-instalace)).
+- **Android aplikace (APK)** – funguje i bez internetu, ale instalaci mimo Obchod Play musí telefon povolit.
+
 ## Instalace
 
 1. Stáhni `boubinsky-kviz.apk` do telefonu – z GitHubu (záložka **Actions → Kvíz APK → poslední běh → Artifacts**,
    soubor je zabalený v ZIPu), nebo z **Releases**, pokud je vydaná verze (tag `kviz-v…`).
 2. Otevři stažený soubor. Android se zeptá, jestli smí prohlížeč / Soubory instalovat aplikace z neznámých zdrojů –
-   povol to a dej **Instalovat**.
+   povol to a dej **Instalovat**. Samsung s **Automatickým blokováním** instalaci odmítne úplně; vypíná se v
+   *Nastavení → Zabezpečení a soukromí → Automatické blokování* (po instalaci ho jde zase zapnout).
 3. Aplikace se jmenuje **Boubínský kvíz**. Novější verze se instaluje přes starou, ukázky i skóre zůstanou.
 
 Aplikace nepotřebuje žádná oprávnění ani internet (jen při nahrávání ukázek z Disku Google).
@@ -71,6 +78,19 @@ kviz/
 - APK je podepsané pevným ladicím klíčem `android/app/debug.keystore` (heslo `android`), aby se každá nová verze
   – z GitHubu i z vlastního počítače – nainstalovala přes předchozí bez ztráty nahraných ukázek. Nejde o tajemství,
   jen o stejný podpis.
+
+## Webová verze (bez instalace)
+
+`kviz/artifact/` sestaví z týchž souborů stránku pro claude.ai: `index.html` je menu, kvízy jsou vedle jako samostatné
+stránky s vloženým `mobile.css` a `bridge.js` (ve webovém režimu bere ukázky z `ukazky.js` a tlačítko Menu vede zpět
+na menu). Ukázky jsou nahrané jako soubory stránky (assets), stránka je soukromá – otevře ji jen vlastník a ti, se
+kterými ji sdílí. Repozitář ani GitHub je neobsahují.
+
+```bash
+python3 kviz/artifact/build.py /tmp/web-kviz ukazky.json   # ukazky.json: {"titanic": "/_blob/…", …}
+```
+
+Skript vypíše mapu `files` pro publikování (pozadí jsou JPEG pod názvy `.png`, které kvíz volá).
 
 ## Vývoj
 

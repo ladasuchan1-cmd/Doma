@@ -1,0 +1,92 @@
+<title>Boubínský kvíz</title>
+<style>
+/* Jeden tmavý vzhled jako kvíz: inkoust, papír, červená a okr; čtvercové rámečky bez stínů. */
+:root{--ink:#14161a;--ink-2:#1e2128;--paper:#f2efe9;--red:#d6371f;--red-dark:#b92c17;--ochre:#e5a50a;--line:#3a3f4a;--muted:#9aa1ad;
+  --green:#4fbf7f;--warn:#ff6a52;--sans:"Helvetica Neue",Helvetica,Arial,sans-serif;color-scheme:dark}
+*{box-sizing:border-box}
+body{background:var(--ink);color:var(--paper);font-family:var(--sans);font-size:16px;line-height:1.4;-webkit-tap-highlight-color:transparent}
+.wrap{max-width:780px;margin:0 auto;padding-inline:16px;padding-block:28px 44px}
+h1{margin:0;font-size:clamp(34px,9vw,60px);line-height:.98;letter-spacing:-.035em;text-wrap:balance}
+h1 em{font-style:normal;display:block;color:var(--ochre)}
+.lead{margin:14px 0 0;color:var(--muted);max-width:60ch;line-height:1.5}
+h2{font-size:13px;letter-spacing:.09em;text-transform:uppercase;color:var(--muted);margin:32px 0 12px}
+.list{display:grid;gap:14px}
+@media (min-width:720px){.list{grid-template-columns:1fr 1fr}}
+.quiz{border:2px solid var(--line);display:grid;grid-template-rows:auto 1fr auto;min-width:0}
+.top{display:flex;gap:14px;padding:16px 16px 10px;align-items:flex-start}
+.no{width:46px;height:46px;background:var(--red);color:#fff;display:grid;place-items:center;font-weight:700;font-size:21px;flex:none}
+.name{font-weight:700;font-size:20px;letter-spacing:-.02em}
+.rounds{color:var(--muted);font-size:13px;line-height:1.45;margin-top:4px}
+.chips{display:flex;flex-wrap:wrap;gap:8px;padding:0 16px 14px;align-content:flex-start}
+.chip{font-size:13px;font-weight:700;padding:5px 10px;border:2px solid var(--line);color:var(--muted)}
+.chip.ok{color:var(--green);border-color:#2f6e4b}
+.chip.part{color:var(--ochre);border-color:#7d6a2f}
+.btns{display:flex;border-top:2px solid var(--line)}
+button{font:inherit;font-size:16px;font-weight:700;color:var(--paper);background:transparent;border:0;border-right:2px solid var(--line);
+  padding:14px 16px;min-height:54px;flex:1;cursor:pointer;touch-action:manipulation}
+button:last-child{border-right:0}
+button.primary{background:var(--red)}
+button:active{background:var(--ink-2)}
+button.primary:active{background:var(--red-dark)}
+button:focus-visible{outline:3px solid var(--ochre);outline-offset:-3px}
+.how{border:2px solid var(--line);padding:4px 16px 12px}
+.how dl{display:grid;grid-template-columns:max-content 1fr;gap:8px 14px;margin:12px 0 0;font-size:15px}
+.how dt{font-weight:700;color:var(--ochre)}
+.how dd{margin:0;color:var(--paper)}
+.note{margin:14px 0 0;color:var(--muted);font-size:14px;line-height:1.5;max-width:65ch}
+</style>
+
+<div class="wrap">
+  <h1>Boubínské<em>rodinné kvízování</em></h1>
+  <p class="lead">Čtyři kvízy, v každém pět bloků po dvou okruzích a 50 otázek s filmovými a hudebními ukázkami.
+    Telefon slouží jako prezentace pro moderátora, klidně ho otoč na šířku.</p>
+
+  <h2>Kvízy</h2>
+  <div class="list" id="quizzes"></div>
+
+  <h2>Ovládání</h2>
+  <section class="how">
+    <dl>
+      <dt>Další, Zpět</dt><dd>listování, nebo přejeď prstem doleva a doprava</dd>
+      <dt>Nápověda</dt><dd>tři možnosti, trefa s nápovědou platí za půl bodu</dd>
+      <dt>Odpověď</dt><dd>správné řešení s vysvětlením</dd>
+      <dt>Přehrát</dt><dd>pustí ukázku, na snímku s časem spustí dvě minuty</dd>
+      <dt>S klipem</dt><dd>u hudby pustí i obraz</dd>
+      <dt>‹ Menu</dt><dd>zpět sem, kvíz si pamatuje, kde jste skončili</dd>
+    </dl>
+    <p class="note">Ukázky se přehrávají přes internet, stačí běžná mobilní data nebo Wi‑Fi.</p>
+  </section>
+</div>
+
+<script>
+const KVIZY = /*KVIZY*/[];
+const esc = s => String(s).replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const pos = file => { try { return JSON.parse(localStorage.getItem("kviz-pos:" + file) || "null"); } catch (e) { return null; } };
+try { localStorage.setItem("kviz-menu", location.href.split("#")[0]); } catch (e) {}
+
+function render() {
+  document.getElementById("quizzes").innerHTML = KVIZY.map(q => {
+    const p = pos(q.file), started = p && p.i > 0;
+    return `<section class="quiz">
+      <div class="top"><div class="no">${esc(q.no)}</div><div>
+        <div class="name">Kvíz ${esc(q.no)}</div>
+        <div class="rounds">${esc(q.rounds.join(" · "))}</div></div></div>
+      <div class="chips">
+        <span class="chip ${q.have === q.total ? "ok" : "part"}">Ukázky ${q.have}/${q.total}</span>
+        ${started ? `<span class="chip">Rozehráno · snímek ${p.i + 1} z ${p.n}</span>` : ""}
+      </div>
+      <div class="btns">
+        <button class="primary" data-open="${esc(q.file)}">${started ? "Pokračovat" : "Hrát"}</button>
+        ${started ? `<button data-restart="${esc(q.file)}">Od začátku</button>` : ""}
+      </div></section>`;
+  }).join("");
+}
+document.addEventListener("click", e => {
+  const b = e.target.closest("button");
+  if (!b) return;
+  if (b.dataset.open) location.href = b.dataset.open;
+  else if (b.dataset.restart) location.href = b.dataset.restart + "#od-zacatku";
+});
+window.addEventListener("pageshow", render);
+render();
+</script>
