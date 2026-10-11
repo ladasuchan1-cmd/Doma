@@ -278,6 +278,50 @@ const bridge = (state) => {
       await pc.close();
     }
 
+    // Veřejný server (kviz/webapp/server.mjs): ukázky pod heslem, rozšifrování v prohlížeči
+    {
+      const os = require('os');
+      const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'kviz-srv-')), clips = path.join(tmp, 'ukazky-src'), site = path.join(tmp, 'web');
+      fs.mkdirSync(clips);
+      fs.copyFileSync(MEDIA.titanic, path.join(clips, 'TITANIC.webm'));
+      require('child_process').execFileSync(process.execPath, [path.join(ROOT, 'kviz/webapp/server.mjs'), site, clips], { env: { ...process.env, KVIZ_HESLO: 'tajne' } });
+      const pages = http.createServer((q, r) => {   // jako GitHub Pages: typ podle přípony, nic navíc
+        let p = decodeURIComponent(q.url.split('?')[0]); if (p.endsWith('/')) p += 'index.html';
+        const f = path.join(site, p);
+        if (!f.startsWith(site) || !fs.existsSync(f)) { r.writeHead(404); return r.end(); }
+        r.writeHead(200, { 'content-type': { html: 'text/html; charset=utf-8', css: 'text/css', js: 'text/javascript', png: 'image/png', bin: 'application/octet-stream' }[f.split('.').pop()] || 'application/octet-stream' });
+        r.end(fs.readFileSync(f));
+      });
+      await new Promise((res) => pages.listen(0, '127.0.0.1', res));
+      const sb = 'http://127.0.0.1:' + pages.address().port + '/';
+      const sc = await browser.newContext({ viewport: { width: 412, height: 915 }, hasTouch: true, isMobile: true });
+      const sp = await sc.newPage();
+      const serr = []; sp.on('pageerror', (e) => serr.push(String(e)));
+      await sp.goto(sb);
+      check('server: menu žádá heslo', await sp.isVisible('#lock'));
+      check('server: heslo není ve zveřejněných souborech', !fs.readFileSync(path.join(site, 'ukazky.js'), 'utf8').includes('tajne'));
+      await sp.fill('#heslo', 'spatne'); await sp.click('#bUnlock');
+      await sp.waitForSelector('#lockBad:not([hidden])');
+      check('server: špatné heslo odmítne', await sp.isVisible('#lock'));
+      await sp.fill('#heslo', 'tajne'); await sp.click('#bUnlock');
+      await sp.waitForSelector('#lock', { state: 'hidden' });
+      check('server: správné heslo odemkne', !(await sp.isVisible('#lock')));
+      await sp.click('[data-open="kviz-boubin-01.html"]'); await sp.waitForSelector('.appback');
+      const bgOk = await sp.evaluate(() => new Promise((res) => { const i = new Image(); i.onload = () => res(i.naturalWidth > 0); i.onerror = () => res(false); i.src = 'pozadi/historie.png'; }));
+      check('server: pozadí (JPEG pod .png) se zobrazí', bgOk);
+      await slideTo(sp, 's.kind==="m" && s.no===1 && s.name==="Film"');
+      await sp.click('#btnA');                                 // stisknuto ještě během rozšifrování → pustí se samo
+      await sp.waitForFunction(() => { const v = cur().node.querySelector('video'); return !v.paused && v.currentTime > 0.3; }, null, { timeout: 8000 }).catch(() => {});
+      check('server: ukázka se rozšifruje a sama pustí', await sp.evaluate(() => { const v = cur().node.querySelector('video'); return v.currentSrc.startsWith('blob:') && !v.paused; }));
+      await sp.evaluate(() => localStorage.removeItem('kviz-klic'));
+      await sp.reload(); await sp.waitForSelector('.appback');
+      await slideTo(sp, 's.kind==="m" && s.no===1 && s.name==="Film"');
+      await sp.waitForFunction(() => cur().node.querySelector('.err').classList.contains('on'), null, { timeout: 8000 }).catch(() => {});
+      check('server: bez hesla ukáže, že je ukázka zamčená', (await sp.textContent('.slide.on .err')).includes('zamčené heslem'));
+      check('server: bez chyb JS', serr.length === 0, serr.join(' | '));
+      await sc.close(); pages.close(); fs.rmSync(tmp, { recursive: true, force: true });
+    }
+
     // Všechny čtyři kvízy se otevřou bez chyb
     for (const q of quizzes) {
       const e2 = [];

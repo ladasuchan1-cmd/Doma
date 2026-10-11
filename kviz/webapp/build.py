@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Sestaví webovou verzi Boubínského kvízu (stránka na claude.ai) do zadané složky.
 
-    python3 kviz/artifact/build.py VÝSTUP [ukazky.json]
+    python3 kviz/webapp/build.py VÝSTUP [ukazky.json]
 
 ukazky.json = {"titanic": "<adresa nahrané ukázky>", ...}; klíč je normalizovaný název souboru
 (stejně jako Names.norm v aplikaci). Kvízy se berou beze změny z kviz/web, přidá se jen mobilní

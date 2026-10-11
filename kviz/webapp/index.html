@@ -34,12 +34,28 @@ button:focus-visible{outline:3px solid var(--ochre);outline-offset:-3px}
 .how dt{font-weight:700;color:var(--ochre)}
 .how dd{margin:0;color:var(--paper)}
 .note{margin:14px 0 0;color:var(--muted);font-size:14px;line-height:1.5;max-width:65ch}
+.lock{margin-top:22px;border:2px solid #7d6a2f}
+.lock p{margin:0;padding:14px 16px 0;color:var(--ochre);font-size:15px;line-height:1.45}
+.lock form{display:flex;margin-top:12px;border-top:2px solid #7d6a2f}
+.lock input{flex:1;min-width:0;font:inherit;font-size:17px;color:var(--paper);background:var(--ink-2);border:0;padding:0 14px;min-height:54px}
+.lock input:focus{outline:3px solid var(--ochre);outline-offset:-3px}
+.lock button{flex:none;border-left:2px solid #7d6a2f;border-right:0}
+.lock .bad{color:var(--warn);padding-bottom:12px}
 </style>
 
 <div class="wrap">
   <h1>Boubínské<em>rodinné kvízování</em></h1>
   <p class="lead">Čtyři kvízy, v každém pět bloků po dvou okruzích a 50 otázek s filmovými a hudebními ukázkami.
     Telefon slouží jako prezentace pro moderátora, klidně ho otoč na šířku.</p>
+
+  <section class="lock" id="lock" hidden>
+    <p>Ukázky z filmů a hudby jsou zamčené heslem. Zadej ho jednou, telefon si ho zapamatuje.</p>
+    <form id="lockForm">
+      <input id="heslo" type="password" autocomplete="current-password" placeholder="Heslo" aria-label="Heslo k ukázkám">
+      <button class="primary" id="bUnlock" type="submit">Odemknout</button>
+    </form>
+    <p class="bad" id="lockBad" hidden>Heslo nesedí, zkus to znovu.</p>
+  </section>
 
   <h2>Kvízy</h2>
   <div class="list" id="quizzes"></div>
@@ -58,6 +74,7 @@ button:focus-visible{outline:3px solid var(--ochre);outline-offset:-3px}
   </section>
 </div>
 
+<!--SKRIPTY-->
 <script>
 const KVIZY = /*KVIZY*/[];
 const esc = s => String(s).replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
@@ -89,4 +106,17 @@ document.addEventListener("click", e => {
 });
 window.addEventListener("pageshow", render);
 render();
+
+/* Jen na veřejném serveru (sifra.js): ukázky jsou pod heslem */
+if (window.KvizSifra) {
+  const lock = document.getElementById("lock"), bad = document.getElementById("lockBad"), btn = document.getElementById("bUnlock");
+  lock.hidden = KvizSifra.unlocked();
+  document.getElementById("lockForm").addEventListener("submit", async e => {
+    e.preventDefault();
+    btn.disabled = true; btn.textContent = "Ověřuji…"; bad.hidden = true;
+    const ok = await KvizSifra.unlock(document.getElementById("heslo").value).catch(() => false);
+    btn.disabled = false; btn.textContent = "Odemknout";
+    if (ok) lock.hidden = true; else bad.hidden = false;
+  });
+}
 </script>

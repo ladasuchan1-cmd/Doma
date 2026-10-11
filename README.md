@@ -95,6 +95,7 @@ Složka [`kviz/`](kviz/README.md) obsahuje **Boubínský kvíz** – Android apl
 (50 otázek, filmové a hudební ukázky, odpočet, řešení a skóre týmů). Původní HTML kvízy běží v aplikaci beze změny,
 přidává se jen úprava pro telefon (listování prstem, pozice se pamatuje). Ukázky se do aplikace nahrají jednou
 z Disku Google. APK sestavuje GitHub Actions (*Kvíz APK*), lokálně `cd kviz/android && ./gradlew assembleDebug`.
+Veřejná webová verze běží na GitHub Pages z větve `kviz-web` (ukázky zašifrované heslem).
 
 ## Licence
 

@@ -4,10 +4,12 @@
 pět bloků po dvou okruzích, 50 otázek, filmové a hudební ukázky, odpočet času, řešení a tabulku skóre. Telefon slouží
 jako prezentace pro moderátora – dá se otočit na šířku nebo zrcadlit na televizi.
 
-Existuje ve dvou podobách se stejnými kvízy a stejnou mobilní úpravou:
+Existuje ve třech podobách se stejnými kvízy a stejnou mobilní úpravou:
 
-- **Webová verze bez instalace** – soukromá stránka na claude.ai s ukázkami nahranými přímo ve stránce; stačí otevřít
-  odkaz (viz [Webová verze](#webová-verze-bez-instalace)).
+- **Web na GitHub Pages** – https://ladasuchan1-cmd.github.io/Doma/ (větev `kviz-web`). Otevře ho kdokoli bez účtu
+  a instalace, na Androidu, iPhonu i počítači; ukázky jsou zašifrované a přehrají se až po zadání hesla
+  (viz [Veřejný web](#veřejný-web-github-pages)).
+- **Soukromá stránka na claude.ai** – jen pro vlastníka účtu, ukázky nahrané přímo ve stránce.
 - **Android aplikace (APK)** – funguje i bez internetu, ale instalaci mimo Obchod Play musí telefon povolit.
 
 ## Instalace
@@ -79,15 +81,35 @@ kviz/
   – z GitHubu i z vlastního počítače – nainstalovala přes předchozí bez ztráty nahraných ukázek. Nejde o tajemství,
   jen o stejný podpis.
 
-## Webová verze (bez instalace)
+## Webové verze
 
-`kviz/artifact/` sestaví z týchž souborů stránku pro claude.ai: `index.html` je menu, kvízy jsou vedle jako samostatné
-stránky s vloženým `mobile.css` a `bridge.js` (ve webovém režimu bere ukázky z `ukazky.js` a tlačítko Menu vede zpět
-na menu). Ukázky jsou nahrané jako soubory stránky (assets), stránka je soukromá – otevře ji jen vlastník a ti, se
-kterými ji sdílí. Repozitář ani GitHub je neobsahují.
+Obě se staví ze složky `kviz/webapp/`: `index.html` je menu (společná šablona), kvízy jsou vedle jako samostatné
+stránky s vloženým `mobile.css` a `bridge.js` z Android aplikace. Tlačítko Menu v kvízu vede zpět na menu.
+
+### Veřejný web (GitHub Pages)
+
+Větev `kviz-web` obsahuje jen sestavený web a GitHub Pages ji zveřejňuje (*Settings → Pages → Branch: kviz-web*).
+Filmové a hudební ukázky jsou chráněné autorským právem, proto na veřejném webu nejsou čitelně: `server.mjs` je
+zašifruje AES-256-GCM klíčem odvozeným z hesla (PBKDF2-SHA256, 210 000 iterací) a `sifra.js` je v prohlížeči
+rozšifruje, až když je kvíz potřebuje. Heslo se zadá jednou v menu, v prohlížeči zůstane jen odvozený klíč; ve
+větvi ani v repozitáři heslo není. Bez hesla jdou otázky hrát, ukázky ukážou „zamčené heslem“.
 
 ```bash
-python3 kviz/artifact/build.py /tmp/web-kviz ukazky.json   # ukazky.json: {"titanic": "/_blob/…", …}
+git worktree add ../kviz-web kviz-web                                  # předchozí sestavení: stejná sůl i nezměněné ukázky
+KVIZ_HESLO=… node kviz/webapp/server.mjs ../kviz-web ~/Kviz/ukazky      # složka s videi pojmenovanými jako na Disku
+cd ../kviz-web && git add -A && git commit -m "…" && git push
+```
+
+Do stávajícího sestavení jde jen s původním heslem (skript jiné odmítne), takže uložená hesla v telefonech dál platí
+a git nahraje jen nové nebo změněné ukázky.
+
+### Soukromá stránka na claude.ai
+
+`build.py` sestaví stránku pro claude.ai; ukázky jsou nahrané jako soubory stránky (assets) a `ukazky.js` obsahuje
+jejich adresy. Stránku otevře jen vlastník účtu a ti, se kterými ji sdílí.
+
+```bash
+python3 kviz/webapp/build.py /tmp/web-kviz ukazky.json   # ukazky.json: {"titanic": "/_blob/…", …}
 ```
 
 Skript vypíše mapu `files` pro publikování (pozadí jsou JPEG pod názvy `.png`, které kvíz volá).
@@ -97,7 +119,7 @@ Skript vypíše mapu `files` pro publikování (pozadí jsou JPEG pod názvy `.p
 ```bash
 cd kviz/android
 ./gradlew assembleDebug testDebugUnitTest    # APK v app/build/outputs/apk/debug/ + testy párování (JDK 17, Android SDK 34)
-cd ../.. && npm run e2e:kviz                 # menu a všechny čtyři kvízy v Chromiu (telefon na výšku/šířku, tablet)
+cd ../.. && npm run e2e:kviz                 # menu, všechny kvízy a veřejný web s heslem v Chromiu (telefon, tablet)
 ```
 
 Testy párování (`app/src/test/…/NamesTest.kt`) ověřují i to, že všech 40 ukázek ze čtyř kvízů je ve složce na Disku

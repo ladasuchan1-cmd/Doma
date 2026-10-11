@@ -1,7 +1,7 @@
 /* Propojení kvízu s aplikací: ukázky uložené v telefonu, listování prstem, uložená pozice a tlačítko Menu.
    Běží za původním skriptem kvízu a používá jeho proměnné (slides, idx, cur, go, load, render, MEDIA).
-   V Android aplikaci mluví s window.KvizApp; ve webové verzi (kviz/artifact) bere ukázky z window.KVIZ_MEDIA
-   (normalizovaný název → adresa) a Menu vede na stránku, kterou si menu uložilo. */
+   V Android aplikaci mluví s window.KvizApp; ve webové verzi (kviz/webapp) bere ukázky z window.KVIZ_MEDIA
+   (normalizovaný název → adresa) nebo je rozšifruje sifra.js, a Menu vede na stránku, kterou si menu uložilo. */
 (function(){
   const app = window.KvizApp;
   const file = decodeURIComponent(location.pathname.split("/").pop());
