@@ -1,0 +1,477 @@
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Boubínské rodinné kvízování 2</title>
+<style>
+:root{--ink:#14161a;--ink-2:#1e2128;--paper:#f2efe9;--red:#d6371f;--blue:#2749b8;--ochre:#e5a50a;--line:#3a3f4a;--muted:#9aa1ad}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%}
+body{background:var(--ink);color:var(--paper);font-family:"Helvetica Neue",Helvetica,Arial,sans-serif;font-size:16px;overflow:hidden}
+#stage{height:100vh;display:grid;grid-template-rows:auto auto 1fr auto}
+#stage>header{grid-row:1}
+#stage>#pickinfo{grid-row:2}
+#stage>main{grid-row:3;min-height:0}
+#stage>footer{grid-row:4}
+header{display:flex;border-bottom:2px solid var(--line)}
+.mark{padding:13px 22px;border-right:2px solid var(--line);display:flex;align-items:center;gap:14px;letter-spacing:-.02em}
+.mark b{font-size:17px}.mark span{color:var(--muted);font-size:14px}
+.roundtag{padding:13px 22px;display:flex;align-items:center;font-weight:700;font-size:17px;border-right:2px solid var(--line);letter-spacing:-.02em}
+.roundtag i{font-style:normal;width:26px;height:26px;margin-right:12px;background:var(--red);color:#fff;display:grid;place-items:center;font-size:14px}
+.counter{margin-left:auto;padding:13px 22px;display:flex;align-items:center;color:var(--muted);font-size:15px}
+main{position:relative;display:grid;place-items:center;padding:26px}
+.slide.light{background-color:#f5f2ec;background-size:cover;background-position:center;
+  margin:-26px;padding:34px 46px;min-height:100%;display:none;align-content:center}
+.slide.light.on{display:grid}
+.slide.light,.slide.light .big h1,.slide.light .qtext,.slide.light .opt,.slide.light .sol .a{color:#1f2933}
+.slide.light .big h1 em{color:#8a6d1f}
+.slide.light .big p,.slide.light .sol .q,.slide.light .sol .e,.slide.light .reveal .n{color:#5a6470}
+.slide.light .hintlabel{color:#8a6d1f;border-top-color:#c9c2b4}
+.slide.light .opt{border-left-color:#c9c2b4}
+.slide.light .opt b{color:#8a6d1f}
+.slide.light .reveal{border-color:#8a6d1f;background:rgba(255,255,255,.72)}
+.slide.light .reveal .e{color:#1f2933}
+.slide.light .sol .row{border-bottom-color:#c9c2b4}
+.slide.light .sol .row:first-child{border-top-color:#c9c2b4}
+.slide.light .clock.low{color:#b33018}
+#pickinfo{background:#22262e;border-bottom:2px solid var(--line);padding:10px 22px;font-size:14px;color:var(--ochre);line-height:1.4}
+.slide{display:none;width:100%;max-width:1180px}
+.slide.on{display:block}
+.big{max-width:940px;margin:0 auto}
+.big h1{font-size:clamp(36px,6vw,80px);line-height:.98;letter-spacing:-.035em;font-weight:700}
+.big h1 em{font-style:normal;display:block;color:var(--ochre)}
+.big p{margin-top:24px;font-size:clamp(16px,1.7vw,21px);color:var(--muted);max-width:62ch;line-height:1.5}
+.keys{margin-top:32px;display:flex;flex-wrap:wrap;gap:10px}
+.key{border:2px solid var(--line);padding:9px 14px;font-size:14px}
+.key b{color:var(--ochre);font-weight:700}
+.qwrap{display:grid;gap:26px}
+.qhead{display:flex;gap:8px;align-items:center}
+.badge{font-size:13px;font-weight:700;padding:6px 11px;color:#fff}
+.b-d2{background:#2f7d4f}.b-d3{background:#7d6a2f}.b-d4{background:#b5541c}.b-d5{background:var(--red)}
+.b-tag{background:var(--blue)}
+.qtext{font-size:clamp(28px,3.9vw,50px);line-height:1.08;letter-spacing:-.03em;font-weight:700;max-width:24ch}
+.opts{display:grid;gap:12px;max-width:820px}
+.opts.hidden{display:none}
+.opt{display:flex;gap:16px;align-items:baseline;border-left:6px solid var(--line);padding:10px 0 10px 16px;font-size:clamp(18px,2.1vw,26px)}
+.opt b{color:var(--ochre);min-width:26px}
+.hintlabel{font-size:14px;font-weight:700;color:var(--ochre);border-top:2px solid var(--line);padding-top:14px}
+.reveal{border:2px solid var(--ochre);padding:16px 20px;display:none;max-width:820px}
+.reveal.on{display:block}
+.reveal .t{font-size:clamp(20px,2.4vw,30px);font-weight:700;letter-spacing:-.02em}
+.reveal .n{margin-top:6px;color:var(--muted);font-size:16px}
+.mediagrid{display:grid;grid-template-columns:1fr 330px;gap:24px;align-items:start}
+.frame{background:#000;border:2px solid var(--line);position:relative;aspect-ratio:16/9;overflow:hidden}
+video{width:100%;height:100%;display:block;background:#000}
+.cover{position:absolute;inset:0;background:var(--ink-2);display:grid;place-items:center}
+.cover.off{display:none}
+.cover .inner{display:grid;justify-items:center;gap:20px}
+.play{width:92px;height:92px;border-radius:50%;background:var(--red);display:grid;place-items:center;cursor:pointer}
+.play::after{content:"";border-left:29px solid #fff;border-top:18px solid transparent;border-bottom:18px solid transparent;margin-left:7px}
+.meter{display:flex;align-items:flex-end;gap:7px;height:92px}
+.meter span{width:14px;background:var(--ochre);height:16px}
+.playing .meter span{animation:bump .9s ease-in-out infinite}
+.playing .meter span:nth-child(2){animation-duration:.7s}
+.playing .meter span:nth-child(3){animation-duration:1.15s}
+.playing .meter span:nth-child(4){animation-duration:.8s}
+.playing .meter span:nth-child(5){animation-duration:1s}
+@keyframes bump{0%,100%{height:16px}50%{height:88px}}
+@media (prefers-reduced-motion:reduce){.playing .meter span{animation:none;height:52px}}
+.cover p{color:var(--muted);font-size:15px;text-align:center;max-width:34ch;line-height:1.5;margin-top:4px}
+.err{position:absolute;inset:0;display:none;place-items:center;background:var(--ink-2);padding:28px;z-index:3}
+.err.on{display:grid}
+.err div{max-width:48ch;text-align:center;font-size:15px;line-height:1.55}
+.err code{color:var(--ochre)}
+.errbtns{display:flex;gap:10px;justify-content:center;margin-top:18px}
+.errbtns button{border:2px solid var(--line);padding:9px 14px;font-size:14px}
+.clock{font-size:clamp(90px,20vw,240px);font-weight:700;letter-spacing:-.05em;line-height:.9;font-variant-numeric:tabular-nums}
+.clock.low{color:var(--red)}
+.sol{display:grid;gap:0;max-width:1000px}
+.sol .row{display:grid;grid-template-columns:44px 1fr 1fr;gap:18px;padding:13px 0;border-bottom:2px solid var(--line);align-items:baseline}
+.sol .row:first-child{border-top:2px solid var(--line)}
+.sol .n{color:var(--muted);font-weight:700}
+.sol .q{font-size:17px;line-height:1.3;color:var(--muted)}
+.sol .a{font-size:19px;font-weight:700;line-height:1.3;letter-spacing:-.01em}
+.sol .e{font-size:14px;line-height:1.45;color:var(--muted);grid-column:2/4;margin-top:-4px}
+.sol .row{grid-template-columns:44px 1fr 1.15fr}
+.reveal .e{margin-top:12px;font-size:16px;line-height:1.5;color:var(--paper);max-width:70ch}
+.tools{display:flex;gap:0;margin-top:18px;flex-wrap:wrap}
+.tools button{border:2px solid var(--line);padding:9px 14px;font-size:14px;margin-right:10px}
+table.score td.here{background:#22262e}
+table.score{border-collapse:collapse;width:100%;max-width:960px}
+table.score th,table.score td{border:2px solid var(--line);padding:10px 12px;text-align:left;font-size:17px}
+table.score th{color:var(--muted);font-weight:700;font-size:14px}
+table.score input{width:100%;background:transparent;border:0;color:var(--paper);font:inherit;font-size:17px}
+table.score input:focus{outline:2px solid var(--ochre)}
+table.score td.total{font-weight:700;color:var(--ochre);font-variant-numeric:tabular-nums}
+footer{border-top:2px solid var(--line);display:flex}
+button{font:inherit;font-size:15px;font-weight:700;color:var(--paper);background:transparent;border:0;border-right:2px solid var(--line);padding:15px 22px;cursor:pointer}
+button:hover{background:var(--ink-2)}
+button:focus-visible{outline:3px solid var(--ochre);outline-offset:-3px}
+button.primary{background:var(--red)}
+button.primary:hover{background:#b92c17}
+button:disabled{color:#5b616d;cursor:default;background:transparent}
+.spacer{margin-left:auto;border:0}
+@media (max-width:900px){.mediagrid{grid-template-columns:1fr}.sol .row{grid-template-columns:32px 1fr}.sol .q{display:none}}
+</style>
+<link rel="stylesheet" href="mobile.css">
+</head>
+<body>
+<div id="stage">
+  <header>
+    <div class="mark"><b>Boubínské rodinné kvízování 2</b><span id="sub">10 okruhů</span></div>
+    <div class="roundtag" id="roundtag"><i>1</i><span>Úvod</span></div>
+    <div class="counter" id="counter"></div>
+  </header>
+  <div id="pickinfo" hidden></div>
+  <main id="main"></main>
+  <footer>
+    <button class="primary" id="btnA">Přehrát</button>
+    <button id="btnB">S klipem</button>
+    <button id="btnHint">Nápověda</button>
+    <button id="btnAnswer">Odpověď</button>
+    <button class="spacer" id="btnPrev">Zpět</button>
+    <button id="btnNext">Další</button>
+    <button id="btnFull">Celá obrazovka</button>
+    <button id="btnPick">Načíst složku s médii</button>
+    <input id="pick" type="file" multiple webkitdirectory directory hidden>
+    <input id="pickone" type="file" accept="video/*,audio/*" hidden>
+  </footer>
+</div>
+<script>
+const BLOCKS = [[{"name": "Historie", "items": [{"t": "q", "d": 2, "q": "Kdo byl posledním panovníkem korunovaným českým králem?", "o": ["Ferdinand V. Dobrotivý", "František Josef I.", "Karel I."], "a": "Ferdinand V. Dobrotivý", "n": "Korunován v Praze roku 1836", "e": "Korunován v Praze roku 1836 jako poslední panovník, který se nechal korunovat českým králem. Po revoluci roku 1848 abdikoval ve prospěch Františka Josefa I. a dožil v Praze."}, {"t": "q", "d": 3, "q": "Ve kterém roce došlo k rakousko-uherskému vyrovnání?", "o": ["1848", "1867", "1878"], "a": "1867", "n": "", "e": "Rakousko po porážce od Pruska potřebovalo uklidnit Uhry, a tak roku 1867 vzniklo dvojstátí Rakousko-Uhersko. Češi žádali o podobné vyrovnání také, nikdy ho ale nedostali."}, {"t": "q", "d": 3, "q": "Který panovník vystavil Janu Husovi ochranný glejt na cestu do Kostnice?", "o": ["Zikmund Lucemburský", "Václav IV.", "Albrecht Habsburský"], "a": "Zikmund Lucemburský", "n": "", "e": "Glejt měl Husovi zaručit bezpečnou cestu na koncil i zpátky. Zikmund ho nakonec neochránil a Hus byl v Kostnici upálen, což v Čechách spustilo vlnu odporu."}, {"t": "q", "d": 4, "q": "Kteří čtyři státníci podepsali v roce 1938 Mnichovskou dohodu?", "o": ["Hitler, Mussolini, Chamberlain, Daladier", "Hitler, Mussolini, Churchill, Pétain", "Hitler, Franco, Chamberlain, Daladier"], "a": "Hitler, Mussolini, Chamberlain a Daladier", "n": "", "e": "Dohodu podepsali v noci na 30. září 1938. Československo, o jehož pohraničí se jednalo, u toho vůbec nebylo — odtud rčení o nás bez nás."}, {"t": "q", "d": 5, "q": "Jak se jmenoval americký plán hospodářské obnovy Evropy, který Československo v roce 1947 pod nátlakem Moskvy odmítlo?", "o": ["Marshallův plán", "Trumanova doktrína", "Dawesův plán"], "a": "Marshallův plán", "n": "", "e": "Americký program obnovy Evropy z roku 1947, pojmenovaný po ministru zahraničí Georgi Marshallovi. Československá vláda účast nejdřív schválila, po nátlaku v Moskvě ji ale odvolala."}]}, {"name": "Geografie", "items": [{"t": "q", "d": 2, "q": "Jak se jmenuje nejvyšší hora Německa?", "o": ["Zugspitze", "Watzmann", "Feldberg"], "a": "Zugspitze", "n": "", "e": "Zugspitze měří 2 962 m a leží v Bavorských Alpách na hranici s Rakouskem. Nahoru vede ozubnicová dráha i lanovka, takže na vrcholu stojí restaurace."}, {"t": "q", "d": 3, "q": "Které dva státy si dělí ostrov Hispaniola?", "o": ["Haiti a Dominikánská republika", "Kuba a Jamajka", "Haiti a Portoriko"], "a": "Haiti a Dominikánská republika", "n": "", "e": "Západní třetinu ostrova zabírá Haiti, zbytek Dominikánská republika. Je to jediný karibský ostrov rozdělený mezi dva státy."}, {"t": "q", "d": 3, "q": "Kolika státy protéká Dunaj?", "o": ["Šesti", "Deseti", "Čtrnácti"], "a": "Deseti", "n": "Nejvíce ze všech řek světa", "e": "Dunaj protéká deseti státy od Německa po Ukrajinu, což je mezi řekami světový rekord. Pramení ve Schwarzwaldu a ústí do Černého moře."}, {"t": "q", "d": 4, "q": "Která řeka je po Nilu nejdelší v Africe?", "o": ["Kongo", "Niger", "Zambezi"], "a": "Kongo", "n": "", "e": "Kongo měří asi 4 700 km a je nejvodnatější řekou Afriky. Nil je delší, Kongo ale odvádí mnohonásobně víc vody, protože teče deštným pralesem."}, {"t": "q", "d": 5, "q": "Které hlavní město leží nejvýše nad mořem?", "o": ["La Paz", "Quito", "Bogotá"], "a": "La Paz v Bolívii (asi 3 600 m)", "n": "", "e": "La Paz leží ve výšce kolem 3 600 metrů a je nejvýše položeným sídlem vlády na světě. Ústavním hlavním městem Bolívie je přitom Sucre, takže odpověď bývá předmětem sporu."}]}], [{"name": "Film", "media": "videos/", "items": [{"t": "m", "d": 2, "q": "Z jakého filmu je ukázka, z jakého je roku a kdo ho režíroval?", "f": ["matrix.mp4"], "a": "Matrix", "n": "Rok: 1999 · Režie: sourozenci Wachowští", "b": "Bod za název, bod za rok, bod za režiséra.", "o": ["Matrix", "Blade Runner", "Total Recall"], "open": true, "tag": "Světová", "e": "Spojení kyberpunku s efektem bullet time změnilo podobu akčních filmů. Scéna s volbou mezi červenou a modrou pilulkou zlidověla."}, {"t": "m", "d": 2, "q": "Z jakého českého filmu je ukázka, z jakého je roku a kdo ho režíroval?", "f": ["bony_a_klid.mp4"], "a": "Bony a klid", "n": "Rok: 1987 · Režie: Vít Olmer", "b": "Bod za název, bod za rok, bod za režiséra.", "o": ["Bony a klid", "Discopříběh", "Kamarád do deště"], "open": true, "tag": "Česká", "e": "Film o vekslácích a šedé ekonomice pozdního socialismu vznikl ještě před listopadem. Právě proto působil ve své době jako neobvykle otevřená výpověď."}, {"t": "m", "d": 4, "q": "Z jakého českého filmu je ukázka, z jakého je roku a kdo ho režíroval?", "f": ["smrt_krasnych_srncu.mp4"], "a": "Smrt krásných srnců", "n": "Rok: 1986 · Režie: Karel Kachyňa", "b": "Bod za název, bod za rok, bod za režiséra.", "o": ["Smrt krásných srnců", "Zlatí úhoři", "Bylo nás pět"], "open": true, "tag": "Česká", "e": "Natočeno podle povídek Oty Pavla o otci Leo Popperovi a rybaření na Berounce. Idylický tón se láme příchodem války a perzekuce."}, {"t": "m", "d": 4, "q": "Z jakého filmu je ukázka, z jakého je roku a kdo ho režíroval?", "f": ["klub_rvacu.mp4"], "a": "Klub rváčů", "n": "Rok: 1999 · Režie: David Fincher", "b": "Bod za název, bod za rok, bod za režiséra.", "o": ["Klub rváčů", "Sedm", "Trainspotting"], "open": true, "tag": "Světová", "e": "Adaptace románu Chucka Palahniuka s Bradem Pittem a Edwardem Nortonem. Závěrečný zvrat patří k nejznámějším ve filmové historii."}, {"t": "m", "d": 5, "q": "Z jakého českého filmu je ukázka, z jakého je roku a kdo ho režíroval?", "f": ["zabil_jsem_einstina_panove.mp4"], "a": "Zabil jsem Einsteina, pánové", "n": "Rok: 1969 · Režie: Oldřich Lipský", "b": "Bod za název, bod za rok, bod za režiséra.", "o": ["Zabil jsem Einsteina, pánové", "Adéla ještě nevečeřela", "Straka v hrsti"], "open": true, "tag": "Česká", "e": "Sci-fi komedie o cestování časem, kde se hrdinové vypraví zabránit vzniku atomové bomby. Lipský ji natočil krátce po srpnu 1968."}]}, {"name": "Fauna", "items": [{"t": "q", "d": 2, "q": "Který hlodavec je největší na světě?", "o": ["Bobr", "Kapybara", "Nutrie"], "a": "Kapybara", "n": "", "e": "Kapybara váží až 65 kilogramů a žije u vody v Jižní Americe. Bobr evropský je druhý největší hlodavec."}, {"t": "q", "d": 3, "q": "Jak se jmenuje samec kachny divoké?", "o": ["Kačer", "Houser", "Krocan"], "a": "Kačer", "n": "", "e": "Samici se říká kachna, mláděti káče. Kačer divoký má lesklou zelenou hlavu, kachna je nenápadně hnědá, aby ji nebylo vidět na hnízdě."}, {"t": "q", "d": 3, "q": "Kolik oddílů má srdce ptáků?", "o": ["Dva", "Tři", "Čtyři"], "a": "Čtyři", "n": "", "e": "Ptáci mají stejně jako savci čtyřdílné srdce se dvěma síněmi a dvěma komorami. Plazi mají většinou tři oddíly, takže se jim okysličená a odkysličená krev částečně mísí."}, {"t": "q", "d": 4, "q": "Který jedovatý had žije volně v České republice?", "o": ["Zmije obecná", "Užovka podplamatá", "Korálovka"], "a": "Zmije obecná", "n": "", "e": "Zmije obecná je jediný jedovatý had u nás, poznat ji lze podle klikaté čáry na hřbetě. Uštknutí je bolestivé, pro zdravého dospělého ale jen výjimečně život ohrožující."}, {"t": "q", "d": 5, "q": "Jak se jmenuje největší žijící ještěr?", "o": ["Varan komodský", "Leguán mořský", "Krajta mřížkovaná"], "a": "Varan komodský", "n": "", "e": "Varan komodský dorůstá tří metrů a přes sedmdesát kilogramů, žije na několika indonéských ostrovech. Kořist kousne a pak ji sleduje, dokud nepodlehne."}]}], [{"name": "Flóra", "items": [{"t": "q", "d": 2, "q": "Ze které rostliny se získává přírodní kaučuk?", "o": ["Kaučukovník", "Fíkovník", "Palma olejná"], "a": "Z kaučukovníku", "n": "", "e": "Latex se získává nařezáváním kůry kaučukovníku brazilského. Pochází z Amazonie, dnes se pěstuje hlavně v jihovýchodní Asii."}, {"t": "q", "d": 3, "q": "Které koření tvoří usušená květní poupata?", "o": ["Hřebíček", "Nové koření", "Badyán"], "a": "Hřebíček", "n": "", "e": "Hřebíček jsou usušená nerozvinutá květní poupata hřebíčkovce. Pochází z Moluk, kvůli kterým se v 16. a 17. století vedly koloniální války."}, {"t": "q", "d": 3, "q": "Ze které rostliny pochází vanilka?", "o": ["Orchidej vanilovník", "Kakaovník", "Skořicovník"], "a": "Z orchideje vanilovníku", "n": "", "e": "Vanilka je plod tropické orchideje vanilovníku. Květ kvete jediný den a mimo domovinu se musí opylovat ručně, proto je tak drahá."}, {"t": "q", "d": 4, "q": "Kterou část rostliny tvoří šafrán?", "o": ["Blizny květu", "Kůra", "Kořen"], "a": "Blizny květu šafránu", "n": "", "e": "Sklízejí se tři blizny z každého květu šafránu setého, a to ručně. Na jeden kilogram koření je potřeba přes sto tisíc květů."}, {"t": "q", "d": 5, "q": "Ze které rostliny se získává přírodní korek?", "o": ["Korkový dub", "Dub letní", "Buk lesní"], "a": "Z korkového dubu", "n": "", "e": "Korek se loupe z kůry korkového dubu, hlavně v Portugalsku a Španělsku. Strom loupání přežije a kůra doroste zhruba za devět let."}]}, {"name": "Hudba", "media": "hudba/", "audio": true, "items": [{"t": "m", "d": 2, "q": "Kdo skladbu zpívá a z jakého je roku?", "f": ["Alanis_Morissette_-_Ironic.mp4"], "a": "Alanis Morissette", "n": "Rok: 1995 · Skladba: Ironic", "b": "Bod za interpreta, bod za rok, bod za název skladby.", "o": ["Alanis Morissette", "Sheryl Crow", "Natalie Imbruglia"], "open": true, "tag": "Sólo", "e": "Skladba z alba Jagged Little Pill, které se prodalo v desítkách milionů kusů. Text je proslulý tím, že většina jeho příkladů ironií ve skutečnosti není."}, {"t": "m", "d": 3, "q": "Kdo skladbu zpívá a z jakého je roku?", "f": ["Prince_-_Raspberry_Beret.mp4"], "a": "Prince", "n": "Rok: 1985 · Skladba: Raspberry Beret", "b": "Bod za interpreta, bod za rok, bod za název skladby.", "o": ["Prince", "Michael Jackson", "Rick James"], "open": true, "tag": "Sólo", "e": "Pochází z alba Around the World in a Day, které Prince vydal hned po úspěchu Purple Rain. Psal, hrál i produkoval převážně sám."}, {"t": "m", "d": 3, "q": "Která dvojice skladbu zpívá a z jakého je roku?", "f": ["Duet_-_Lady_Gaga_a_Bradley_Cooper_-_Shallow.mp4"], "a": "Lady Gaga a Bradley Cooper", "n": "Rok: 2018 · Skladba: Shallow", "b": "Bod za dvojici, bod za rok, bod za název skladby.", "o": ["Lady Gaga a Bradley Cooper", "Lady Gaga a Bruno Mars", "Ariana Grande a Bradley Cooper"], "open": true, "tag": "Duet", "e": "Ústřední skladba filmu Zrodila se hvězda získala Oscara i Grammy. Cooper se kvůli roli učil zpívat a hrát na kytaru."}, {"t": "m", "d": 4, "q": "Kdo skladbu zpívá a z jakého je roku?", "f": ["Aretha_Franklin_-_Respect.mp4"], "a": "Aretha Franklin", "n": "Rok: 1967 · Skladba: Respect", "b": "Bod za interpreta, bod za rok, bod za název skladby.", "o": ["Aretha Franklin", "Tina Turner", "Etta James"], "open": true, "tag": "Sólo", "e": "Původně ji napsal a nahrál Otis Redding, Aretha ji ale přetočila do ženské perspektivy. Stala se hymnou hnutí za občanská práva i ženské emancipace."}, {"t": "m", "d": 5, "q": "Kdo skladbu zpívá a z jakého je roku?", "f": ["Depeche_Mode_-_But_Not_Tonight.mp4"], "a": "Depeche Mode", "n": "Rok: 1986 · Skladba: But Not Tonight", "b": "Bod za interpreta, bod za rok, bod za název skladby.", "o": ["Depeche Mode", "New Order", "The Cure"], "open": true, "tag": "Sólo", "e": "Skladba vyšla jako doprovod k singlu Stripped, v USA ji ale vydavatel prosadil jako hlavní stranu. Kapela k ní měla vlažný vztah, mezi fanoušky přesto zdomácněla."}]}], [{"name": "Stalo se", "items": [{"t": "q", "d": 2, "q": "Ve kterém roce vstoupila Česká republika do Evropské unie?", "o": ["2000", "2004", "2007"], "a": "2004", "n": "", "e": "Do Evropské unie jsme vstoupili 1. května 2004 spolu s dalšími devíti státy. Šlo o největší rozšíření v historii unie."}, {"t": "q", "d": 3, "q": "Ve kterém roce se konalo referendum o vstupu ČR do EU?", "o": ["2001", "2003", "2005"], "a": "2003", "n": "", "e": "Referendum proběhlo v červnu 2003, pro vstup hlasovalo asi sedmasedmdesát procent zúčastněných. Volební účast byla něco přes padesát pět procent."}, {"t": "q", "d": 3, "q": "Ve kterém roce vstoupilo Česko do schengenského prostoru?", "o": ["2004", "2007", "2011"], "a": "2007", "n": "", "e": "Do schengenského prostoru jsme vstoupili v prosinci 2007, kdy padly kontroly na pozemních hranicích. Na letištích se rušily až o několik měsíců později."}, {"t": "q", "d": 4, "q": "Ve kterém roce byla v ČR zrušena povinná vojenská služba?", "o": ["2001", "2004", "2008"], "a": "2004", "n": "", "e": "Poslední odvedenci odešli koncem roku 2004 a armáda přešla na plně profesionální model. Návrat odvodů se od té doby periodicky vrací do debaty."}, {"t": "q", "d": 5, "q": "Ve kterém roce vznikly v Česku kraje jako samosprávné celky?", "o": ["1993", "2000", "2004"], "a": "2000", "n": "", "e": "Kraje vznikly zákonem k 1. lednu 2000, první krajské volby byly na podzim téhož roku. Úřady se naplno rozjely od roku 2001."}]}, {"name": "Sport", "items": [{"t": "q", "d": 2, "q": "Kolik hráčů má na hřišti tým v ragby union?", "o": ["Třináct", "Patnáct", "Sedmnáct"], "a": "Patnáct", "n": "", "e": "Ragby union hraje patnáct hráčů, ragby league třináct. Olympijská sedmičková verze má sedm."}, {"t": "q", "d": 3, "q": "Kolik bodů se počítá za touchdown v americkém fotbale?", "o": ["Tři", "Šest", "Sedm"], "a": "Šest", "n": "", "e": "Za touchdown je šest bodů, k tomu následuje kop za jeden bod nebo pokus o dvoubodovou konverzi. Samotný kop mezi tyče během hry dává tři body."}, {"t": "q", "d": 3, "q": "Jak dlouho trvá basketbalové utkání podle pravidel FIBA?", "o": ["4× 10 minut", "2× 20 minut", "4× 12 minut"], "a": "4× 10 minut", "n": "", "e": "Podle pravidel FIBA se hrají čtyři desetiminutové čtvrtiny, tedy čtyřicet minut čistého času. NBA má čtvrtiny dvanáctiminutové."}, {"t": "q", "d": 4, "q": "Kolik metrů měří olympijský plavecký bazén?", "o": ["25 metrů", "50 metrů", "100 metrů"], "a": "50 metrů", "n": "", "e": "Olympijský bazén měří padesát metrů, říká se mu dlouhý. Zimní soutěže se často plavou v pětadvacítce, kde jsou časy díky obrátkám rychlejší."}, {"t": "q", "d": 5, "q": "Kolik váží koule ve vrhu koulí mužů?", "o": ["5,00 kg", "7,26 kg", "9,50 kg"], "a": "7,26 kg", "n": "", "e": "Mužská koule váží 7,26 kilogramu, ženská čtyři. Číslo vychází z anglických šestnácti liber."}]}], [{"name": "Věda a technika", "items": [{"t": "q", "d": 2, "q": "Který prvek má chemickou značku Fe?", "o": ["Železo", "Fosfor", "Fluor"], "a": "Železo", "n": "", "e": "Značka Fe pochází z latinského ferrum. Železo je nejrozšířenější kov v zemském jádře a základ oceli."}, {"t": "q", "d": 3, "q": "Jakou chemickou značku má draslík?", "o": ["D", "K", "Dr"], "a": "K", "n": "", "e": "Značka K je z latinského kalium. Draslík je měkký kov, který na vzduchu prudce reaguje, a v těle je klíčový pro činnost srdce."}, {"t": "q", "d": 3, "q": "Který prvek je nejlehčí?", "o": ["Vodík", "Helium", "Lithium"], "a": "Vodík", "n": "", "e": "Vodík je nejlehčí a zároveň nejrozšířenější prvek ve vesmíru. Tvoří palivo hvězd, kde se slučuje na helium."}, {"t": "q", "d": 4, "q": "Kolik prvků obsahuje dnešní periodická tabulka?", "o": ["104", "118", "126"], "a": "118", "n": "", "e": "Tabulka má 118 potvrzených prvků, poslední čtyři byly doplněny v roce 2016. Prvky nad číslem 92 jsou umělé a většinou extrémně nestálé."}, {"t": "q", "d": 5, "q": "Po kterém vědci je pojmenován prvek s číslem 99?", "o": ["Albert Einstein", "Enrico Fermi", "Niels Bohr"], "a": "Po Albertu Einsteinovi (einsteinium)", "n": "", "e": "Prvek číslo 99 byl objeven v troskách po termonukleárním testu v roce 1952 a pojmenován po Albertu Einsteinovi. Sousední fermium nese jméno Enrica Fermiho."}]}, {"name": "Česko", "items": [{"t": "q", "d": 2, "q": "Ve kterém městě stojí nejstarší dochovaný kamenný most v Česku?", "o": ["Písek", "Roudnice nad Labem", "Český Krumlov"], "a": "V Písku", "n": "", "e": "Kamenný most v Písku pochází ze 13. století a je nejstarší dochovaný u nás. Karlův most je mladší, Juditin se nedochoval."}, {"t": "q", "d": 3, "q": "Jak se jmenoval pražský most, který stál na místě Karlova mostu před ním?", "o": ["Juditin most", "Vyšehradský most", "Přemyslův most"], "a": "Juditin most", "n": "", "e": "Juditin most postavili ve 12. století za Vladislava II. a nesl jméno jeho ženy Judity. Strhla ho povodeň roku 1342, o patnáct let později se začal stavět Karlův most."}, {"t": "q", "d": 3, "q": "Kolik sousoší zdobí Karlův most?", "o": ["Dvacet", "Třicet", "Čtyřicet"], "a": "Třicet", "n": "", "e": "Na mostě stojí třicet soch a sousoší, většina z nich jsou barokní kopie. Originály jsou uložené v lapidáriu, aby je nezničilo počasí."}, {"t": "q", "d": 4, "q": "Ve kterém roce byla dokončena stavba Karlova mostu?", "o": ["1357", "1402", "1450"], "a": "1402", "n": "", "e": "Stavba trvala zhruba pětačtyřicet let a dokončena byla kolem roku 1402. Most stojí dodnes, přestože ho několikrát vážně poškodily povodně."}, {"t": "q", "d": 5, "q": "Ve kterém roce položil Karel IV. základní kámen Karlova mostu?", "o": ["1348", "1357", "1380"], "a": "1357", "n": "", "e": "Základní kámen byl položen 9. července 1357 a podle pověsti v 5 hodin 31 minut, takže vznikla řada 1 3 5 7 9 7 5 3 1. Stavbu vedl Petr Parléř."}]}]];
+const SECONDS = 120;
+</script>
+<script>
+const BG={"Historie":"historie","Geografie":"geografie","Fauna":"fauna","Flóra":"flora",
+  "Stalo se":"stalo-se","Sport":"sport","Věda a technika":"veda","Umění a literatura":"umeni",
+  "Jídlo a pití":"jidlo","Česko":"cesko"};
+const bgStyle=n=>BG[n]
+  ? ` style="background-image:linear-gradient(rgba(247,244,238,.62),rgba(247,244,238,.62)),url('pozadi/${BG[n]}.png')"`
+  : "";
+const bgClass=n=>BG[n]?" light":"";
+const main=document.getElementById("main"),roundtag=document.getElementById("roundtag"),
+      counter=document.getElementById("counter"),sub=document.getElementById("sub");
+const esc=s=>String(s).replace(/[&<>]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;"}[c]));
+const el=h=>{const d=document.createElement("div");d.innerHTML=h.trim();return d.firstElementChild;};
+
+const slides=[{kind:"title"}];
+BLOCKS.forEach((block,bi)=>{
+  block.forEach(round=>{
+    slides.push({kind:"round",block:bi+1,name:round.name,count:round.items.length});
+    round.items.forEach((it,i)=>slides.push({kind:it.t,block:bi+1,name:round.name,no:i+1,of:round.items.length,it,
+                                            media:round.media,audio:!!round.audio}));
+  });
+  slides.push({kind:"timer",block:bi+1,names:block.map(r=>r.name)});
+  block.forEach(round=>slides.push({kind:"sol",block:bi+1,name:round.name,items:round.items}));
+  slides.push({kind:"score",block:bi+1});
+});
+slides.push({kind:"end"});
+
+function optsHTML(o){
+  return `<div class="hintlabel">Nápověda — s možnostmi platí správná odpověď za půl bodu</div>`
+    + o.map((x,k)=>`<div class="opt"><b>${"ABC"[k]}</b><span>${esc(x)}</span></div>`).join("");
+}
+
+slides.forEach(s=>{
+  let n;
+  if(s.kind==="title"){
+    n=el(`<section class="slide"><div class="big">
+      <h1>Kvíz 2<em>10 okruhů, 50 otázek</em></h1>
+      <p>Pět bloků, v každém dva okruhy. Po druhém okruhu jsou dvě minuty na odpovědi, pak řešení a zápis bodů.
+         Všechny otázky se ptají bez možností. Když si tým vyžádá nápovědu se třemi možnostmi, platí trefa jen za půl bodu.</p>
+      <div class="keys">
+        <span class="key"><b>→ ←</b> další a zpět</span>
+        <span class="key"><b>N</b> nápověda</span>
+        <span class="key"><b>O</b> odpověď</span>
+        <span class="key"><b>mezerník</b> ukázka nebo start času</span>
+        <span class="key"><b>V</b> hudba i s klipem</span>
+        <span class="key"><b>F</b> celá obrazovka</span>
+      </div></div></section>`);
+  }else if(s.kind==="round"){
+    n=el(`<section class="slide${bgClass(s.name)}"${bgStyle(s.name)}><div class="big">
+      <h1>${esc(s.name)}<em>${s.count} otázek</em></h1></div></section>`);
+  }else if(s.kind==="q"){
+    const it=s.it;
+    n=el(`<section class="slide${bgClass(s.name)}"${bgStyle(s.name)}><div class="qwrap">
+      <div class="qhead"><span class="badge b-d${it.d}">Obtížnost ${it.d}</span></div>
+      <p class="qtext">${esc(it.q)}</p>
+      <div class="opts hidden">${optsHTML(it.o)}</div>
+      <div class="reveal"><div class="t">${esc(it.a)}</div>${it.n?`<div class="n">${esc(it.n)}</div>`:""}
+        ${it.e?`<div class="e">${esc(it.e)}</div>`:""}</div>
+    </div></section>`);
+  }else if(s.kind==="m"){
+    const it=s.it;
+    n=el(`<section class="slide"><div class="mediagrid">
+      <div class="frame">
+        <video preload="none" playsinline controlsList="nodownload noplaybackrate" disablepictureinpicture></video>
+        <div class="cover"><div class="inner">
+          ${s.audio?`<div class="meter"><span></span><span></span><span></span><span></span><span></span></div>
+                     <p>Zvuk bez obrazu. Klip pustíš klávesou V.</p>`
+                   :`<div class="play"></div><p>Klikni nebo zmáčkni mezerník</p>`}
+        </div></div>
+        <div class="err"><div>Ukázka není načtená.
+          <div class="errbtns">
+            <button data-err="folder">Načíst složku s médii</button>
+            <button data-err="file">Vybrat tento soubor</button>
+          </div></div></div>
+      </div>
+      <aside>
+        <div class="qhead" style="margin-bottom:16px">
+          <span class="badge b-d${it.d}">Obtížnost ${it.d}</span>
+          ${it.tag?`<span class="badge b-tag">${esc(it.tag)}</span>`:""}
+        </div>
+        <p class="qtext" style="font-size:24px;max-width:none">${esc(it.q)}</p>
+        ${it.b?`<p style="margin-top:12px;font-size:15px;color:var(--ochre);line-height:1.4">${esc(it.b)}</p>`:""}
+        <div class="opts hidden" style="margin-top:20px">${optsHTML(it.o)}</div>
+        <div class="reveal" style="margin-top:20px"><div class="t">${esc(it.a)}</div>${it.n?`<div class="n">${esc(it.n)}</div>`:""}
+          ${it.e?`<div class="e" style="font-size:15px">${esc(it.e)}</div>`:""}</div>
+      </aside></div></section>`);
+  }else if(s.kind==="timer"){
+    n=el(`<section class="slide"><div class="big">
+      <h1>Čas na odpovědi<em>${esc(s.names.join(" a "))}</em></h1>
+      <div class="clock" style="margin-top:22px">2:00</div>
+      <p>Mezerník spustí čas znovu od začátku.</p></div></section>`);
+  }else if(s.kind==="sol"){
+    n=el(`<section class="slide${bgClass(s.name)}"${bgStyle(s.name)}><div class="big" style="max-width:1000px">
+      <h1 style="font-size:clamp(28px,4vw,52px)">Řešení<em style="font-size:.5em">${esc(s.name)}</em></h1>
+      <div class="sol" style="margin-top:26px">${s.items.map((it,i)=>`
+        <div class="row"><div class="n">${i+1}</div><div class="q">${esc(it.q)}</div><div class="a">${esc(it.a)}${it.n?`<span style="display:block;font-weight:400;font-size:15px;color:var(--muted);margin-top:4px">${esc(it.n)}</span>`:""}</div>
+          ${it.e?`<div class="e">${esc(it.e)}</div>`:""}</div>`).join("")}
+      </div></div></section>`);
+  }else if(s.kind==="score"){
+    n=el(`<section class="slide"><div class="big" style="max-width:1040px">
+      <h1 style="font-size:clamp(28px,4vw,52px)">Průběžné skóre<em style="font-size:.5em">po ${s.block}. bloku</em></h1>
+      <div class="scorebox" style="margin-top:22px"></div>
+      <div class="tools">
+        <button data-act="add">Přidat tým</button>
+        <button data-act="del">Odebrat poslední</button>
+        <button data-act="clear">Vymazat body</button>
+      </div></div></section>`);
+  }else{
+    n=el(`<section class="slide"><div class="big">
+      <h1>Konec kvízu<em>Sečtěte body</em></h1>
+      <p>Skóre za všech pět bloků je na posledním skóre slidu. Šipkou zpět se k němu dostaneš.</p></div></section>`);
+  }
+  main.appendChild(n); s.node=n;
+});
+
+/* skóre – editovatelná tabulka, drží se i po zavření souboru */
+const SKEY="boubin-skore-2";
+let teams=[{n:"Tým 1",p:["","","","",""]},{n:"Tým 2",p:["","","","",""]},{n:"Tým 3",p:["","","","",""]}];
+try{const raw=localStorage.getItem(SKEY); if(raw)teams=JSON.parse(raw);}catch(e){}
+const saveScore=()=>{try{localStorage.setItem(SKEY,JSON.stringify(teams));}catch(e){}};
+const sumTeam=t=>t.p.reduce((a,v)=>a+(Number(v)||0),0);
+
+function renderScore(node,block){
+  const box=node.querySelector(".scorebox");
+  box.innerHTML=`<table class="score"><thead><tr><th>Tým</th>
+      ${[1,2,3,4,5].map(b=>`<th>Blok ${b}</th>`).join("")}<th>Celkem</th></tr></thead>
+    <tbody>${teams.map((t,ti)=>`<tr>
+      <td><input data-t="${ti}" data-f="n" value="${esc(t.n)}"></td>
+      ${t.p.map((v,bi)=>`<td class="${bi+1===block?"here":""}"><input data-t="${ti}" data-f="${bi}" inputmode="numeric" value="${esc(v)}"></td>`).join("")}
+      <td class="total">${sumTeam(t)}</td></tr>`).join("")}</tbody></table>`;
+}
+main.addEventListener("input",e=>{
+  const i=e.target; if(!i.dataset.t)return;
+  const t=teams[+i.dataset.t];
+  if(i.dataset.f==="n")t.n=i.value; else t.p[+i.dataset.f]=i.value;
+  const row=i.closest("tr"); row.querySelector(".total").textContent=sumTeam(t);
+  saveScore();
+});
+main.addEventListener("click",e=>{
+  const b=e.target.closest("[data-act]"); if(!b)return;
+  const act=b.dataset.act;
+  if(act==="add"&&teams.length<10)teams.push({n:"Tým "+(teams.length+1),p:["","","","",""]});
+  else if(act==="del"&&teams.length>1)teams.pop();
+  else if(act==="clear")teams.forEach(t=>t.p=["","","","",""]);
+  saveScore(); renderScore(cur().node,cur().block);
+});
+
+/* přehrávání – soubory se párují podle podoby názvu, ne přesné shody */
+const MEDIA={};                       // normalizovaný název -> {url,name}
+const FOLDERS=["","videos/","hudba/","media/","./"];
+const norm=s=>s.normalize("NFD").replace(/[\u0300-\u036f]/g,"").toLowerCase()
+                .replace(/\.[a-z0-9]+$/,"").replace(/[^a-z0-9]/g,"");
+function fromPicked(name){
+  const k=norm(name);
+  if(MEDIA[k])return MEDIA[k].url;
+  let best=null,score=0;
+  for(const key in MEDIA){
+    let s=0;
+    if(key.includes(k)||k.includes(key)) s=Math.min(key.length,k.length);
+    else{ // shoda na začátku názvu
+      let i=0; while(i<key.length&&i<k.length&&key[i]===k[i])i++;
+      if(i>=10)s=i;
+    }
+    if(s>score){score=s;best=MEDIA[key];}
+  }
+  return best?best.url:null;
+}
+function nameVariants(n){
+  const v=[n, n.replace(/_-_/g," - ").replace(/_/g," "), n.replace(/_/g," ")];
+  return [...new Set(v)];
+}
+function urlsFor(s){
+  const out=[];
+  if(s.manual)out.push(s.manual);
+  const names=[].concat(...s.it.f.map(nameVariants));
+  names.forEach(n=>{
+    const picked=fromPicked(n); if(picked)out.push(picked);
+    out.push(s.media+encodeURIComponent(n));
+    FOLDERS.forEach(f=>{const u=f+encodeURIComponent(n); if(!out.includes(u))out.push(u);});
+  });
+  return out;
+}
+function load(s,force){
+  const v=s.node.querySelector("video"); if(!v)return;
+  if(v.dataset.bound&&!force)return;
+  const err=s.node.querySelector(".err"), cover=s.node.querySelector(".cover");
+  if(!v.dataset.bound){
+    v.addEventListener("play",()=>cover.classList.add("playing"));
+    v.addEventListener("pause",()=>cover.classList.remove("playing"));
+    v.addEventListener("ended",()=>cover.classList.remove("playing"));
+    v.addEventListener("loadeddata",()=>err.classList.remove("on"));
+    v.addEventListener("error",()=>tryNext(v));
+  }
+  v.dataset.bound="1";
+  v.dataset.list=JSON.stringify(urlsFor(s)); v.dataset.i="0";
+  err.classList.remove("on");
+  tryNext(v);
+}
+function tryNext(v){
+  const list=JSON.parse(v.dataset.list||"[]"); let i=+(v.dataset.i||0);
+  if(i>=list.length){v.closest(".frame").querySelector(".err").classList.add("on");return;}
+  v.dataset.i=String(i+1);
+  v.src=list[i]; v.load();
+}
+function play(withVideo){
+  const s=cur(); if(s.kind!=="m")return;
+  const v=s.node.querySelector("video"), cover=s.node.querySelector(".cover");
+  cover.classList.toggle("off", s.audio ? withVideo : true);
+  v.currentTime=0; v.play().catch(()=>{});
+}
+document.getElementById("btnPick").onclick=()=>document.getElementById("pick").click();
+main.addEventListener("click",e=>{
+  const b=e.target.closest("[data-err]"); if(!b)return;
+  if(b.dataset.err==="folder")document.getElementById("pick").click();
+  else{const inp=document.getElementById("pickone"); inp.dataset.slide=String(idx); inp.value=""; inp.click();}
+});
+document.getElementById("pickone").onchange=e=>{
+  const f=e.target.files[0]; if(!f)return;
+  const s=slides[+e.target.dataset.slide];
+  s.manual=URL.createObjectURL(f);
+  MEDIA[norm(f.name)]={url:s.manual,name:f.name};
+  load(s,true);
+};
+function registerFiles(files){
+  let seen=0,added=0;
+  [...files].forEach(f=>{
+    seen++;
+    if(!/\.(mp4|m4v|webm|mov|mkv|mp3|m4a|ogg|wav)$/i.test(f.name))return;
+    MEDIA[norm(f.name)]={url:URL.createObjectURL(f),name:f.name}; added++;
+  });
+  const clips=slides.filter(s=>s.kind==="m");
+  clips.forEach(s=>{const v=s.node.querySelector("video"); if(v)v.dataset.bound="";});
+  const missing=clips.filter(s=>!fromPicked(s.it.f[0]));
+  const box=document.getElementById("pickinfo");
+  box.hidden=false;
+  if(!seen){box.innerHTML="Nepřišly žádné soubory. Zkus místo výběru složky přetáhnout mp3 nebo mp4 soubory myší přímo sem do okna.";}
+  else if(missing.length){
+    box.innerHTML=`Prohlédnuto ${seen} souborů, z toho ${added} přehratelných. Nespárováno ${missing.length} z ${clips.length} ukázek: `
+      +missing.map(s=>esc(s.name+" "+s.no)).join(", ")+". Zbylé lze přiřadit tlačítkem u dané ukázky.";
+  }else box.innerHTML=`Načteno ${added} souborů, všech ${clips.length} ukázek je připraveno.`;
+  if(cur().kind==="m"||cur().kind==="m")load(cur(),true);
+}
+document.getElementById("pick").onchange=e=>registerFiles(e.target.files);
+
+/* přetažení souborů nebo složky myší kamkoli do okna */
+document.addEventListener("dragover",e=>{e.preventDefault();});
+document.addEventListener("drop",async e=>{
+  e.preventDefault();
+  const items=[...(e.dataTransfer.items||[])];
+  const out=[];
+  const walk=entry=>new Promise(res=>{
+    if(!entry)return res();
+    if(entry.isFile)entry.file(f=>{out.push(f);res();},()=>res());
+    else if(entry.isDirectory){
+      const rd=entry.createReader();
+      const read=()=>rd.readEntries(async ents=>{
+        if(!ents.length)return res();
+        for(const en of ents)await walk(en);
+        read();
+      },()=>res());
+      read();
+    }else res();
+  });
+  const entries=items.map(i=>i.webkitGetAsEntry&&i.webkitGetAsEntry()).filter(Boolean);
+  if(entries.length){for(const en of entries)await walk(en);}
+  else out.push(...(e.dataTransfer.files||[]));
+  registerFiles(out);
+});
+
+/* odpočet */
+let tick=null;
+function startClock(s){
+  const out=s.node.querySelector(".clock"); let left=SECONDS;
+  const draw=()=>{out.textContent=Math.floor(left/60)+":"+String(left%60).padStart(2,"0");
+                  out.classList.toggle("low",left<=15);};
+  clearInterval(tick); draw();
+  tick=setInterval(()=>{left--; draw(); if(left<=0)clearInterval(tick);},1000);
+}
+
+let idx=0;
+const btnA=document.getElementById("btnA"),btnB=document.getElementById("btnB"),
+      btnHint=document.getElementById("btnHint"),btnAnswer=document.getElementById("btnAnswer"),
+      btnPrev=document.getElementById("btnPrev"),btnNext=document.getElementById("btnNext"),
+      btnFull=document.getElementById("btnFull");
+const cur=()=>slides[idx];
+
+function render(){
+  slides.forEach((s,i)=>s.node.classList.toggle("on",i===idx));
+  document.querySelectorAll("video").forEach(v=>{if(!v.paused)v.pause();});
+  clearInterval(tick);
+  const s=cur();
+  const label = s.kind==="title"?"Úvod":(s.kind==="end"?"Konec":(s.name||("Blok "+s.block)));
+  roundtag.innerHTML=`<i>${s.block||"•"}</i><span>${esc(label)}</span>`;
+  counter.textContent=(s.kind==="q"||s.kind==="m")?`Otázka ${s.no} z ${s.of}`:"";
+  sub.textContent = s.block?`Blok ${s.block} z 5`:"10 okruhů";
+  if(s.kind==="m"){load(s); s.node.querySelector(".cover").classList.remove("off");}
+  if(s.kind==="timer")startClock(s);
+  if(s.kind==="score")renderScore(s.node,s.block);
+  const isQ=s.kind==="q"||s.kind==="m";
+  btnA.disabled=!(s.kind==="m"||s.kind==="timer");
+  btnA.textContent=s.kind==="timer"?"Spustit čas":"Přehrát";
+  btnB.disabled=!(s.kind==="m"&&s.audio);
+  btnHint.disabled=!isQ; btnAnswer.disabled=!isQ;
+  btnPrev.disabled=idx===0; btnNext.disabled=idx===slides.length-1;
+}
+const toggle=sel=>{const s=cur(); const n=s.node.querySelector(sel); if(n)n.classList.toggle(sel===".opts"?"hidden":"on");};
+const go=d=>{const n=idx+d; if(n>=0&&n<slides.length){idx=n;render();}};
+
+btnA.onclick=()=>{const s=cur(); s.kind==="timer"?startClock(s):play(false);};
+btnB.onclick=()=>play(true);
+btnHint.onclick=()=>toggle(".opts");
+btnAnswer.onclick=()=>toggle(".reveal");
+btnPrev.onclick=()=>go(-1);
+btnNext.onclick=()=>go(1);
+btnFull.onclick=()=>{document.fullscreenElement?document.exitFullscreen():document.documentElement.requestFullscreen().catch(()=>{});};
+main.addEventListener("click",e=>{if(e.target.closest(".play"))play(false);});
+
+document.addEventListener("keydown",e=>{
+  if(e.target.tagName==="INPUT")return;
+  if(e.key===" "){e.preventDefault(); const s=cur(); s.kind==="timer"?startClock(s):play(false);}
+  else if(e.key==="v"||e.key==="V"){play(true);}
+  else if(e.key==="ArrowRight"||e.key==="PageDown"){e.preventDefault();go(1);}
+  else if(e.key==="ArrowLeft"||e.key==="PageUp"){e.preventDefault();go(-1);}
+  else if(e.key==="n"||e.key==="N"){toggle(".opts");}
+  else if(e.key==="o"||e.key==="O"){toggle(".reveal");}
+  else if(e.key==="f"||e.key==="F"){btnFull.click();}
+});
+render();
+</script>
+<script src="ukazky.js"></script>
+<script src="sifra.js"></script>
+<script src="bridge.js"></script>
+</body>
+</html>
