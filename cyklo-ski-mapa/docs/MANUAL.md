@@ -125,6 +125,7 @@ Tlačítko **Tabulka** nahoře přepne mapu na tabulku všech míst aktuálního
 - **Zaškrtávátka stavů** přímo v řádcích se rovnou ukládají – hodí se na hromadné odškrtání po rozeslání nabídek.
 - Klik na **název** otevře detail místa v mapě.
 - **Export CSV (N)** exportuje **všechny** řádky výběru, ne jen zobrazených 500.
+- **Import z Excelu…** načte upravený export zpět – hromadné změny stavů a poznámek (kap. 13).
 
 ## 10. Export CSV
 
@@ -148,22 +149,54 @@ Dialog **Stav oslovení** ukazuje, kolik míst má záznam, a nabízí:
 - **Načíst soubor…** – sloučí záznamy ze souboru s aktuálními; u každého místa vyhraje novější úprava. Načtené
   záznamy se pošlou i na server.
 - **Export všech záznamů (CSV)** – viz výše.
+- **Načíst upravenou tabulku (Excel/CSV)…** – hromadné úpravy, kap. 13.
 
 Na webu je stav uložený na serveru a zálohuje se tam **každý den ve 2:30**. Ruční zálohu JSON je dobré udělat
 před hromadnými změnami. Když aplikaci otevřete přímo ze souboru `index.html` (bez serveru), stav se ukládá jen
 do daného prohlížeče a smazání dat prohlížeče ho vymaže.
 
-## 13. Doporučený postup (příklad kampaně)
+## 13. Hromadné úpravy přes Excel (od 14. 10. 2026)
+
+Když potřebujete změnit stav u desítek míst najednou (třeba po obvolání okresu), nemusíte klikat v tabulce:
+
+1. Vyberte oblast a dejte **Export CSV**. Soubor otevřete v Excelu; můžete ho uložit jako `.xlsx` a exporty víc
+   krajů dát do jednoho sešitu – **každý list jeden kraj**.
+2. Upravte buňky podle pravidel níže a soubor uložte.
+3. **Tabulka → Import z Excelu…** (nebo **Stav oslovení → Načíst upravenou tabulku**) a vyberte soubor
+   (`.xlsx` nebo `.csv`).
+4. Mapa ukáže **náhled**: kolik řádků se spárovalo, co se změní a které řádky nebo hodnoty nepoznala. Zapíše se
+   to až tlačítkem **Uložit** – u každého místa s vaším jménem a časem.
+
+**Pravidla:**
+
+- Řádky se párují podle sloupce **OSM** (odkaz na místo) – ten v souboru nechte. Řádky bez něj nebo s místem,
+  které v mapě není, náhled vypíše a nepoužije. Listy bez sloupce OSM se přeskočí.
+- **Zaškrtávací sloupce** (Chceme kontaktovat, Proběhl nabídkový e-mail, Volali jsme, Osobní návštěva proběhla):
+  „ano“, „ano (14. 10. 2026)“, x nebo 1 zaškrtne (s datem z buňky, jinak dnešním), „ne“ nebo 0 odškrtne.
+  **Prázdná buňka nic nemění** – nic se tedy nesmaže jen proto, že jste řádek nevyplnili.
+- **Poznámka** vyplněná a jiná než v mapě se přepíše. Prázdná nic nemění.
+- **Půjčovna** (ano/ne) a **kontakty** (provozovatel, telefon, e-mail, web): když se liší od mapy, uloží se jako
+  ruční údaj – ale **jen když v náhledu zaškrtnete „Zapsat i údaje o místech“**. Mapa se každé pondělí obnovuje,
+  takže starší export může obsahovat údaj, který se mezitím v OSM nebo na webu změnil.
+- Ostatní sloupce (název, vzdálenosti, Upravil, Upraveno…) se jen čtou. Nerozpoznané hodnoty (třeba „možná“)
+  náhled vypíše a nepoužije.
+- Starý formát `.xls` se nenačte – uložte soubor jako `.xlsx` nebo CSV.
+
+**Pozor na hromadné e-maily:** nabídku e-mailem posílejte jen těm, kdo o ni požádali nebo s ní souhlasili.
+Obchodní sdělení e-mailem bez souhlasu porušuje zákon č. 480/2004 Sb., a to i vůči firmám.
+
+## 14. Doporučený postup (příklad kampaně)
 
 1. Vyberte okres.
 2. Filtry: **Ubytování**, okolí **u cyklotras do 1 km**, půjčovna **ne** nebo **neznámo**.
 3. Přepněte na **Tabulku**, projděte řádky a u vhodných zaškrtněte **Chceme kontaktovat** (do poznámky proč).
-4. Filtr stavu **Chceme kontaktovat – zatím neosloveno** → **Export CSV** → podklad pro nabídkový e-mail.
-5. Po rozeslání v tabulce zaškrtněte **Proběhl nabídkový e-mail**; po telefonátu **Volali jsme** + poznámka;
-   po návštěvě **Osobní návštěva proběhla**.
+4. Filtr stavu **Chceme kontaktovat – zatím neosloveno** → **Export CSV** → podklad pro hovory. Nabídku e-mailem
+   jen tomu, kdo si o ni řekne (kap. 13).
+5. Po hovoru zaškrtněte **Volali jsme** + poznámka, po odeslání vyžádané nabídky **Proběhl nabídkový e-mail**,
+   po návštěvě **Osobní návštěva proběhla** – v tabulce, nebo hromadně přes Excel (kap. 13).
 6. Kontrola rozpracovaného: filtr **S jakýmkoli stavem**, řazení podle **Upraveno**.
 
-## 14. Časté otázky
+## 15. Časté otázky
 
 **Místo v mapě chybí.** Není v OpenStreetMap. Ručně ho do aplikace přidat nejde; nejrychlejší je doplnit ho
 v OSM (odkaz „OpenStreetMap“ u sousedního místa, účet zdarma) – do mapy se dostane s pondělní obnovou dat,

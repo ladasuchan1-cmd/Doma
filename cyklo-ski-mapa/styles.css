@@ -365,4 +365,13 @@ table.grid .name-btn { background: none; border: 0; padding: 0; color: var(--pri
 }
 .callout { background: var(--primary-soft); border: 1px solid var(--primary); border-radius: 8px; padding: 8px 10px; font-size: 13px; }
 .callout.warn { background: var(--warning-soft); border-color: var(--warning); }
+.modal.modal-siroky { width: min(780px, 100%); }
+.imp-souhrn { margin: 6px 0 10px; padding-left: 18px; font-size: 13px; }
+.imp-souhrn li { margin: 2px 0; }
+.imp-pozor { color: var(--warning); }
+.imp-h { font-size: 14px; margin: 12px 0 4px; }
+.imp-wrap { max-height: 320px; overflow: auto; margin: 6px 0 10px; border: 1px solid var(--border); border-radius: 6px; }
+.imp-tab { width: 100%; border-collapse: collapse; font-size: 12px; }
+.imp-tab th, .imp-tab td { text-align: left; vertical-align: top; padding: 4px 6px; border-bottom: 1px solid var(--border); }
+.imp-tab th { position: sticky; top: 0; background: var(--surface); }
 kbd { font-family: var(--mono); font-size: 11px; background: var(--surface-3); border: 1px solid var(--border-strong); border-radius: 4px; padding: 0 4px; }

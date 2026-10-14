@@ -169,6 +169,20 @@ Ukládání: v prohlížeči (`localStorage`, klíč `csm.stav.v1`) a přes serv
 import zálohy): u každého místa vyhraje záznam s novějším `upraveno`; při hromadném importu se `kdo` doplní
 jen tam, kde chybí.
 
+**Hromadný import tabulky** (od 14. 10. 2026; `lib/import-tabulky.js`, čtení XLSX `lib/xlsx.js`): upravený export
+(XLSX nebo CSV) se načte zpět do stavu oslovení. Každý list se prohledá na hlavičku (prvních 10 řádků, sloupec
+OSM nebo ID a aspoň jeden zapisovatelný sloupec); listy bez ní se přeskočí a vypíšou. Řádek se páruje podle odkazu
+OSM (`node|way|relation/<id>` → `n|w|r<id>`) nebo sloupce ID; stejné místo na dalším řádku či listu se nepoužije.
+Zaškrtávací sloupce: „ano“, „ano (datum)“, x, 1, true, datum i pořadové číslo dne z Excelu → zaškrtnout (datum
+z buňky, jinak dnešní), „ne“, 0, false → odškrtnout, prázdná buňka → beze změny, cokoli jiného → nerozpoznaná
+hodnota (vypíše se, nepoužije). Poznámka vyplněná a jiná → přepíše se. Půjčovna (ano/ne) a kontakty se porovnají
+s efektivní hodnotou (výše) a při rozdílu se nabídnou jako ruční údaj; zapíšou se jen na výslovný souhlas
+v náhledu, protože týdenní obnova dat mezitím mohla údaj v OSM nebo na webu změnit. Telefony se porovnávají jen
+podle číslic, weby bez koncového lomítka a bez ohledu na velikost písmen, e-maily bez ohledu na velikost písmen;
+apostrof, kterým export chrání hodnoty před vzorci, se odstraní. Zápis jde přes `PUT /api/stav/:id` jako ruční
+úprava (server doplní `kdo` = přihlášený). XLSX se čte bez knihoven (ZIP + DecompressionStream, sdílené i inline
+řetězce), CSV v UTF‑8, případně windows‑1250 (CSV z českého Excelu).
+
 **Identifikátory** jsou trvalé: místa a trasy mají id z OSM (`n…` uzel, `w…` cesta, `r…` relace), areály id
 z OpenSkiMap (`osk-…`) nebo z OSM. Obnova dat je nemění; zanikne‑li objekt v OSM, jeho záznam ve `stav.json`
 zůstane (nezobrazuje se).
@@ -180,7 +194,8 @@ Provozovatel · Telefon · E-mail · Web (efektivní hodnoty podle kap. 6) · Ne
 Nejbližší skiareál · km od skiareálu · Chceme kontaktovat · Proběhl nabídkový e-mail · Volali jsme · Osobní
 návštěva proběhla (každý „ano (datum)“ nebo prázdné) · Poznámka · Upravil · Upraveno · OSM (odkaz) · Zem. šířka ·
 Zem. délka. Formát RFC 4180, oddělovač `;`, UTF‑8 s BOM, konce řádků CRLF, desetinná čárka; hodnoty začínající
-`=`, `+`, `-`, `@` jsou chráněné proti spuštění jako vzorec v Excelu.
+`=`, `+`, `-`, `@` jsou chráněné proti spuštění jako vzorec v Excelu. Upravený export jde načíst zpět (hromadný
+import, kap. 6).
 
 ## 8. Obnova dat
 
@@ -236,3 +251,5 @@ Zem. délka. Formát RFC 4180, oddělovač `;`, UTF‑8 s BOM, konce řádků CR
   sestavení (3. 10. 2026); data OSM ve skutečnosti pocházela ze snímku z 21. 9. 2026 (dotazy 14. 10. vrátily
   totéž). Výpočty a klasifikace se nemění, čísla jsou srovnatelná; skiareálů z OpenSkiMap je od této obnovy
   víc (OpenSkiMap mezitím přidal areály).
+- **14. 10. 2026** – hromadný import upravené tabulky z Excelu nebo CSV (kap. 6). Výpočty se nemění; mění se jen
+  to, jak se do stavu oslovení zapisuje.

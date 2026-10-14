@@ -9,6 +9,8 @@
   const csvLib = window.CSM.csv;
   const contacts = window.CSM.contacts;
   const stavLib = window.CSM.stav;
+  const xlsxLib = window.CSM.xlsx;
+  const importLib = window.CSM.importTabulky;
   const $ = (sel, root) => (root || document).querySelector(sel);
 
   if (!D.hranice || !D.mista || !D.trasy || !D.ski) {
@@ -144,6 +146,7 @@
 
   // ================================================================== úložiště stavu oslovení
   const LS_KEY = 'csm.stav.v1';
+  const IMPORT_ACCEPT = '.xlsx,.csv,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
   function loadLocal() {
     try {
       const raw = localStorage.getItem(LS_KEY);
@@ -194,20 +197,23 @@
       state.server.on = false;
     }
   }
-  async function pushRecord(id, rec) {
-    if (!state.server.on) return;
+  // Vrací true, když server záznam přijal. `tiche` = bez hlášek (hromadný import hlásí výsledek sám).
+  async function pushRecord(id, rec, tiche) {
+    if (!state.server.on) return false;
     try {
       const res = await fetch(state.server.url + '/' + encodeURIComponent(id), { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(rec) });
       if (res.status === 401) {
-        toast('Přihlášení vypršelo – obnovte stránku a přihlaste se.');
-        return;
+        if (!tiche) toast('Přihlášení vypršelo – obnovte stránku a přihlaste se.');
+        return false;
       }
       if (res.ok && state.stav[id]) {
         const j = await res.json().catch(() => null);
         if (j && j.kdo) state.stav[id].kdo = j.kdo;
       }
+      return res.ok;
     } catch (_e) {
-      toast('Server nedostupný – změna je zatím jen v tomto prohlížeči.');
+      if (!tiche) toast('Server nedostupný – změna je zatím jen v tomto prohlížeči.');
+      return false;
     }
   }
   function updateRecord(id, mutate) {
@@ -1234,7 +1240,7 @@
       if (c.key === 'web' || c.key === 'osm') return `<td>${v ? `<a href="${esc(v)}" target="_blank" rel="noopener">${esc(trunc(v.replace(/^https?:\/\/(www\.)?/, ''), 40))}</a>` : ''}</td>`;
       return `<td class="${c.wrap ? 'wrap' : ''}">${esc(c.wrap ? trunc(v, 160) : v)}</td>`;
     }).join('')}</tr>`).join('');
-    wrap.innerHTML = `<div class="toolbar"><b>${fmtN(rows.length)} míst</b><span class="muted small">zobrazeno ${fmtN(limit)} · klik na záhlaví řadí · zaškrtávátka se rovnou ukládají</span>${rows.length > limit ? `<button type="button" class="btn btn-sm" id="table-more">Zobrazit dalších 500</button>` : ''}<span style="flex:1"></span><button type="button" class="btn btn-sm" id="table-export">Export CSV (${fmtN(rows.length)})</button></div>
+    wrap.innerHTML = `<div class="toolbar"><b>${fmtN(rows.length)} míst</b><span class="muted small">zobrazeno ${fmtN(limit)} · klik na záhlaví řadí · zaškrtávátka se rovnou ukládají</span>${rows.length > limit ? `<button type="button" class="btn btn-sm" id="table-more">Zobrazit dalších 500</button>` : ''}<span style="flex:1"></span><label class="btn btn-sm" title="Načte upravený export (Excel nebo CSV) a po náhledu zapíše změny stavu oslovení">Import z Excelu… <input type="file" id="table-import" accept="${IMPORT_ACCEPT}" hidden></label><button type="button" class="btn btn-sm" id="table-export">Export CSV (${fmtN(rows.length)})</button></div>
       <table class="grid"><thead><tr>${head}</tr></thead><tbody>${body}</tbody></table>`;
     wrap.querySelectorAll('th').forEach((th) => th.addEventListener('click', () => {
       const k = th.dataset.col;
@@ -1255,6 +1261,11 @@
       renderTable();
     });
     $('#table-export').addEventListener('click', exportCsv);
+    $('#table-import').addEventListener('change', (e) => {
+      const f = e.target.files[0];
+      e.target.value = '';
+      if (f) importTabulky(f);
+    });
   }
 
   function exportCsv() {
@@ -1277,8 +1288,14 @@
         <label class="btn">Načíst soubor… <input type="file" id="stav-import" accept="application/json,.json" hidden></label>
         <button type="button" class="btn" id="stav-csv">Export všech záznamů (CSV)</button>
       </div>
+      <p>Hromadné úpravy (třeba po rozeslání nabídek): exportujte tabulku, upravte ji v Excelu a načtěte zpět. Před uložením
+      uvidíte, co se změní.</p>
+      <div class="row" style="flex-wrap:wrap;gap:8px;margin:12px 0">
+        <label class="btn">Načíst upravenou tabulku (Excel/CSV)… <input type="file" id="stav-tabulka" accept="${IMPORT_ACCEPT}" hidden></label>
+      </div>
       <div class="callout warn small">Smazání dat prohlížeče (cookies, úložiště) stav vymaže – zálohujte si ho. Pro sdílení v týmu spusťte <code>npm start</code> (server.js) a otevřete aplikaci přes něj.</div>`;
-    const m = openModal('Stav oslovení – záloha a sdílení', body);
+    const modal = openModal('Stav oslovení – záloha a sdílení', body);
+    const m = modal.el;
     $('#stav-export', m).addEventListener('click', () => {
       download(`stav-osloveni-${new Date().toISOString().slice(0, 10)}.json`, JSON.stringify(stavLib.exportJson(state.stav), null, 1), 'application/json');
       toast('Záloha uložena.');
@@ -1297,10 +1314,17 @@
         markerCache.clear();
         renderAll();
         toast(`Načteno ${fmtN(im.pocet)} záznamů (celkem ${fmtN(Object.keys(state.stav).length)}, předtím ${fmtN(before)}).`);
-        m.close();
+        modal.close();
       } catch (err) {
         toast('Import se nezdařil: ' + err.message);
       }
+    });
+    $('#stav-tabulka', m).addEventListener('change', (e) => {
+      const f = e.target.files[0];
+      e.target.value = '';
+      if (!f) return;
+      modal.close();
+      importTabulky(f);
     });
     $('#stav-csv', m).addEventListener('click', () => {
       const ids = Object.keys(state.stav);
@@ -1315,6 +1339,141 @@
         }
       }
       download(`stav-osloveni-${new Date().toISOString().slice(0, 10)}.csv`, csvLib.serialize(data), 'text/csv;charset=utf-8');
+    });
+  }
+
+  // ------------------------------------------------------------------ hromadný import upravené tabulky (Excel/CSV)
+  // Pravidla (co se načte a co ne) jsou v lib/import-tabulky.js a v manuálu; tady je jen čtení souboru a náhled.
+  async function inflateRaw(data) {
+    const proud = new Blob([data]).stream().pipeThrough(new DecompressionStream('deflate-raw'));
+    return new Uint8Array(await new Response(proud).arrayBuffer());
+  }
+  async function nactiListy(file) {
+    if (file.size > 20 * 1024 * 1024) throw new Error('Soubor je větší než 20 MB.');
+    const bytes = new Uint8Array(await file.arrayBuffer());
+    if (bytes[0] === 0x50 && bytes[1] === 0x4b) {
+      if (typeof DecompressionStream === 'undefined') throw new Error('Tento prohlížeč neumí rozbalit soubor Excelu – uložte ho v Excelu jako CSV (UTF-8) a načtěte znovu.');
+      return xlsxLib.nactiXlsx(bytes, inflateRaw);
+    }
+    if (bytes[0] === 0xd0 && bytes[1] === 0xcf) throw new Error('Starý formát Excelu (.xls) neumíme – uložte soubor jako .xlsx nebo CSV.');
+    let text;
+    try {
+      text = new TextDecoder('utf-8', { fatal: true }).decode(bytes);
+    } catch (_e) {
+      text = new TextDecoder('windows-1250').decode(bytes); // CSV z českého Excelu bez volby „UTF-8“
+    }
+    return [{ nazev: file.name, radky: csvLib.parse(text) }];
+  }
+  // Co mapa u místa ukazuje teď (ruční údaj, jinak OSM a web) – s tím se buňky souboru porovnávají.
+  function mistoProImport(id) {
+    const m = mistoById.get(id);
+    if (m) {
+      const e = ef(m);
+      return { nazev: m.nazev, pujcovna: efektivniPujcovna(m), provozovatel: e.provozovatel, telefon: e.telefon, email: e.email, web: e.web };
+    }
+    const a = arealById.get(id);
+    if (!a) return null;
+    const r = state.stav[id] || {};
+    return { nazev: a.nazev, pujcovna: r.pujcovna || '', provozovatel: r.provozovatel || a.operator || '', telefon: r.telefon || a.telefon || '', email: r.email || a.email || '', web: r.web || (a.web || [])[0] || '' };
+  }
+  async function importTabulky(file) {
+    let navrh;
+    try {
+      const listy = await nactiListy(file);
+      navrh = importLib.navrhni({ listy, misto: mistoProImport, stav: state.stav, dnes: new Date().toLocaleDateString('sv-SE') });
+    } catch (err) {
+      openModal('Tabulku nejde načíst', `<p><b>${esc(file.name)}</b></p><div class="callout warn">${esc(err.message)}</div>`);
+      return;
+    }
+    nahledImportu(file.name, navrh);
+  }
+  function nahledImportu(soubor, n) {
+    const zkrat = (t) => (String(t).length > 70 ? String(t).slice(0, 69) + '…' : String(t));
+    const pujc = { ano: 'ano', ne: 'ne', 'ano?': 'podle webu', '': '–' };
+    const tedy = (z) => (z.druh === 'stav' ? (z.puvodni ? 'ano' : '–') : z.pole === 'pujcovna' ? pujc[z.puvodni] || '–' : z.puvodni || '–');
+    const nove = (z) => (z.druh === 'stav' ? (z.nove ? 'ano' + (z.datum ? ' (' + fmtDate(z.datum) + ')' : '') : 'ne') : z.pole === 'pujcovna' ? pujc[z.nove] : z.nove);
+    const kolik = (x) => [x.zaskrtnout ? `zaškrtnout ${fmtN(x.zaskrtnout)}×` : '', x.odskrtnout ? `odškrtnout ${fmtN(x.odskrtnout)}×` : '', x.zmenit ? `změnit ${fmtN(x.zmenit)}×` : ''].filter(Boolean).join(', ');
+    const zmen = (k) => `${fmtN(k)} ${pl(k, 'změna', 'změny', 'změn')}`;
+    const radku = (k) => `${fmtN(k)} ${pl(k, 'řádek', 'řádky', 'řádků')}`;
+    const uMist = (k) => `u ${fmtN(k)} ${pl(k, 'místa', 'míst', 'míst')}`;
+    const vice = n.listy.length > 1;
+    const kde = (x) => (vice ? `${esc(x.list)}, ř. ${x.radek}` : `ř. ${x.radek}`);
+    const sparovano = n.listy.reduce((a, l) => a + l.sparovano, 0);
+    const osloveni = n.zmeny.filter((z) => z.skupina === 'osloveni');
+    const udaje = n.zmeny.filter((z) => z.skupina === 'udaje');
+    const tabulka = (hlavicka, radky) => `<div class="imp-wrap"><table class="imp-tab"><thead><tr>${hlavicka.map((h) => `<th>${h}</th>`).join('')}</tr></thead><tbody>${radky.join('')}</tbody></table></div>`;
+    const ukazka = (zmeny) => tabulka(['Kde', 'Místo', 'Sloupec', 'Teď', 'Nově'], zmeny.slice(0, 50).map((z) => `<tr><td>${kde(z)}</td><td>${esc(zkrat(z.nazev))}</td><td>${esc(importLib.POPISY[z.pole])}</td><td>${esc(zkrat(tedy(z)))}</td><td>${esc(zkrat(nove(z)))}</td></tr>`));
+    const body = `
+      <p><b>${esc(soubor)}</b> – ${vice ? `${fmtN(n.listy.length)} ${pl(n.listy.length, 'list', 'listy', 'listů')}` : `list „${esc(n.listy[0].nazev)}“`}, ${radku(n.radku)} s daty.</p>
+      ${vice ? `<ul class="imp-souhrn">${n.listy.map((l) => `<li>${esc(l.nazev)}: ${radku(l.radku)}, ${zmen(l.zmen)}</li>`).join('')}</ul>` : ''}
+      <ul class="imp-souhrn">
+        <li>Spárováno s místy v mapě: <b>${fmtN(sparovano)}</b></li>
+        ${n.nesparovane.length ? `<li class="imp-pozor">Nespárováno: <b>${fmtN(n.nesparovane.length)}</b> – tyto řádky se nepoužijí (viz níže)</li>` : ''}
+        ${n.nerozpoznane.length ? `<li class="imp-pozor">Nerozpoznané hodnoty: <b>${fmtN(n.nerozpoznane.length)}</b> – tyto buňky se nepoužijí (viz níže)</li>` : ''}
+        ${n.preskocene.length ? `<li class="imp-pozor">Listy bez sloupce OSM se přeskočí: ${esc(n.preskocene.join(', '))}</li>` : ''}
+      </ul>
+      ${osloveni.length
+        ? `<h3 class="imp-h">Stav oslovení a poznámky: ${zmen(osloveni.length)} ${uMist(new Set(osloveni.map((z) => z.id)).size)}</h3>
+           <ul class="imp-souhrn">${importLib.souhrn(osloveni).map((x) => `<li><b>${esc(x.popis)}</b>: ${kolik(x)}</li>`).join('')}</ul>
+           <details><summary>Ukázka${osloveni.length > 50 ? ' (prvních 50)' : ''}</summary>${ukazka(osloveni)}</details>`
+        : ''}
+      ${udaje.length
+        ? `<h3 class="imp-h">Údaje o místech: ${zmen(udaje.length)} ${uMist(new Set(udaje.map((z) => z.id)).size)}</h3>
+           <p class="small">Půjčovna nebo kontakty v souboru se liší od toho, co mapa ukazuje. Může jít o vaše opravy, ale i o starší
+           údaje z doby exportu – mapa se každé pondělí obnovuje z OSM a webů. Zapisují se jako ruční údaje, proto jen na požádání.</p>
+           <ul class="imp-souhrn">${importLib.souhrn(udaje).map((x) => `<li><b>${esc(x.popis)}</b>: ${kolik(x)}</li>`).join('')}</ul>
+           <details><summary>Ukázka${udaje.length > 50 ? ' (prvních 50)' : ''}</summary>${ukazka(udaje)}</details>
+           <label class="row" style="margin:6px 0"><input type="checkbox" id="imp-udaje"> Zapsat i údaje o místech (${zmen(udaje.length)})</label>`
+        : ''}
+      ${n.zmeny.length ? '' : '<div class="callout">Soubor nic nemění – všechno z něj už v mapě je.</div>'}
+      ${n.nesparovane.length ? `<details><summary>Nespárované řádky (${fmtN(n.nesparovane.length)})</summary>${tabulka(['Kde', 'Název v souboru', 'Proč'], n.nesparovane.slice(0, 100).map((x) => `<tr><td>${kde(x)}</td><td>${esc(zkrat(x.nazev || '–'))}</td><td>${esc(x.duvod)}</td></tr>`))}</details>` : ''}
+      ${n.nerozpoznane.length ? `<details><summary>Nerozpoznané hodnoty (${fmtN(n.nerozpoznane.length)})</summary>${tabulka(['Kde', 'Místo', 'Sloupec', 'Hodnota'], n.nerozpoznane.slice(0, 100).map((x) => `<tr><td>${kde(x)}</td><td>${esc(zkrat(x.nazev))}</td><td>${esc(x.sloupec)}</td><td>${esc(zkrat(x.hodnota))}</td></tr>`))}</details>` : ''}
+      <p class="muted small">Prázdná buňka nic nemění, odškrtnout jde napsáním „ne“. Načítají se zaškrtávací sloupce, poznámka, půjčovna
+      (ano/ne) a kontakty; ostatní sloupce${n.ignorovane.length ? ' (i neznámé: ' + esc(n.ignorovane.join(', ')) + ')' : ''} se jen čtou.</p>
+      <div class="row" style="justify-content:flex-end;gap:8px;margin-top:12px">
+        <button type="button" class="btn" id="imp-zrusit">${n.zmeny.length ? 'Zrušit' : 'Zavřít'}</button>
+        ${n.zmeny.length ? '<button type="button" class="btn btn-primary" id="imp-ok"></button>' : ''}
+      </div>`;
+    const modal = openModal('Import tabulky – náhled', body);
+    modal.el.querySelector('.modal').classList.add('modal-siroky');
+    $('#imp-zrusit', modal.el).addEventListener('click', modal.close);
+    const ok = $('#imp-ok', modal.el);
+    if (!ok) return;
+    const chciUdaje = $('#imp-udaje', modal.el);
+    const vybrane = () => (chciUdaje && chciUdaje.checked ? n.zmeny : osloveni);
+    const popisTlacitka = () => {
+      const k = vybrane().length;
+      ok.textContent = k ? `Uložit ${fmtN(k)} ${pl(k, 'změnu', 'změny', 'změn')}` : 'Nic k uložení';
+      ok.disabled = !k;
+    };
+    popisTlacitka();
+    if (chciUdaje) chciUdaje.addEventListener('change', popisTlacitka);
+    ok.addEventListener('click', async () => {
+      const zmeny = vybrane();
+      ok.disabled = true;
+      if (chciUdaje) chciUdaje.disabled = true;
+      const { stav, id } = importLib.pouzij(state.stav, zmeny, { kdo: state.server.user, now: new Date().toISOString() });
+      state.stav = stav;
+      saveLocal();
+      markerCache.clear();
+      renderAll();
+      if (!state.server.on) {
+        modal.close();
+        toast(`Uloženo v tomto prohlížeči (${fmtN(id.length)} ${pl(id.length, 'místo', 'místa', 'míst')}) – server není připojený.`);
+        return;
+      }
+      ok.textContent = `Ukládám na server… (${fmtN(id.length)} ${pl(id.length, 'místo', 'místa', 'míst')})`;
+      let hotovo = 0;
+      let i = 0;
+      const dalsi = async () => {
+        while (i < id.length) {
+          const x = id[i++];
+          if (await pushRecord(x, state.stav[x] || stavLib.emptyRecord(), true)) hotovo++;
+        }
+      };
+      await Promise.all(Array.from({ length: Math.min(6, id.length) }, dalsi));
+      modal.close();
+      toast(hotovo === id.length ? `Import uložen: ${zmen(zmeny.length)} ${uMist(hotovo)}.` : `Na server se uložilo ${fmtN(hotovo)} z ${fmtN(id.length)} míst – zbytek je v tomto prohlížeči a odešle se po obnovení stránky.`);
     });
   }
 
@@ -1359,6 +1518,10 @@
   }
   function esc(s) {
     return String(s == null ? '' : s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
+  }
+  // Český tvar podle počtu: pl(2, 'změna', 'změny', 'změn') → 'změny'.
+  function pl(n, jeden, dva, pet) {
+    return n === 1 ? jeden : n >= 2 && n <= 4 ? dva : pet;
   }
   function fmtN(n) {
     return Number(n || 0).toLocaleString('cs-CZ');
