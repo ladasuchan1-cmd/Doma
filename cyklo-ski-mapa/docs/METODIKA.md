@@ -184,16 +184,26 @@ Zem. délka. Formát RFC 4180, oddělovač `;`, UTF‑8 s BOM, konce řádků CR
 
 ## 8. Obnova dat
 
-- **Automaticky** 1. den v měsíci (3:17 UTC) workflow `.github/workflows/cyklo-ski-mapa-data.yml`:
-  `build-data --fetch` → `enrich-web --force` → `npm test` → commit `data/*.js` do hlavní větve → spuštění
-  testů a nasazení. **Ručně**: Actions → „Cyklo & Ski mapa – obnova dat“ → Run workflow (volitelně bez průchodu
-  webů). **Lokálně**: `npm run build-data` (≈ 1 min nad cache) a `npm run enrich` (≈ 30 min).
+- **Automaticky každé pondělí** (3:17 UTC; od 14. 10. 2026, dřív 1. den v měsíci) workflow
+  `.github/workflows/cyklo-ski-mapa-data.yml`: `build-data --fetch` → průchod webů → `npm test` → commit
+  `data/*.js` do hlavní větve → spuštění testů a nasazení. **Weby**: první pondělí v měsíci se projdou znovu
+  všechny (`enrich-web --force`, ≈ 30 min), ostatní pondělky jen místa, která údaje z webu ještě nemají.
+  **Ručně**: Actions → „Cyklo & Ski mapa – obnova dat“ → Run workflow s volbou webů *nova* / *vse* / *zadne*.
+  **Lokálně**: `npm run build-data` (≈ 1 min nad cache) a `npm run enrich` (≈ 30 min).
+- **Stáří dat OSM**: QLever odpovídá ze snímku planety OSM, který obnovuje po svém – 14. 10. 2026 měl snímek
+  z 21. 9. 2026. Sestavení si datum snímku přečte z `cmd=stats` (`planet-RRMMDD.osm.pbf` v popisu indexu)
+  a uloží ho do `meta.osmSnimek`; mapa pak v záhlaví ukazuje „data OSM k ‹snímek› · obnoveno ‹sestavení›“.
+  Když datum zjistit nejde, sestavení pokračuje bez něj a mapa ukáže jen datum sestavení jako dřív. Změny
+  v OSM tedy týdenní obnova přinese až s novým snímkem v QLeveru, OpenSkiMap a weby míst jsou čerstvé hned.
 - **Testy nad daty** (`test/data-io.test.js`) hlídají: 14 krajů a 77 okresů, přes 10 000 míst, jedinečná id,
   každé místo v existujícím okrese a kraji, souřadnice v obálce ČR, odkazy na existující trasy a areály,
-  vzdálenosti v mezích 3 km / 15 km, platné druhy tras a shodu počtů v `meta.js`.
-- **Co se mezi obnovami mění**: počty a názvy podle úprav v OSM, nové/zaniklé objekty, výsledky z webů
-  (každý měsíc se stahují znovu). **Co se nemění**: stav oslovení (kap. 6).
-- `data/meta.js` nese datum sestavení (`vytvoreno`), počty a použité okruhy – aplikace je zobrazuje v patičce.
+  vzdálenosti v mezích 3 km / 15 km, platné druhy tras, shodu počtů v `meta.js` a platné datum snímku OSM
+  (když je uvedené, nesmí být novější než sestavení).
+- **Co se mezi obnovami mění**: počty a názvy podle úprav v OSM (s novým snímkem), nové/zaniklé objekty,
+  výsledky z webů (nová místa každý týden, všechna znovu jednou měsíčně). **Co se nemění**: stav oslovení
+  (kap. 6).
+- `data/meta.js` nese datum sestavení (`vytvoreno`), datum snímku OSM (`osmSnimek`), počty a použité okruhy –
+  data aplikace ukazuje v záhlaví.
 
 ## 9. Omezení a jak čísla číst
 
@@ -206,10 +216,14 @@ Zem. délka. Formát RFC 4180, oddělovač `;`, UTF‑8 s BOM, konce řádků CR
 - **Vzdálenosti jsou vzdušné** k linii trasy / sjezdovce, ne dojezdové.
 - **Síť trasy** (místní/regionální/dálková) závisí na zapsaném `network`; u 862 tras chybí.
 - **Skiareály zahrnují i neprovozované** – stav je v detailu, nefiltruje se.
-- **Historický stav se neuchovává** – data mapy se každý měsíc přepíší; porovnání „co přibylo“ je možné jen
+- **Historický stav se neuchovává** – data mapy se každý týden přepíší; porovnání „co přibylo“ je možné jen
   z historie gitu (`data/*.js` jsou verzované).
 
 ## 10. Historie změn metodiky
 
 - **3. 10. 2026** – první sestavení dat (OSM přes QLever, OpenSkiMap, ČÚZK RÚIAN; okolí 3 km / 15 km; průchod
   webů s ARES). Od tohoto data platí vše výše.
+- **14. 10. 2026** – obnova dat každé pondělí místo jednou měsíčně; weby nových míst se procházejí každý týden,
+  všechny znovu první pondělí v měsíci. Popisek „data OSM k“ nově ukazuje datum snímku OSM v QLeveru a vedle
+  něj datum obnovy. Do té doby ukazoval datum sestavení (3. 10. 2026), skutečná data OSM byla o něco starší –
+  datum snímku se tehdy nezaznamenávalo. Výpočty a klasifikace se nemění, čísla jsou srovnatelná.

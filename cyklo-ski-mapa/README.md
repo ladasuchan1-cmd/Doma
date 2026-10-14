@@ -56,7 +56,7 @@ pro přihlášení přes Cloudflare Access `CF_ACCESS_TEAM_DOMAIN`, `CF_ACCESS_A
 
 **Nasazení jako web** popisuje **[NASAZENI.md](NASAZENI.md)**: Hetzner (Docker Compose + Caddy s automatickým
 HTTPS, skript `deploy/hetzner.sh` pro instalaci, aktualizace, zálohy a návrat zpět, nasazení z GitHubu přes SSH),
-interní server Koloshopu se systémovou Caddy, nebo běh bez Dockeru; měsíční obnova dat.
+interní server Koloshopu se systémovou Caddy, nebo běh bez Dockeru; obnova dat každé pondělí.
 
 ## Ovládání
 

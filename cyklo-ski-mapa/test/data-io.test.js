@@ -68,4 +68,10 @@ test('vygenerovaná data jsou konzistentní (přeskočeno bez data/)', { skip: !
   assert.strictEqual(meta.pocty.mista, mista.length);
   assert.strictEqual(meta.pocty.trasy, trasy.length);
   assert.strictEqual(meta.pocty.skiarealy, ski.arealy.length);
+  // datum OSM snímku je volitelné (starší data ho nemají), ale když je, musí to být skutečné datum
+  if (meta.osmSnimek != null) {
+    assert.match(meta.osmSnimek.datum, /^\d{4}-\d{2}-\d{2}$/);
+    assert.ok(!Number.isNaN(Date.parse(meta.osmSnimek.datum)));
+    assert.ok(meta.osmSnimek.datum <= meta.vytvoreno.slice(0, 10), 'snímek OSM nemůže být novější než sestavení');
+  }
 });

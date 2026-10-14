@@ -166,7 +166,8 @@ do daného prohlížeče a smazání dat prohlížeče ho vymaže.
 ## 14. Časté otázky
 
 **Místo v mapě chybí.** Není v OpenStreetMap. Ručně ho do aplikace přidat nejde; nejrychlejší je doplnit ho
-v OSM (odkaz „OpenStreetMap“ u sousedního místa, účet zdarma) – do mapy se dostane s příští měsíční obnovou dat.
+v OSM (odkaz „OpenStreetMap“ u sousedního místa, účet zdarma) – do mapy se dostane s pondělní obnovou dat,
+jakmile QLever převezme novější snímek OSM (bývá to pár týdnů).
 
 **Místo nemá telefon ani e-mail.** OSM ho nemá a web se nenačetl (nebo místo web nemá). Použijte odkazy Google,
 Firmy.cz, ARES v detailu a zjištěný kontakt zapište do ručních polí – zůstane napořád.
@@ -177,7 +178,13 @@ v OpenStreetMap.
 **Co znamená „podle webu“ u půjčovny?** Web místa zmiňuje půjčovnu kol nebo lyží (text na úvodní nebo
 kontaktní stránce). Je to odhad – ověřte a nastavte ručně *ano* / *ne*.
 
-**Co se stane s mým stavem při měsíční obnově dat?** Nic – záznamy jsou vázané na trvalé identifikátory míst
+**Jak často se mapa obnovuje a proč je „data OSM k“ starší než „obnoveno“?** Mapa se obnovuje každé pondělí
+ráno (od 14. 10. 2026). OpenStreetMap ale bere ze serveru QLever, který snímek OSM obnovuje po svém, takže bývá
+o pár týdnů starší. První datum v záhlaví říká, z kdy jsou data OSM, druhé, kdy se mapa naposledy sestavila –
+k tomuto dni jsou čerstvé skiareály z OpenSkiMap a údaje z webů nových míst. Všechny weby se procházejí znovu
+první pondělí v měsíci.
+
+**Co se stane s mým stavem při obnově dat?** Nic – záznamy jsou vázané na trvalé identifikátory míst
 z OpenStreetMap a žijí mimo data mapy. Když objekt v OSM někdo smaže nebo sloučí, jeho záznam se přestane
 zobrazovat, ale v záloze zůstane.
 

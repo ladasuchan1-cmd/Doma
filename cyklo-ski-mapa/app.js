@@ -639,7 +639,11 @@
     const os = $('#nav-okres');
     if (os) os.addEventListener('change', (e) => setScope(state.scope.kraj, e.target.value ? Number(e.target.value) : null));
     const ml = $('#meta-line');
-    ml.textContent = meta.vytvoreno ? `data OSM k ${new Date(meta.vytvoreno).toLocaleDateString('cs-CZ')}` : '';
+    // Datum OSM = snímek planety, ze kterého odpovídal QLever (bývá starší než samotná obnova mapy).
+    // Starší data snímek neznají – pak zůstává původní popisek s datem sestavení.
+    const snimek = meta.osmSnimek && meta.osmSnimek.datum;
+    const sestaveno = fmtDate(meta.vytvoreno);
+    ml.textContent = snimek ? `data OSM k ${fmtDate(snimek)} · obnoveno ${sestaveno}` : sestaveno ? `data OSM k ${sestaveno}` : '';
     let hint = $('#map-hint');
     if (!hint) {
       hint = document.createElement('div');
