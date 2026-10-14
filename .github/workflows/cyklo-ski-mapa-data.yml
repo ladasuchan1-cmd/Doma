@@ -1,92 +1,40 @@
-# Týdenní obnova dat Cyklo & Ski mapy (každé pondělí): stáhne nové trasy, sjezdovky a místa z OpenStreetMap,
-# OpenSkiMap a ČÚZK, projde weby míst a výsledek commitne do hlavní větve repa. Po commitu spustí
-# workflow „Cyklo & Ski mapa“ (testy + nasazení), protože pushe z Actions ho samy nespouštějí.
-# Weby: první pondělí v měsíci se projdou znovu všechny (≈30 min), ostatní pondělky jen místa, která údaje
-# z webu ještě nemají. Ručně tlačítkem „Run workflow“ s volbou, které weby projít.
+# DOČASNÝ TEST (jen ve větvi csm-test-qlever, nikdy nesloučit): odpovídá QLever runneru GitHubu a serveru Hetzner?
 name: Cyklo & Ski mapa – obnova dat
 
 on:
-  schedule:
-    - cron: "17 3 * * 1"   # každé pondělí 3:17 UTC (5:17 letního, 4:17 zimního času)
   workflow_dispatch:
     inputs:
       weby:
-        description: "Weby míst: nova = jen místa bez údajů z webu, vse = znovu všechny (≈30 min), zadne = bez webů"
+        description: "nepoužito"
         type: choice
         options: [nova, vse, zadne]
         default: nova
 
 permissions:
-  contents: write
-  actions: write
-
-concurrency:
-  group: csm-data
-  cancel-in-progress: false
+  contents: read
 
 jobs:
-  obnova:
+  test-qlever:
     runs-on: ubuntu-latest
-    timeout-minutes: 180
+    timeout-minutes: 10
     steps:
-      - name: Hlavní větev repa
-        id: vetev
+      - name: QLever z runneru a přes server
         env:
-          GH_TOKEN: ${{ github.token }}
-        run: echo "nazev=$(gh repo view ${{ github.repository }} --json defaultBranchRef -q .defaultBranchRef.name)" >> "$GITHUB_OUTPUT"
-
-      - uses: actions/checkout@v5
-        with:
-          ref: ${{ steps.vetev.outputs.nazev }}
-
-      - name: Node.js 22
-        uses: actions/setup-node@v4
-        with:
-          node-version: "22"
-
-      - name: Sestavení dat (nové stažení zdrojů)
-        working-directory: cyklo-ski-mapa
-        run: node tools/build-data.js --fetch
-
-      - name: Průchod webů míst
-        working-directory: cyklo-ski-mapa
-        env:
-          UDALOST: ${{ github.event_name }}
-          VOLBA: ${{ inputs.weby }}
+          HOST: ${{ secrets.HETZNER_HOST }}
+          USER: ${{ secrets.HETZNER_USER }}
+          PORT: ${{ secrets.HETZNER_PORT }}
+          KEY: ${{ secrets.HETZNER_SSH_KEY }}
         run: |
-          rezim="$VOLBA"
-          if [ "$UDALOST" = "schedule" ]; then
-            # první pondělí v měsíci (den 1–7) projde znovu všechny weby, ostatní pondělky jen nová místa
-            if [ "$(date -u +%-d)" -le 7 ]; then rezim=vse; else rezim=nova; fi
-          fi
-          case "$rezim" in
-            vse)  node tools/enrich-web.js --force --concurrency 10 ;;
-            nova) node tools/enrich-web.js --concurrency 10 ;;
-            *)    echo "Weby se tentokrát neprocházejí." ;;
-          esac
-
-      - name: Testy nad novými daty
-        working-directory: cyklo-ski-mapa
-        run: npm test
-
-      - name: Commit a push
-        id: commit
-        working-directory: cyklo-ski-mapa
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add data/*.js
-          if git diff --cached --quiet; then
-            echo "Žádná změna dat."
-            echo "changed=0" >> "$GITHUB_OUTPUT"
-            exit 0
-          fi
-          git commit -m "Cyklo & Ski mapa: obnova dat ($(date +%Y-%m-%d))"
-          git push origin "HEAD:${{ steps.vetev.outputs.nazev }}"
-          echo "changed=1" >> "$GITHUB_OUTPUT"
-
-      - name: Spustit testy a nasazení nad novými daty
-        if: steps.commit.outputs.changed == '1'
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: gh workflow run cyklo-ski-mapa.yml --ref "${{ steps.vetev.outputs.nazev }}"
+          echo "runner stats: $(curl -sS -o /dev/null -w '%{http_code}' 'https://qlever.dev/api/osm-planet?cmd=stats')"
+          mkdir -p ~/.ssh
+          raw="$(printf '%s\n' "$KEY" | sed '1s/^\xEF\xBB\xBF//' | tr -d '\r')"
+          typ="$(printf '%s\n' "$raw" | grep -o -m1 'BEGIN [A-Z0-9 ]*PRIVATE KEY' | sed 's/^BEGIN //')"
+          body="$(printf '%s\n' "$raw" | sed -e 's/-----BEGIN [A-Z0-9 ]*PRIVATE KEY-----//' -e 's/-----END [A-Z0-9 ]*PRIVATE KEY-----//' | tr -d '[:space:]')"
+          { echo "-----BEGIN $typ-----"; printf '%s\n' "$body" | fold -w 70; echo "-----END $typ-----"; } > ~/.ssh/id_deploy
+          chmod 600 ~/.ssh/id_deploy
+          ssh-keyscan -p "${PORT:-22}" -H "$HOST" >> ~/.ssh/known_hosts 2>/dev/null
+          ssh -i ~/.ssh/id_deploy -p "${PORT:-22}" -o StrictHostKeyChecking=yes "${USER:-root}@$HOST" 'bash -s' <<'SKRIPT'
+          command -v curl >/dev/null || { echo "curl na serveru chybí"; exit 0; }
+          echo "server stats: $(curl -sS -o /dev/null -w '%{http_code}' 'https://qlever.dev/api/osm-planet?cmd=stats')"
+          echo "server dotaz: $(curl -sS -o /dev/null -w '%{http_code}' -H 'Accept: text/csv' --data-urlencode 'query=SELECT ?x WHERE { ?x ?y ?z } LIMIT 1' https://qlever.dev/api/osm-planet)"
+          SKRIPT
