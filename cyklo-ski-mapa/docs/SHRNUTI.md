@@ -53,9 +53,11 @@ není, v mapě není.
 
 ## Je to aktualizovatelné? Ano – tři nezávislé věci
 
-1. **Data mapy (trasy, areály, místa, údaje z webů)** se obnovují **automaticky 1. den v měsíci** workflow
-   „Cyklo & Ski mapa – obnova dat“ na GitHubu: stáhne nové zdroje, projde weby míst (≈ 30 min), spustí testy,
-   uloží nová data do repozitáře a nasadí je na web. Obnovu jde pustit kdykoli ručně (GitHub → Actions → Run
+1. **Data mapy (trasy, areály, místa, údaje z webů)** se obnovují **automaticky každé pondělí** workflow
+   „Cyklo & Ski mapa – obnova dat“ na GitHubu: stáhne nové zdroje, projde weby nových míst (první pondělí
+   v měsíci znovu všechny, ≈ 30 min), spustí testy, uloží nová data do repozitáře a nasadí je na web. Data OSM
+   bere ze snímku v QLeveru, který bývá o pár týdnů starší – záhlaví mapy ukazuje obě data („data OSM k …
+   · obnoveno …“). Obnovu jde pustit kdykoli ručně (GitHub → Actions → Run
    workflow) nebo na počítači příkazy `npm run build-data` a `npm run enrich`. **Stav oslovení obnova nemaže** –
    je uložený zvlášť a vázaný na trvalé identifikátory míst z OpenStreetMap.
 2. **Aplikace (kód)** se nasazuje sama po každém sloučení změny do hlavní větve repozitáře: GitHub spustí testy
@@ -68,7 +70,8 @@ není, v mapě není.
 
 Chybu v datech (špatný telefon, zavřený penzion) jde opravit okamžitě ručně v detailu místa – ruční zápis má
 přednost před automatickými údaji a přežije obnovu dat. Trvalou opravu pro všechny je nejlepší udělat přímo
-v OpenStreetMap (odkaz je u každého místa); do mapy se dostane s příští měsíční obnovou.
+v OpenStreetMap (odkaz je u každého místa); do mapy se dostane s pondělní obnovou, jakmile ji převezme snímek
+v QLeveru.
 
 ## Jak s tím pracovat (postup pro obchodníka)
 
@@ -134,7 +137,7 @@ v OpenStreetMap (odkaz je u každého místa); do mapy se dostane s příští m
   tým), [METODIKA.md](METODIKA.md) (zdroje dat, klasifikace, výpočty), [NASAZENI.md](../NASAZENI.md) (nasazení
   a provoz)
 - **Automatizace:** GitHub → Actions → „Cyklo & Ski mapa“ (testy + nasazení), „Cyklo & Ski mapa – obnova dat“
-  (měsíční obnova)
+  (každé pondělí)
 - **Zdroje dat:** [OpenStreetMap](https://www.openstreetmap.org/copyright) · [QLever osm-planet](https://qlever.dev/osm-planet)
   · [OpenSkiMap](https://openskimap.org/) · [ČÚZK RÚIAN](https://ags.cuzk.cz/arcgis/rest/services/RUIAN/MapServer)
   · [ARES](https://ares.gov.cz/)

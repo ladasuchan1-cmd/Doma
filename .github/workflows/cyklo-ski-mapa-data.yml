@@ -1,18 +1,20 @@
-# Měsíční obnova dat Cyklo & Ski mapy: stáhne nové trasy, sjezdovky a místa z OpenStreetMap,
-# OpenSkiMap a ČÚZK, znovu projde weby míst a výsledek commitne do hlavní větve repa. Po commitu spustí
+# Týdenní obnova dat Cyklo & Ski mapy (každé pondělí): stáhne nové trasy, sjezdovky a místa z OpenStreetMap,
+# OpenSkiMap a ČÚZK, projde weby míst a výsledek commitne do hlavní větve repa. Po commitu spustí
 # workflow „Cyklo & Ski mapa“ (testy + nasazení), protože pushe z Actions ho samy nespouštějí.
-# Lze pustit i ručně tlačítkem „Run workflow“ (volitelně bez průchodu webů).
+# Weby: první pondělí v měsíci se projdou znovu všechny (≈30 min), ostatní pondělky jen místa, která údaje
+# z webu ještě nemají. Ručně tlačítkem „Run workflow“ s volbou, které weby projít.
 name: Cyklo & Ski mapa – obnova dat
 
 on:
   schedule:
-    - cron: "17 3 1 * *"   # 1. den v měsíci 3:17 UTC
+    - cron: "17 3 * * 1"   # každé pondělí 3:17 UTC (5:17 letního, 4:17 zimního času)
   workflow_dispatch:
     inputs:
-      enrich:
-        description: "Projít i weby míst (≈30 min)"
-        type: boolean
-        default: true
+      weby:
+        description: "Weby míst: nova = jen místa bez údajů z webu, vse = znovu všechny (≈30 min), zadne = bez webů"
+        type: choice
+        options: [nova, vse, zadne]
+        default: nova
 
 permissions:
   contents: write
@@ -47,9 +49,21 @@ jobs:
         run: node tools/build-data.js --fetch
 
       - name: Průchod webů míst
-        if: ${{ github.event_name == 'schedule' || inputs.enrich }}
         working-directory: cyklo-ski-mapa
-        run: node tools/enrich-web.js --force --concurrency 10
+        env:
+          UDALOST: ${{ github.event_name }}
+          VOLBA: ${{ inputs.weby }}
+        run: |
+          rezim="$VOLBA"
+          if [ "$UDALOST" = "schedule" ]; then
+            # první pondělí v měsíci (den 1–7) projde znovu všechny weby, ostatní pondělky jen nová místa
+            if [ "$(date -u +%-d)" -le 7 ]; then rezim=vse; else rezim=nova; fi
+          fi
+          case "$rezim" in
+            vse)  node tools/enrich-web.js --force --concurrency 10 ;;
+            nova) node tools/enrich-web.js --concurrency 10 ;;
+            *)    echo "Weby se tentokrát neprocházejí." ;;
+          esac
 
       - name: Testy nad novými daty
         working-directory: cyklo-ski-mapa
@@ -67,7 +81,7 @@ jobs:
             echo "changed=0" >> "$GITHUB_OUTPUT"
             exit 0
           fi
-          git commit -m "Cyklo & Ski mapa: měsíční obnova dat ($(date +%Y-%m-%d))"
+          git commit -m "Cyklo & Ski mapa: obnova dat ($(date +%Y-%m-%d))"
           git push origin "HEAD:${{ steps.vetev.outputs.nazev }}"
           echo "changed=1" >> "$GITHUB_OUTPUT"
 

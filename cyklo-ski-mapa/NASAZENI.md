@@ -234,9 +234,9 @@ přes Cloudflare a server je zvenčí vidět jen pro Cloudflare. Co to pro aplik
    pro `ksprehledy.cz` je od 7. 10. 2026 vypnutá. Mapu neovlivní (e-maily jsou v datech, ne v HTML), ale na webech
    Půjčovny kol Cloudflare v HTML nahrazoval e-maily textem „[email protected]“ a dekódoval je až svým skriptem
    v prohlížeči.
-   Auto Minify Cloudflare v roce 2024 zrušil. Cloudflare Access na `cyklomapa` nezapínat, aplikace má vlastní
-   přihlášení. Cache: statické soubory posílá aplikace jako
-   `Cache-Control: private`, Cloudflare je tedy neukládá a nepodá je nepřihlášeným; po měsíční obnově dat nic nevisí.
+   Auto Minify Cloudflare v roce 2024 zrušil. Cloudflare Access je na `cyklomapa` od 7. 10. 2026 zapnutý (oddíl
+   níže). Cache: statické soubory posílá aplikace jako
+   `Cache-Control: private`, Cloudflare je tedy neukládá a nepodá je nepřihlášeným; po obnově dat nic nevisí.
 6. **Firewall (volitelně):** když jsou všechny weby za proxy, lze porty 80/443 omezit jen na adresy Cloudflare
    (Hetzner Cloud Firewall) – server pak zvenčí neodpovídá vůbec.
 
@@ -294,9 +294,10 @@ na serveru (`curl -k --resolve cyklomapa.ksprehledy.cz:443:127.0.0.1 …`) nebo 
 - **Uživatelé**: s Cloudflare Access (od 7. 10. 2026) je určuje pravidlo v Zero Trust – e-maily @koloshop.cz,
   viz oddíl výše. Bez něj `CSM_USERS` v `.env` (na Hetzneru secret `HETZNER_USERS`) + nasazení; odebraný
   uživatel přestane platit okamžitě, i když má cookie.
-- **Obnova dat (trasy, místa, weby)**: workflow **„Cyklo & Ski mapa – obnova dat“** běží 1. den v měsíci,
-  commitne nová `data/*.js` do hlavní větve a spustí testy + nasazení. Jde pustit i ručně (Actions → Run workflow,
-  volitelně bez průchodu webů). Lokálně: `npm run build-data && npm run enrich`.
+- **Obnova dat (trasy, místa, weby)**: workflow **„Cyklo & Ski mapa – obnova dat“** běží každé pondělí ve 3:17 UTC
+  (od 14. 10. 2026, dřív 1. den v měsíci), commitne nová `data/*.js` do hlavní větve a spustí testy + nasazení.
+  Weby nových míst projde každý týden, všechny první pondělí v měsíci. Jde pustit i ručně (Actions → Run workflow,
+  volba webů *nova* / *vse* / *zadne*). Lokálně: `npm run build-data && npm run enrich`.
 - **Bezpečnost**: přihlášení s brzdou (10 pokusů / 15 min na IP), HttpOnly + Secure cookie (za HTTPS),
   CSP, bez indexace mimo přihlášení (bez přihlášení je vidět jen přihlašovací formulář). Hesla jsou
   v `.env` v otevřené podobě jako u R01 Sales – soubor patří jen uživateli (`chmod 600`).

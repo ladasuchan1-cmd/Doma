@@ -120,10 +120,24 @@ async function sparqlCsv(query) {
   });
 }
 
+// Stáří OSM dat: QLever v `cmd=stats` uvádí, ze kterého snímku planety index sestavil
+// („…/pbf/planet-260921.osm.pbf…“). Vrací datum snímku jako 'YYYY-MM-DD', nebo null, když ho v textu nenajde.
+function planetDatum(nameIndex) {
+  const m = /planet-(\d{2})(\d{2})(\d{2})\.osm\.pbf/.exec(String(nameIndex || ''));
+  if (!m) return null;
+  const [, yy, mm, dd] = m;
+  if (Number(mm) < 1 || Number(mm) > 12 || Number(dd) < 1 || Number(dd) > 31) return null;
+  return `20${yy}-${mm}-${dd}`;
+}
+
+function qleverStatsUrl() {
+  return `${QLEVER_ENDPOINT}?cmd=stats`;
+}
+
 // ČÚZK RÚIAN – vrstva 15 = okresy, 17 = kraje (VÚSC); generalizace ~55 m, WGS84, GeoJSON.
 function cuzkUrl(layer) {
   const q = new URLSearchParams({ where: '1=1', outFields: '*', outSR: '4326', f: 'geojson', maxAllowableOffset: '0.0005', returnGeometry: 'true' });
   return `${CUZK_BASE}/${layer}/query?${q}`;
 }
 
-module.exports = { QLEVER_ENDPOINT, OPENSKIMAP_URL, CUZK_BASE, USER_AGENT, PREFIXES, POI_KEYS, SPARQL_QUERIES, fetchText, fetchJson, sparqlCsv, cuzkUrl };
+module.exports = { QLEVER_ENDPOINT, OPENSKIMAP_URL, CUZK_BASE, USER_AGENT, PREFIXES, POI_KEYS, SPARQL_QUERIES, fetchText, fetchJson, sparqlCsv, cuzkUrl, planetDatum, qleverStatsUrl };

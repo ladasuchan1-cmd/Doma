@@ -16,7 +16,7 @@ const path = require('node:path');
 const geo = require('../lib/geo.js');
 const csv = require('../lib/csv.js');
 const contacts = require('../lib/contacts.js');
-const { fetchText, fetchJson, sparqlCsv, cuzkUrl, OPENSKIMAP_URL, SPARQL_QUERIES } = require('./lib/sources.js');
+const { fetchText, fetchJson, sparqlCsv, cuzkUrl, OPENSKIMAP_URL, SPARQL_QUERIES, planetDatum, qleverStatsUrl } = require('./lib/sources.js');
 const { writeDataset } = require('./lib/data-io.js');
 
 const args = parseArgs(process.argv.slice(2));
@@ -713,10 +713,40 @@ async function buildMista(locate, trasy, ski) {
   return mista;
 }
 
+// ---------------------------------------------------------- stáří OSM
+// Ze kterého snímku planety QLever odpovídá. Stahuje se spolu s dotazy (před nimi), takže datum patří
+// k datům v cache. Když ho zjistit nejde, sestavení pokračuje a datum zůstane prázdné – nikdy si ho nevymýšlí.
+async function osmSnimek() {
+  const file = path.join(CACHE, 'qlever_stats.json');
+  const dotazyVCache = fs.existsSync(path.join(CACHE, 'routes.csv'));
+  try {
+    let text;
+    if (!FORCE && fs.existsSync(file)) text = fs.readFileSync(file, 'utf8');
+    else if (!FORCE && dotazyVCache) {
+      log('upozornění: cache nemá qlever_stats.json – datum OSM snímku k datům v cache není známé');
+      return null;
+    } else {
+      log('stahuji qlever_stats.json');
+      text = await fetchText(qleverStatsUrl(), { timeoutMs: 60000 });
+      fs.mkdirSync(CACHE, { recursive: true });
+      fs.writeFileSync(file, text);
+    }
+    const index = String(JSON.parse(text)['name-index'] || '');
+    const datum = planetDatum(index);
+    if (!datum) log('upozornění: z popisu indexu QLeveru nejde vyčíst datum snímku:', index.slice(0, 160));
+    return datum ? { datum, index: index.slice(0, 300) } : null;
+  } catch (e) {
+    log('upozornění: statistiky QLeveru nejdou načíst –', e.message);
+    return null;
+  }
+}
+
 // ----------------------------------------------------------------- main
 async function main() {
   log(`cache: ${CACHE}`);
   log(`výstup: ${OUT}`);
+  const snimek = await osmSnimek();
+  if (snimek) log(`OSM snímek: ${snimek.datum}`);
   const hranice = await buildHranice();
   const locate = makeLocator(hranice);
   const trasy = await buildTrasy(locate);
@@ -731,6 +761,7 @@ async function main() {
   writeDataset(OUT, 'mista', mista);
   const meta = {
     vytvoreno: new Date().toISOString(),
+    osmSnimek: snimek,
     pocty: {
       kraje: hranice.kraje.length,
       okresy: hranice.okresy.length,
