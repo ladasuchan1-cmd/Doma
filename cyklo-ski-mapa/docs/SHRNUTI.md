@@ -87,7 +87,8 @@ v QLeveru.
 5. **Stav oslovení**: zaškrtnout fázi (Chceme kontaktovat → Proběhl nabídkový e-mail → Volali jsme → Osobní
    návštěva proběhla), napsat poznámku „kdo, kdy, co domluveno“. Ukládá se hned, s datem, časem a jménem.
 6. **Tabulka** (tlačítko nahoře): řazení kliknutím na záhlaví, zaškrtávátka stavů rovnou v řádcích,
-   **Export CSV** aktuálního výběru do Excelu (oddělovač `;`, čeština v pořádku).
+   **Export CSV** aktuálního výběru do Excelu (oddělovač `;`, čeština v pořádku). Upravený soubor (i sešit s listem
+   pro každý kraj) jde **načíst zpět** – po náhledu se zapíšou hromadné změny stavů a poznámek.
 7. **Odkaz kolegovi**: adresa v prohlížeči nese kraj, okres i vybrané místo – stačí ji zkopírovat.
 
 ## Provoz, přístup a bezpečnost

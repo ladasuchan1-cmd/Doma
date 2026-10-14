@@ -72,6 +72,7 @@ interní server Koloshopu se systémovou Caddy, nebo běh bez Dockeru; obnova da
 | Detail trasy / areálu | seznam míst do 3 km od trasy, resp. do zvoleného okruhu od areálu; u areálu lze vést stav oslovení provozovatele |
 | Tabulka | tlačítko **Tabulka**: řazení kliknutím na záhlaví, zaškrtávátka stavů se rovnou ukládají |
 | Export | **Export CSV** (aktuální výběr, oddělovač `;`, UTF‑8 s BOM – otevře Excel), v dialogu stavu i export všech záznamů |
+| Import | **Import z Excelu…** – upravený export (XLSX, i víc listů, nebo CSV) se po náhledu zapíše zpět do stavu oslovení |
 | Odkaz | adresa stránky nese kraj/okres/vybraný objekt (`#kraj=35&okres=3302&misto=n123`) – dá se poslat kolegovi |
 
 Na úrovni ČR se značky míst nekreslí (překrývaly by kraje); zapnout je lze ve filtrech. Zobrazené trasy na úrovni ČR
@@ -109,6 +110,8 @@ lib/geo.js                       WKT, zjednodušení linií, bod v polygonu, vzd
 lib/csv.js                       CSV parser/serializace (RFC 4180, Excel)
 lib/contacts.js                  e-maily, telefony, IČO, provozovatel, zmínky o půjčovně z HTML
 lib/stav.js                      model stavu oslovení (sloučení, import/export, efektivní kontakt)
+lib/xlsx.js                      čtení XLSX bez knihoven (ZIP + listy) pro import tabulky
+lib/import-tabulky.js            hromadný import upravené tabulky (párování podle OSM, pravidla buněk, náhled)
 tools/build-data.js              sestavení dat (tools/lib/sources.js = dotazy a URL zdrojů, tools/lib/data-io.js = formát data/*.js)
 tools/enrich-web.js              obohacení z webů + ARES
 server.js                        web: přihlášení, statika (gzip, CSP), API /api/stav (sdílený stav v data/stav.json)
