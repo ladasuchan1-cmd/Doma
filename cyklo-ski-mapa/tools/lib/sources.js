@@ -109,9 +109,15 @@ async function fetchJson(url, opts) {
   return JSON.parse(await fetchText(url, opts));
 }
 
+// Tělo POST požadavku na QLever (formulář s dotazem včetně prefixů) – stejné pro přímé stažení i pro stažení
+// přes server (tools/qlever-pres-ssh.js).
+function sparqlBody(query) {
+  return new URLSearchParams({ query: PREFIXES + query }).toString();
+}
+
 // SPARQL dotaz → CSV text (QLever vrací hlavičku s názvy proměnných bez otazníků).
 async function sparqlCsv(query) {
-  const body = new URLSearchParams({ query: PREFIXES + query }).toString();
+  const body = sparqlBody(query);
   return fetchText(QLEVER_ENDPOINT, {
     method: 'POST',
     headers: { Accept: 'text/csv', 'Content-Type': 'application/x-www-form-urlencoded' },
@@ -140,4 +146,4 @@ function cuzkUrl(layer) {
   return `${CUZK_BASE}/${layer}/query?${q}`;
 }
 
-module.exports = { QLEVER_ENDPOINT, OPENSKIMAP_URL, CUZK_BASE, USER_AGENT, PREFIXES, POI_KEYS, SPARQL_QUERIES, fetchText, fetchJson, sparqlCsv, cuzkUrl, planetDatum, qleverStatsUrl };
+module.exports = { QLEVER_ENDPOINT, OPENSKIMAP_URL, CUZK_BASE, USER_AGENT, PREFIXES, POI_KEYS, SPARQL_QUERIES, fetchText, fetchJson, sparqlCsv, sparqlBody, cuzkUrl, planetDatum, qleverStatsUrl };

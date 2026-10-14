@@ -57,7 +57,7 @@ není, v mapě není.
    „Cyklo & Ski mapa – obnova dat“ na GitHubu: stáhne nové zdroje, projde weby nových míst (první pondělí
    v měsíci znovu všechny, ≈ 30 min), spustí testy, uloží nová data do repozitáře a nasadí je na web. Data OSM
    bere ze snímku v QLeveru, který bývá o pár týdnů starší – záhlaví mapy ukazuje obě data („data OSM k …
-   · obnoveno …“). Obnovu jde pustit kdykoli ručně (GitHub → Actions → Run
+   · obnoveno …“). Dotazy na QLever jdou přes server, protože GitHubu QLever odpovídá chybou 403. Obnovu jde pustit kdykoli ručně (GitHub → Actions → Run
    workflow) nebo na počítači příkazy `npm run build-data` a `npm run enrich`. **Stav oslovení obnova nemaže** –
    je uložený zvlášť a vázaný na trvalé identifikátory míst z OpenStreetMap.
 2. **Aplikace (kód)** se nasazuje sama po každém sloučení změny do hlavní větve repozitáře: GitHub spustí testy

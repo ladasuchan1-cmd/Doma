@@ -190,6 +190,12 @@ Zem. délka. Formát RFC 4180, oddělovač `;`, UTF‑8 s BOM, konce řádků CR
   všechny (`enrich-web --force`, ≈ 30 min), ostatní pondělky jen místa, která údaje z webu ještě nemají.
   **Ručně**: Actions → „Cyklo & Ski mapa – obnova dat“ → Run workflow s volbou webů *nova* / *vse* / *zadne*.
   **Lokálně**: `npm run build-data` (≈ 1 min nad cache) a `npm run enrich` (≈ 30 min).
+- **Dotazy na QLever jdou přes server.** QLever odpovídá runnerům GitHub Actions chybou 403, ze serveru Hetzner
+  normálně (ověřeno 14. 10. 2026). Workflow proto pošle každý dotaz přes SSH na server, kde ho provede `curl`
+  (`tools/qlever-pres-ssh.js`, klíč připraví `deploy/ssh-klic.sh` ze stejných secrets jako nasazení), a CSV uloží
+  do `cache/`. `build-data.js` (bez `--fetch`) je vezme odtud a ČÚZK, OpenSkiMap i weby stahuje runner sám. Dotaz,
+  který selže, ukončí obnovu s chybou a data zůstanou beze změny – neúplná data se nesestaví. Bez serveru
+  (`CSM_HETZNER` ≠ 1) by sestavení skončilo chybou 403.
 - **Stáří dat OSM**: QLever odpovídá ze snímku planety OSM, který obnovuje po svém – 14. 10. 2026 měl snímek
   z 21. 9. 2026. Sestavení si datum snímku přečte z `cmd=stats` (`planet-RRMMDD.osm.pbf` v popisu indexu)
   a uloží ho do `meta.osmSnimek`; mapa pak v záhlaví ukazuje „data OSM k ‹snímek› · obnoveno ‹sestavení›“.
@@ -224,6 +230,9 @@ Zem. délka. Formát RFC 4180, oddělovač `;`, UTF‑8 s BOM, konce řádků CR
 - **3. 10. 2026** – první sestavení dat (OSM přes QLever, OpenSkiMap, ČÚZK RÚIAN; okolí 3 km / 15 km; průchod
   webů s ARES). Od tohoto data platí vše výše.
 - **14. 10. 2026** – obnova dat každé pondělí místo jednou měsíčně; weby nových míst se procházejí každý týden,
-  všechny znovu první pondělí v měsíci. Popisek „data OSM k“ nově ukazuje datum snímku OSM v QLeveru a vedle
-  něj datum obnovy. Do té doby ukazoval datum sestavení (3. 10. 2026), skutečná data OSM byla o něco starší –
-  datum snímku se tehdy nezaznamenávalo. Výpočty a klasifikace se nemění, čísla jsou srovnatelná.
+  všechny znovu první pondělí v měsíci. Dotazy na QLever jdou přes server, protože runnerům GitHubu QLever
+  odpovídá 403 – automatická obnova do té doby ještě neproběhla a první by touto chybou skončila. Popisek
+  „data OSM k“ nově ukazuje datum snímku OSM v QLeveru a vedle něj datum obnovy. Do té doby ukazoval datum
+  sestavení (3. 10. 2026); data OSM ve skutečnosti pocházela ze snímku z 21. 9. 2026 (dotazy 14. 10. vrátily
+  totéž). Výpočty a klasifikace se nemění, čísla jsou srovnatelná; skiareálů z OpenSkiMap je od této obnovy
+  víc (OpenSkiMap mezitím přidal areály).
