@@ -297,7 +297,10 @@ na serveru (`curl -k --resolve cyklomapa.ksprehledy.cz:443:127.0.0.1 …`) nebo 
 - **Obnova dat (trasy, místa, weby)**: workflow **„Cyklo & Ski mapa – obnova dat“** běží každé pondělí ve 3:17 UTC
   (od 14. 10. 2026, dřív 1. den v měsíci), commitne nová `data/*.js` do hlavní větve a spustí testy + nasazení.
   Weby nových míst projde každý týden, všechny první pondělí v měsíci. Jde pustit i ručně (Actions → Run workflow,
-  volba webů *nova* / *vse* / *zadne*). Lokálně: `npm run build-data && npm run enrich`.
+  volba webů *nova* / *vse* / *zadne*). Lokálně: `npm run build-data && npm run enrich`. **Dotazy na OpenStreetMap
+  (QLever) jdou přes tento server**: QLever runnerům GitHubu odpovídá 403, proto je workflow pošle přes SSH
+  (secrets `HETZNER_*`, variable `CSM_HETZNER=1`) a na serveru je provede `curl` – ten tam musí být. Server tím
+  na pár desítek sekund stáhne ≈ 65 MB; aplikaci to neovlivní.
 - **Bezpečnost**: přihlášení s brzdou (10 pokusů / 15 min na IP), HttpOnly + Secure cookie (za HTTPS),
   CSP, bez indexace mimo přihlášení (bez přihlášení je vidět jen přihlašovací formulář). Hesla jsou
   v `.env` v otevřené podobě jako u R01 Sales – soubor patří jen uživateli (`chmod 600`).

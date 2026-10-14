@@ -1,6 +1,8 @@
 # Týdenní obnova dat Cyklo & Ski mapy (každé pondělí): stáhne nové trasy, sjezdovky a místa z OpenStreetMap,
 # OpenSkiMap a ČÚZK, projde weby míst a výsledek commitne do hlavní větve repa. Po commitu spustí
 # workflow „Cyklo & Ski mapa“ (testy + nasazení), protože pushe z Actions ho samy nespouštějí.
+# QLever (OpenStreetMap) odpovídá runnerům GitHubu chybou 403, proto se dotazy na něj posílají přes SSH na server
+# (Hetzner, vars.CSM_HETZNER = 1), kde je provede curl; ostatní zdroje a weby stahuje runner sám.
 # Weby: první pondělí v měsíci se projdou znovu všechny (≈30 min), ostatní pondělky jen místa, která údaje
 # z webu ještě nemají. Ručně tlačítkem „Run workflow“ s volbou, které weby projít.
 name: Cyklo & Ski mapa – obnova dat
@@ -44,9 +46,22 @@ jobs:
         with:
           node-version: "22"
 
-      - name: Sestavení dat (nové stažení zdrojů)
+      - name: Dotazy na OpenStreetMap (QLever) přes server
+        if: vars.CSM_HETZNER == '1'
         working-directory: cyklo-ski-mapa
-        run: node tools/build-data.js --fetch
+        env:
+          HOST: ${{ secrets.HETZNER_HOST }}
+          USER: ${{ secrets.HETZNER_USER }}
+          PORT: ${{ secrets.HETZNER_PORT }}
+          KEY: ${{ secrets.HETZNER_SSH_KEY }}
+        run: |
+          bash deploy/ssh-klic.sh
+          node tools/qlever-pres-ssh.js --cache cache -- ssh -i ~/.ssh/id_deploy -p "${PORT:-22}" -o StrictHostKeyChecking=yes -o ServerAliveInterval=30 "${USER:-root}@$HOST"
+
+      - name: Sestavení dat
+        working-directory: cyklo-ski-mapa
+        # Runner začíná s prázdnou cache: co v ní není (ČÚZK, OpenSkiMap; bez serveru i QLever), stáhne se čerstvé.
+        run: node tools/build-data.js
 
       - name: Průchod webů míst
         working-directory: cyklo-ski-mapa
