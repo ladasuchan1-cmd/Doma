@@ -145,6 +145,15 @@
   height: 38px;
   transition: filter var(--motion) var(--ease);
 }
+/* Logo, které název půjčovny samo nese (SVG s textem – logo dema), ho v hlavičce vedle sebe neopakuje a je o něco
+   větší, aby byl název v něm čitelný; hlavička se pak na desktopu vejde s menu do jednoho řádku. Logo bez textu
+   (výchozí kolo webu klienta) i nahraný obrázek název dál doplňuje. */
+[data-theme='outdoor'] .site-header .site-logo:has(.site-logo__img text) .site-logo__img {
+  height: 44px;
+}
+[data-theme='outdoor'] .site-header .site-logo:has(.site-logo__img text) .site-logo__text {
+  display: none;
+}
 [data-theme='outdoor'] .site-nav__link {
   position: relative;
   padding: 0 var(--space-2);
@@ -190,7 +199,38 @@
   outline-color: currentColor;
 }
 
-/* Průhledná navigace přes hero (jen stránky, které hero začínají) – po scrollu plná, čistě CSS. */
+/* Průhledná navigace přes hero (jen stránky, které hero začínají) – po scrollu plná, čistě CSS.
+   Hlavička a <main> sdílejí jednu oblast mřížky <body>, takže hero začíná přesně na horní hraně hlavičky, ať je
+   hlavička vysoká jakkoli: menu zalomené pod logo na užším desktopu, při zvětšení stránky, u delšího názvu půjčovny.
+   Záporný okraj podle --header-height to nezajistil – CSS výšku zalomené hlavičky nezná a hero pak začínal pod ní.
+   Proužek ukázky a pruh náhledu mají vlastní řádek nad hlavičkou, patička a přepínač designů (na mobilu v toku)
+   pod ní. Další přímý potomek <body> v toku (layout.js) potřebuje řádek i tady – jinak by ho mřížka vložila do
+   volného řádku nad hlavičku. */
+[data-theme='outdoor'] body:has(.site-main > .hero:first-child) {
+  display: grid;
+  grid-template: 'demo' auto 'preview' auto 'page' 1fr 'footer' auto 'switch' auto / minmax(0, 1fr);
+}
+[data-theme='outdoor'] body:has(.site-main > .hero:first-child) > .demo-bar {
+  grid-area: demo;
+}
+[data-theme='outdoor'] body:has(.site-main > .hero:first-child) > .preview-bar {
+  grid-area: preview;
+}
+[data-theme='outdoor'] body:has(.site-main > .hero:first-child) > .site-main {
+  grid-area: page;
+}
+/* hlavička nahoře v oblasti obsahu; sahá až na konec stránky, aby jako sticky zůstala nahoře i nad patičkou */
+[data-theme='outdoor'] body:has(.site-main > .hero:first-child) > .site-header {
+  grid-row: page / -1;
+  grid-column: 1;
+  align-self: start;
+}
+[data-theme='outdoor'] body:has(.site-main > .hero:first-child) > .site-footer {
+  grid-area: footer;
+}
+[data-theme='outdoor'] body:has(.site-main > .hero:first-child) > .design-switch {
+  grid-area: switch;
+}
 @keyframes outdoor-header {
   from {
     color: #f5f0e6;
@@ -223,22 +263,19 @@
     animation-timeline: scroll(root);
     animation-range: 40px 300px;
   }
-  [data-theme='outdoor'] body:has(.site-main > .hero:first-child) .site-logo__img {
+  /* jen logo v hlavičce – patička má logo vlastní, světlé (animace by ho na stránce s hero přebila na černé) */
+  [data-theme='outdoor'] body:has(.site-main > .hero:first-child) .site-header .site-logo__img {
     animation: outdoor-logo linear both;
     animation-timeline: scroll(root);
     animation-range: 40px 300px;
   }
-  [data-theme='outdoor'] body:has(.site-main > .hero:first-child) .site-main {
-    margin-top: calc(-1 * var(--header-height));
-  }
 }
 @supports not (animation-timeline: scroll()) {
-  /* Fallback: navigace leží přes hero, při scrollu odjede (není sticky). */
+  /* Fallback: navigace leží přes hero, při scrollu odjede (není sticky). Zůstává v toku – s proužkem ukázky / pruhem
+     náhledu i bez nich: proužek má vlastní řádek nad ní, hero se pod ni dostane sdílenou oblastí mřížky (viz výše).
+     Absolutní hlavička by ve flexu i v mřížce <body> ležela vždy úplně nahoře a proužek by zakryla. */
   [data-theme='outdoor'] body:has(.site-main > .hero:first-child) .site-header {
-    position: absolute;
-    left: 0;
-    right: 0;
-    top: 0;
+    position: relative;
     color: #f5f0e6;
     background-color: transparent;
     border-bottom-color: transparent;
@@ -246,16 +283,8 @@
     -webkit-backdrop-filter: none;
     backdrop-filter: none;
   }
-  [data-theme='outdoor'] body:has(.site-main > .hero:first-child) .site-logo__img {
+  [data-theme='outdoor'] body:has(.site-main > .hero:first-child) .site-header .site-logo__img {
     filter: invert(1) drop-shadow(0 1px 2px rgba(0, 0, 0, 0.35));
-  }
-  /* S proužkem ukázky / pruhem náhledu nad hlavičkou zůstane hlavička v toku (absolutní prvek ve flex <body> leží
-     vždy nahoře a proužek by zakryla); hero se pod ni podsune záporným okrajem jako ve větvi se scroll animací. */
-  [data-theme='outdoor'] body:has(.demo-bar, .preview-bar):has(.site-main > .hero:first-child) .site-header {
-    position: relative;
-  }
-  [data-theme='outdoor'] body:has(.demo-bar, .preview-bar):has(.site-main > .hero:first-child) .site-main {
-    margin-top: calc(-1 * var(--header-height));
   }
 }
 /* Otevřené mobilní menu musí být vždy čitelné (přebije i animaci) */

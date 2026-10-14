@@ -2,7 +2,8 @@
 // E2E průchod dema v prohlížeči (SPEC kap. 2 a 17.8): Playwright z GLOBÁLNÍ instalace (projekt má 0 npm závislostí),
 // Chromium z PLAYWRIGHT_BROWSERS_PATH. Spustí server na volném portu s dočasnými daty + demo daty, pro každé téma
 // (?design=outdoor|sport|family) projde veřejné stránky a rezervační tok, loguje chyby konzole prohlížeče, chyby
-// stránky (pageerror), porušení CSP (securitypolicyviolation), odpovědi 5xx a nerozvinuté {{…}} v HTML; screenshoty
+// stránky (pageerror), porušení CSP (securitypolicyviolation), odpovědi 5xx, nerozvinuté {{…}} v HTML a hero, které
+// nelícuje s průhlednou hlavičkou (nebo do něj zasahuje plná hlavička); screenshoty
 // ukládá do dist/screenshots/<tema>-<stranka>.png (dist/ není v gitu). Chybějící routa (404) = varování a přeskočení.
 //
 //   node --disable-warning=ExperimentalWarning tools/e2e.js                 (npm run e2e)
@@ -294,6 +295,28 @@ async function checkDocument(page, theme, sink, label) {
   if (h1 !== 1) sink.warn(`${label}: počet <h1> = ${h1}`);
 }
 
+/**
+ * Hlavička a hero (jen stránky, které hero začínají; měří se před scrollem): u průhledné navigace
+ * (data-nav="transparent", outdoor) musí fotka začínat přesně na horní hraně hlavičky – jinak pod ní prosvítá světlý
+ * podklad stránky a světlé logo a menu nejsou vidět; u ostatních navigací musí být hlavička celá nad fotkou.
+ */
+async function checkHeaderHero(page, sink, label) {
+  const m = await page.evaluate(() => {
+    const hero = document.querySelector('.site-main > .hero:first-child');
+    const header = document.querySelector('.site-header');
+    if (!hero || !header || window.scrollY !== 0) return null;
+    const h = header.getBoundingClientRect();
+    return { nav: document.documentElement.getAttribute('data-nav'), headerTop: h.top, headerBottom: h.bottom, heroTop: hero.getBoundingClientRect().top };
+  });
+  if (!m) return;
+  const px = (n) => Math.round(n * 10) / 10;
+  if (m.nav === 'transparent') {
+    if (Math.abs(m.heroTop - m.headerTop) > 0.5) sink.error(`${label}: hero začíná ${px(m.heroTop - m.headerTop)} px pod horní hranou průhledné hlavičky (má s ní lícovat)`);
+  } else if (m.heroTop < m.headerBottom - 0.5) {
+    sink.error(`${label}: hlavička zasahuje ${px(m.headerBottom - m.heroTop)} px do hero`);
+  }
+}
+
 function withDesign(p, theme) {
   return `${p}${p.includes('?') ? '&' : '?'}design=${theme}`;
 }
@@ -322,6 +345,7 @@ async function visit(page, { baseUrl, theme, out, sink, p, name, viewportTag = '
   }
   await settle(page);
   await checkDocument(page, theme, sink, label);
+  await checkHeaderHero(page, sink, viewportTag ? `${label} (${viewportTag.replace(/^-/, '')})` : label);
   const file = path.join(out, `${theme}-${name}${viewportTag}.png`);
   await page.screenshot({ path: file, fullPage: true });
   return 'ok';

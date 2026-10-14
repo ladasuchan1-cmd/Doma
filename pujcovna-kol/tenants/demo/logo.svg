@@ -1,5 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 80" width="320" height="80" role="img" aria-label="Půjčovna kol U Tří dubů">
-  <!-- Logo dema: tři stylizované duby + nápis, jedna barva přes currentColor (téma určí barvu). -->
+  <!-- Logo dema: tři stylizované duby + nápis, jedna barva přes currentColor (téma určí barvu).
+       Podtitul musí končit uvnitř viewBoxu (do x ≈ 310 při metrice Arialu), jinak se ořízne. -->
   <g fill="currentColor">
     <!-- dub 1 -->
     <path d="M22 60c-1-9-1-16 0-22-6 2-11-1-11-7 0-5 4-8 8-7 0-6 4-10 10-10s10 4 10 10c4-1 8 2 8 7 0 6-5 9-11 7 1 6 1 13 0 22z"/>
@@ -10,6 +11,6 @@
     <!-- země -->
     <rect x="8" y="64" width="116" height="3" rx="1.5"/>
     <text x="140" y="38" font-family="Georgia, 'Times New Roman', serif" font-size="26" font-weight="700" letter-spacing="0.5">U Tří dubů</text>
-    <text x="141" y="60" font-family="Arial, Helvetica, sans-serif" font-size="13" letter-spacing="2.5">PŮJČOVNA KOL · TŘEBOŇ</text>
+    <text x="141" y="60" font-family="Arial, Helvetica, sans-serif" font-size="11" letter-spacing="1.4">PŮJČOVNA KOL · TŘEBOŇ</text>
   </g>
 </svg>
