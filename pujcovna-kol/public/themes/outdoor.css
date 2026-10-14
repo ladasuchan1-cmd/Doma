@@ -249,6 +249,14 @@
   [data-theme='outdoor'] body:has(.site-main > .hero:first-child) .site-logo__img {
     filter: invert(1) drop-shadow(0 1px 2px rgba(0, 0, 0, 0.35));
   }
+  /* S proužkem ukázky / pruhem náhledu nad hlavičkou zůstane hlavička v toku (absolutní prvek ve flex <body> leží
+     vždy nahoře a proužek by zakryla); hero se pod ni podsune záporným okrajem jako ve větvi se scroll animací. */
+  [data-theme='outdoor'] body:has(.demo-bar, .preview-bar):has(.site-main > .hero:first-child) .site-header {
+    position: relative;
+  }
+  [data-theme='outdoor'] body:has(.demo-bar, .preview-bar):has(.site-main > .hero:first-child) .site-main {
+    margin-top: calc(-1 * var(--header-height));
+  }
 }
 /* Otevřené mobilní menu musí být vždy čitelné (přebije i animaci) */
 [data-theme='outdoor'] .site-header:has(.nav-toggle:checked) {

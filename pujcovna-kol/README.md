@@ -6,7 +6,9 @@ bezpečnost a datový model jsou podle [PLAN.md](PLAN.md) a závazné [specifika
 Mockované jsou jen externí služby – karetní brána (simulační stránka), bankovní API (tlačítko „simulovat příchozí
 platbu“), e-maily (tabulka `outbox` zobrazená v adminu) a Mapy.cz (bez klíče → CyclOSM). Žádné reálné osoby,
 žádné smyšlené recenze, obrázky jen CC0 / CC BY z Wikimedia Commons s uvedenou attribution (stránka `/fotografie`
-generovaná z `public/img/demo/*/ATTRIBUTION.md`, odkaz v patičce; u zajímavostí přímo u obrázku).
+generovaná z `public/img/demo/*/ATTRIBUTION.md`, odkaz v patičce; u zajímavostí přímo u obrázku). Že jde o ukázku,
+říká od 14. 10. 2026 proužek nad hlavičkou každé stránky dema („Ukázka – takhle může vypadat web vaší půjčovny“
+s odkazem „Chci takový web“ na `/nabidka`); dřív to stálo jen v patičce. Weby klientů ani administrace ho nemají.
 
 ## Jak spustit
 
@@ -43,7 +45,7 @@ Nová půjčovna si web založí sama průvodcem `/zalozeni/<token>` (7 kroků, 
 jsou ve správě platformy `/platforma` – zapíná ji `PK_PLATFORMA_HESLO` (min. 12 znaků; demo heslo administrace je
 veřejné, proto má platforma vlastní přihlášení). Weby klientů leží v `$PK_DATA/klienti/<slug>/` a běží na
 `<slug>.<PK_KLIENTI_DOMENA>` (výchozí `PK_DOMAIN`); nemají demo chování (veřejné demo heslo, přepínač designů, noční
-reset), v náhledovém provozu jen simulované platby a pruh „náhledový provoz“. Lokálně si průvodce vyzkoušíte:
+reset, proužek „Ukázka“), v náhledovém provozu jen simulované platby a pruh „náhledový provoz“. Lokálně si průvodce vyzkoušíte:
 
 ```sh
 PK_PLATFORMA_HESLO=heslo-platformy-123 npm start      # http://localhost:8092/platforma → pozvánka → odkaz

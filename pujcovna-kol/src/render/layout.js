@@ -1,7 +1,9 @@
 'use strict';
 // Layout stránky (SPEC kap. 6): <!doctype html><html lang="cs" data-theme data-hero data-nav data-cards>, <head>
 // (title „Stránka · Název půjčovny“, description, viewport, styly base + fonty + téma + feature, preload fontů, favicon,
-// canonical, JSON-LD), <body>: skip-link, <header class="site-header"> (logo, <nav class="site-nav"> z nav všech
+// canonical, JSON-LD), <body>: skip-link, v demo režimu proužek „Ukázka – takhle může vypadat web vaší půjčovny“
+// (<p class="demo-bar">; ukázková „U Tří dubů“ je vymyšlená, dřív to stálo jen v patičce), u webu klienta v náhledu
+// pruh náhledového provozu, <header class="site-header"> (logo, <nav class="site-nav"> z nav všech
 // features, CTA „Rezervovat“), <main id="obsah">, <footer class="site-footer"> (kontakt, otevírací doba, odkazy,
 // attribution map, odkaz „Fotografie: autoři a licence“ na /fotografie, verze), v demo režimu <aside class="design-switch">.
 // Texty (description, „o půjčovně“ v patičce) = tenant.texts přepsané settings.texts z adminu (siteTexts).
@@ -142,6 +144,18 @@ function designSwitch(ctx) {
 </aside>`;
 }
 
+/** Stránky platformy, kde odkaz „Chci takový web“ nedává smysl (nabídka sama, správa platformy, průvodce klienta). */
+const DEMO_BAR_BEZ_ODKAZU = /^\/(nabidka|platforma|zalozeni)(\/|$)/;
+
+/**
+ * Proužek nad hlavičkou demo webu: ukázková půjčovna je vymyšlená a web je vzor pro klienty. Jen v demo režimu
+ * (web klienta má config.demo = false); v administraci ho skryje admin.css.
+ */
+function demoBar(ctx) {
+  const odkaz = !DEMO_BAR_BEZ_ODKAZU.test(ctx.url.pathname);
+  return html`<p class="demo-bar" role="note">Ukázka – takhle může vypadat web vaší půjčovny.${odkaz ? html` <a class="demo-bar__link" href="/nabidka">Chci takový web</a>` : ''}</p>`;
+}
+
 /**
  * Vyrenderuje celou stránku.
  * @param {object} ctx
@@ -186,6 +200,7 @@ ${page.jsonLd ? raw(`<script type="application/ld+json">${JSON.stringify(page.js
 </head>
 <body${attr({ class: page.bodyClass || null })}>
 <a class="skip-link" href="#obsah">Přejít k obsahu</a>
+${config.demo ? demoBar(ctx) : ''}
 ${ctx.nahled ? html`<p class="preview-bar" role="note">Náhledový provoz: web se právě připravuje, rezervace jsou zkušební a platby se nepřevádějí.</p>` : ''}
 <header class="site-header">
   <div class="container site-header__inner">

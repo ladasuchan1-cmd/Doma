@@ -71,6 +71,8 @@ test('stránky /, /kontakt, /design vracejí 200 v layoutu, bez inline JS/CSS', 
     assert.ok(html.startsWith('<!doctype html>'), p);
     assert.match(html, /<html lang="cs" data-theme="outdoor" data-hero="fullbleed" data-nav="transparent" data-cards="photo-top">/);
     assert.match(html, /<a class="skip-link" href="#obsah">/);
+    assert.match(html, /<p class="demo-bar" role="note">Ukázka – takhle může vypadat web vaší půjčovny\. <a class="demo-bar__link" href="\/nabidka">Chci takový web<\/a><\/p>/, `${p}: proužek ukázky`);
+    assert.ok(html.indexOf('class="demo-bar"') < html.indexOf('<header class="site-header">'), `${p}: proužek je nad hlavičkou`);
     assert.match(html, /<header class="site-header">/);
     assert.match(html, /<nav class="site-nav"/);
     assert.match(html, /<main id="obsah"/);
@@ -85,6 +87,13 @@ test('stránky /, /kontakt, /design vracejí 200 v layoutu, bez inline JS/CSS', 
     assert.ok(!/ style="/.test(html), `${p}: inline style`);
     assert.ok(!/\bon[a-z]+="/.test(html), `${p}: inline handler`);
     assert.match(html, /Podmínky.*Ochrana osobních údajů.*Reklamace.*Kontakt/s);
+  }
+});
+
+test('proužek ukázky: na stránkách platformy (/nabidka, /platforma) bez odkazu „Chci takový web“', async () => {
+  for (const p of ['/nabidka', '/platforma']) {
+    const html = await (await srv.fetch(p)).text();
+    assert.match(html, /<p class="demo-bar" role="note">Ukázka – takhle může vypadat web vaší půjčovny\.<\/p>/, p);
   }
 });
 
@@ -532,6 +541,7 @@ test('neznámý host mimo demo režim → 404 Půjčovna nenalezena; /design mim
     assert.equal((await prod.fetch('/design')).status, 404);
     const home = await (await prod.fetch('/')).text();
     assert.ok(!/design-switch/.test(home), 'přepínač jen v demu');
+    assert.ok(!/demo-bar/.test(home), 'proužek ukázky jen v demu');
     assert.ok(!/\?design=/.test(home));
   } finally {
     await prod.stop();

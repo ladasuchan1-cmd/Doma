@@ -222,6 +222,7 @@ test('celý průchod: pozvánka → průvodce → web klienta na subdoméně v n
     assert.match(html, /src="\/tenant\/logo\.png"/);
     assert.ok(!/design-switch/.test(html), 'žádný přepínač designů dema');
     assert.ok(!/Demo verze/.test(html), 'žádná patička dema');
+    assert.ok(!/demo-bar/.test(html), 'žádný proužek „Ukázka“ – web klienta není ukázka');
     html = await (await srv.fetch('/kola', { headers: H })).text();
     assert.equal((html.match(/<article class="card card--bike">/g) || []).length, 2);
     res = await srv.fetch('/tenant/logo.png', { headers: H });

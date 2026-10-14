@@ -8,6 +8,7 @@ body.admin {
   background: var(--surface);
 }
 body.admin .site-footer,
+body.admin .demo-bar,
 body.admin .hero {
   display: none;
 }
