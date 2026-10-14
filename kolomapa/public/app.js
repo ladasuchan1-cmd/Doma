@@ -137,6 +137,18 @@
     ['expensive', 'Nejdražší'],
     ['discount', 'Největší sleva vs. odhad'],
   ];
+  const SORT_NEAR = ['near', 'Nejblíž hledanému místu'];
+  // Stav výkupu (jen se serverem, sdílený celým obchodem): pořadí, jak výkup jde po sobě. Ve filtru i „Neřešené“.
+  const MARKS = [
+    { key: 'contacted', label: 'Osloveno', icon: 'phone', hint: 'Prodávajícího jsme kontaktovali (telefon, zpráva)' },
+    { key: 'scheduled', label: 'Domluveno', icon: 'calendar', hint: 'Domluvená prohlídka nebo výkup' },
+    { key: 'bought', label: 'Koupeno', icon: 'check', hint: 'Kolo jsme vykoupili' },
+    { key: 'rejected', label: 'Nechceme', icon: 'ban', hint: 'Nechceme řešit – nevyplatí se, podezřelé, prodáno jinde…' },
+  ];
+  const MARK_BY_KEY = Object.fromEntries(MARKS.map((m) => [m.key, m]));
+  const MARK_FILTERS = [{ key: 'none', label: 'Neřešené' }, ...MARKS];
+  const MARKS_POLL_MS = 60000;
+  const NOTE_MAX = 500;
   const PAGE = 60;
   const POLL_MS = 3000;
   const DEFAULT_THRESHOLDS = { deal: 0.85, suspicious: 0.3, evidenceConfidence: 0.6, high: 1.15, minConfidence: 0.45, newHours: 36 };
@@ -162,6 +174,11 @@
     search: ['M10.5 4a6.5 6.5 0 1 0 0 13 6.5 6.5 0 0 0 0-13zM20 20l-4.8-4.8'],
     bike: ['M5.5 17.5a3.5 3.5 0 1 0 0-.01zM18.5 17.5a3.5 3.5 0 1 0 0-.01zM5.5 17.5 9 10h7l2.5 7.5M9 10l3.2 7.5H5.5M14.5 6.5H17l-1 3.5'],
     map: ['M9 4 3 6.5v13.5L9 17.5l6 2.5 6-2.5V4l-6 2.5L9 4zM9 4v13.5M15 6.5V20'],
+    phone: ['M6.6 3.5h3l1.4 4.2-2 1.4a12 12 0 0 0 5.9 5.9l1.4-2 4.2 1.4v3a2 2 0 0 1-2.2 2A17 17 0 0 1 4.6 5.7a2 2 0 0 1 2-2.2z'],
+    calendar: ['M5 6h14v14H5zM5 10h14M9 3.5V7M15 3.5V7'],
+    check: ['M5 12.5l4.5 4.5L19 7.5'],
+    ban: ['M12 3.5a8.5 8.5 0 1 0 0 17 8.5 8.5 0 0 0 0-17zM6 6l12 12'],
+    pin: ['M12 21s-6.5-6.2-6.5-11.2a6.5 6.5 0 0 1 13 0C18.5 14.8 12 21 12 21zM12 7.3a2.5 2.5 0 1 0 0 5 2.5 2.5 0 0 0 0-5z'],
   };
 
   /** SVG ikona (důvěryhodné konstanty z ICONS). */
@@ -302,8 +319,8 @@
   // =========================================================================================== stav
 
   // Filtry se pamatují (localStorage) – obchod si jednou zaškrtne, co prodává, a mapa to drží; hledaný text ne.
-  const SET_FILTERS = ['sourcesOff', 'cats', 'drive', 'susp', 'motors'];
-  const EMPTY_FILTERS = () => ({ q: '', sourcesOff: new Set(), cats: new Set(), drive: new Set(), susp: new Set(), motors: new Set(), age: '', min: '', max: '', deals: false, fresh: false });
+  const SET_FILTERS = ['sourcesOff', 'cats', 'drive', 'susp', 'motors', 'marks'];
+  const EMPTY_FILTERS = () => ({ q: '', sourcesOff: new Set(), cats: new Set(), drive: new Set(), susp: new Set(), motors: new Set(), marks: new Set(), age: '', min: '', max: '', deals: false, fresh: false });
   function loadFilters() {
     const f = EMPTY_FILTERS();
     const saved = storage.get('filters', null);
@@ -344,6 +361,14 @@
     navSeq: 0,
     run: { timer: null, wasRunning: false },
     breaks: [],
+    marks: new Map(), // id inzerátu → stav výkupu {s, n, by, at, t, p, k, c, la, lo, gone} (server, /api/marks)
+    markKeys: new Map(), // klíč titulku → id inzerátů se stavem (rozpoznání znovu vloženého kola)
+    marksSig: '',
+    marksTimer: null,
+    markSaving: false,
+    searchPoint: null, // hledané místo {lat, lon, label} – značka na mapě, vzdálenost a řazení „nejblíž“
+    searchMarker: null,
+    pendingView: null, // po vstupu do kraje přiblížit sem místo celého kraje (hledání místa)
   };
 
   // =========================================================================================== klasifikace nabídky
@@ -404,6 +429,68 @@
 
   const sourceLabel = (s) => state.summary?.sources?.[s]?.label || SOURCE_LABELS[s] || s || '';
   const krajName = (k) => (KRAJE[k] ? KRAJE[k][0] : k || '');
+
+  /** Vzdálenost dvou bodů vzdušnou čarou v km. */
+  function distKm(aLat, aLon, bLat, bLon) {
+    const r = Math.PI / 180;
+    const h = Math.sin(((bLat - aLat) * r) / 2) ** 2 + Math.cos(aLat * r) * Math.cos(bLat * r) * Math.sin(((bLon - aLon) * r) / 2) ** 2;
+    return 12742 * Math.asin(Math.min(1, Math.sqrt(h)));
+  }
+  const kmFmt = new Intl.NumberFormat('cs-CZ', { maximumFractionDigits: 1 });
+  const fmtKm = (km) => (km < 1 ? 'do 1 km' : `${km < 10 ? kmFmt.format(km) : fmtNum(km)} km`);
+  /** Vzdálenost inzerátu od hledaného místa (km) nebo null. */
+  const distToSearch = (l) => (state.searchPoint && l.la != null && l.lo != null ? distKm(state.searchPoint.lat, state.searchPoint.lon, l.la, l.lo) : null);
+
+  // =========================================================================================== stav výkupu (server)
+
+  const marksOn = () => state.mode === 'server';
+  const markOf = (l) => (l && marksOn() ? state.marks.get(l.id) || null : null);
+  const markKey = (l) => markOf(l)?.s || 'none';
+  /** „Nikol · dnes 9:12“ */
+  const markWho = (m) => [m.by || null, fmtWhen(m.at)].filter(Boolean).join(' · ');
+
+  /** Čip se stavem výkupu (karta, tooltip pinu, historie); null = bez stavu. */
+  function markChip(m) {
+    const def = m && MARK_BY_KEY[m.s];
+    if (!def) return null;
+    return el('span', { class: `mk mk--${m.s}`, title: `${def.label} – ${markWho(m)}${m.n ? `\n${m.n}` : ''}` }, icon(def.icon), def.label);
+  }
+
+  /** Klíč titulku pro rozpoznání stejného kola v novém inzerátu: bez diakritiky, interpunkce a mezer navíc. */
+  const titleKey = (t) =>
+    fold(t)
+      .replace(/[^a-z0-9]+/g, ' ')
+      .trim();
+
+  function rebuildMarkIndex() {
+    state.markKeys = new Map();
+    for (const [id, m] of state.marks) {
+      const k = m.t ? titleKey(m.t) : '';
+      if (k.length < 8) continue; // „Kolo“, „Prodám kolo“ – příliš obecné
+      if (!state.markKeys.has(k)) state.markKeys.set(k, []);
+      state.markKeys.get(k).push(id);
+    }
+  }
+
+  /**
+   * Inzerát bez stavu, který nejspíš nabízí kolo, které už obchod řešil – prodávající ho vložil znovu pod novým
+   * inzerátem: stejný titulek i značka (a model, je-li u obou), do 15 km a cena ±30 %. Bez značky ne – „Dětské kolo
+   * 20"“ je v každém okrese několikrát. Vrací {id, m} nebo null.
+   */
+  function similarMarked(l) {
+    if (!l || !marksOn() || state.marks.has(l.id) || !state.markKeys.size || !l.t || !l.b) return null;
+    const ids = state.markKeys.get(titleKey(l.t));
+    if (!ids) return null;
+    for (const id of ids) {
+      const m = state.marks.get(id);
+      if (!m || id === l.id || !m.b || fold(m.b) !== fold(l.b)) continue;
+      if (m.m && l.m && fold(m.m) !== fold(l.m)) continue;
+      if (m.la != null && l.la != null && distKm(m.la, m.lo, l.la, l.lo) > 15) continue;
+      if (m.p > 0 && l.p > 0 && Math.abs(m.p - l.p) / Math.max(m.p, l.p) > 0.3) continue;
+      return { id, m };
+    }
+    return null;
+  }
 
   // =========================================================================================== načítání dat
 
@@ -676,26 +763,47 @@
     if (visual === 'good') dot.append(icon('down'));
     else if (visual === 'suspicious') dot.append(el('span', { class: 'pin__q', text: '?' }));
     else if (visual === 'high') dot.append(icon('up'));
-    const wrap = el('span', null, dot, isEbike(l) ? el('span', { class: 'pin__bolt' }, icon('bolt')) : null);
-    return L.divIcon({ className: `pin pin--${visual}`, html: wrap, iconSize: [s, s], iconAnchor: [s / 2, s / 2], tooltipAnchor: [0, -s / 2] });
+    // stav výkupu: odznak vpravo dole; „koupeno“ a „nechceme“ navíc zašedlé – už to nejsou příležitosti
+    const mk = markOf(l);
+    const wrap = el('span', null, dot, isEbike(l) ? el('span', { class: 'pin__bolt' }, icon('bolt')) : null, mk ? el('span', { class: 'pin__mk' }, icon(MARK_BY_KEY[mk.s].icon)) : null);
+    return L.divIcon({ className: `pin pin--${visual}${mk ? ` pin--mk pin--mk-${mk.s}` : ''}`, html: wrap, iconSize: [s, s], iconAnchor: [s / 2, s / 2], tooltipAnchor: [0, -s / 2] });
+  }
+
+  /** Třída pro počet výhodných ve shluku: koupené a nechtěné se nepočítají. */
+  function pinDealClass(l) {
+    const mk = markOf(l);
+    return mk && (mk.s === 'bought' || mk.s === 'rejected') ? 'handled' : dealClass(l);
   }
 
   function pinTooltip(l) {
     const price = l.p > 0 ? fmtCzk(l.p) : l.pn || 'cena neuvedena';
     const badge = dealBadge(l);
-    return el('div', { class: 'tip' }, el('b', { text: price }), el('span', { text: l.t }), badge ? el('span', null, badge) : null);
+    const mk = markOf(l);
+    return el(
+      'div',
+      { class: 'tip' },
+      el('b', { text: price }),
+      el('span', { text: l.t }),
+      badge ? el('span', null, badge) : null,
+      mk ? el('span', { class: 'tip__mk' }, markChip(mk), ` ${markWho(mk)}`) : null
+    );
+  }
+
+  function pinLabel(l) {
+    const mk = markOf(l);
+    return `${l.t} – ${l.p > 0 ? fmtCzk(l.p) : l.pn || 'cena neuvedena'}${mk ? ` – ${MARK_BY_KEY[mk.s].label}` : ''}`;
   }
 
   function getMarker(l) {
     let m = markers.get(l.id);
     if (m) return m;
-    m = L.marker([l.la, l.lo], { icon: pinIcon(l), keyboard: true, riseOnHover: true, dealClass: dealClass(l) });
+    m = L.marker([l.la, l.lo], { icon: pinIcon(l), keyboard: true, riseOnHover: true, dealClass: pinDealClass(l) });
     m.bindTooltip(() => pinTooltip(l), { direction: 'top', opacity: 1 });
     m.on('click', () => navigate(state.kraj || l.k, l.id));
     m.on('add', () => {
       const e = m.getElement();
       if (!e) return;
-      e.setAttribute('aria-label', `${l.t} – ${l.p > 0 ? fmtCzk(l.p) : l.pn || 'cena neuvedena'}`);
+      e.setAttribute('aria-label', pinLabel(l));
       e.classList.toggle('is-selected', state.selectedId === l.id);
     });
     m.on('mouseover', () => setCardHighlight(l.id, true));
@@ -934,18 +1042,31 @@
     const est = l.ai?.e ?? l.e;
     const when = ago(l.ps || l.f);
     const place = showKraj && l.k ? [l.c, KRAJE[l.k]?.[1]].filter(Boolean).join(', ') : l.c;
-    const meta = [est ? `odhad ${fmtCzk(est)}` : null, place, sourceLabel(l.s), when]
+    const dist = distToSearch(l);
+    const meta = [dist != null ? fmtKm(dist) : null, est ? `odhad ${fmtCzk(est)}` : null, place, sourceLabel(l.s), when]
       .filter(Boolean)
       .join(' · ');
+    const mk = markOf(l);
+    const sim = mk ? null : similarMarked(l);
+    const marks = mk
+      ? el('span', { class: 'card__marks' }, markChip(mk), el('span', { class: 'card__who', text: markWho(mk) }))
+      : sim
+        ? el('span', { class: 'card__marks' }, el('span', { class: 'mk mk--dup', title: `Stejný titulek jako inzerát, který už jste řešili: ${MARK_BY_KEY[sim.m.s].label} – ${markWho(sim.m)}` }, icon('warn'), 'možná už řešené'))
+        : null;
     const btn = el(
       'button',
-      { type: 'button', class: 'card' + (state.selectedId === l.id ? ' is-selected' : ''), dataset: { id: String(l.id) } },
+      {
+        type: 'button',
+        class: 'card' + (state.selectedId === l.id ? ' is-selected' : '') + (mk && (mk.s === 'bought' || mk.s === 'rejected') ? ' card--done' : ''),
+        dataset: { id: String(l.id), ...(showKraj ? { showKraj: '1' } : {}) },
+      },
       thumb,
       el(
         'span',
         { class: 'card__body' },
         el('span', { class: 'card__title' }, isNew(l) ? el('span', { class: 'new-tag', text: 'NOVÉ' }) : null, isEbike(l) ? el('span', { class: 'tag-eb', title: 'Elektrokolo' }, icon('bolt')) : null, l.t),
         el('span', { class: 'card__price-row' }, priceEl, dealBadge(l)),
+        marks,
         el('span', { class: 'card__meta', text: meta })
       )
     );
@@ -1086,7 +1207,17 @@
   function activeFilterCount() {
     const f = state.filters;
     return (
-      f.sourcesOff.size + f.cats.size + f.drive.size + f.susp.size + f.motors.size + (f.age ? 1 : 0) + (f.min !== '' ? 1 : 0) + (f.max !== '' ? 1 : 0) + (f.deals ? 1 : 0) + (f.fresh ? 1 : 0)
+      f.sourcesOff.size +
+      f.cats.size +
+      f.drive.size +
+      f.susp.size +
+      f.motors.size +
+      (marksOn() ? f.marks.size : 0) +
+      (f.age ? 1 : 0) +
+      (f.min !== '' ? 1 : 0) +
+      (f.max !== '' ? 1 : 0) +
+      (f.deals ? 1 : 0) +
+      (f.fresh ? 1 : 0)
     );
   }
 
@@ -1122,11 +1253,11 @@
         applyFilters();
       }, 160);
     });
-    const sort = el('select', { class: 'select', 'aria-label': 'Řazení' }, SORTS.map(([k, label]) => el('option', { value: k, text: label })));
-    sort.value = state.sort;
+    const sort = el('select', { class: 'select', id: 'sort', 'aria-label': 'Řazení' });
+    fillSortOptions(sort);
     sort.addEventListener('change', () => {
       state.sort = sort.value;
-      storage.set('sort', state.sort);
+      if (state.sort !== 'near') storage.set('sort', state.sort); // „nejblíž“ platí jen pro hledané místo
       applyFilters();
     });
     const n = activeFilterCount();
@@ -1139,6 +1270,7 @@
     );
     const filters = buildFilters();
     filters.hidden = !state.filtersOpen;
+    filters.append(filtersFoot());
     const active = el('div', { class: 'chips chips--active', id: 'active-filters', 'aria-label': 'Zapnuté filtry' });
     const syncOpen = () => {
       $('filters').hidden = !state.filtersOpen;
@@ -1150,13 +1282,7 @@
       storage.set('filtersOpen', state.filtersOpen);
       syncOpen();
     });
-    const hide = el('button', { type: 'button', class: 'btn btn--sm', id: 'hide-filters' }, 'Skrýt filtry');
-    hide.addEventListener('click', () => {
-      state.filtersOpen = false;
-      storage.set('filtersOpen', false);
-      syncOpen();
-    });
-    filters.append(el('div', { class: 'filters__foot' }, hide));
+
     const reset = el('button', { type: 'button', class: 'linkbtn', id: 'reset', hidden: !n }, 'Zrušit filtry');
     reset.addEventListener('click', () => {
       Object.assign(state.filters, EMPTY_FILTERS());
@@ -1184,6 +1310,38 @@
     );
   }
 
+  /** Patička panelu filtrů s tlačítkem „Skrýt filtry“. */
+  function filtersFoot() {
+    const hide = el('button', { type: 'button', class: 'btn btn--sm', id: 'hide-filters' }, 'Skrýt filtry');
+    hide.addEventListener('click', () => {
+      state.filtersOpen = false;
+      storage.set('filtersOpen', false);
+      const f = $('filters');
+      if (f) f.hidden = true;
+      document.querySelector('.toolbar [aria-controls="filters"]')?.setAttribute('aria-expanded', 'false');
+      renderActiveFilters();
+    });
+    return el('div', { class: 'filters__foot' }, hide);
+  }
+
+  /** Panel filtrů znovu (počty u „Stav výkupu“ po změně stavů); otevřenost a fokus zůstanou. */
+  function rebuildFilters() {
+    const old = $('filters');
+    if (!old || old.contains(document.activeElement)) return; // právě v něm píše (cena) – nepřekreslovat pod rukama
+    const fresh = buildFilters();
+    fresh.hidden = old.hidden;
+    fresh.append(filtersFoot());
+    old.replaceWith(fresh);
+  }
+
+  /** Volby řazení; „Nejblíž hledanému místu“ jen při hledaném místě. */
+  function fillSortOptions(sel) {
+    const opts = state.searchPoint ? [SORT_NEAR, ...SORTS] : SORTS;
+    if (state.sort === 'near' && !state.searchPoint) state.sort = storage.get('sort', 'deal');
+    sel.replaceChildren(...opts.map(([k, label]) => el('option', { value: k, text: label })));
+    sel.value = state.sort;
+  }
+
   /** Zapnuté filtry jako čipy s křížkem – vidět i při skrytém panelu filtrů; křížek filtr zruší. */
   function activeFilterItems() {
     const f = state.filters;
@@ -1194,6 +1352,7 @@
         items.push({ label: d ? d.label : key, remove: () => f[setKey].delete(key) });
       }
     };
+    if (marksOn()) for (const k of f.marks) items.push({ label: `stav: ${(MARK_FILTERS.find((x) => x.key === k) || { label: k }).label.toLowerCase()}`, remove: () => f.marks.delete(k) });
     for (const k of f.sourcesOff) items.push({ label: `bez: ${sourceLabel(k)}`, remove: () => f.sourcesOff.delete(k) });
     setItems('cats', CATEGORIES);
     setItems('drive', DRIVES);
@@ -1228,7 +1387,7 @@
   function buildFilters() {
     const f = state.filters;
     const now = Date.now();
-    const counts = { src: {}, cat: {}, drive: {}, susp: {}, motor: {}, age: {} };
+    const counts = { src: {}, cat: {}, drive: {}, susp: {}, motor: {}, age: {}, mark: {} };
     const inc = (o, k) => {
       if (k != null) o[k] = (o[k] || 0) + 1;
     };
@@ -1238,6 +1397,7 @@
       inc(counts.drive, drive(l));
       inc(counts.susp, suspension(l));
       inc(counts.motor, motorBrand(l));
+      inc(counts.mark, markKey(l));
       for (const a of AGES) if (withinHours(l, a.key, now)) inc(counts.age, a.key);
     }
     const srcKeys = [...new Set([...Object.keys(state.summary?.sources || {}), ...Object.keys(counts.src)])].filter((k) => counts.src[k]);
@@ -1256,15 +1416,15 @@
       })
     );
     /** Zaškrtávací čipy (více najednou) nad množinou f[setKey]; jen položky, které v kraji jsou. */
-    const chipSet = (items, setKey, countOf) =>
+    const chipSet = (items, setKey, countOf, showZero = false) =>
       el(
         'div',
         { class: 'chips', role: 'group' },
         items
-          .filter((it) => countOf[it.key])
+          .filter((it) => showZero || countOf[it.key])
           .map((it) => {
             const set = f[setKey];
-            const b = el('button', { type: 'button', class: 'chip', 'aria-pressed': String(set.has(it.key)) }, it.label, el('span', { class: 'count', text: fmtNum(countOf[it.key]) }));
+            const b = el('button', { type: 'button', class: 'chip', 'aria-pressed': String(set.has(it.key)) }, it.label, el('span', { class: 'count', text: fmtNum(countOf[it.key] || 0) }));
             b.addEventListener('click', () => {
               if (set.has(it.key)) set.delete(it.key);
               else set.add(it.key);
@@ -1314,6 +1474,7 @@
     return el(
       'div',
       { class: 'filters', id: 'filters' },
+      marksOn() ? group('Stav výkupu', chipSet(MARK_FILTERS, 'marks', counts.mark, true), 'Sdílený pro celý obchod – nastavíte ho v detailu inzerátu. „Neřešené“ = zatím bez stavu.') : null,
       group('Zdroj', sources),
       group('Typ kola', chipSet(CATEGORIES, 'cats', counts.cat)),
       group('Pohon', chipSet(DRIVES, 'drive', counts.drive)),
@@ -1357,6 +1518,7 @@
       if (f.drive.size && !f.drive.has(drive(l))) return false;
       if (f.susp.size && !f.susp.has(suspension(l))) return false;
       if (f.motors.size && !f.motors.has(motorBrand(l))) return false;
+      if (f.marks.size && marksOn() && !f.marks.has(markKey(l))) return false;
       if (f.age && !withinHours(l, f.age, now)) return false;
       if (min != null && !(l.p >= min)) return false;
       if (max != null && !(l.p <= max)) return false;
@@ -1442,6 +1604,7 @@
         const e = l.ai?.e ?? l.e;
         return l.p > 0 && e ? -(e - l.p) : Infinity;
       },
+      near: (l) => distToSearch(l) ?? Infinity,
     }[state.sort] || ((l) => l.d ?? Infinity);
     for (const l of arr) l._k = by(l);
     arr.sort((a, b) => a._k - b._k || (a.id > b.id ? -1 : 1));
@@ -1632,6 +1795,7 @@
           priceRow,
           estimateBox(l),
           buy,
+          markBox(l),
           chips.childNodes.length ? chips : null,
           warnings,
           factors,
@@ -1670,6 +1834,12 @@
       return;
     }
     if (ctrl.signal.aborted || state.selectedId !== id) return;
+    if (marksOn()) {
+      markLog = { id, log: Array.isArray(full.markLog) ? full.markLog : [] };
+      // stav z detailu je čerstvější než seznam (ten se stahuje jednou za minutu)
+      if ((full.mark?.at ?? null) !== (state.marks.get(id)?.at ?? null)) setLocalMark(id, full.mark || null);
+      else renderMarkBox(state.byId.get(id), noteDraft());
+    }
     const desc = $('desc');
     if (desc && full.description && full.description.length > desc.textContent.length) desc.textContent = full.description;
     const box = $('history');
@@ -1729,6 +1899,251 @@
 
   function closeDetailNav() {
     navigate(state.kraj, null);
+  }
+
+  // =========================================================================================== stav výkupu – detail, ukládání, obnova
+
+  let markLog = { id: null, log: [] }; // historie stavu otevřeného inzerátu
+
+  function markBox(l) {
+    if (!marksOn()) return null;
+    const box = el('section', { class: 'mkbox', id: 'markbox', 'aria-label': 'Stav výkupu' });
+    fillMarkBox(box, l, null);
+    return box;
+  }
+
+  function renderMarkBox(l, draft) {
+    const box = $('markbox');
+    if (box && l && state.selectedId === l.id) fillMarkBox(box, l, draft);
+  }
+
+  /** Rozepsaná poznámka v otevřeném detailu (null = uživatel nepsal → zobrazí se uložená). */
+  function noteDraft() {
+    const ta = document.querySelector('#markbox textarea');
+    return ta && ta.dataset.dirty === '1' ? ta.value : null;
+  }
+
+  function fillMarkBox(box, l, draft) {
+    const m = markOf(l);
+    const busy = state.markSaving;
+    const note = el('textarea', {
+      class: 'input mkbox__note',
+      rows: '2',
+      maxlength: String(NOTE_MAX),
+      placeholder: m ? 'Poznámka pro kolegy – např. „odmítl 26 tis., zkusit znovu 20. 10.“' : 'Poznámka (nepovinná) – uloží se spolu se stavem',
+      'aria-label': 'Poznámka ke stavu výkupu',
+    });
+    note.value = draft != null ? draft : m?.n || '';
+    if (draft != null) note.dataset.dirty = '1';
+    const save = el('button', { type: 'button', class: 'btn btn--sm' }, 'Uložit poznámku');
+    const syncSave = () => {
+      const cur = markOf(l);
+      save.hidden = !cur;
+      save.disabled = busy || !cur || note.value.trim() === (cur.n || '');
+    };
+    note.addEventListener('input', () => {
+      note.dataset.dirty = '1';
+      syncSave();
+    });
+    note.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' && (e.ctrlKey || e.metaKey) && !save.disabled && !save.hidden) {
+        e.preventDefault();
+        save.click();
+      }
+    });
+    save.addEventListener('click', () => {
+      const cur = markOf(l);
+      if (cur) saveMark(l, cur.s, note.value);
+    });
+    syncSave();
+    const seg = el(
+      'div',
+      { class: 'mkbox__seg', role: 'group', 'aria-label': 'Nastavit stav výkupu' },
+      MARKS.map((d) => {
+        const on = m?.s === d.key;
+        const b = el('button', { type: 'button', class: `mkbtn mkbtn--${d.key}`, 'aria-pressed': String(on), title: d.hint, disabled: busy }, icon(d.icon), d.label);
+        b.addEventListener('click', () => {
+          if (!on) saveMark(l, d.key, note.value);
+        });
+        return b;
+      })
+    );
+    const clear = m ? el('button', { type: 'button', class: 'linkbtn mkbox__clear', disabled: busy }, 'Zrušit stav') : null;
+    if (clear) clear.addEventListener('click', () => saveMark(l, null, ''));
+    // prodávající vložil stejné kolo znovu pod novým inzerátem?
+    const sim = m ? null : similarMarked(l);
+    let dup = null;
+    if (sim) {
+      const name = `„${sim.m.t}“`;
+      let link;
+      if (sim.m.gone) link = el('span', { text: `${name} (už není na webu)` });
+      else {
+        link = el('button', { type: 'button', class: 'linkbtn' }, name);
+        link.addEventListener('click', () => navigate(sim.m.k || state.kraj, sim.id));
+      }
+      dup = el(
+        'div',
+        { class: 'alert alert--soft', role: 'note' },
+        icon('warn'),
+        el('span', null, 'Možná stejné kolo, které už jste řešili: ', link, ` – ${MARK_BY_KEY[sim.m.s].label}, ${markWho(sim.m)}${sim.m.n ? ` („${sim.m.n}“)` : ''}.`)
+      );
+    }
+    box.replaceChildren(
+      el('div', { class: 'mkbox__head' }, el('span', { class: 'box__label', text: 'Stav výkupu' }), el('span', { class: 'mkbox__who', text: m ? markWho(m) : 'zatím nikdo neřešil' })),
+      seg,
+      dup || '',
+      note,
+      el('div', { class: 'mkbox__actions' }, save, clear, busy ? el('span', { class: 'spinner', role: 'status', 'aria-label': 'Ukládám' }) : null),
+      (markLog.id === l.id && markLogEl(markLog.log)) || ''
+    );
+  }
+
+  function markLogEl(log) {
+    if (!Array.isArray(log) || !log.length) return null;
+    return el(
+      'details',
+      { class: 'mkbox__hist' },
+      el('summary', { text: `Historie změn (${log.length})` }),
+      el(
+        'ol',
+        null,
+        log.map((x) =>
+          el(
+            'li',
+            null,
+            el('span', { class: 'mkbox__when', text: fmtWhen(x.at) }),
+            x.s && MARK_BY_KEY[x.s] ? markChip(x) : el('span', { class: 'muted', text: 'stav zrušen' }),
+            x.by ? el('span', { class: 'muted', text: x.by }) : null,
+            x.n ? el('div', { class: 'mkbox__lognote', text: x.n }) : null
+          )
+        )
+      )
+    );
+  }
+
+  /** Uloží stav (status null = zrušit) na server; souběh s kolegou → aktuální stav a upozornění. */
+  async function saveMark(l, status, note) {
+    if (state.markSaving) return;
+    const cur = markOf(l);
+    state.markSaving = true;
+    renderMarkBox(l, note);
+    let keepDraft = true;
+    try {
+      const r = await fetch(`api/marks/${encodeURIComponent(l.id)}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Accept: 'application/json', 'X-Requested-With': 'kolomapa' },
+        body: JSON.stringify({ status: status || null, note: status ? note : null, expect: cur ? cur.at : null }),
+        cache: 'no-store',
+      });
+      const j = await r.json().catch(() => ({}));
+      if (r.status === 409) {
+        if (Array.isArray(j.log)) markLog = { id: l.id, log: j.log };
+        setLocalMark(l.id, j.mark || null);
+        toast(
+          j.mark
+            ? `Mezitím ${j.mark.by || 'kolega'} nastavil(a) „${MARK_BY_KEY[j.mark.s]?.label || j.mark.s}“ – zkontrolujte a případně změňte znovu.`
+            : 'Stav mezitím někdo zrušil – zkontrolujte a případně nastavte znovu.'
+        );
+      } else if (!r.ok) {
+        toast(j.error || `Stav se nepodařilo uložit (HTTP ${r.status}).`);
+      } else {
+        keepDraft = false;
+        if (Array.isArray(j.log)) markLog = { id: l.id, log: j.log };
+        setLocalMark(l.id, j.mark || null);
+        toast(status ? `Uloženo: ${MARK_BY_KEY[status].label}${j.mark?.n ? ' s poznámkou' : ''}` : 'Stav výkupu zrušen.');
+      }
+    } catch {
+      toast('Server neodpovídá – stav se neuložil.');
+    } finally {
+      state.markSaving = false;
+      renderMarkBox(l, keepDraft && note !== (markOf(l)?.n || '') ? note : null);
+    }
+  }
+
+  /** Stavy ze serveru (při startu, každou minutu a po návratu do okna) – vidět, co mezitím řešili kolegové. */
+  async function loadMarks() {
+    clearTimeout(state.marksTimer);
+    if (!marksOn()) return;
+    state.marksAt = Date.now();
+    try {
+      const j = await fetchJson('api/marks', { cache: 'no-cache' });
+      applyMarks(Array.isArray(j.marks) ? j.marks : []);
+    } catch {
+      /* server dočasně nedostupný – další pokus za minutu */
+    }
+    state.marksTimer = setTimeout(loadMarks, MARKS_POLL_MS);
+  }
+
+  function applyMarks(list) {
+    const sig = list.map((m) => `${m.id}:${m.at}`).join(',');
+    if (sig === state.marksSig) return;
+    state.marksSig = sig;
+    const next = new Map();
+    for (const m of list) if (m && Number.isFinite(m.id) && MARK_BY_KEY[m.s]) next.set(m.id, m);
+    const changed = new Set();
+    for (const [id, m] of next) if (state.marks.get(id)?.at !== m.at) changed.add(id);
+    for (const id of state.marks.keys()) if (!next.has(id)) changed.add(id);
+    const keys = new Set([...changed].map((id) => titleKey((next.get(id) || state.marks.get(id))?.t || '')));
+    state.marks = next;
+    rebuildMarkIndex();
+    onMarksChanged(changed, keys);
+  }
+
+  /** Jeden stav po vlastním uložení nebo z detailu (údaje pro rozpoznání znovu vloženého kola doplní z inzerátu). */
+  function setLocalMark(id, mark) {
+    const prev = state.marks.get(id);
+    if ((prev?.at ?? null) === (mark?.at ?? null)) return;
+    const l = state.byId.get(id);
+    const src = prev || l || {};
+    if (mark) state.marks.set(id, { id, t: src.t, b: src.b, m: src.m, p: src.p, k: src.k, c: src.c, la: src.la, lo: src.lo, ...mark });
+    else state.marks.delete(id);
+    state.marksSig = ''; // příští seznam ze serveru se převezme celý
+    rebuildMarkIndex();
+    onMarksChanged(new Set([id]), new Set([titleKey(src.t || '')]));
+  }
+
+  /** Překreslí, čeho se změna stavů týká: piny, karty (i se stejným titulkem), otevřený detail. */
+  function onMarksChanged(ids, keys = new Set()) {
+    if (!ids.size) return;
+    for (const id of ids) {
+      const l = state.byId.get(id);
+      const m = markers.get(id);
+      if (!l || !m) continue;
+      m.setIcon(pinIcon(l));
+      m.options.dealClass = pinDealClass(l);
+      m.getElement()?.setAttribute('aria-label', pinLabel(l));
+      if (cluster.hasLayer(m)) cluster.refreshClusters(m);
+    }
+    if (state.selectedId != null && ids.has(state.selectedId)) setSelectedPin(state.selectedId);
+    keys.delete('');
+    if (state.kraj && state.listings.length) rebuildFilters();
+    if (state.kraj && state.filters.marks.size) applyFilters();
+    else refreshCards((l) => ids.has(l.id) || keys.has(titleKey(l.t || '')));
+    const sel = state.selectedId != null ? state.byId.get(state.selectedId) : null;
+    if (sel && (ids.has(sel.id) || keys.has(titleKey(sel.t || '')))) {
+      renderMarkBox(sel, noteDraft());
+      if (ids.has(sel.id) && !state.markSaving) loadMarkLog(sel.id);
+    }
+  }
+
+  function refreshCards(pred) {
+    for (const c of document.querySelectorAll('.card[data-id]')) {
+      const l = state.byId.get(Number(c.dataset.id));
+      const li = c.closest('li');
+      if (!l || !li || !pred(l)) continue;
+      li.replaceWith(card(l, { showKraj: c.dataset.showKraj === '1' }));
+    }
+  }
+
+  async function loadMarkLog(id) {
+    try {
+      const j = await fetchJson(`api/marks/${encodeURIComponent(id)}`, { cache: 'no-store' });
+      if (state.selectedId !== id) return;
+      markLog = { id, log: Array.isArray(j.log) ? j.log : [] };
+      renderMarkBox(state.byId.get(id), noteDraft());
+    } catch {
+      /* historie počká na další otevření */
+    }
   }
 
   // =========================================================================================== běh stahování (server)
@@ -1792,6 +2207,301 @@
     await applyRoute(kraj, id);
   }
 
+  // =========================================================================================== hledání místa na mapě (server)
+
+  /** Kód kraje pro bod (point-in-polygon nad hranicemi krajů), null = mimo ČR. */
+  function krajAtPoint(lat, lon) {
+    const inRing = (ring) => {
+      let inside = false;
+      for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
+        const [xi, yi] = ring[i];
+        const [xj, yj] = ring[j];
+        if (yi > lat !== yj > lat && lon < ((xj - xi) * (lat - yi)) / (yj - yi) + xi) inside = !inside;
+      }
+      return inside;
+    };
+    for (const f of state.geo?.features || []) {
+      const g = f.geometry;
+      const polys = g.type === 'Polygon' ? [g.coordinates] : g.type === 'MultiPolygon' ? g.coordinates : [];
+      for (const poly of polys) if (inRing(poly[0]) && !poly.slice(1).some(inRing)) return f.properties.code;
+    }
+    return null;
+  }
+
+  /**
+   * Značka hledaného místa, vzdálenosti v seznamu a řazení „nejblíž“. refresh = hned přepočítat seznam (při přechodu
+   * do jiného kraje ne – nový kraj se vykreslí sám).
+   */
+  function setSearchPoint(p, refresh = true) {
+    state.searchMarker?.remove();
+    state.searchPoint = p;
+    const inner = el('span', { class: 'searchpin__inner' }, icon('pin'));
+    const m = L.marker([p.lat, p.lon], {
+      icon: L.divIcon({ className: 'searchpin', html: inner, iconSize: [30, 34], iconAnchor: [15, 32], tooltipAnchor: [0, -30] }),
+      zIndexOffset: 5000,
+      keyboard: false,
+    });
+    m.bindTooltip(() => el('div', { class: 'tip' }, el('b', { text: p.label }), p.sub ? el('span', { text: p.sub }) : null), { direction: 'top', opacity: 1 });
+    m.on('add', () => m.getElement()?.setAttribute('aria-label', `Hledané místo: ${p.label}`));
+    m.addTo(map);
+    state.searchMarker = m;
+    state.sort = 'near';
+    if (refresh) afterSearchPointChange();
+  }
+
+  function clearSearchPoint() {
+    if (!state.searchPoint && !state.searchMarker) return;
+    state.searchMarker?.remove();
+    state.searchMarker = null;
+    state.searchPoint = null;
+    if (state.sort === 'near') state.sort = storage.get('sort', 'deal');
+    afterSearchPointChange();
+  }
+
+  function afterSearchPointChange() {
+    const sel = $('sort');
+    if (sel) fillSortOptions(sel);
+    if (state.kraj && state.listings.length) applyFilters();
+    else refreshCards(() => true);
+  }
+
+  /** Přesun mapy na vybrané místo: do jeho kraje (načte inzeráty) a přiblížit; kraj = celý kraj. */
+  function goToPlace(r) {
+    const lat = Number(r.lat);
+    const lon = Number(r.lon);
+    if (!Number.isFinite(lat) || !Number.isFinite(lon)) return;
+    const kraj = r.kraj && KRAJE[r.kraj] ? r.kraj : krajAtPoint(lat, lon);
+    if (r.kind === 'kraj') {
+      clearSearchPoint();
+      if (kraj) navigate(kraj);
+      return;
+    }
+    setSearchPoint({ lat, lon, label: r.label, sub: r.sub || '' }, !kraj || state.kraj === kraj);
+    // adresa zblízka, obec s okolím (seznam „v zobrazené části mapy“ pak ukáže kola kolem)
+    const zoom = Math.min(Number(r.zoom) || 13, r.kind === 'adresa' ? 14.5 : 13);
+    if (!kraj) {
+      whenMapIdle().then(() => map.setView([lat, lon], zoom));
+      toast('Místo leží mimo Českou republiku – inzeráty tam Kolomapa nemá.');
+      return;
+    }
+    if (state.kraj !== kraj) {
+      state.pendingView = { center: [lat, lon], zoom };
+      navigate(kraj);
+      return;
+    }
+    if (state.selectedId != null) navigate(kraj, null);
+    state.keepListUntil = 0;
+    whenMapIdle().then(() => map.setView([lat, lon], zoom));
+  }
+
+  /** Souřadnice „49.195, 16.606“ (i s čárkou místo tečky ve tvaru „49,195 16,606“). */
+  function parseCoords(q) {
+    const m = /^\s*(-?\d{1,2}(?:[.,]\d+)?)\s*[,;\s]\s*(-?\d{1,3}(?:[.,]\d+)?)\s*$/.exec(q);
+    if (!m) return null;
+    const lat = Number(m[1].replace(',', '.'));
+    const lon = Number(m[2].replace(',', '.'));
+    if (!(Math.abs(lat) <= 90 && Math.abs(lon) <= 180) || !/[.,]/.test(m[1])) return null;
+    return { label: `${lat.toFixed(5)}, ${lon.toFixed(5)}`, sub: 'souřadnice', lat, lon, kraj: null, kind: 'adresa', zoom: 14 };
+  }
+
+  /**
+   * Vyhledávací pole nad mapou: při psaní našeptává obce, části obcí, kraje a PSČ (/api/places, bez internetu),
+   * Enter nebo „Hledat adresu“ najde ulici a číslo (/api/geocode – OpenStreetMap). Klávesy: šipky, Enter, Esc.
+   */
+  function buildMapSearch() {
+    if (state.mode !== 'server' || $('mapsearch')) return;
+    const input = el('input', {
+      class: 'mapsearch__input',
+      id: 'mapsearch-input',
+      type: 'search',
+      placeholder: 'Hledat místo, adresu nebo PSČ…',
+      'aria-label': 'Hledat místo na mapě (obec, adresa, PSČ)',
+      role: 'combobox',
+      'aria-autocomplete': 'list',
+      'aria-expanded': 'false',
+      'aria-controls': 'mapsearch-list',
+      autocomplete: 'off',
+      spellcheck: 'false',
+      enterkeyhint: 'search',
+      maxlength: '120',
+    });
+    const clear = el('button', { type: 'button', class: 'mapsearch__clear', 'aria-label': 'Zrušit hledané místo', title: 'Zrušit hledané místo', hidden: true }, icon('close'));
+    const list = el('ul', { class: 'mapsearch__list', id: 'mapsearch-list', role: 'listbox', 'aria-label': 'Nalezená místa', hidden: true });
+    const box = el('div', { class: 'mapsearch', id: 'mapsearch', role: 'search' }, el('span', { class: 'mapsearch__ic' }, icon('search')), input, clear, list);
+    document.querySelector('.mapwrap').append(box);
+
+    let items = [];
+    let itemsFor = null; // dotaz, ke kterému patří items (Enter před doběhnutím našeptávače)
+    let active = -1;
+    let seq = 0;
+    let deb = null;
+    let geocoderOn = true;
+    let note = null; // řádek se stavem (hledám…, nic nenalezeno, chyba)
+    let attribution = null;
+
+    const open = () => {
+      list.hidden = !items.length && !note;
+      input.setAttribute('aria-expanded', String(!list.hidden));
+    };
+    const close = () => {
+      list.hidden = true;
+      input.setAttribute('aria-expanded', 'false');
+      input.removeAttribute('aria-activedescendant');
+      active = -1;
+    };
+    const syncClear = () => {
+      clear.hidden = !input.value && !state.searchPoint;
+    };
+    const kindIcon = (it) => (it.kind === 'action' ? 'search' : it.kind === 'kraj' ? 'map' : 'pin');
+    function render() {
+      list.replaceChildren(
+        ...items.map((it, i) => {
+          const li = el(
+            'li',
+            { id: `mapsearch-opt-${i}`, role: 'option', class: `mapsearch__opt mapsearch__opt--${it.kind}`, 'aria-selected': String(i === active) },
+            el('span', { class: 'mapsearch__oic' }, icon(kindIcon(it))),
+            el('span', { class: 'mapsearch__otext' }, el('span', { class: 'mapsearch__olabel', text: it.label }), it.sub ? el('span', { class: 'mapsearch__osub', text: it.sub }) : null)
+          );
+          li.addEventListener('mousedown', (e) => e.preventDefault()); // fokus zůstane v poli
+          li.addEventListener('click', () => choose(it));
+          return li;
+        }),
+        ...(note ? [el('li', { class: 'mapsearch__note', role: 'presentation', text: note })] : []),
+        ...(attribution ? [el('li', { class: 'mapsearch__attr', role: 'presentation', text: attribution })] : [])
+      );
+      if (active >= 0) input.setAttribute('aria-activedescendant', `mapsearch-opt-${active}`);
+      else input.removeAttribute('aria-activedescendant');
+      open();
+    }
+    const addressAction = (q) => (geocoderOn && q.trim().length >= 3 ? [{ kind: 'action', label: `Hledat adresu „${q.trim()}“`, sub: 'ulice a číslo – OpenStreetMap' }] : []);
+
+    async function suggest() {
+      const q = input.value.trim();
+      const my = ++seq;
+      attribution = null;
+      note = null;
+      active = -1;
+      if (q.length < 2) {
+        items = [];
+        itemsFor = q;
+        close();
+        return;
+      }
+      const coords = parseCoords(q);
+      if (coords) {
+        items = [coords];
+        itemsFor = q;
+        render();
+        return;
+      }
+      let res;
+      try {
+        res = await fetchJson(`api/places?q=${encodeURIComponent(q)}`, { cache: 'default' });
+      } catch (e) {
+        if (my !== seq) return;
+        items = addressAction(q);
+        note = `Hledání míst nefunguje: ${e.message}`;
+        render();
+        return;
+      }
+      if (my !== seq) return;
+      geocoderOn = res.geocoder !== false;
+      items = [...(Array.isArray(res.results) ? res.results : []), ...addressAction(q)];
+      itemsFor = q;
+      if (!items.length) note = 'Nic takového neznám – zkuste obec, část obce nebo PSČ.';
+      render();
+    }
+
+    async function searchAddress(q) {
+      const my = ++seq;
+      items = [];
+      note = 'Hledám adresu…';
+      attribution = null;
+      active = -1;
+      render();
+      let res;
+      try {
+        res = await fetchJson(`api/geocode?q=${encodeURIComponent(q)}`, { cache: 'default' });
+      } catch (e) {
+        if (my !== seq) return;
+        note = e.message || 'Hledání adres teď nefunguje.';
+        render();
+        return;
+      }
+      if (my !== seq) return;
+      items = Array.isArray(res.results) ? res.results : [];
+      itemsFor = q;
+      attribution = res.attribution || null;
+      note = items.length ? null : 'Adresu se nepodařilo najít – zkuste přidat obec („Kounicova 10, Brno“), nebo hledejte obec či PSČ.';
+      if (items.length === 1) return choose(items[0]);
+      render();
+    }
+
+    function choose(it) {
+      if (!it) return;
+      if (it.kind === 'action') return searchAddress(input.value.trim());
+      input.value = it.label;
+      close();
+      syncClear();
+      goToPlace(it);
+      if (isMobile()) input.blur();
+    }
+
+    input.addEventListener('input', () => {
+      syncClear();
+      clearTimeout(deb);
+      deb = setTimeout(suggest, 150);
+    });
+    input.addEventListener('focus', () => {
+      if (items.length || note) open();
+    });
+    input.addEventListener('blur', () => setTimeout(close, 120));
+    input.addEventListener('keydown', async (e) => {
+      const n = items.length;
+      if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+        if (!n) return;
+        e.preventDefault();
+        if (list.hidden) open();
+        active = e.key === 'ArrowDown' ? (active + 1) % n : active <= 0 ? n - 1 : active - 1;
+        render();
+      } else if (e.key === 'Enter') {
+        e.preventDefault();
+        clearTimeout(deb);
+        const q = input.value.trim();
+        if (active >= 0 && items[active] && itemsFor === q) return choose(items[active]);
+        if (q.length < 2) return;
+        const coords = parseCoords(q);
+        if (coords) return choose(coords);
+        if (itemsFor !== q) await suggest(); // Enter dřív, než doběhl našeptávač
+        if (input.value.trim() !== q) return;
+        // přesná shoda obce / PSČ → tam; adresa (číslo domu, čárka) → vyhledávač adres; jinak první našeptaná obec
+        const places = items.filter((it) => it.kind !== 'action');
+        const exact = places.find((it) => fold(it.label).replace(/\s+/g, '') === fold(q).replace(/\s+/g, ''));
+        if (exact) return choose(exact);
+        if (geocoderOn && q.length >= 3 && (/\d|,/.test(q) || !places.length)) return searchAddress(q);
+        if (places.length) return choose(places[0]);
+      } else if (e.key === 'Escape') {
+        if (!list.hidden) {
+          e.preventDefault();
+          close();
+        } else if (input.value) {
+          e.preventDefault();
+          input.value = '';
+          syncClear();
+        }
+      }
+    });
+    clear.addEventListener('click', () => {
+      input.value = '';
+      items = [];
+      note = null;
+      close();
+      clearSearchPoint();
+      syncClear();
+      input.focus();
+    });
+  }
+
   // =========================================================================================== navigace
 
   function parseHash() {
@@ -1824,7 +2534,10 @@
     $('btn-cr').hidden = false;
     renderLegend();
     const layer = krajLayers.get(code);
-    if (layer) fitTo(layer.getBounds(), isMobile() ? [12, 12] : [28, 28]);
+    const pv = state.pendingView; // hledané místo: rovnou k němu, ne na celý kraj
+    state.pendingView = null;
+    if (pv) whenMapIdle().then(() => map.setView(pv.center, pv.zoom));
+    else if (layer) fitTo(layer.getBounds(), isMobile() ? [12, 12] : [28, 28]);
     layer?.closeTooltip();
     renderKrajPanel(true);
     $('panel').scrollTop = 0;
@@ -1912,6 +2625,14 @@
         renderLegend();
       }
     });
+    if (state.mode === 'server') {
+      buildMapSearch();
+      loadMarks();
+      // po návratu do okna hned ukázat, co mezitím řešili kolegové
+      window.addEventListener('focus', () => {
+        if (Date.now() - (state.marksAt || 0) > 10000) loadMarks();
+      });
+    }
     if (!parseHash().kraj) renderOverview();
     await applyRoute();
     if (state.mode === 'server') {

@@ -13,6 +13,16 @@ Výhodné nabídky (cena pod odhadem) jsou zeleně, u každého kola je i **dopo
   jako čipy s křížkem. Seznam vlevo ukazuje jen kola v zobrazené části mapy (přiblížíte město a vidíte, co je tam
   k mání; piny zůstávají všude) – vypíná se zaškrtávátkem pod počtem. Na mapě jsou inzeráty, které web stále
   uvádí – zmizelé (prodané, smazané) se skryjí při dalším celém průchodu webu.
+- **Hledání místa** (pole nad mapou): obec, část obce, kraj nebo PSČ našeptává už při psaní (bez internetu, z dat
+  GeoNames), Enter najde i **adresu** – ulici a číslo domu (vyhledávač OpenStreetMap Nominatim, jen po potvrzení).
+  Mapa se přesune do správného kraje, hledané místo označí červeným špendlíkem, karty ukážou vzdálenost a řadí se
+  „nejblíž hledanému místu“. Funguje i zápis souřadnic (`49.195, 16.606`). Křížek v poli místo zruší.
+- **Stav výkupu** u každého inzerátu (jen se serverem, sdílený celým obchodem): v detailu tlačítka **Osloveno ·
+  Domluveno · Koupeno · Nechceme**, k tomu poznámka pro kolegy („odmítl 26 tis., volat 20. 10.“). Zapíše se, kdo a kdy
+  stav nastavil, i celá historie změn. Stav je vidět na kartě, v tooltipu i na pinu (odznak; koupená a nechtěná kola
+  zešednou) a dá se podle něj filtrovat („Neřešené“ = zatím bez stavu). Ostatní uvidí změnu do minuty; když stav
+  mezitím změnil kolega, Kolomapa ho nepřepíše a upozorní. Inzerát, který vypadá jako stejné kolo vložené znovu
+  (stejný titulek a značka, do 15 km, cena ±30 %) jako kolo, které už má stav, má upozornění „možná už řešené“.
 - Detail: fotka, cena, odhad s rozpětím a vysvětlením „proč“, značka/model/rok/velikost/motor…, odkaz na inzerát.
 - Odhad ceny se **učí z trhu** (tisíce inzerátů, srovnatelné nabídky) a **kalibruje na vlastní prodeje obchodu**
   (`training/koloshop-prodeje.json`). S klíčem k Claude API umí nacenit i **podle fotky** (stav kola, výbava).
@@ -154,6 +164,7 @@ Ve Windows v souboru `nastaveni.txt` (řádky `KLÍČ=hodnota`), jinde i jako pr
 | `KOLOMAPA_DELAY_MS` | pauza mezi dotazy na jeden web | `1200` |
 | `KOLOMAPA_FULL_SCAN_DAYS` | jak často projít výpis celý (odhalí prodaná kola), ve dnech | podle zdroje (Bazoš 7, ostatní 1) |
 | `KOLOMAPA_USER_AGENT` | jak se Kolomapa webům představuje | `Mozilla/5.0 (compatible; Kolomapa/1.0; +odkaz na projekt)` |
+| `KOLOMAPA_GEOCODER` | hledání adres na mapě: adresa vyhledávače s rozhraním Nominatim, `off` = jen obce, části obcí, kraje a PSČ z místních dat | veřejný Nominatim OpenStreetMap (nejvýš 1 dotaz za sekundu, jen po Enteru, výsledky se 7 dní pamatují) |
 | `KOLOMAPA_MAX_DETAILS` | max. detailů inzerátů na zdroj za běh | podle zdroje (Bazoš 4000, Sbazar 2000, Aukro 300, Cyklobazar 120; Cyklobazar nikdy víc než 300) |
 | `KOLOMAPA_CYKLOBAZAR_DELAY_MS` | pauza mezi stránkami Cyklobazaru (nejméně 10 s) | `20000` |
 | `KOLOMAPA_CYKLOBAZAR_MAX_LIST_PAGES` | max. stránek výpisu Cyklobazaru za běh (celý výpis ~445 stránek se projde postupně) | `60` |

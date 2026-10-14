@@ -499,9 +499,12 @@ async function runPipeline(o) {
         log?.warn?.('AI nacenění selhalo', { error: e.message });
       }
     }
-    // Úklid: zmizelé inzeráty starší než goneKeepDays
+    // Úklid: zmizelé inzeráty starší než goneKeepDays – kromě těch se stavem výkupu (osloveno, koupeno …), ať zůstane
+    // přehled, co obchod s kterým kolem řešil
     const cutoff = new Date(Date.parse(startedAt) - config.goneKeepDays * 86400000).toISOString();
-    stats.pruned = Number(db.prepare('DELETE FROM listings WHERE gone_at IS NOT NULL AND gone_at < ?').run(cutoff).changes);
+    stats.pruned = Number(
+      db.prepare('DELETE FROM listings WHERE gone_at IS NOT NULL AND gone_at < ? AND id NOT IN (SELECT listing_id FROM listing_marks)').run(cutoff).changes
+    );
     // Minimalizace dat: u inzerátů zmizelých před víc než MINIMIZE_AFTER_DAYS dny smazat popis a parametry – pro učení
     // modelu stačí titulek, cena a vytěžené vlastnosti (features). Vrátí-li se inzerát, detail se stáhne znovu.
     const minCutoff = new Date(Date.parse(startedAt) - MINIMIZE_AFTER_DAYS * 86400000).toISOString();

@@ -5,11 +5,17 @@
 //   GET  /data/summary.json        přehled ČR (data.buildSummary, mode 'server')
 //   GET  /data/kraj/<KOD>.json     inzeráty kraje (data.buildKraj); neplatný kód → 400, neznámý → 404
 //   GET  /data/kraje.geojson       hranice krajů (src/geo/data/kraje.geojson)
-//   GET  /api/listing/:id          plný detail inzerátu + historie ceny
+//   GET  /api/listing/:id          plný detail inzerátu + historie ceny + stav výkupu a jeho historie (mark, markLog)
 //   GET  /api/run                  stav běhu (běží?, průběh, poslední běh, příští plánovaný)
 //   POST /api/run                  spustí stahování hned (202), když už běží → 409. Vyžaduje hlavičku
 //                                  X-Requested-With: kolomapa (ochrana proti CSRF – prohlížeč ji cizímu webu nepošle
 //                                  bez preflightu, který server nepovolí) a odmítá Sec-Fetch-Site ≠ same-origin.
+//   GET  /api/marks                stavy výkupu všech inzerátů v mapě (osloveno / domluveno / koupeno / nechceme), ETag
+//   GET  /api/marks/:id            stav výkupu jednoho inzerátu + historie změn
+//   POST /api/marks/:id            nastaví / zruší stav: JSON {status, note, expect}; stejná ochrana proti CSRF jako
+//                                  POST /api/run + Content-Type application/json; souběh (expect ≠ současný) → 409
+//   GET  /api/places?q=            našeptávač míst pro hledání na mapě – obce, části obcí, kraje, PSČ (bez internetu)
+//   GET  /api/geocode?q=           adresa (ulice a číslo) přes Nominatim OpenStreetMap; KOLOMAPA_GEOCODER=off → 503
 //
 // Volitelné přihlášení → HTTP Basic, porovnání v konstantním čase: společné heslo (config.password, KOLOMAPA_PASSWORD;
 // jméno libovolné) a/nebo uživatelé jméno:heslo (config.users z KOLOMAPA_USERS, config.usersFile z KOLOMAPA_USERS_FILE –
@@ -40,11 +46,14 @@ const defaultLog = require('../util/log');
 const { parseUsersFile } = require('../config');
 const { createAccessVerifier, tokenFromRequest } = require('./cfaccess');
 const data = require('./data');
+const marks = require('./marks');
+const { createGeocoder, GeocodeError } = require('./geocode');
+const { searchPlaces } = require('../geo');
 
 const gzipAsync = promisify(zlib.gzip);
 const GZIP_MIN_BYTES = 1024;
 const GEOJSON_FILE = path.join(__dirname, '..', 'geo', 'data', 'kraje.geojson');
-/** Žádný endpoint tělo požadavku nepotřebuje – větší tělo se odmítne (413) a spojení zavře. */
+/** Tělo čte jen POST /api/marks/:id (JSON se stavem a poznámkou) – větší tělo se odmítne (413) a spojení zavře. */
 const MAX_BODY_BYTES = 64 * 1024;
 /** Kolik špatných hesel z jedné IP adresy za AUTH_WINDOW_MS, než server začne odpovídat 429. */
 const AUTH_MAX_FAILS = 10;
@@ -184,6 +193,16 @@ function checkBasicAuth(header, password, users = null) {
   return !!m && ok;
 }
 
+/** Jméno z hlavičky Authorization: Basic (kdo nastavil stav výkupu); prázdné → null. Volat až po úspěšném ověření. */
+function basicUserName(header) {
+  const m = /^Basic\s+([A-Za-z0-9+/=]+)\s*$/i.exec(String(header || ''));
+  if (!m) return null;
+  const decoded = Buffer.from(m[1], 'base64').toString('utf8');
+  const i = decoded.indexOf(':');
+  const name = (i >= 0 ? decoded.slice(0, i) : decoded).trim();
+  return name ? name.slice(0, 60) : null;
+}
+
 /**
  * Uživatelé pro přihlášení: config.users (KOLOMAPA_USERS) + soubor config.usersFile (KOLOMAPA_USERS_FILE), který se
  * načte znovu, jakmile se změní (podle mtime, velikosti a inode – stat je levný). Chybějící nebo nečitelný soubor =
@@ -288,6 +307,30 @@ function hostAllowed(header, allowed = new Set()) {
   return PRIVATE_HOST_SUFFIXES.some((s) => name.endsWith(s));
 }
 
+/** Ochrana zápisů proti CSRF: hlavička X-Requested-With: kolomapa (cizí web ji bez preflightu neodešle) a
+ * Sec-Fetch-Site = same-origin, pokud ji prohlížeč posílá. */
+function assertSameOrigin(req, what) {
+  if (String(req.headers['x-requested-with'] || '').toLowerCase() !== 'kolomapa') throw new HttpError(403, 'Chybí hlavička X-Requested-With: kolomapa.');
+  const site = req.headers['sec-fetch-site'];
+  if (site && String(site).toLowerCase() !== 'same-origin') throw new HttpError(403, `${what} jen z Kolomapy samotné.`);
+}
+
+/** JSON z těla požadavku (handler ho sbírá do MAX_BODY_BYTES). */
+async function readJson(req) {
+  const ct = String(req.headers['content-type'] || '')
+    .split(';')[0]
+    .trim()
+    .toLowerCase();
+  if (ct !== 'application/json') throw new HttpError(415, 'Čekám tělo s Content-Type: application/json.');
+  const buf = req.kolomapaBody ? await req.kolomapaBody : null;
+  if (!buf || !buf.length) throw new HttpError(400, 'Tělo požadavku chybí.');
+  try {
+    return JSON.parse(buf.toString('utf8'));
+  } catch {
+    throw new HttpError(400, 'Tělo požadavku není platný JSON.');
+  }
+}
+
 function etagOf(buf) {
   return `W/"${crypto.createHash('sha1').update(buf).digest('base64url').slice(0, 27)}"`;
 }
@@ -312,8 +355,15 @@ function cacheEntry(raw, etag) {
  *   (bez hesla), viz hostAllowed. now = hodiny (testy).
  * @returns {(req: import('node:http').IncomingMessage, res: import('node:http').ServerResponse) => Promise<void>}
  */
-function createApp({ db, config, log = defaultLog, runner = null, now: clock = () => new Date(), accessVerifier = null }) {
+function createApp({ db, config, log = defaultLog, runner = null, now: clock = () => new Date(), accessVerifier = null, geocoder: givenGeocoder }) {
   const publicDir = config.publicDir ? path.resolve(config.publicDir) : null;
+  // hledání adres: testy podstrčí vlastní; jinak podle config.geocoderUrl (null = vypnuto)
+  const geocoder =
+    givenGeocoder !== undefined
+      ? givenGeocoder
+      : config.geocoderUrl
+        ? createGeocoder({ url: config.geocoderUrl, userAgent: `Kolomapa/1.0 (+https://${config.domain || 'github.com/ladasuchan1-cmd/Doma'}; map of used bike listings)`, log })
+        : null;
   const allowedHosts = new Set(
     [...(Array.isArray(config.allowedHosts) ? config.allowedHosts : []), os.hostname(), config.host]
       .filter((h) => typeof h === 'string' && h.trim())
@@ -552,6 +602,9 @@ function createApp({ db, config, log = defaultLog, runner = null, now: clock = (
       if (!/^\d{1,15}$/.test(mm[1])) throw new HttpError(400, 'Neplatné ID inzerátu.');
       const l = data.buildListing(db, Number(mm[1]));
       if (!l) throw new HttpError(404, 'Inzerát nenalezen.');
+      const mk = marks.getMark(db, l.id);
+      l.mark = mk.mark;
+      l.markLog = mk.log;
       return sendJson(req, res, 200, l);
     }
     if (p === '/api/run') {
@@ -568,6 +621,50 @@ function createApp({ db, config, log = defaultLog, runner = null, now: clock = (
       if (!r.started) return sendJson(req, res, 409, { error: r.reason || 'Stahování už běží.', status: runner.status() });
       return sendJson(req, res, 202, { started: true, status: runner.status() });
     }
+    if (p === '/api/marks') {
+      if (!isGet) throw new HttpError(405, 'Metoda není povolena.');
+      // UI se ptá každou minutu – bez změny 304 podle ETagu
+      return sendJson(req, res, 200, marks.listMarks(db, { now: clock() }), { etag: true, headers: { 'Cache-Control': 'no-cache' } });
+    }
+    mm = /^\/api\/marks\/([^/]+)$/.exec(p);
+    if (mm) {
+      if (!/^\d{1,15}$/.test(mm[1])) throw new HttpError(400, 'Neplatné ID inzerátu.');
+      const id = Number(mm[1]);
+      if (isGet) {
+        if (!db.prepare('SELECT 1 FROM listings WHERE id = ?').get(id)) throw new HttpError(404, 'Inzerát nenalezen.');
+        return sendJson(req, res, 200, marks.getMark(db, id));
+      }
+      if (m !== 'POST') throw new HttpError(405, 'Metoda není povolena.');
+      assertSameOrigin(req, 'Stav výkupu jde měnit');
+      const body = await readJson(req);
+      let r;
+      try {
+        r = marks.setMark(db, id, body, { user: req.kolomapaActor || null, now: clock() });
+      } catch (e) {
+        if (e instanceof marks.MarkError) throw new HttpError(e.status, e.message);
+        throw e;
+      }
+      if (r.conflict) return sendJson(req, res, 409, { error: 'Stav mezitím změnil někdo jiný – zobrazuji aktuální.', mark: r.mark, log: r.log });
+      if (r.changed) log.info('Stav výkupu', { id, stav: r.mark ? r.mark.s : 'zrušen', kdo: req.kolomapaActor || null });
+      return sendJson(req, res, 200, { mark: r.mark, log: r.log, changed: r.changed });
+    }
+    if (p === '/api/places') {
+      if (!isGet) throw new HttpError(405, 'Metoda není povolena.');
+      const results = searchPlaces(url.searchParams.get('q') || '', { limit: 8 });
+      return sendJson(req, res, 200, { results, geocoder: !!geocoder }, { headers: { 'Cache-Control': 'private, max-age=600' } });
+    }
+    if (p === '/api/geocode') {
+      if (!isGet) throw new HttpError(405, 'Metoda není povolena.');
+      if (!geocoder) throw new HttpError(503, 'Hledání adres je vypnuté (KOLOMAPA_GEOCODER=off) – hledejte obec, část obce nebo PSČ.', { expose: true });
+      let r;
+      try {
+        r = await geocoder.search(url.searchParams.get('q') || '');
+      } catch (e) {
+        if (e instanceof GeocodeError) throw new HttpError(e.status, e.message, e.status >= 500 ? { expose: true } : null);
+        throw e;
+      }
+      return sendJson(req, res, 200, { results: r.results, cached: r.cached, attribution: 'Adresy © přispěvatelé OpenStreetMap (Nominatim)' }, { headers: { 'Cache-Control': 'private, max-age=600' } });
+    }
     if (p === '/api/me') {
       if (!isGet) throw new HttpError(405, 'Metoda není povolena.');
       return sendJson(req, res, 200, { user: req.kolomapaUser || null, access: !!access, logout: access ? access.logoutPath : null }, { headers: { 'Cache-Control': 'no-store' } });
@@ -578,13 +675,24 @@ function createApp({ db, config, log = defaultLog, runner = null, now: clock = (
   }
 
   const handler = async function handler(req, res) {
-    // Tělo požadavku nepotřebujeme: zahodit, ale ne neomezeně (jinak by šlo server zaměstnat nekonečným uploadem).
+    // Tělo požadavku: do MAX_BODY_BYTES se sbírá do paměti (čte ho jen POST /api/marks/:id přes readJson), větší →
+    // zavřít spojení (jinak by šlo server zaměstnat nekonečným uploadem).
     let received = 0;
+    const chunks = [];
+    req.kolomapaBody = new Promise((resolve) => {
+      req.on('end', () => resolve(received > MAX_BODY_BYTES ? null : Buffer.concat(chunks)));
+      req.on('close', () => resolve(null)); // přerušený upload (po 'end' už nic nemění)
+      req.on('error', () => resolve(null));
+    });
     req.on('data', (c) => {
       received += c.length;
-      if (received > MAX_BODY_BYTES) req.socket.destroy();
+      if (received > MAX_BODY_BYTES) {
+        chunks.length = 0;
+        req.socket.destroy();
+        return;
+      }
+      chunks.push(c);
     });
-    req.on('error', () => {});
     req.resume();
     let url;
     try {
@@ -620,6 +728,7 @@ function createApp({ db, config, log = defaultLog, runner = null, now: clock = (
           throw new HttpError(403, `Přístup odepřen: ${r.reason}. ${accessHint}`);
         }
         req.kolomapaUser = r.name;
+        req.kolomapaActor = r.name;
       } else if (authOn) {
         const ip = clientIp(req, !!config.trustProxy);
         const now = Date.now();
@@ -628,7 +737,10 @@ function createApp({ db, config, log = defaultLog, runner = null, now: clock = (
           const min = Math.ceil(blocked / 60000);
           throw new HttpError(429, `Příliš mnoho neúspěšných pokusů o přihlášení – zkuste to znovu za ${min} min.`, { 'Retry-After': String(Math.ceil(blocked / 1000)) });
         }
-        if (!checkBasicAuth(req.headers.authorization, config.password, getUsers())) {
+        if (checkBasicAuth(req.headers.authorization, config.password, getUsers())) {
+          // jen pro záznam, kdo změnil stav výkupu (/api/me jméno z hesla neuvádí – se společným heslem je libovolné)
+          req.kolomapaActor = basicUserName(req.headers.authorization);
+        } else {
           if (req.headers.authorization) authFailed(ip, now);
           res.writeHead(401, {
             ...SECURITY_HEADERS,
@@ -653,7 +765,7 @@ function createApp({ db, config, log = defaultLog, runner = null, now: clock = (
       const wantsJson = !!url && (url.pathname.startsWith('/api/') || url.pathname.startsWith('/data/'));
       const { expose: _expose, ...extraHeaders } = (e instanceof HttpError && e.headers) || {};
       const headers = { 'Cache-Control': 'no-store', ...extraHeaders };
-      if (status === 405) headers.Allow = url && url.pathname === '/api/run' ? 'GET, HEAD, POST' : 'GET, HEAD';
+      if (status === 405) headers.Allow = url && (url.pathname === '/api/run' || /^\/api\/marks\/[^/]+$/.test(url.pathname)) ? 'GET, HEAD, POST' : 'GET, HEAD';
       try {
         if (wantsJson) await sendJson(req, res, status, { error: message }, { headers });
         else await send(req, res, { status, headers: { 'Content-Type': 'text/plain; charset=utf-8', ...headers }, body: message });

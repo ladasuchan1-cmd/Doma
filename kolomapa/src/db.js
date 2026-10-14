@@ -130,6 +130,28 @@ const MIGRATIONS = [
   UPDATE listings SET geo_precision = NULL
    WHERE kraj IS NOT NULL AND kraj NOT IN ('PHA', 'STC', 'JHC', 'PLK', 'KVK', 'ULK', 'LBK', 'HKK', 'PAK', 'VYS', 'JHM', 'OLK', 'ZLK', 'MSK');
   `,
+  // v5 – stav výkupu u inzerátu, sdílený celým obchodem (src/server/marks.js): kdo ho oslovil, domluvil, koupil,
+  // nebo ho nechce řešit – ať se lidé netočí na stejném kole. listing_marks = současný stav, listing_mark_log = historie.
+  `
+  CREATE TABLE listing_marks (
+    listing_id INTEGER PRIMARY KEY REFERENCES listings(id) ON DELETE CASCADE,
+    status TEXT NOT NULL,              -- contacted | scheduled | bought | rejected
+    note TEXT,
+    by_user TEXT,                      -- e-mail z Cloudflare Access / přihlašovací jméno; NULL = bez přihlášení
+    at TEXT NOT NULL
+  );
+  CREATE INDEX listing_marks_at ON listing_marks(at);
+
+  CREATE TABLE listing_mark_log (
+    id INTEGER PRIMARY KEY,
+    listing_id INTEGER NOT NULL REFERENCES listings(id) ON DELETE CASCADE,
+    status TEXT,                       -- NULL = stav zrušen
+    note TEXT,
+    by_user TEXT,
+    at TEXT NOT NULL
+  );
+  CREATE INDEX listing_mark_log_listing ON listing_mark_log(listing_id, id);
+  `,
 ];
 
 function nowIso(d = new Date()) {

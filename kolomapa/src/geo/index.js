@@ -421,4 +421,73 @@ function jitter(lat, lon, precision, seed) {
   return [lat + r * Math.sin((a * Math.PI) / 180), lon + (r * Math.cos((a * Math.PI) / 180)) / Math.cos((lat * Math.PI) / 180)];
 }
 
-module.exports = { resolveLocation, krajAt, krajFromText, findPlace, placeKey, jitter, pscEntry, KRAJE, KRAJ_POINT, GEO_VERSION, load };
+/** Doporučený zoom mapy pro místo podle počtu obyvatel (velké město celé, vesnice zblízka). */
+function zoomForPop(pop) {
+  return pop >= 300000 ? 11.5 : pop >= 50000 ? 12.5 : pop >= 10000 ? 13 : pop >= 1000 ? 13.5 : 14.5;
+}
+
+/**
+ * Našeptávač pro hledání na mapě (bez internetu): obce, části obcí a sídla podle názvu – i bez diakritiky, zkráceně
+ * a po slovech („nove mesto mor“ → Nové Město na Moravě) –, kraje a PSČ („602 00“, i jen „602“).
+ * Pořadí: přesná shoda, začátek názvu, začátky slov, výskyt uvnitř názvu; v rámci skupiny větší místa dřív.
+ * @param {string} q
+ * @param {{limit?: number}} [o]
+ * @returns {{label: string, sub: string, lat: number, lon: number, kraj: string|null, kind: 'obec'|'psc'|'kraj', zoom: number}[]}
+ */
+function searchPlaces(q, { limit = 8 } = {}) {
+  const c = load();
+  const raw = String(q ?? '').trim().slice(0, 100);
+  if (!raw) return [];
+  const digits = raw.replace(/\s+/g, '');
+  if (/^\d{3,5}$/.test(digits)) {
+    const out = [];
+    for (const code of Object.keys(c.psc).filter((x) => x.startsWith(digits)).sort()) {
+      const e = pscEntry(code);
+      if (!e) continue;
+      const [lat, lon, kraj, okres, obec] = e;
+      out.push({ label: `${code.slice(0, 3)} ${code.slice(3)}`, sub: [`PSČ · ${obec}`, okres && okres !== obec ? `okres ${okres}` : null].filter(Boolean).join(', '), lat, lon, kraj, kind: 'psc', zoom: 13 });
+      if (out.length >= limit) break;
+    }
+    return out;
+  }
+  const key = placeKey(raw);
+  if (key.length < 2) return [];
+  const tokens = key.split(' ');
+  const hits = [];
+  // kraje (Praha jako kraj ne – je to totéž co obec Praha)
+  if (key.length >= 3) {
+    for (const [code, name] of Object.entries(KRAJE)) {
+      if (code === 'PHA') continue;
+      const words = placeKey(name).split(' ').filter((w) => w !== 'kraj');
+      if (tokens.every((t) => t === 'kraj' || words.some((w) => w.startsWith(t)))) {
+        hits.push({ score: 1.5, pop: 2e6, r: { label: name, sub: 'kraj', lat: KRAJ_POINT[code][0], lon: KRAJ_POINT[code][1], kraj: code, kind: 'kraj', zoom: 8.5 } });
+      }
+    }
+  }
+  const seen = new Set();
+  for (const [pk, list] of c.byKey) {
+    let score;
+    if (pk === key) score = 0;
+    else if (pk.startsWith(key)) score = 1;
+    else {
+      const words = pk.split(' ');
+      if (tokens.every((t) => words.some((w) => w.startsWith(t)))) score = 2;
+      else if (key.length >= 3 && pk.includes(key)) score = 3;
+      else continue;
+    }
+    for (const p of list) {
+      const dup = `${p.n}|${p.o || ''}`;
+      if (seen.has(dup) || !validPlace(p)) continue;
+      seen.add(dup);
+      const sub = [p.o && p.o !== p.n ? `okres ${p.o}` : null, KRAJE[p.k] || null].filter(Boolean).join(' · ');
+      const zoom = /^Praha \d{1,2}$/.test(p.n) ? 13 : zoomForPop(p.pop || 0); // městská část celá
+      hits.push({ score, pop: p.pop || 0, r: { label: p.n, sub, lat: p.lat, lon: p.lon, kraj: p.k || null, kind: 'obec', zoom } });
+    }
+  }
+  // přesná shoda vesnice nemá přebít velké město, které tak začíná („hradec“ → Hradec Králové před Hradcem u Plzně)
+  const rank = (h) => h.score - 0.6 * Math.log10(h.pop + 10);
+  hits.sort((a, b) => rank(a) - rank(b) || a.r.label.localeCompare(b.r.label, 'cs'));
+  return hits.slice(0, limit).map((h) => h.r);
+}
+
+module.exports = { resolveLocation, krajAt, krajFromText, findPlace, searchPlaces, placeKey, jitter, pscEntry, KRAJE, KRAJ_POINT, GEO_VERSION, load };

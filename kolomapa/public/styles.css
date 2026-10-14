@@ -41,6 +41,17 @@
   --pin-ring: #ffffff;
   --ebike: #1f2328;
 
+  /* stav výkupu (osloveno / domluveno / koupeno / nechceme) – vždy s ikonou a textem, nikdy jen barva */
+  --mk-contacted: #b86e00;
+  --mk-contacted-soft: rgba(201, 133, 0, 0.13);
+  --mk-scheduled: #6a43c9;
+  --mk-scheduled-soft: rgba(106, 67, 201, 0.12);
+  --mk-bought: #0d7d36;
+  --mk-bought-soft: rgba(13, 125, 54, 0.12);
+  --mk-rejected: #5d5c58;
+  --mk-rejected-soft: rgba(93, 92, 88, 0.13);
+  --searchpin: #d1342f;
+
   /* choropleta krajů (modrá sekvenční škála 100 → 600) */
   --seq-0: #cde2fb;
   --seq-1: #9ec5f4;
@@ -94,6 +105,16 @@
     --danger: #e66767;
     --pin-ring: #1a1a19;
     --ebike: #f4f4f1;
+
+    --mk-contacted: #f0aa3c;
+    --mk-contacted-soft: rgba(240, 170, 60, 0.16);
+    --mk-scheduled: #a88cf0;
+    --mk-scheduled-soft: rgba(168, 140, 240, 0.18);
+    --mk-bought: #4cc979;
+    --mk-bought-soft: rgba(76, 201, 121, 0.16);
+    --mk-rejected: #b4b2aa;
+    --mk-rejected-soft: rgba(180, 178, 170, 0.16);
+    --searchpin: #ff6b61;
 
     --seq-0: #0d366b;
     --seq-1: #184f95;
@@ -1661,6 +1682,449 @@ a {
 
 .sheet-handle {
   display: none;
+}
+
+/* ---------------------------------------------------------------- stav výkupu */
+
+.mk {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 22px;
+  padding: 0 8px 0 6px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+  color: var(--mk-c, var(--text-2));
+  background: var(--mk-bg, var(--surface-3));
+  border: 1px solid color-mix(in srgb, var(--mk-c, var(--border-strong)) 35%, transparent);
+}
+
+.mk .ic {
+  width: 13px;
+  height: 13px;
+  stroke-width: 2.4;
+}
+
+.mk--contacted,
+.mkbtn--contacted,
+.pin--mk-contacted {
+  --mk-c: var(--mk-contacted);
+  --mk-bg: var(--mk-contacted-soft);
+}
+
+.mk--scheduled,
+.mkbtn--scheduled,
+.pin--mk-scheduled {
+  --mk-c: var(--mk-scheduled);
+  --mk-bg: var(--mk-scheduled-soft);
+}
+
+.mk--bought,
+.mkbtn--bought,
+.pin--mk-bought {
+  --mk-c: var(--mk-bought);
+  --mk-bg: var(--mk-bought-soft);
+}
+
+.mk--rejected,
+.mkbtn--rejected,
+.pin--mk-rejected {
+  --mk-c: var(--mk-rejected);
+  --mk-bg: var(--mk-rejected-soft);
+}
+
+.mk--dup {
+  --mk-c: var(--warn);
+  --mk-bg: var(--warn-soft);
+  border-style: dashed;
+  font-weight: 500;
+}
+
+.card__marks {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 2px 8px;
+  min-width: 0;
+}
+
+.card__who {
+  color: var(--text-2);
+  font-size: 12px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+}
+
+/* koupené a nechtěné: pořád vidět (ať je nikdo neřeší znovu), ale potlačené */
+.card--done .thumb,
+.card--done .card__title,
+.card--done .card__price-row {
+  opacity: 0.55;
+}
+
+.pin__mk {
+  position: absolute;
+  right: -7px;
+  bottom: -6px;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--mk-c);
+  color: #fff;
+  box-shadow: 0 0 0 1.5px var(--pin-ring);
+  display: grid;
+  place-items: center;
+}
+
+.pin__mk .ic {
+  width: 9px;
+  height: 9px;
+  stroke-width: 3;
+}
+
+@media (prefers-color-scheme: dark) {
+  .pin__mk {
+    color: #111;
+  }
+}
+
+.pin--mk-rejected .pin__dot,
+.pin--mk-bought .pin__dot {
+  opacity: 0.45;
+  filter: grayscale(0.85);
+}
+
+.tip__mk {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 2px;
+  font-size: 12px;
+}
+
+/* panel v detailu */
+.mkbox {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 12px 14px;
+  background: var(--surface-2);
+  display: grid;
+  gap: 9px;
+}
+
+.mkbox__head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.mkbox__who {
+  color: var(--text-2);
+  font-size: 12.5px;
+}
+
+.mkbox__seg {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.mkbtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  min-height: 36px;
+  padding: 4px 6px;
+  border-radius: 8px;
+  border: 1px solid var(--border-strong);
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.mkbtn .ic {
+  color: var(--mk-c);
+  width: 15px;
+  height: 15px;
+}
+
+.mkbtn:hover:not(:disabled) {
+  border-color: var(--mk-c);
+}
+
+.mkbtn[aria-pressed="true"] {
+  background: var(--mk-bg);
+  border-color: var(--mk-c);
+  color: var(--mk-c);
+  box-shadow: inset 0 0 0 1px var(--mk-c);
+  cursor: default;
+}
+
+.mkbtn:disabled {
+  opacity: 0.6;
+  cursor: progress;
+}
+
+.mkbtn:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 1px;
+}
+
+.mkbox__note {
+  width: 100%;
+  height: auto;
+  min-height: 52px;
+  padding: 7px 10px;
+  resize: vertical;
+  font: inherit;
+  font-size: 13.5px;
+  line-height: 1.4;
+}
+
+.mkbox__actions {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  min-height: 0;
+}
+
+.mkbox__actions:empty {
+  display: none;
+}
+
+.mkbox__actions .spinner {
+  margin-left: auto;
+}
+
+.mkbox__hist summary {
+  cursor: pointer;
+  color: var(--link);
+  font-weight: 600;
+  font-size: 13px;
+}
+
+.mkbox__hist ol {
+  list-style: none;
+  margin: 8px 0 0;
+  padding: 0;
+  display: grid;
+  gap: 7px;
+  font-size: 12.5px;
+}
+
+.mkbox__hist li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 8px;
+}
+
+.mkbox__when {
+  color: var(--text-2);
+  font-variant-numeric: tabular-nums;
+  min-width: 92px;
+}
+
+.mkbox__lognote {
+  flex-basis: 100%;
+  padding-left: 100px;
+  color: var(--text);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.alert--soft {
+  align-items: start;
+}
+
+.alert .linkbtn {
+  font-weight: 600;
+  text-align: left;
+}
+
+@media (max-width: 420px) {
+  .mkbox__lognote {
+    padding-left: 0;
+  }
+}
+
+/* ---------------------------------------------------------------- hledání místa na mapě */
+
+.mapsearch {
+  position: absolute;
+  z-index: 900;
+  top: 10px;
+  right: 10px;
+  width: min(360px, calc(100% - 200px));
+}
+
+.mapsearch__input {
+  width: 100%;
+  height: 38px;
+  padding: 0 36px 0 34px;
+  border-radius: 9px;
+  border: 1px solid var(--border-strong);
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+  font-size: 14px;
+  box-shadow: var(--shadow-1);
+}
+
+.mapsearch__input::-webkit-search-cancel-button {
+  display: none;
+}
+
+.mapsearch__input:focus {
+  outline: 2px solid var(--focus);
+  outline-offset: 0;
+}
+
+.mapsearch__ic {
+  position: absolute;
+  left: 10px;
+  top: 11px;
+  color: var(--muted);
+  pointer-events: none;
+  display: grid;
+}
+
+.mapsearch__clear {
+  position: absolute;
+  right: 5px;
+  top: 5px;
+  width: 28px;
+  height: 28px;
+  border: 0;
+  border-radius: 6px;
+  background: none;
+  color: var(--text-2);
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+}
+
+.mapsearch__clear:hover {
+  background: var(--surface-3);
+}
+
+.mapsearch__list {
+  list-style: none;
+  margin: 4px 0 0;
+  padding: 4px;
+  max-height: min(60vh, 420px);
+  overflow-y: auto;
+  border-radius: 10px;
+  border: 1px solid var(--border-strong);
+  background: var(--surface);
+  box-shadow: var(--shadow-2);
+}
+
+.mapsearch__opt {
+  display: grid;
+  grid-template-columns: 22px minmax(0, 1fr);
+  gap: 8px;
+  align-items: start;
+  padding: 7px 8px;
+  border-radius: 7px;
+  cursor: pointer;
+}
+
+.mapsearch__opt[aria-selected="true"],
+.mapsearch__opt:hover {
+  background: var(--accent-soft);
+}
+
+.mapsearch__oic {
+  color: var(--muted);
+  display: grid;
+  place-items: center;
+  padding-top: 1px;
+}
+
+.mapsearch__opt--action .mapsearch__oic,
+.mapsearch__opt--action .mapsearch__olabel {
+  color: var(--link);
+}
+
+.mapsearch__otext {
+  display: grid;
+  min-width: 0;
+}
+
+.mapsearch__olabel {
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.mapsearch__osub {
+  color: var(--text-2);
+  font-size: 12.5px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.mapsearch__note {
+  padding: 8px 10px;
+  color: var(--text-2);
+  font-size: 13px;
+}
+
+.mapsearch__attr {
+  padding: 4px 10px 2px;
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.searchpin {
+  background: none;
+  border: 0;
+}
+
+.searchpin__inner {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  color: var(--searchpin);
+  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.45));
+}
+
+.searchpin__inner .ic {
+  width: 30px;
+  height: 30px;
+  fill: var(--searchpin);
+  stroke: var(--pin-ring);
+  stroke-width: 1.6;
+}
+
+@media (max-width: 899px) {
+  .mapsearch {
+    left: 52px;
+    right: 10px;
+    width: auto;
+  }
+
+  .map-btn {
+    top: 56px;
+  }
+
+  .mapsearch__list {
+    max-height: calc(55svh - 70px);
+  }
 }
 
 /* ---------------------------------------------------------------- toast, noscript */

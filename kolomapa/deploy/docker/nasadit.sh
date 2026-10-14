@@ -207,6 +207,9 @@ KOLOMAPA_PASSWORD=$NOVE_HESLO
 
 # AI nacenění podle fotek (placené, klíč z console.anthropic.com):
 #ANTHROPIC_API_KEY=
+
+# Hledání adres na mapě (OpenStreetMap Nominatim, nejvýš 1 dotaz za sekundu); off = jen obce a PSČ bez internetu:
+#KOLOMAPA_GEOCODER=off
 EOF
   chmod 600 "$ENV_SOUBOR"
 fi

@@ -59,6 +59,9 @@
 //   KOLOMAPA_USERS_FILE         soubor s uživateli (řádky KOLOMAPA_USERS=…, CSM_USERS=…, CSM_PASSWORD=… → uživatel
 //                               „tým“); čte se znovu při každé změně souboru – na serveru ho plní nasadit.sh z Cyklo & Ski
 //                               mapy, takže obě aplikace mají stejná jména a hesla
+//   KOLOMAPA_GEOCODER           hledání adres na mapě (ulice a číslo): adresa vyhledávače s rozhraním Nominatim
+//                               (výchozí veřejný Nominatim OpenStreetMap – nejvýš 1 dotaz za sekundu, jen po Enteru),
+//                               „off“ = jen obce, části obcí, kraje a PSČ z místních dat
 //   KOLOMAPA_DOMENA, KOLOMAPA_PROHLIZEC   čte hlavně deploy/docker/nasadit.sh (doména pro Caddy/tunel, Chromium do
 //                               obrazu); Kolomapa doménu jen uvádí v hlášce o přihlášení
 //   KOLOMAPA_EVAL_DIR           data pro tools/eval-pricing.js (výchozí data/eval)
@@ -75,6 +78,7 @@ const PROJECT_DIR = path.join(__dirname, '..');
 const ALL_SOURCES = ['bazos', 'sbazar', 'aukro', 'cyklobazar'];
 const DEFAULT_SOURCES = ['bazos'];
 const DEFAULT_SETTINGS_FILE = path.join(PROJECT_DIR, 'nastaveni.txt');
+const DEFAULT_GEOCODER_URL = 'https://nominatim.openstreetmap.org/search';
 
 /** Všechny proměnné, kterým Kolomapa rozumí (kvůli upozornění na překlepy v nastaveni.txt). */
 const KNOWN_KEYS = new Set([
@@ -97,6 +101,7 @@ const KNOWN_KEYS = new Set([
   'KOLOMAPA_CF_ACCESS_AUD',
   'KOLOMAPA_CF_ACCESS_EMAILS',
   'KOLOMAPA_USER_AGENT',
+  'KOLOMAPA_GEOCODER',
   'KOLOMAPA_SOURCES',
   'KOLOMAPA_SCHEDULE',
   'KOLOMAPA_RUN_ON_START',
@@ -463,6 +468,15 @@ function loadConfig(env = process.env) {
     }
   }
 
+  // hledání adres: výchozí veřejný Nominatim, vlastní adresa, nebo off
+  const geoRaw = envStr(env.KOLOMAPA_GEOCODER);
+  let geocoderUrl = DEFAULT_GEOCODER_URL;
+  if (geoRaw) {
+    if (OFF_RE.test(geoRaw)) geocoderUrl = null;
+    else if (/^https?:\/\/[^\s/]+(\/\S*)?$/i.test(geoRaw)) geocoderUrl = geoRaw;
+    else bad('KOLOMAPA_GEOCODER', geoRaw, 'čekám adresu https://…/search (rozhraní Nominatim) nebo off', 'veřejný Nominatim OpenStreetMap');
+  }
+
   const aiKey = envStr(env.ANTHROPIC_API_KEY);
   const config = {
     projectDir: PROJECT_DIR,
@@ -481,6 +495,7 @@ function loadConfig(env = process.env) {
     cfAccess,
     domain: envStr(env.KOLOMAPA_DOMENA),
     userAgent: envStr(env.KOLOMAPA_USER_AGENT),
+    geocoderUrl,
     sources,
     schedule,
     runOnStart: bool('KOLOMAPA_RUN_ON_START', true),

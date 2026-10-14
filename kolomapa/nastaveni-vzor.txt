@@ -28,3 +28,6 @@
 
 # Pauza mezi dotazy na jeden web v ms (víc = šetrnější a pomalejší):
 #KOLOMAPA_DELAY_MS=1200
+
+# Hledání adres na mapě (ulice a číslo) přes OpenStreetMap; off = jen obce, části obcí a PSČ bez internetu:
+#KOLOMAPA_GEOCODER=off
