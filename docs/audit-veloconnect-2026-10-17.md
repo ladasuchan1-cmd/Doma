@@ -174,6 +174,25 @@ kroky 2, 4 a 5 najednou; chyby z nasazení posílat jako jeden řádek z logu; k
 V obou variantách se odkládají kroky 9 a 10 (3,3–5,6 mil. tokenů). Doporučení: začít A hned, B až po
 měsíci, když se data v OBR osvědčí.
 
+### Co koupí rozpočet 150 $ na API
+
+Ceny Anthropic k říjnu 2026 za milion tokenů: Opus 5.5 vstup 4 $ / výstup 20 $, Sonnet 5.5 2 $ / 10 $,
+Fable 5.1 10 $ / 50 $; opakovaný kontext z keše 0,20–0,25 $. S režií keše vychází zhruba 10 $ za milion
+nových tokenů na Opusu 5.5, 5 $ na Sonnetu 5.5 a 25 $ na Fable 5.1 (tento audit, 0,5 mil. na Fable 5.1,
+odpovídá zhruba 12 $). Rozptyl ±50 %.
+
+| Rozsah | Tokeny | Opus 5.5 | Fable 5.1 |
+| --- | --- | --- | --- |
+| Varianta A (bez Clauda) | 0 | 0 $ | 0 $ |
+| Varianta B (jedno sezení) | 0,6–0,9 mil. | 6–9 $ | 15–23 $ |
+| Kroky 0–5 (původní plán) | 1,2–2,3 mil. | 12–23 $ | 30–58 $ |
+| Kroky 0–6 (i Pohoda přes PlusImportUni) | 1,4–2,7 mil. | 14–27 $ | 35–68 $ |
+| Vše (kroky 0–10, 5 dalších dodavatelů) | 5–9 mil. | 60–150 $ | 125–220 $ |
+
+Na Opusu 5.5 (výchozí model Claude Code) se do 150 $ vejde celý plán i s rezervou; na Fable 5.1 kroky 0–6
+a objednávka, ne Pohoda XML. Předplatné Claude kryje běžná sezení v Claude Code v rámci limitů; kredit na
+API je rezerva na špičky a dlouhá sezení.
+
 ## Rozhodnutí k potvrzení
 
 - [ ] Server pro Feed Hub.
