@@ -153,6 +153,27 @@ Součty: kroky 0–5 (první užitek) 1,2–2,3 mil. tokenů, 2,5 dne Clauda, 7 
 1,4–2,7 mil. tokenů, 3 dny Clauda, 10 h lidí, 3–4 týdny. Kroky 7–10 s pěti dalšími dodavateli
 +3,5–6 mil. tokenů a 6–8 týdnů.
 
+### Úsporná varianta (minimum tokenů, víc ruční práce)
+
+| | A: bez Clauda | B: jedno sezení | Původní plán (0–5) |
+| --- | --- | --- | --- |
+| Tokeny | 0 (max. 0,05 mil. na kontrolu prvního CSV) | 0,6–0,9 mil. | 1,2–2,3 mil. |
+| Čas lidí | 1,5 h týdně trvale (2 dodavatelé, 2 běhy týdně); další dodavatel +40 min týdně | 10 h jednorázově (Láďa nasadí Feed Hub sám) | 7 h |
+| Start | hned po resetu hesel | 2–3 týdny | 2–3 týdny |
+| Co chybí | historie změn cen, semafor, automatika | nic z prvního užitku | |
+
+Varianta A: na PC spustit hotový `velodostupnost.py` (OBR, nic se nemění) se seznamem kódů; pro Focus
+nastavit `VELOTEST_URL`. Výstup `<seznam>-cenik.csv` poslat e-mailem do schránky OBR (načte se podle slova
+„cenik“ jako podklad Ceník a zásoba; parser CSV umí) a tentýž soubor do PlusImportu pro Pohodu (šablona
+IT Future jednou, 2–4 h). Frekvence 2× týdně.
+
+Varianta B: Feed Hub nasadí Láďa sám (kroky 0–1); jedno sezení ve `feedhub` s auditem jako zadáním udělá
+kroky 2, 4 a 5 najednou; chyby z nasazení posílat jako jeden řádek z logu; každé další sezení stojí
+0,1–0,15 mil. navíc jen na čtení repa.
+
+V obou variantách se odkládají kroky 9 a 10 (3,3–5,6 mil. tokenů). Doporučení: začít A hned, B až po
+měsíci, když se data v OBR osvědčí.
+
 ## Rozhodnutí k potvrzení
 
 - [ ] Server pro Feed Hub.
