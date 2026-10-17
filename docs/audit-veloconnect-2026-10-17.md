@@ -121,12 +121,37 @@ co PlusImportUni a umí plánovaný import z URL; do kterého pole BHIT/PlusImpo
 | 2 | Opravy klienta Feed Hubu + testy | Claude | půl dne |
 | 3 | Pilot Raymon + Focus, týden sledování | Láďa, Petr Sůva | 1 h + týden |
 | 4 | Seznam SKU per dodavatel z exportu OBR | Claude | den |
-| 5 | Most Feed Hub → OBR (job v Sales) | Claude | den |
+| 5 | Most Feed Hub → OBR bez zásahu do Sales a OBR: denní CSV e-mailem do schránky OBR (SMTP ve Feed Hubu) | Claude, František | půl dne |
 | 6 | Pohoda cesta A přes PlusImportUni, pilot Raymon | Láďa, František, IT Future, Claude | týden |
 | 7 | Přístupy PON značky, Lindlau, ABUS | Pavel Veselý, Láďa | e-maily |
 | 8 | Vyjasnit Fameless a Campudus | Pavel Veselý | hodina |
-| 9 | Objednávka přes rozhraní (vzor z Bruno kolekce, IsTest, pak 1 levná položka) | Claude, Láďa | den + pokus |
-| 10 | Pohoda cesta C (XML/mServer) po měsíci bezchybného běhu | Claude, František | týdny |
+| 9 | Objednávka přes rozhraní jako nástroj ve Feed Hubu, ne v OBR (vzor z Bruno kolekce, IsTest, pak 1 levná položka) | Claude, Láďa | den + pokus |
+| 10 | Pohoda cesta C (XML/mServer) včetně párování `sku_map`, po měsíci bezchybného běhu | Claude, František | týdny |
+
+Podle pokynu ze 17. 10. se v Sales ani v OBR nic nemění; všechna práce Clauda je ve Feed Hubu.
+
+## Odhad času a tokenů
+
+Tokeny = součet vstupu i výstupu přes všechna kola sezení (účtování Claude Code); kalibrace: tento audit
+≈ 0,5 mil. tokenů za 1,5 h. Rozptyl ±50 %.
+
+| # | Krok | Čas lidí | Práce Clauda | Tokeny Clauda | Kalendář |
+| --- | --- | --- | --- | --- | --- |
+| 0 | Rozhodnutí o serveru | 1 h | 0 | 0 | den |
+| 1 | Přístupy, `.env`, secrets, nasazení | 2 h | 1 h dohled | 0,1–0,2 mil. | den |
+| 2 | Opravy klienta Feed Hubu + testy | 0,5 h revize | půl dne | 0,3–0,6 mil. | den |
+| 3 | Pilot Raymon + Focus | 1 h + 10 min denně | 1 h vyhodnocení | 0,1–0,2 mil. | týden |
+| 4 | Seznam SKU per dodavatel | 1 h | den | 0,4–0,8 mil. | 2 dny |
+| 5 | Most e-mailem do schránky OBR | 1 h (SMTP) | půl dne | 0,3–0,5 mil. | 2 dny |
+| 6 | Pohoda cesta A (PlusImportUni) | 2 h František + 2–4 h IT Future (2–4 tis. Kč) | půl dne | 0,2–0,4 mil. | týden |
+| 7 | Další dodavatelé (na jednoho) | 1 h | 1 h | 0,05–0,1 mil. | podle dodavatele |
+| 8 | Fameless, Campudus | 1 h | 0 | 0 | den |
+| 9 | Objednávka přes rozhraní | 1 h test | den | 0,3–0,6 mil. | 2 dny + pokus |
+| 10 | Pohoda cesta C + párování `sku_map` | 1 den František | 5–8 dní | 3–5 mil. | 4–6 týdnů |
+
+Součty: kroky 0–5 (první užitek) 1,2–2,3 mil. tokenů, 2,5 dne Clauda, 7 h lidí, 2–3 týdny. Kroky 0–6
+1,4–2,7 mil. tokenů, 3 dny Clauda, 10 h lidí, 3–4 týdny. Kroky 7–10 s pěti dalšími dodavateli
++3,5–6 mil. tokenů a 6–8 týdnů.
 
 ## Rozhodnutí k potvrzení
 
