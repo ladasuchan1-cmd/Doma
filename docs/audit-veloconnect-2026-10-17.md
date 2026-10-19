@@ -226,6 +226,44 @@ Při 410/411 u Raymonu: nové heslo na `velo-password.raymon-bicycles.com`, podp
 - [ ] Objednávání přes VeloConnect: ano/ne, kdo smí spustit pokus.
 - [ ] Reset hesel Raymon a Focus; přístupy se nepřeposílají e-mailem.
 
+## Feedy BHIT a IT Future (19. 10. 2026)
+
+Tabulky od BHIT (listy Aktivní feedy, Nové feedy) a IT Future (šablona) mají 82 řádků a 68 adres; po
+sloučení duplicit a přidání dostupnostního feedu Crussis je to **60 zdrojů**. Každý byl stažen, nalezen
+prvek položky a XPath polí a mapování ověřeno produkčním parserem Feed Hubu nad staženým souborem. Výsledek
+je migrace `005_feeds_bhit_itf.sql` ve Feed Hubu (větev `claude/feeds-bhit-itf`, nenasazeno), plán 6:00
+a 12:00 = kontrola funkčnosti dvakrát denně; změny cen a dostupnosti zachytí `offer_history`.
+
+| Stav | Zdrojů | Které |
+| --- | --- | --- |
+| Aktivní, cena i dostupnost | 27 | KCK, Cyklo profi, N Distribution, Sport import, Sloger, Helios, Cyklo Žitný, CykloMax nový, Ride Hard, Catherine, Cyklospeciality, Rascal, Sidas, Pinguin, Beany, Pedalsport, Bottico, Bike Park, 4ever, Protocycles, Summit dostupnost, Origos, Zookee s cenou, Viva nový, Vertone nový, Summit outlet, Snow-how |
+| Aktivní, jen dostupnost (tabulka říká, že feed cenu nenese) | 8 | Zookee, Sport und Freizeit (2×), CykloMax, ABUS, Summit produkt, Penco nový, Crussis dostupnost |
+| Aktivní, cena k ověření | 1 | Bike Time (ve feedu jen `PRICE`, u kola 26 499 = nejspíš MOC) |
+| Aktivní, jen cena | 1 | Crussis (dostupnost je v druhém feedu) |
+| Mrtvá adresa (404) | 5 | Aspire, Penco starý, Sprint, Vertone starý, Viva Lanškroun starý |
+| Blokace nebo přihlášení (403) | 5 | Paul Lange (2×), MTBiker, Laid, Bike Fun |
+| Přihlašovací stránka místo feedu | 4 | Endura B2B, Bike Brothers, Vavrys, Forever Faster |
+| Timeout (IP:3380, nejspíš jen z firemní sítě) | 4 | Silvini (4 feedy) |
+| Není XML, potřebuje vlastní adaptér | 3 | Endura katalog (JSON), Stablecam (ZIP), OneUp (XLSX) |
+| Prázdná odpověď | 2 | Level Sport (mywac: „Function GetResult12 not found“), Aspire ITF („Access denied“) |
+
+Co z průzkumu vzešlo:
+
+- **Cena se mapuje jen tam, kde se našel prvek, který jmenuje tabulka.** Prvek nalezený jen podle obvyklého
+  názvu (`PRICE`) bývá MOC; u Summitu by obecný `Price` vzal doporučenou cenu místo `MyPrice`, u Bike Parku je
+  ceník B2B jeden ze dvou.
+- **21 adres nese token nebo heslo** (hash v cestě, `password=`, `api_token=`) — podle direktivy CEO nejsou
+  v repu: `url` je prázdné a čte se z `.env` (`<DODAVATEL>_FEED_URL`); fragment `.env` dostal Láďa.
+- Adaptér dostal přepočet ceny faktorem (MOC → nákup: /1,21/1,4), úpravy kódu (Rascal „R“ + kód, podtržítko →
+  pomlčka), měnu za číslem („1990.00 CZK“) a seznam XPath (ABUS: `PRODUCTNO` / `VARIANTNO` / `ITEM_ID`).
+- Dostupnost zůstává text („32“, „skladem“, „in stock“, „ano/ne“, „5+“, „false“; Sport import prázdné = není)
+  — normalizace na množství je další krok, až bude jasné, co OBR potřebuje.
+- 4ever: BHIT mapuje `CATALOGUE_PRICE`, IT Future `CUSTOMER_PRICE/1,21` a liší se — ponechána varianta BHIT,
+  rozhodnout při souběhu.
+
+Zbývá: `.env` na serveru (21 URL), Silvini z firemní IP, přístupy k B2B portálům (dají přímý feed?), adaptéry
+JSON/ZIP/XLSX, normalizace dostupnosti, SMTP pro hlášení; teprve pak nasazení a souběh s BHIT/ITF.
+
 ## Zdroje
 
 E-maily ve schránce suchan@koloshop.cz (vlákna „Fwd: Veloconnect“ 26. 8. 2026, „Fwd: RAYMON Bicycles -
