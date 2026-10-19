@@ -274,6 +274,13 @@ limit kontejneru 2 GB a nasazení přes self-hosted runner jako Sales (zkouška 
 cesta zpět). Postup pro server: `feedhub/NASAZENI.md` — odchozí firewall na hosty dodavatelů (František),
 `.env`, runner se štítkem `feedhub`, blok v Caddy a interní DNS `feeds.sales.report`.
 
+**20. 10. 2026: feedy se přidávají z dashboardu, ne migrací.** Tlačítko „Přidat feed“: vložit URL, Feed Hub
+feed stáhne, navrhne položku a prvky (stejná pravidla jako průzkum 60 feedů), u ceny varuje (obecný `PRICE`
+bývá MOC), ukáže vzorek z produkčního parseru; po odsouhlasení se uloží a hned naplánuje. „Upravit“ u řádku
+mění existující feed. Adresa i s tokenem se ukládá do databáze Feed Hubu (upřesnění direktivy č. 3 —
+rozhodnutí Láďi), takže nový feed nepotřebuje zásah na serveru ani Františka; firewall se řeší jednou pro
+odchozí 80/443. Ověřeno živě na feedu KCK (6 316 položek, cena `priceVOCNoVat`).
+
 ## Zdroje
 
 E-maily ve schránce suchan@koloshop.cz (vlákna „Fwd: Veloconnect“ 26. 8. 2026, „Fwd: RAYMON Bicycles -
