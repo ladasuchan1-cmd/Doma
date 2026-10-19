@@ -56,7 +56,15 @@ Objednávání přes VeloConnect (Order) je naprogramované, ale neověřené; d
 | Výpis celého sortimentu | ne; TextSearch přes GET 404, náš XML-POST tvar 405 | ano |
 | Order / GetStatus / Rollback | server hlásí, nástroj napsán, ostrý pokus neproběhl | ne |
 
-Důsledky: bez seznamu objednacích kódů se nedá ptát na nic; dostupnost je binární vstup, ne množstevní strop;
+**Ověřeno naostro 19. 10. 2026.** Oba přístupy fungují (Raymon z přílohy 26. 8., Focus z e-mailu pon.bike);
+oba servery běží na Tridata (`veloapi.net`). Výpis celého sortimentu jde: `CreateTextSearchRequest` (TransactionID,
+TotalCount) + `SearchResultRequest` se `StartIndex`/`Count`; dřívější `TextSearchRequest` vrací 404. Prázdný výraz
+= celý katalog: Raymon 2 354 položek (všechny s EAN, CZK, MOC; 380 available / 473 expecting_delivery s termínem
+v ISO tvaru / 1 501 not_available), Focus 1 677 (cena CZK, MOC, stav bez kusů a termínů; profil navíc nabízí
+Receipt: dodací listy, faktury). Seznam sledovaných SKU tím přestává být podmínka; výstupy `raymon-cenik.csv`
+a `raymon-katalog.csv` (Focus po dokončení).
+
+Důsledky: dostupnost je binární vstup, ne množstevní strop;
 ceník a rozhraní se doplňují (ceník základ, rozhraní denní aktualizace). Oficiální Bruno/Postman kolekce
 (github.com/veloconnect/postman) má vzory GET i POST pro GetProfile, GetItemDetailsList, GetItemDetails,
 objednávky i TextSearch; z ní se má vzít správný tvar XML-POST místo hádání.
