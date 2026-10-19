@@ -60,9 +60,11 @@ Objednávání přes VeloConnect (Order) je naprogramované, ale neověřené; d
 oba servery běží na Tridata (`veloapi.net`). Výpis celého sortimentu jde: `CreateTextSearchRequest` (TransactionID,
 TotalCount) + `SearchResultRequest` se `StartIndex`/`Count`; dřívější `TextSearchRequest` vrací 404. Prázdný výraz
 = celý katalog: Raymon 2 354 položek (všechny s EAN, CZK, MOC; 380 available / 473 expecting_delivery s termínem
-v ISO tvaru / 1 501 not_available), Focus 1 677 (cena CZK, MOC, stav bez kusů a termínů; profil navíc nabízí
-Receipt: dodací listy, faktury). Seznam sledovaných SKU tím přestává být podmínka; výstupy `raymon-cenik.csv`
-a `raymon-katalog.csv` (Focus po dokončení).
+v ISO tvaru / 1 501 not_available), Focus 3 184 (855 Focus, 808 Focus Auslauf, 1 521 „General“; 1 455 bez EAN;
+1 652 available / 237 expecting_delivery s kusy a termínem / 1 295 not_available; profil navíc nabízí Receipt:
+dodací listy, faktury). Pozor: MOC Focusu je označená CZK, ale hodnoty jsou v EUR, do Pohody neimportovat.
+Seznam sledovaných SKU tím přestává být podmínka; výstupy `raymon-cenik.csv`, `raymon-katalog.csv`,
+`focus-cenik.csv` (MOC vyprázdněná), `focus-katalog.csv`.
 
 Důsledky: dostupnost je binární vstup, ne množstevní strop;
 ceník a rozhraní se doplňují (ceník základ, rozhraní denní aktualizace). Oficiální Bruno/Postman kolekce
