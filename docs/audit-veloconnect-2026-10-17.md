@@ -193,6 +193,19 @@ Na Opusu 5.5 (výchozí model Claude Code) se do 150 $ vejde celý plán i s rez
 a objednávka, ne Pohoda XML. Předplatné Claude kryje běžná sezení v Claude Code v rámci limitů; kredit na
 API je rezerva na špičky a dlouhá sezení.
 
+### Plán na jeden večer (varianta A, ~2,5 h, 0 $)
+
+| Čas | Krok | Co přesně |
+| --- | --- | --- |
+| 0:00–0:30 | Přístupy a kódy | Raymon z přílohy `Velo_Zugang_VeloCity.docx` (26. 8.), Focus z e-mailu pon.bike; kódy = `ItemNumber` z ceníku Raymonu nebo EANy z exportu OBR; `raymon.txt`, `focus.txt` |
+| 0:30–1:00 | Python a test | Python 3; `velotest.py` a `velodostupnost.py` z `r01sales/obr3/nastroje`; `python velotest.py <2 kódy>`; Focus: `set VELOTEST_URL=https://focus.veloapi.net/ITriData.asmx/Connector` (první test Focusu, při chybě pokračovat jen s Raymonem) |
+| 1:00–1:45 | Dotazy | `python velodostupnost.py raymon.txt`, pak focus.txt; vzniknou `*-dostupnost.csv` a `*-cenik.csv` |
+| 1:45–2:15 | Do OBR | `*-cenik.csv` do schránky OBR (název s „cenik“) nebo nahrát v ⚙ Data jako Ceník a zásoba dodavatele; zkontrolovat datum a počet řádků |
+| 2:15–2:30 | Předání | CSV Františkovi: umí PlusImport brát plánovaně z e-mailu a kam zapisuje; reset hesel |
+
+Feed Hub se do téhož večera nevejde (rozhodnutí o serveru, DNS, oprava klienta); je to druhý večer.
+Při 410/411 u Raymonu: nové heslo na `velo-password.raymon-bicycles.com`, podpora b2b@raymon-bicycles.com.
+
 ## Rozhodnutí k potvrzení
 
 - [ ] Server pro Feed Hub.
