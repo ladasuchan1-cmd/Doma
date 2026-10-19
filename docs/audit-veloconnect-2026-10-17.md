@@ -218,7 +218,7 @@ Při 410/411 u Raymonu: nové heslo na `velo-password.raymon-bicycles.com`, podp
 
 ## Rozhodnutí k potvrzení
 
-- [ ] Server pro Feed Hub.
+- [x] Server pro Feed Hub — interní server 172.18.9.31 (rozhodnuto 19. 10. 2026).
 - [ ] Cesta do Pohody v první vlně: PlusImportUni.
 - [ ] Rozsah první vlny dodavatelů (Raymon, Focus; pak PON, Lindlau, ABUS).
 - [ ] Fameless bod 3: běží, nebo ho nahrazuje Feed Hub?
@@ -263,6 +263,16 @@ Co z průzkumu vzešlo:
 
 Zbývá: `.env` na serveru (21 URL), Silvini z firemní IP, přístupy k B2B portálům (dají přímý feed?), adaptéry
 JSON/ZIP/XLSX, normalizace dostupnosti, SMTP pro hlášení; teprve pak nasazení a souběh s BHIT/ITF.
+
+**Rozhodnuto 19. 10. 2026 večer: Feed Hub jde na interní server 172.18.9.31 vedle Sales**, ne na Hetzner
+(tam se nikdy nenasadilo — chyběly SSH secrets). Důvody: direktiva CEO č. 1, Silvini pouští feed jen
+z firemní IP, zásoby Pohody v `ksprehledy` pro Fázi 2 jsou ve stejné síti. Nároky změřené na datech
+průzkumu: aplikace 150 MB v klidu, 750 MB při parsování největšího feedu (126 MB XML), databáze
+< 1 GB za rok, raw feedy 430 MB za běh — s gzipem ~5 GB za 90 dní (bez něj 77 GB). Feed Hub proto
+dostal gzip raw souborů, strop 2 souběžných běhů (jinak by 37 feedů v 6:00 parsovalo deset najednou),
+limit kontejneru 2 GB a nasazení přes self-hosted runner jako Sales (zkouška nové verze vedle běžící,
+cesta zpět). Postup pro server: `feedhub/NASAZENI.md` — odchozí firewall na hosty dodavatelů (František),
+`.env`, runner se štítkem `feedhub`, blok v Caddy a interní DNS `feeds.sales.report`.
 
 ## Zdroje
 
