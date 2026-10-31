@@ -221,6 +221,12 @@ Při 410/411 u Raymonu: nové heslo na `velo-password.raymon-bicycles.com`, podp
 - [x] Server pro Feed Hub — interní server 172.18.9.31 (rozhodnuto 19. 10. 2026).
 - [ ] Cesta do Pohody v první vlně: PlusImportUni.
 - [ ] Rozsah první vlny dodavatelů (Raymon, Focus; pak PON, Lindlau, ABUS).
+  Stav 31. 10. 2026: Raymon a Focus jedou celým katalogem přes TextSearch (bez seznamu SKU z Pohody).
+  **Lindlau** — zdroj ve Feed Hubu hotový, chybí heslo z e-shopu Lindlau (účet objednavky@koloshop.cz)
+  do `.env`. **ABUS** — VeloConnect má (`partner-de.abus.com/Veloconnect`, adresář veloconnect.de),
+  zdroj založený vypnutý: portál je v údržbě (přechod ABUS DE na nový systém), přístup vyžádat u ABUS
+  CZECH (L. Semelka). **Bike-Discount** není VeloConnect dodavatel — ve Feed Hubu jen jako konkurence
+  pro položky našich dodavatelů (rejstřík ze sitemapy, hledání web zakazuje).
 - [ ] Fameless bod 3: běží, nebo ho nahrazuje Feed Hub?
 - [ ] Campudus: odmítnout, nebo držet jako zálohu.
 - [ ] Objednávání přes VeloConnect: ano/ne, kdo smí spustit pokus.
