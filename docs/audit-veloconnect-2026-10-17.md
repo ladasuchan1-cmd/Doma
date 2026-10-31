@@ -225,7 +225,9 @@ Při 410/411 u Raymonu: nové heslo na `velo-password.raymon-bicycles.com`, podp
   **Lindlau** — zdroj ve Feed Hubu hotový, chybí heslo z e-shopu Lindlau (účet objednavky@koloshop.cz)
   do `.env`. **ABUS** — VeloConnect má (`partner-de.abus.com/Veloconnect`, adresář veloconnect.de),
   zdroj založený vypnutý: portál je v údržbě (přechod ABUS DE na nový systém), přístup vyžádat u ABUS
-  CZECH (L. Semelka). **Bike-Discount** není VeloConnect dodavatel — ve Feed Hubu jen jako konkurence
+  CZECH (L. Semelka). **MBPS** (Magura Bike Parts) — endpoint `veloconnect-magura.e-vendo.de` odpovídá
+  (profil 1.3), zdroj ve Feed Hubu aktivní, chybí BuyersID + heslo (vyžádat u MBPS / myMBPS).
+  **Bike-Discount** není VeloConnect dodavatel — ve Feed Hubu jen jako konkurence
   pro položky našich dodavatelů (rejstřík ze sitemapy, hledání web zakazuje).
 - [ ] Fameless bod 3: běží, nebo ho nahrazuje Feed Hub?
 - [ ] Campudus: odmítnout, nebo držet jako zálohu.
