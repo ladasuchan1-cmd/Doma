@@ -105,13 +105,15 @@ a obj. kód); OBR → Export sledovaných SKU.
 | Cesta | Jak | Doporučení |
 | --- | --- | --- |
 | A. PlusImportUni | Feed Hub vystaví CSV ve tvaru ceníku Raymonu (`velodostupnost.py` ho už píše); PlusImportUni z URL/FTP/e-mailu, párování EAN, zápis dostupnosti, termínu, dodavatelské ceny; licence 14 000 Kč, šablona 1 000 Kč/h | první krok |
-| B. BHIT agenda | XML ve tvaru `SHOP/SHOPITEM` | jen most, nestavět |
+| B. BHIT agenda | XML ve tvaru `SHOP/SHOPITEM` | původně „jen most, nestavět“; **postaveno 10. 11. 2026** na rozhodnutí Ládi: souhrnný XML feed Feed Hubu `/export/<token>/feed.xml` (`FEED/SHOPITEM`, všichni dodavatelé přes VeloConnect v jednom souboru). Čeká na token v `.env`, zpřístupnění zvenku (František) a potvrzení struktury od BHIT |
 | C. Pohoda XML / mServer | `dat:dataPack` + `stk:stock` update podle kódu (vzor v `repricing/docs/POHODA.md`); mServer v LAN; vyžaduje `sku_map` a výslovné schválení | druhý krok |
 | D. Campudus SaaS | 3 360 € + 300 €/měs., data mimo firmu | záloha |
 
 Pohoda dostane stav, ne počet kusů. Otevřené otázky na Františka a IT Future: je dnešní PlusImport totéž
 co PlusImportUni a umí plánovaný import z URL; do kterého pole BHIT/PlusImport zapisují dostupnost; jak
 často se vyváží do `katalog_karet`.
+
+Úvaha o přímém zápisu do Pohody z 10. 11. 2026 (mServer, XML dávka, plusImportUni, SQL; co je pole „Dodání“, pojistky, postup a otázky na Františka, IT Future a Pavla): [pohoda-primy-zapis-2026-11-10.md](pohoda-primy-zapis-2026-11-10.md).
 
 ## Rizika
 
