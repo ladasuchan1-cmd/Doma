@@ -9,7 +9,7 @@ Seznam úkolů, 10. 11. 2026. Cíl zadal Láďa:
 
 Pracnost je odhad v člověkodnech práce Clauda, ne slib. Stav „dnes“ je ověřený v kódu na `main` (verze `v2026-11-10-5f28be2`).
 
-**Stav k večeru 10. 11. 2026:** hotové a nasazené jsou A1, B1 a B2 (verze `v2026-11-10-b21a8ab`). Podrobnosti u jednotlivých řádků.
+**Stav k večeru 10. 11. 2026:** hotové a nasazené jsou A1, B1, B2 a E7 (verze `v2026-11-10-6f15685`). Podrobnosti u jednotlivých řádků.
 
 ## Kde jsme dnes
 
@@ -71,8 +71,8 @@ Dnešní zkušenost ukazuje, proč je to potřeba: Lindlau deset dní padal po m
 | E4 | Jednotný stav dostupnosti napříč dodavateli: skladem, na cestě, není, neznámé, plus množství. Pravidla po zdrojích, vidět ve vzorku. | Dostupnost jde porovnávat a posílat dál v jednom tvaru. | 1,5 |
 | E5 | Formulář pro CSV a XLSX z adresy nebo ze složky. Dnes jen XML. | Pokrytí zbylých formátů bez programování. | 2 |
 | E6 | Projít 23 vypnutých feedů a 21 adres s tokenem. | Co nejvíc dodavatelů ze seznamu BHIT a IT Future opravdu běží. | Láďa a Claude, průběžně |
-| E8 | Číst i údaje, které dnes zahazujeme. Raymon posílá u každé položky kód výrobce, zařazení do skupiny, odkaz na informace o zboží a sazbu DPH (ověřeno 10. 11. na staženém katalogu). | Kód výrobce pomůže s párováním na karty, skupina s orientací v sortimentu. | 1 |
-| E7 | Lindlau: číst celý katalog. Sonda 10. 11. ukázala, že katalog má 8 898 položek a hledání funguje; náš klient jen neumí přečíst stránky výsledků. Dnes se stahují ručně zadané kódy (937 známých z 1 765). Zároveň číst velikost balení, protože cena chodí za balení. | Celý katalog Lindlau místo 937 položek a nákupní cena za kus. | 1, čeká na výstup druhé sondy |
+| E8 | Číst i údaje, které dnes zahazujeme. Raymon posílá u každé položky kód výrobce, zařazení do skupiny, odkaz na informace o zboží a sazbu DPH (ověřeno 10. 11. na staženém katalogu). Lindlau navíc velikost balení a minimální odběr. | Kód výrobce pomůže s párováním na karty, skupina s orientací v sortimentu. | 1 |
+| E7 | Lindlau: číst celý katalog. | **Hotovo 10. 11.** Lindlau na stránku hledání bez parametru `ResultFormat` vrací jen počet, položky až na `ITEM_DETAIL`; klient to teď zkusí sám. Katalog má 8 898 položek místo dosavadních 937. Velikost balení je 1 u 936 z 937 dosud stahovaných položek (jedna má balení po 50), minimální odběr má 59 položek; ani jedno Feed Hub zatím nečte, viz E8. | hotovo |
 
 ## Navržené pořadí
 
