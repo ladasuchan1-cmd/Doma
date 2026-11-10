@@ -9,7 +9,9 @@ Seznam úkolů, 10. 11. 2026. Cíl zadal Láďa:
 
 Pracnost je odhad v člověkodnech práce Clauda, ne slib. Stav „dnes“ je ověřený v kódu na `main` (verze `v2026-11-10-5f28be2`).
 
-**Stav k večeru 10. 11. 2026:** hotové a nasazené jsou A1, B1, B2 a E7 (verze `v2026-11-10-6f15685`). Podrobnosti u jednotlivých řádků.
+**Stav k večeru 10. 11. 2026:** hotové a nasazené jsou A1, B1, B2, D4, E1 a E7 (verze `v2026-11-10-a83beaf`). Podrobnosti u jednotlivých řádků.
+
+**Rozhodnutí Ládi 10. 11. 2026:** celý katalog vždy, kde to jde, u všech dodavatelů. Je to výchozí chování všech zdrojů přes VeloConnect; zadané kódy jsou jen záloha.
 
 ## Kde jsme dnes
 
@@ -58,14 +60,14 @@ Dnešní zkušenost ukazuje, proč je to potřeba: Lindlau deset dní padal po m
 | D1 | Deník změn nastavení zdroje: adresa, mapování, plán, zapnutí, kódy, zařazení do feedu. Hodnota před a po, adresy s tokenem maskovaně. | U každého zdroje je vidět, kdy a co se změnilo. | 1 |
 | D2 | Jmenná přihlášení místo jednoho společného. | V deníku je i kdo. Kolik lidí bude mít přístup, určí Láďa. | 1 |
 | D3 | Změny přístupů v `.env`. Hodnoty nikdy neukládat, jen otisk. Při startu porovnat s minulým. | Událost „přístup k Lindlau změněn 10. 11.“ a vedle ní, jestli od té doby běhy procházejí. | 0,5 |
-| D4 | Tlačítko „Ověřit přihlášení“ u zdroje. | Po změně hesla víš do minuty, jestli funguje. | 0,5 |
+| D4 | Tlačítko „Ověřit přihlášení“ u zdroje. | **Hotovo 10. 11.** Tlačítko „Ověřit“ u zdroje přes VeloConnect: přístupy, přihlášení, co dodavatel umí, jestli jde stáhnout celý katalog (a kolik má položek) nebo proč ne, a tři položky na ukázku. Nic neukládá. | hotovo |
 | D5 | Deník nasazení: která verze kdy naběhla. Po nasazení porovnat stav zdrojů před a po. | Událost „od verze X padá Lindlau“. Přesně tohle 31. 10. chybělo. | 0,5 |
 
 ## E. Sami si zavedeme feed do správného parsování (cíl 1)
 
 | # | Úkol | Výsledek | Pracnost |
 | --- | --- | --- | --- |
-| E1 | Přidání dodavatele přes VeloConnect z dashboardu. Dnes jen zásahem do kódu. Zadat adresu, název proměnné s přístupem, test připojení, zkouška hledání, vzorek. | Nový německý dodavatel bez programování. | 1 |
+| E1 | Přidání dodavatele přes VeloConnect z dashboardu. Zadat adresu, název proměnné s přístupem, test připojení, zkouška hledání, vzorek. | **Hotovo 10. 11.** „Přidat feed“ → druh VeloConnect. Na serveru stačí řádek s přístupem v `.env` a nasazení. Přístup z `.env` se posílá jen na server, ke kterému patří. | hotovo |
 | E2 | Kontrolní položky u zdroje: tři až pět kódů s ručně ověřenou nákupní cenou. Každý běh ověří, že je parser čte stejně. | Jistota, že se bere nákupní cena, ne MOC, a že to tak zůstane. | 1 |
 | E3 | Přepočet z uloženého stažení po úpravě mapování. | Změnu mapování ověříš hned, bez dalšího dotazu na dodavatele. | 0,5 |
 | E4 | Jednotný stav dostupnosti napříč dodavateli: skladem, na cestě, není, neznámé, plus množství. Pravidla po zdrojích, vidět ve vzorku. | Dostupnost jde porovnávat a posílat dál v jednom tvaru. | 1,5 |
