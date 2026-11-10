@@ -9,12 +9,14 @@ Seznam úkolů, 10. 11. 2026. Cíl zadal Láďa:
 
 Pracnost je odhad v člověkodnech práce Clauda, ne slib. Stav „dnes“ je ověřený v kódu na `main` (verze `v2026-11-10-5f28be2`).
 
+**Stav k večeru 10. 11. 2026:** hotové a nasazené jsou A1, B1 a B2 (verze `v2026-11-10-b21a8ab`). Podrobnosti u jednotlivých řádků.
+
 ## Kde jsme dnes
 
 | Cíl | Co už je | Co chybí |
 | --- | --- | --- |
 | 1. Zavedení feedu | Formulář „Přidat feed“ pro XML: stáhne, navrhne mapování, ukáže vzorek z produkčního parseru, uloží. | Formulář pro VeloConnect, CSV a XLSX. Kontrola, že cena je nákupní a ne MOC. Přepočet z uloženého stažení po úpravě mapování. Jednotný stav dostupnosti. |
-| 2. Změny mezi běhy | Do `offer_history` se zapisuje změna ceny a dostupnosti. Běh má počty a stav ok / warn / fail. | Historie se nikde neukazuje a nikdo ji nečte. Nové a zmizelé položky se nesledují vůbec. Chybí souhrn „co se změnilo“. |
+| 2. Změny mezi běhy | **Od 10. 11. večer:** každý úspěšný běh zapíše, co se změnilo (nová, zmizelá a vrácená položka, nákupní cena, MOC, naskladněno, vyprodáno, dostupnost, množství, termín, EAN, název). Na dashboardu sekce „Co se změnilo“ s filtry a exportem do Excelu, souhrn u posledního běhu. | Prahy na podezřelé změny (B3) a strop na stáří dat (B4). Starší historie zná jen cenu a dostupnost. |
 | 3. Kdo změnu udělal | Semafor a text chyby u zdroje. | Rozlišení příčin (přihlášení, síť, struktura). Otisk struktury feedu. Deník událostí. Pošta, protože chybí SMTP. |
 | 4. Naše změny | Nic. Úpravy z dashboardu se nezapisují, přihlášení je jedno společné. | Deník změn nastavení, kdo je udělal, změny přístupů v `.env`, deník nasazení. |
 
@@ -24,19 +26,19 @@ Dnešní zkušenost ukazuje, proč je to potřeba: Lindlau deset dní padal po m
 
 | # | Úkol | Výsledek | Kdo | Pracnost |
 | --- | --- | --- | --- | --- |
-| A1 | Heslo nesmí do chybové hlášky. Při HTTP chybě dodavatele se dnes do historie běhů zapíše celá adresa i s heslem k VeloConnectu. | Hesla nejsou v databázi ani na dashboardu. | Claude | 0,5 |
+| A1 | Heslo nesmí do chybové hlášky. Při HTTP chybě dodavatele se do historie běhů zapisovala celá adresa i s heslem k VeloConnectu. | **Hotovo 10. 11.** Chyba nese jen stav a adresu serveru, starší řádky jsou vyčištěné. Jestli se nějaké heslo opravdu uložilo, ukáže dotaz na značku „migrace 011“ v historii běhů; pak ho změnit. | Claude | hotovo |
 | A2 | Přístupy Raymonu a Focusu do `.env` na serveru. | Oba se stahují denně. | Láďa | hned |
 | A3 | Zpřístupnit `/export/*` zvenku pro BHIT, interní adresa dashboardu `feeds.sales.report`. | BHIT má odkaz, dashboard jde otevřít bez tunelu. | František | zpráva odeslána |
 | A4 | Potvrdit strukturu XML a zdrojovou IP. | BHIT feed načte. | Láďa, BHIT | e-mail |
 | A5 | Denní záloha databáze Feed Hubu. Bez ní se historie změn nedá obnovit. | Záloha a vyzkoušená obnova. | Claude, František | 0,5 |
-| A6 | Počty na dashboardu brát jen z aktuálních nabídek a zboží na cestě nepočítat jako skladem. | Čísla sedí s tím, co je ve feedu. Je to změna zobrazených čísel, napřed ukázat dopad. | Claude, Láďa rozhodne | 1 |
+| A6 | Počty na dashboardu brát jen z aktuálních nabídek a zboží na cestě nepočítat jako skladem. Totéž pro CSV pro IT Future. | Čísla sedí s tím, co je ve feedu. Je to změna zobrazených čísel, napřed ukázat dopad. Od 10. 11. dashboard aspoň ukazuje zvlášť, kolik nabídek dodavatel už neposílá. | Claude, Láďa rozhodne | 0,5 |
 
 ## B. Víme o každé změně mezi běhy (cíl 2)
 
 | # | Úkol | Výsledek | Pracnost |
 | --- | --- | --- | --- |
-| B1 | Souhrn změn každého běhu: nové položky, zmizelé položky, změna ceny, dostupnosti a termínu. Počty k běhu, detail do historie. | U každého stažení je vidět, co se proti minulému změnilo. | 1,5 |
-| B2 | Obrazovka „Co se změnilo“: po zdrojích, za poslední běh a za 7 dní, s filtrem a exportem do Excelu. | Změny jde projít bez databáze. | 1 |
+| B1 | Souhrn změn každého běhu: nové položky, zmizelé položky, změna ceny, dostupnosti a termínu. Počty k běhu, detail do historie. | **Hotovo 10. 11.** U každého stažení je vidět, co se proti minulému změnilo. Pojistka: když by zmizela víc než polovina položek, neoznačí se žádná a běh to řekne (neúplné stažení). | hotovo |
+| B2 | Obrazovka „Co se změnilo“: po zdrojích, za poslední běh a za 7 dní, s filtrem a exportem do Excelu. | **Hotovo 10. 11.** Filtr období, dodavatele, druhu změny a hledání podle kódu, EAN nebo názvu; tabulka „kdo se měnil nejvíc“. Změny množství se drží 30 dní, ostatní 400. | hotovo |
 | B3 | Prahy na podezřelé změny: skok ceny o víc než X %, hromadná změna dostupnosti, propad počtu položek. | Chyba ve feedu dodavatele se zachytí dřív, než se propíše dál. Prahy určí Láďa. | 1 |
 | B4 | Strop na stáří dat ve výstupech. Dnes feed pro BHIT drží po výpadku poslední známý stav bez omezení. | Po N dnech výpadku se dodavatel z feedu vyřadí nebo označí. N určí Láďa. | 0,5 |
 
@@ -70,12 +72,12 @@ Dnešní zkušenost ukazuje, proč je to potřeba: Lindlau deset dní padal po m
 | E5 | Formulář pro CSV a XLSX z adresy nebo ze složky. Dnes jen XML. | Pokrytí zbylých formátů bez programování. | 2 |
 | E6 | Projít 23 vypnutých feedů a 21 adres s tokenem. | Co nejvíc dodavatelů ze seznamu BHIT a IT Future opravdu běží. | Láďa a Claude, průběžně |
 | E8 | Číst i údaje, které dnes zahazujeme. Raymon posílá u každé položky kód výrobce, zařazení do skupiny, odkaz na informace o zboží a sazbu DPH (ověřeno 10. 11. na staženém katalogu). | Kód výrobce pomůže s párováním na karty, skupina s orientací v sortimentu. | 1 |
-| E7 | Lindlau: zjistit, jestli jde vidět celý katalog hledáním po značkách. Dnes se stahují jen ručně zadané kódy. | Buď seznam hledaných výrazů místo kódů, nebo jistota, že to nejde. | podle výsledku sondy |
+| E7 | Lindlau: číst celý katalog. Sonda 10. 11. ukázala, že katalog má 8 898 položek a hledání funguje; náš klient jen neumí přečíst stránky výsledků. Dnes se stahují ručně zadané kódy (937 známých z 1 765). Zároveň číst velikost balení, protože cena chodí za balení. | Celý katalog Lindlau místo 937 položek a nákupní cena za kus. | 1, čeká na výstup druhé sondy |
 
 ## Navržené pořadí
 
-1. **A1 a A2.** Bezpečnost a dva dodavatelé, kteří čekají jen na řádky v `.env`.
-2. **A6, B1 a B2.** Základ všeho ostatního: co je aktuální nabídka a co se mezi běhy změnilo.
+1. **A1 a A2.** Bezpečnost a dva dodavatelé, kteří čekají jen na řádky v `.env`. A1 hotovo, A2 čeká na Láďu.
+2. **A6, B1 a B2.** Základ všeho ostatního: co je aktuální nabídka a co se mezi běhy změnilo. B1 a B2 hotovo, A6 čeká na rozhodnutí.
 3. **C1, C2 a D5.** Kdo za změnou stojí, dodavatel nebo naše nasazení.
 4. **D1, D3 a D4.** Naše vlastní změny.
 5. **C3 a C4.** Deník a pošta. Pošta čeká na SMTP.
