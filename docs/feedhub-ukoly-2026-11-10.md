@@ -37,9 +37,9 @@ Dnešní zkušenost ukazuje, proč je to potřeba: Lindlau deset dní padal po m
 | A3 | Zpřístupnit `/export/*` zvenku pro BHIT, interní adresa dashboardu `feeds.sales.report`. | BHIT má odkaz, dashboard jde otevřít bez tunelu. | František | zpráva odeslána |
 | A4 | Potvrdit strukturu XML a zdrojovou IP. | BHIT feed načte. | Láďa, BHIT | e-mail |
 | A5 | Denní záloha databáze Feed Hubu. Bez ní se historie změn nedá obnovit. | Záloha a vyzkoušená obnova. | Claude, František | 0,5 |
-| A7 | Kupkolo skoro nic nenachází: z 6 904 ověřených EANů vede 4 (0,06 %), poslední běh 4 z 300. Buď hledání podle EAN na Kupkole nefunguje, nebo se změnila stránka, nebo jsou ve frontě hlavně EANy mimo jeho sortiment. | Zjistit příčinu a opravit, jinak je srovnání s Kupkolem prázdné. Bike-Discount funguje (5 447 z 5 449). | Claude | 0,5 |
+| A7 | Kupkolo skoro nic nenachází: z 6 904 ověřených EANů vede 4 (0,06 %), poslední běh 4 z 300. | **Neřeší se** (rozhodnutí Ládi 11. 11.): konkurence se napojí přes monitoring třetí strany. Noční běhy Kupkola a Bike-Discountu zatím běží dál; jdou vypnout tlačítkem u zdroje. | — | — |
 | A8 | Výchozí větev repozitáře `feedhub` je stará `claude/claude-md-phase-1-fi5irl`, ne `main`. Kvůli tomu GitHub nezaregistroval ruční workflow „Spustit zdroj na serveru“. | Výchozí větev `main` (GitHub → Settings → General → Default branch). | Láďa | minuta |
-| A9 | Fronta ověřování u konkurence: u dodavatelů je 87 821 různých EANů, Kupkolo zvládne 300 za noc, celý průchod by trval asi 290 dní. | Ověřovat přednostně položky, které opravdu vedeme. Jde až po spárování na karty Pohody (Fáze 2), nebo jiným pravidlem, které určí Láďa. | Claude, Láďa | po Fázi 2 |
+| A9 | Fronta ověřování u konkurence: u dodavatelů je 87 821 různých EANů, Kupkolo zvládne 300 za noc. | **Neřeší se** (rozhodnutí Ládi 11. 11.), viz A7. | — | — |
 | A6 | Počty na dashboardu brát jen z aktuálních nabídek a zboží na cestě nepočítat jako skladem. Totéž pro CSV pro IT Future. | Čísla sedí s tím, co je ve feedu. Je to změna zobrazených čísel, napřed ukázat dopad. Od 10. 11. dashboard aspoň ukazuje zvlášť, kolik nabídek dodavatel už neposílá. | Claude, Láďa rozhodne | 0,5 |
 
 ## B. Víme o každé změně mezi běhy (cíl 2)
