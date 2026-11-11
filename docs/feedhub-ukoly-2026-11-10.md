@@ -13,6 +13,8 @@ Pracnost je odhad v člověkodnech práce Clauda, ne slib. Stav „dnes“ je ov
 
 **Stav 11. 11. 2026 ráno (verze `v2026-11-11-5bdc817`), čtený z logu nasazení:** Lindlau stahuje celý katalog (8 898 položek, EAN má 8 737, běh 53 s), Raymon (2 354) i Focus (3 184) běží, takže A2 je hotové. Aktivních zdrojů je 45, z toho 25 funkčních, 2 s varováním a 18 nefunkčních: 15 českých feedů bez adresy s tokenem, MBPS bez přístupu a oba zdroje Oberalpu bez připojené složky. Nabídek je 118 271, z toho 2 840 dodavatelé už neposílají.
 
+**Deník od 11. 11. 2026 (verze `v2026-11-11-87cd4fb`):** hotové a nasazené jsou C2, D1, D3 a D5, z C3 základ. Na dashboardu je sekce „Deník“; první záznam na serveru je dnešní nasazení.
+
 **Nové od 11. 11. 2026:** po každém nasazení se do logu na GitHubu vypíše stav zdrojů (bez cen, položek, adres a přístupů; souhlas Ládi), na serveru jde `bash deploy.sh --stav` a `bash deploy.sh --spust <zdroj>`.
 
 **Rozhodnutí Ládi 10. 11. 2026:** celý katalog vždy, kde to jde, u všech dodavatelů. Je to výchozí chování všech zdrojů přes VeloConnect; zadané kódy jsou jen záloha.
@@ -56,19 +58,19 @@ Dnešní zkušenost ukazuje, proč je to potřeba: Lindlau deset dní padal po m
 | # | Úkol | Výsledek | Pracnost |
 | --- | --- | --- | --- |
 | C1 | Otisk struktury feedu při každém běhu: které prvky nebo sloupce přišly a jak jsou vyplněné. | Událost „dodavatel změnil strukturu“: přibyl prvek, zmizel prvek, prvek se vyprázdnil, změnila se měna. | 1 |
-| C2 | Rozlišení příčin selhání: odmítnuté přihlášení, nedostupná adresa, přesměrování, změna struktury, prázdný feed. Ke každé česká věta, co s tím. | Z chyby je hned jasné, jestli je to na dodavateli, nebo na nás. | 0,5 |
-| C3 | Deník událostí, jedna časová osa za všechny zdroje: výpadek a obnova, změna struktury, změna ceníku s počtem cen, změna sortimentu, odmítnuté přihlášení. | Odpověď na otázku „co se tento týden u dodavatelů stalo“. | 1 |
+| C2 | Rozlišení příčin selhání: odmítnuté přihlášení, nedostupná adresa, přesměrování, změna struktury, prázdný feed. Ke každé česká věta, co s tím. | **Hotovo 11. 11.** Jedna tabulka pravidel: chybí nastavení, odmítnutý přístup, adresa neexistuje, chyba serveru dodavatele, spojení selhalo, feed nejde přečíst, prázdný feed. Příčina a rada jsou u záznamu o výpadku v deníku. | hotovo |
+| C3 | Deník událostí, jedna časová osa za všechny zdroje: výpadek a obnova, změna struktury, změna ceníku s počtem cen, změna sortimentu, odmítnuté přihlášení. | **Základ hotov 11. 11.:** sekce „Deník“ s výpadky a obnovami zdrojů, nasazeními, úpravami nastavení a změnami přístupů. Chybí změna struktury (C1) a hromadné změny ceníku a sortimentu (B3). | 0,5 zbývá |
 | C4 | Pošta: denní souhrn v 7:00 a okamžité upozornění při selhání. Je v zadání od začátku. | O změně se dozvíš, aniž bys otevřel dashboard. | 1, čeká na SMTP |
 
 ## D. Víme, když změnu uděláme my (cíl 4)
 
 | # | Úkol | Výsledek | Pracnost |
 | --- | --- | --- | --- |
-| D1 | Deník změn nastavení zdroje: adresa, mapování, plán, zapnutí, kódy, zařazení do feedu. Hodnota před a po, adresy s tokenem maskovaně. | U každého zdroje je vidět, kdy a co se změnilo. | 1 |
+| D1 | Deník změn nastavení zdroje: adresa, mapování, plán, zapnutí, kódy, zařazení do feedu. Hodnota před a po, adresy s tokenem maskovaně. | **Hotovo 11. 11.** Každé založení a úprava z dashboardu je v deníku jako před → po. | hotovo |
 | D2 | Jmenná přihlášení místo jednoho společného. | V deníku je i kdo. Kolik lidí bude mít přístup, určí Láďa. | 1 |
-| D3 | Změny přístupů v `.env`. Hodnoty nikdy neukládat, jen otisk. Při startu porovnat s minulým. | Událost „přístup k Lindlau změněn 10. 11.“ a vedle ní, jestli od té doby běhy procházejí. | 0,5 |
+| D3 | Změny přístupů v `.env`. Hodnoty nikdy neukládat, jen otisk. Při startu porovnat s minulým. | **Hotovo 11. 11.** Při nasazení se porovnají otisky přístupů zdrojů, adres feedů, hesla do dashboardu a tokenu feedu: přibylo, změnilo se, zmizelo. Jestli od té doby běhy procházejí, je vidět na stejné časové ose. | hotovo |
 | D4 | Tlačítko „Ověřit přihlášení“ u zdroje. | **Hotovo 10. 11.** Tlačítko „Ověřit“ u zdroje přes VeloConnect: přístupy, přihlášení, co dodavatel umí, jestli jde stáhnout celý katalog (a kolik má položek) nebo proč ne, a tři položky na ukázku. Nic neukládá. | hotovo |
-| D5 | Deník nasazení: která verze kdy naběhla. Po nasazení porovnat stav zdrojů před a po. | Událost „od verze X padá Lindlau“. Přesně tohle 31. 10. chybělo. | 0,5 |
+| D5 | Deník nasazení: která verze kdy naběhla. Po nasazení porovnat stav zdrojů před a po. | **Hotovo 11. 11.** Nasazení je v deníku a záznam o výpadku zdroje říká, jaká verze byla nasazena od posledního úspěšného běhu. Stav zdrojů se po nasazení vypisuje do logu. | hotovo |
 
 ## E. Sami si zavedeme feed do správného parsování (cíl 1)
 
