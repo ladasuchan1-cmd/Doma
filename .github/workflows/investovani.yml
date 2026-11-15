@@ -1,0 +1,108 @@
+# Testy a nasazení Investiční školy (složka investovani/) na https://investice.ksprehledy.cz.
+#
+# Testy běží na každém pushi a PR, který se složky dotkne. Nasazení běží jen z hlavní větve repa
+# (default branch) nebo ručně (Run workflow) a potřebuje:
+#   secret   INVESTOVANI_HESLO   heslo k přihlášení (na server jde jen jeho otisk scrypt)
+#   secrets  HETZNER_HOST, HETZNER_SSH_KEY, volitelně HETZNER_USER (výchozí root), HETZNER_PORT
+#            – tytéž, kterými se nasazuje Cyklo & Ski mapa
+#   variable INVESTOVANI_DOMENA  volitelně jiná doména (výchozí investice.ksprehledy.cz)
+# Na serveru se web připojí ke sdílené Caddy z cyklo-ski-mapa/deploy (blok v /opt/caddy-extra/investovani.caddy).
+# Postup nasazení je v investovani/deploy/nasadit.sh – změny patří tam, ne sem.
+name: Investiční škola
+
+on:
+  push:
+    branches: ["**"]
+    paths:
+      - "investovani/**"
+      - ".github/workflows/investovani.yml"
+  pull_request:
+    paths:
+      - "investovani/**"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.event_name == 'pull_request' && format('inv-pr-{0}', github.ref) || (github.ref_name == github.event.repository.default_branch && 'inv-deploy' || format('inv-{0}', github.ref)) }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Testy serveru
+        working-directory: investovani
+        run: node --test test/server.test.js
+      - name: Syntaxe skriptu stránky a nasazovacího skriptu
+        working-directory: investovani
+        run: |
+          node -e "const s=require('fs').readFileSync('index.html','utf8');const m=[...s.matchAll(/<script>([\s\S]*?)<\/script>/g)].map(x=>x[1]).sort((a,b)=>b.length-a.length)[0];require('fs').writeFileSync(process.env.RUNNER_TEMP+'/stranka.js',m)"
+          node --check "$RUNNER_TEMP/stranka.js"
+          bash -n deploy/nasadit.sh
+
+  deploy:
+    needs: test
+    if: github.event_name != 'pull_request' && github.ref_name == github.event.repository.default_branch
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Nasazení přes SSH (deploy/nasadit.sh)
+        env:
+          HOST: ${{ secrets.HETZNER_HOST }}
+          USER: ${{ secrets.HETZNER_USER }}
+          PORT: ${{ secrets.HETZNER_PORT }}
+          KEY: ${{ secrets.HETZNER_SSH_KEY }}
+          HESLO: ${{ secrets.INVESTOVANI_HESLO }}
+          DOMENA: ${{ vars.INVESTOVANI_DOMENA || 'investice.ksprehledy.cz' }}
+        run: |
+          if [ -z "$HESLO" ]; then
+            echo "::warning::Nenasazeno: chybí secret INVESTOVANI_HESLO (Settings → Secrets and variables → Actions). Po jeho přidání spusť workflow znovu."
+            exit 0
+          fi
+          test -n "$HOST" || { echo "Chybí secret HETZNER_HOST"; exit 1; }
+          test -n "$KEY" || { echo "Chybí secret HETZNER_SSH_KEY"; exit 1; }
+          case "$DOMENA" in *[!a-z0-9.-]*) echo "INVESTOVANI_DOMENA smí obsahovat jen malá písmena, číslice, tečky a pomlčky."; exit 1 ;; esac
+          mkdir -p ~/.ssh
+          # Klíč vložený ze schránky mívá CRLF, BOM nebo je slepený do jednoho řádku – vezme se jen tělo a znovu zalomí
+          # (stejně jako v cyklo-ski-mapa.yml, klíč je tentýž secret).
+          raw="$(printf '%s\n' "$KEY" | sed '1s/^\xEF\xBB\xBF//' | tr -d '\r')"
+          typ="$(printf '%s\n' "$raw" | grep -o -m1 'BEGIN [A-Z0-9 ]*PRIVATE KEY' | sed 's/^BEGIN //')"
+          test -n "$typ" || { echo "Secret HETZNER_SSH_KEY neobsahuje soukromý klíč."; exit 1; }
+          body="$(printf '%s\n' "$raw" | sed -e 's/-----BEGIN [A-Z0-9 ]*PRIVATE KEY-----//' -e 's/-----END [A-Z0-9 ]*PRIVATE KEY-----//' | tr -d '[:space:]')"
+          { echo "-----BEGIN $typ-----"; printf '%s\n' "$body" | fold -w 70; echo "-----END $typ-----"; } > ~/.ssh/id_deploy
+          chmod 600 ~/.ssh/id_deploy
+          ssh-keygen -y -P "" -f ~/.ssh/id_deploy >/dev/null || { echo "Secret HETZNER_SSH_KEY není použitelný klíč."; exit 1; }
+          ssh-keyscan -p "${PORT:-22}" -H "$HOST" >> ~/.ssh/known_hosts 2>/dev/null
+          SUDO=""; [ "${USER:-root}" != "root" ] && SUDO="sudo -n"
+          ssh_cmd() { ssh -i ~/.ssh/id_deploy -p "${PORT:-22}" -o StrictHostKeyChecking=yes "${USER:-root}@$HOST" "$@"; }
+
+          # Na server jde jen otisk hesla (scrypt s náhodnou solí), heslo samotné runner neopustí.
+          OTISK_B64="$(printf %s "$HESLO" | node investovani/server.js --hash | tr -d '\n' | base64 -w0)"
+          echo "::add-mask::$OTISK_B64"
+          VERZE="v$(git log -1 --format=%cd --date=format:%Y-%m-%d)-$(git rev-parse --short HEAD)"
+
+          echo "→ Nahrávám zdrojáky ($VERZE)"
+          tar -czf - -C investovani server.js index.html Dockerfile .dockerignore \
+            | ssh_cmd "$SUDO sh -c 'rm -rf /opt/investovani/src.new && mkdir -p /opt/investovani/src.new && tar -xzf - -C /opt/investovani/src.new'"
+
+          # Skript jde stdinem z nasazovaného commitu; otisk hesla před ním, ne v příkazové řádce (tu na serveru vidí ps).
+          { printf 'export INV_HESLO_HASH_B64=%q\n' "$OTISK_B64"; cat investovani/deploy/nasadit.sh; } \
+            | ssh_cmd "$SUDO env INV_DOMENA='$DOMENA' INV_VERZE='$VERZE' bash -s"
+
+          echo "→ Kontrola zvenčí"
+          kod="$(curl -sS -o /dev/null -m 20 -w '%{http_code}' "https://$DOMENA/api/health" || true)"
+          if [ "$kod" = "200" ]; then
+            echo "✓ https://$DOMENA/api/health odpovídá 200"
+          else
+            echo "::warning::Aplikace na serveru běží, ale https://$DOMENA/api/health zvenčí vrátilo '$kod'. Zkontroluj DNS záznam v Cloudflare (proxy zapnutá) a případné pravidlo Cloudflare Access."
+          fi
