@@ -582,3 +582,32 @@ test('pošta: vypnutá bez přihlášení, správný tvar zprávy, rozlišení c
   const spatne = PO.posta({ env: { MAIL_USER: 'a@b.cz', MAIL_PASSWORD: 'x' }, transport: { sendMail: async () => { throw Object.assign(new Error('535'), { code: 'EAUTH' }); } } });
   await assert.rejects(spatne.posli({ predmet: 'x', text: 'y' }), (e) => e.kod === 'posta_prihlaseni');
 });
+
+test('úkoly: odškrtnutí se uloží, přežije restart a je v záloze', async () => {
+  const s = await spust();
+  const { cookie } = await prihlas(s.base);
+  const H = { Cookie: cookie, 'Content-Type': 'application/json', 'X-Inv': '1' };
+  try {
+    assert.equal((await fetch(s.base + '/api/ukoly')).status, 401);
+    assert.deepEqual((await (await fetch(s.base + '/api/ukoly', { headers: { Cookie: cookie } })).json()).hotovo, {});
+    assert.equal((await fetch(s.base + '/api/ukoly', { method: 'POST', headers: { Cookie: cookie, 'Content-Type': 'application/json' }, body: '{"id":"web-heslo","hotovo":true}' })).status, 403);
+    assert.equal((await fetch(s.base + '/api/ukoly', { method: 'POST', headers: H, body: '{"id":"../x","hotovo":true}' })).status, 400);
+    const r = await (await fetch(s.base + '/api/ukoly', { method: 'POST', headers: H, body: '{"id":"web-heslo","hotovo":true}' })).json();
+    assert.match(r.hotovo['web-heslo'], /^\d{4}-\d{2}-\d{2}$/);
+    await fetch(s.base + '/api/ukoly', { method: 'POST', headers: H, body: '{"id":"web-dns","hotovo":true}' });
+    const po = await (await fetch(s.base + '/api/ukoly', { method: 'POST', headers: H, body: '{"id":"web-dns","hotovo":false}' })).json();
+    assert.deepEqual(Object.keys(po.hotovo), ['web-heslo']);
+    assert.deepEqual(Object.keys((await (await fetch(s.base + '/api/zaloha', { headers: { Cookie: cookie } })).json()).ukoly), ['web-heslo']);
+  } finally { await s.zavri(); }
+  const s2 = await spust({ dataDir: s.dataDir });
+  try { assert.deepEqual(Object.keys((await (await fetch(s2.base + '/api/ukoly', { headers: { Cookie: cookie } })).json()).hotovo), ['web-heslo']); } finally { await s2.zavri(); }
+});
+
+test('stránka: seznam úkolů je platný a každý úkol má jedinečné jméno, popis, místo a čas', () => {
+  const html = fs.readFileSync(path.join(__dirname, '..', 'index.html'), 'utf8');
+  const skupiny = JSON.parse(/<script type="application\/json" id="ukolyData">([\s\S]*?)<\/script>/.exec(html)[1]);
+  const ukoly = skupiny.flatMap((g) => g.ukoly);
+  assert.ok(skupiny.length >= 3 && ukoly.length >= 10);
+  assert.equal(new Set(ukoly.map((u) => u.id)).size, ukoly.length);
+  for (const u of ukoly) { assert.match(u.id, /^[a-z0-9-]{1,40}$/); assert.ok(u.t && u.d && u.kde && u.cas, u.id); }
+});

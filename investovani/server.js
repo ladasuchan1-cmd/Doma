@@ -183,6 +183,12 @@ function vytvor(opts = {}) {
     const b = obchody[i].bSym ? await kurzNeboNic(obchody[i].bSym) : null;
     obchody[i] = Object.assign({}, obchody[i], { exit: k.cena, xd: dnesPraha(), autoClose: duvod, bExit: b ? b.cena : null });
   }
+  // Odškrtnuté úkoly ze stránky (které úkoly existují, určuje stránka; tady je jen stav).
+  const ukolySoubor = path.join(dataDir, 'ukoly.json');
+  let ukolyHotovo = {};
+  try { const j = JSON.parse(fs.readFileSync(ukolySoubor, 'utf8')); if (j && j.hotovo && typeof j.hotovo === 'object' && !Array.isArray(j.hotovo)) ukolyHotovo = j.hotovo; } catch (e) { /* první spuštění */ }
+  function ulozUkoly() { const tmp = ukolySoubor + '.tmp'; fs.writeFileSync(tmp, JSON.stringify({ hotovo: ukolyHotovo }), { mode: 0o600 }); fs.renameSync(tmp, ukolySoubor); }
+
   // ---- Upozornění e-mailem a zálohy ----
   // Stav, aby se totéž neposlalo dvakrát ani po restartu: který den už šlo upozornění na pohyb titulu a kdy týdenní záloha.
   const upoSoubor = path.join(dataDir, 'upozorneni.json');
@@ -237,7 +243,7 @@ function vytvor(opts = {}) {
   }
 
   // Záloha: všechno, co uživatel zadal ručně a nejde odjinud obnovit.
-  const zalohaDat = () => ({ vytvoreno: new Date(ted()).toISOString(), verze, denik: { trades: obchody }, sledovane, zdroje: seznamZdroju });
+  const zalohaDat = () => ({ vytvoreno: new Date(ted()).toISOString(), verze, denik: { trades: obchody }, sledovane, zdroje: seznamZdroju, ukoly: ukolyHotovo });
   const zalohyDir = path.join(dataDir, 'zalohy');
   const snimky = () => { try { return fs.readdirSync(zalohyDir).filter((f) => /^denik-\d{4}-\d{2}-\d{2}\.json$/.test(f)).sort(); } catch (e) { return []; } };
   // Denní snímek do složky dat (60 posledních). Chrání před omylem a chybou programu; před ztrátou serveru chrání
@@ -422,6 +428,16 @@ input:focus-visible,button:focus-visible{outline:2px solid var(--acc);outline-of
 
     if (cesta === '/api/trades' && m === 'GET') return json(res, 200, { trades: obchody });
 
+    if (cesta === '/api/ukoly' && m === 'GET') return json(res, 200, { hotovo: ukolyHotovo });
+    if (cesta === '/api/ukoly' && m === 'POST') {
+      if (req.headers['x-inv'] !== '1') return json(res, 403, { chyba: 'chybi_hlavicka' });
+      let b; try { b = JSON.parse(await telo(req)); } catch (e) { return json(res, e.kod || 400, { chyba: 'spatny_json' }); }
+      if (!b || typeof b.id !== 'string' || !/^[a-z0-9-]{1,40}$/.test(b.id)) return json(res, 400, { chyba: 'neplatny_ukol' });
+      if (b.hotovo) { if (Object.keys(ukolyHotovo).length >= 200 && !ukolyHotovo[b.id]) return json(res, 409, { chyba: 'plno' }); ukolyHotovo[b.id] = dnesPraha(); }
+      else delete ukolyHotovo[b.id];
+      ulozUkoly();
+      return json(res, 200, { hotovo: ukolyHotovo });
+    }
     if (cesta === '/api/zaloha' && m === 'GET') {
       return posli(res, 200, 'application/json; charset=utf-8', JSON.stringify(zalohaDat(), null, 1), { 'Content-Disposition': `attachment; filename="investicni-skola-zaloha-${dnesPraha()}.json"` });
     }
