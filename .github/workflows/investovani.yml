@@ -7,6 +7,8 @@
 #                                čitelný jen pro roota); bez něj web běží, jen Překladač na něm ne
 #   secrets  HETZNER_HOST, HETZNER_SSH_KEY, volitelně HETZNER_USER (výchozí root), HETZNER_PORT
 #            – tytéž, kterými se nasazuje Cyklo & Ski mapa
+#   secrets  INVESTOVANI_MAIL_USER + INVESTOVANI_MAIL_PASSWORD  volitelně pošta pro upozornění a týdenní zálohu deníku
+#            (SMTP, výchozí Gmail: adresa a heslo aplikace); INVESTOVANI_MAIL_TO = kam posílat (výchozí odesílatel)
 #   variable INVESTOVANI_DOMENA  volitelně jiná doména (výchozí investice.ksprehledy.cz)
 # Na serveru se web připojí ke sdílené Caddy z cyklo-ski-mapa/deploy (blok v /opt/caddy-extra/investovani.caddy).
 # Postup nasazení je v investovani/deploy/nasadit.sh – změny patří tam, ne sem.
@@ -68,6 +70,9 @@ jobs:
           KEY: ${{ secrets.HETZNER_SSH_KEY }}
           HESLO: ${{ secrets.INVESTOVANI_HESLO }}
           CLAUDE_KLIC: ${{ secrets.ANTHROPIC_API_KEY }}
+          MAIL_UZIVATEL: ${{ secrets.INVESTOVANI_MAIL_USER }}
+          MAIL_HESLO: ${{ secrets.INVESTOVANI_MAIL_PASSWORD }}
+          MAIL_KOMU: ${{ secrets.INVESTOVANI_MAIL_TO }}
           DOMENA: ${{ vars.INVESTOVANI_DOMENA || 'investice.ksprehledy.cz' }}
         run: |
           if [ -z "$HESLO" ]; then
@@ -95,16 +100,23 @@ jobs:
           OTISK_B64="$(printf %s "$HESLO" | node investovani/server.js --hash | tr -d '\n' | base64 -w0)"
           echo "::add-mask::$OTISK_B64"
           KLIC_B64=""; if [ -n "$CLAUDE_KLIC" ]; then KLIC_B64="$(printf %s "$CLAUDE_KLIC" | tr -d '\r\n ' | base64 -w0)"; echo "::add-mask::$KLIC_B64"; else echo "::notice::Secret ANTHROPIC_API_KEY není nastavený – Překladač na webu poběží jen s klíčem, který už na serveru je."; fi
+          MU_B64=""; MP_B64=""; MT_B64=""
+          if [ -n "$MAIL_UZIVATEL" ] && [ -n "$MAIL_HESLO" ]; then
+            MU_B64="$(printf %s "$MAIL_UZIVATEL" | tr -d '\r\n' | base64 -w0)"; MP_B64="$(printf %s "$MAIL_HESLO" | tr -d '\r\n' | base64 -w0)"; MT_B64="$(printf %s "$MAIL_KOMU" | tr -d '\r\n' | base64 -w0)"
+            echo "::add-mask::$MP_B64"
+          else
+            echo "::notice::Secrets INVESTOVANI_MAIL_USER a INVESTOVANI_MAIL_PASSWORD nejsou nastavené – upozornění e-mailem poběží jen s údaji, které už na serveru jsou."
+          fi
           VERZE="v$(git log -1 --format=%cd --date=format:%Y-%m-%d)-$(git rev-parse --short HEAD)"
 
           echo "→ Závislosti pro běh (bez vývojových), přesně podle package-lock.json"
           (cd investovani && rm -rf node_modules && npm ci --omit=dev --no-audit --no-fund)
           echo "→ Nahrávám zdrojáky ($VERZE)"
-          tar -czf - -C investovani server.js trh.js zdroje.js preklad.js index.html package.json package-lock.json node_modules Dockerfile .dockerignore \
+          tar -czf - -C investovani server.js trh.js zdroje.js preklad.js posta.js index.html package.json package-lock.json node_modules Dockerfile .dockerignore \
             | ssh_cmd "$SUDO sh -c 'rm -rf /opt/investovani/src.new && mkdir -p /opt/investovani/src.new && tar -xzf - -C /opt/investovani/src.new'"
 
           # Skript jde stdinem z nasazovaného commitu; otisk hesla před ním, ne v příkazové řádce (tu na serveru vidí ps).
-          { printf 'export INV_HESLO_HASH_B64=%q INV_ANTHROPIC_KEY_B64=%q\n' "$OTISK_B64" "$KLIC_B64"; cat investovani/deploy/nasadit.sh; } \
+          { printf 'export INV_HESLO_HASH_B64=%q INV_ANTHROPIC_KEY_B64=%q INV_MAIL_USER_B64=%q INV_MAIL_PASS_B64=%q INV_MAIL_TO_B64=%q\n' "$OTISK_B64" "$KLIC_B64" "$MU_B64" "$MP_B64" "$MT_B64"; cat investovani/deploy/nasadit.sh; } \
             | ssh_cmd "$SUDO env INV_DOMENA='$DOMENA' INV_VERZE='$VERZE' bash -s"
 
           echo "→ Kontrola zvenčí"

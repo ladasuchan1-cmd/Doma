@@ -433,6 +433,14 @@ footer{border-top:1px solid var(--line);padding-block:18px 8px;font-size:.84rem;
     <label class="field" id="jCopyBox" hidden>Schránka není dostupná. Označ text a zkopíruj ho ručně.<textarea id="jCopyTxt" readonly></textarea></label>
   </div>
   <div class="trades" id="jList"></div>
+
+  <div class="panel" id="uBox" hidden>
+    <span class="eyebrow">Záloha a upozornění</span>
+    <p class="verdict" id="uZaloha"></p>
+    <p class="verdict" id="uPosta"></p>
+    <p class="verdict" id="uMsg"></p>
+    <div class="seg"><a class="btn2" href="/api/zaloha" download style="text-decoration:none">Stáhnout zálohu deníku</a><button class="btn2" type="button" id="uTest" hidden>Poslat zkušební e-mail</button></div>
+  </div>
 </section>
 
 <!-- ============ TRH NAŽIVO ============ -->
@@ -1058,10 +1066,21 @@ $('#jCopy').addEventListener('click',()=>{
   const txt=denikText(),b=$('#jCopy'),fallback=()=>{$('#jCopyBox').hidden=false;const a=$('#jCopyTxt');a.value=txt;a.focus();a.select()};
   if(navigator.clipboard&&navigator.clipboard.writeText)navigator.clipboard.writeText(txt).then(()=>{b.textContent='Zkopírováno, vlož to do chatu';setTimeout(()=>b.textContent='Zkopírovat deník pro vyhodnocení',2500)},fallback);else fallback();
 });
+function upozorneniInit(){
+  $('#uBox').hidden=false;
+  const nacti=()=>api('GET','/api/upozorneni').then(u=>{
+    $('#uZaloha').textContent=`Server si každý den ukládá snímek deníku${u.posledniSnimek?` (poslední ${u.posledniSnimek}, drží jich ${u.snimku})`:''} a kopii mimo aplikaci. Zálohu si můžeš kdykoli stáhnout tlačítkem níže.`;
+    $('#uPosta').textContent=u.zapnuto?`Upozornění chodí na ${u.adresat}: když zkušební obchod skončí na stopu nebo cíli, když se sledovaný titul za den pohne o ${cz(u.prah,1)} % a víc, a každou neděli večer záloha deníku${u.zalohaMail?` (naposledy ${u.zalohaMail})`:''}.`:'Upozornění e-mailem jsou vypnutá, na serveru není nastavená pošta.';
+    $('#uTest').hidden=!u.zapnuto},()=>{$('#uPosta').textContent='Stav upozornění se nepodařilo načíst.'});
+  nacti();
+  $('#uTest').addEventListener('click',()=>{const b=$('#uTest'),m=$('#uMsg');b.disabled=true;m.textContent='Posílám…';
+    api('POST','/api/upozorneni/test').then(j=>{m.textContent=`Odesláno na ${j.adresat}. Když nepřijde do pár minut, podívej se do spamu.`},
+      e=>{m.textContent=e.chyba==='posta_prihlaseni'?'Poštovní server odmítl přihlášení. Zkontroluj jméno a heslo aplikace v GitHubu.':'E-mail se nepodařilo odeslat. Zkus to za chvíli.'}).then(()=>{b.disabled=false})});
+}
 function initJournal(){
   $('#jD').value=new Date().toISOString().slice(0,10);
   if(window.__INV_SERVER){
-    $('#odhlasit').hidden=false;
+    $('#odhlasit').hidden=false;upozorneniInit();
     $('#jKde').textContent='Ukládá se na serveru, takže ho najdeš z telefonu i z počítače. Když chceš vyhodnocení, zkopíruj deník tlačítkem pod statistikou a vlož mi ho do chatu.';
     db=serverStore();$('#jAdd').disabled=false;
     db.load().catch(e=>{if(e&&e.code==='auth')return;jLoaded=true;jMsg('Deník se nepodařilo načíst. Obnov stránku.');renderJournal()});

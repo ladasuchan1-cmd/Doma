@@ -10,7 +10,12 @@
 # Deník obchodů žije ve svazku `investovani_data` a nasazení na něj nesahá.
 #
 # Proměnné: INV_DOMENA (povinná), INV_VERZE, INV_HESLO_HASH_B64 (otisk hesla v base64; bez něj platí dosavadní),
-# INV_ANTHROPIC_KEY_B64 (klíč ke Claude API pro Překladač v base64; bez něj platí dosavadní, nebo překladač neběží).
+# INV_ANTHROPIC_KEY_B64 (klíč ke Claude API pro Překladač v base64; bez něj platí dosavadní, nebo překladač neběží),
+# INV_MAIL_USER_B64 + INV_MAIL_PASS_B64 (+ INV_MAIL_TO_B64) – pošta pro upozornění a týdenní zálohu; bez nich platí dosavadní.
+#
+# Zálohy: před každou výměnou kontejneru a každý den ve 2:40 se data ze svazku zkopírují do /opt/zalohy-investovani
+# (60 posledních kopií, bez klíče cookie). Obnova: zastavit kontejner, soubory z kopie vrátit přes `docker cp` do
+# investovani:/data/ a kontejner spustit.
 set -euo pipefail
 
 DIR=/opt/investovani
@@ -34,10 +39,10 @@ env_set() {
 command -v docker >/dev/null || chyba "Na serveru chybí docker."
 [[ "$DOMENA" =~ ^([a-z0-9]([a-z0-9-]*[a-z0-9])?\.)+[a-z]{2,}$ ]] || chyba "INV_DOMENA musí být doména malými písmeny, např. investice.ksprehledy.cz (dostal jsem '$DOMENA')."
 case "$VERZE" in ""|*[!A-Za-z0-9._-]*) chyba "INV_VERZE smí obsahovat jen písmena, číslice, tečku, - a _." ;; esac
-for soubor in server.js trh.js zdroje.js preklad.js index.html package.json package-lock.json Dockerfile; do
+for soubor in server.js trh.js zdroje.js preklad.js posta.js index.html package.json package-lock.json Dockerfile; do
   [ -f "$NOVY/$soubor" ] || chyba "V $NOVY chybí $soubor."
 done
-[ -f "$NOVY/node_modules/@anthropic-ai/sdk/package.json" ] || chyba "V $NOVY chybí nainstalované závislosti (node_modules) – nasazení je má poslat hotové."
+[ -f "$NOVY/node_modules/@anthropic-ai/sdk/package.json" ] && [ -f "$NOVY/node_modules/nodemailer/package.json" ] || chyba "V $NOVY chybí nainstalované závislosti (node_modules) – nasazení je má poslat hotové."
 
 echo "== 1/4 Heslo"
 mkdir -p "$DIR" && chmod 700 "$DIR"
@@ -58,6 +63,39 @@ elif grep -q '^ANTHROPIC_API_KEY=' "$ENVF" 2>/dev/null; then
 else
   echo "  ⚠ klíč ke Claude API na serveru není – Překladač na webu nepoběží (secret ANTHROPIC_API_KEY)"
 fi
+if [ -n "${INV_MAIL_USER_B64:-}" ] && [ -n "${INV_MAIL_PASS_B64:-}" ]; then
+  mu="$(printf %s "$INV_MAIL_USER_B64" | base64 -d)" && mp="$(printf %s "$INV_MAIL_PASS_B64" | base64 -d)" || chyba "Údaje k poště nejsou base64."
+  mt="$(printf %s "${INV_MAIL_TO_B64:-}" | base64 -d 2>/dev/null || true)"
+  for adresa in "$mu" ${mt:+"$mt"}; do [[ "$adresa" =~ ^[^[:space:]@]+@[^[:space:]@]+\.[^[:space:]@]+$ ]] || chyba "Poštovní adresa nemá tvar jmeno@domena."; done
+  [ -n "$mp" ] || chyba "Heslo k poště je prázdné."
+  env_set MAIL_USER "$mu"; env_set MAIL_PASSWORD "$mp"; env_set MAIL_TO "${mt:-$mu}"
+  echo "  ✓ pošta pro upozornění uložena"
+elif grep -q '^MAIL_USER=' "$ENVF" 2>/dev/null; then
+  echo "  ✓ pošta pro upozornění zůstává dosavadní"
+else
+  echo "  ⚠ pošta na serveru není nastavená – upozornění e-mailem a týdenní záloha nepůjdou (secrets INVESTOVANI_MAIL_USER a INVESTOVANI_MAIL_PASSWORD)"
+fi
+
+# Kopie dat mimo kontejner: stejný skript pouští nasazení i denní cron.
+ZALOHY=/opt/zalohy-investovani
+cat > "$DIR/zaloha.sh" <<'ZALOHA'
+#!/bin/sh
+# Kopie dat Investiční školy ze svazku na disk serveru (zapisuje deploy/nasadit.sh, ručně neupravovat).
+set -eu
+ZALOHY=/opt/zalohy-investovani
+docker container inspect investovani >/dev/null 2>&1 || exit 0
+CIL="$ZALOHY/$(date +%F_%H%M%S)"
+mkdir -p "$CIL"
+docker cp investovani:/data/. "$CIL/" || { rmdir "$CIL" 2>/dev/null || true; exit 1; }
+rm -f "$CIL/cookie.key"
+chmod -R go-rwx "$ZALOHY"
+ls -1d "$ZALOHY"/*/ 2>/dev/null | sort | head -n -60 | xargs -r rm -rf
+ZALOHA
+chmod 700 "$DIR/zaloha.sh"
+if [ -d /etc/cron.d ]; then
+  printf '%s\n' "# Denní kopie dat Investiční školy mimo kontejner (deploy/nasadit.sh)" "40 2 * * * root $DIR/zaloha.sh >> /var/log/investovani-zaloha.log 2>&1" > /etc/cron.d/investovani-zaloha
+  chmod 644 /etc/cron.d/investovani-zaloha
+fi
 
 echo "== 2/4 Sdílená Caddy"
 CADDY="$(docker ps -q --filter label=com.docker.compose.project=deploy --filter label=com.docker.compose.service=caddy | head -1)"
@@ -70,11 +108,15 @@ echo "  ✓ Caddy $CADDY, síť $SIT"
 
 echo "== 3/4 Kontejner"
 docker build --build-arg APP_VERSION="$VERZE" -t "investovani:$VERZE" "$NOVY"
-PRED="$(docker inspect -f '{{.Config.Image}}' investovani 2>/dev/null || true)"
+if docker container inspect investovani >/dev/null 2>&1; then
+  if "$DIR/zaloha.sh"; then echo "  ✓ data zkopírována do $ZALOHY (před výměnou kontejneru)"
+  else echo "  ⚠ kopii dat před výměnou se nepodařilo udělat – pokračuji, svazek s daty nasazení nemění"; fi
+fi
+PRED="$(docker container inspect -f '{{.Config.Image}}' investovani 2>/dev/null || true)"
 spust() {
   docker rm -f investovani >/dev/null 2>&1 || true
   docker run -d --name investovani --restart unless-stopped --network "$SIT" \
-    --env-file "$ENVF" -e INV_TRUST_PROXY=1 -v investovani_data:/data "$1" >/dev/null
+    --env-file "$ENVF" -e INV_TRUST_PROXY=1 -e INV_ADRESA="https://$DOMENA" -v investovani_data:/data "$1" >/dev/null
 }
 zdravy() {
   local i odp

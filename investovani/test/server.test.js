@@ -8,6 +8,7 @@ const { vytvor, hashHesla, overHeslo } = require('../server.js');
 const { yahoo, platnySym } = require('../trh.js');
 const Z = require('../zdroje.js');
 const PR = require('../preklad.js');
+const PO = require('../posta.js');
 
 const HESLO = 'zkusebni-heslo-1';
 const OBCHOD = { t: 'ČEZ', d: '2026-11-16', mode: 'paper', size: 2000, entry: 100, stop: 95, target: 112, fees: 0, why: 'Zkouška deníku.' };
@@ -26,7 +27,7 @@ function falesnyTrh(ceny, extra = {}) {
 
 async function spust(opts = {}) {
   const dataDir = opts.dataDir || fs.mkdtempSync(path.join(os.tmpdir(), 'inv-'));
-  const srv = vytvor({ dataDir, hash: opts.hash !== undefined ? opts.hash : hashHesla(HESLO), trustProxy: !!opts.trustProxy, hlidac: false, trh: opts.trh || falesnyTrh({}).trh, ted: opts.ted, preklad: opts.preklad || { dostupny: () => false, preloz: async () => { throw new Error('bez klíče'); } }, limitPrekladu: opts.limitPrekladu, zdroje: opts.zdroje || { stahni: async (u) => ({ adresa: u, text: '<html><head><style>a{}</style></head><body><h1>Kurz obchodování</h1><p>Naučíme vás vydělávat 5 % měsíčně. Zadejte e-mail a telefon a získáte analýzu zdarma.</p><script>x()</script></body></html>' }), prozkoumej: async (u) => ({ typ: /facebook/.test(u) ? 'facebook' : 'web', feed: /patria/.test(u) ? 'https://www.patria.cz/rss.html' : null }), novinky: async () => [{ titul: 'Zpráva', odkaz: 'https://www.patria.cz/z/1', kdy: 1794600000 }] } });
+  const srv = vytvor({ dataDir, hash: opts.hash !== undefined ? opts.hash : hashHesla(HESLO), trustProxy: !!opts.trustProxy, hlidac: false, trh: opts.trh || falesnyTrh({}).trh, ted: opts.ted, posta: opts.posta, prahPohybu: opts.prahPohybu, adresa: opts.adresa, preklad: opts.preklad || { dostupny: () => false, preloz: async () => { throw new Error('bez klíče'); } }, limitPrekladu: opts.limitPrekladu, zdroje: opts.zdroje || { stahni: async (u) => ({ adresa: u, text: '<html><head><style>a{}</style></head><body><h1>Kurz obchodování</h1><p>Naučíme vás vydělávat 5 % měsíčně. Zadejte e-mail a telefon a získáte analýzu zdarma.</p><script>x()</script></body></html>' }), prozkoumej: async (u) => ({ typ: /facebook/.test(u) ? 'facebook' : 'web', feed: /patria/.test(u) ? 'https://www.patria.cz/rss.html' : null }), novinky: async () => [{ titul: 'Zpráva', odkaz: 'https://www.patria.cz/z/1', kdy: 1794600000 }] } });
   await new Promise((ok) => srv.listen(0, '127.0.0.1', ok));
   const base = 'http://127.0.0.1:' + srv.address().port;
   return { base, dataDir, srv, zavri: () => new Promise((ok) => srv.close(ok)) };
@@ -460,4 +461,124 @@ test('překladač: čtení odpovědi modelu, text ze stránky a volání Claude 
   odpoved = { stop_reason: 'refusal', content: [] };
   await assert.rejects(pr.preloz({ pokyn: 'P', material: 'M' }), (e) => e.kod === 'odmitnuto');
   await assert.rejects(pr.preloz({ pokyn: 'P', material: 'x'.repeat(PR.MAX_ZNAKU + 1) }), (e) => e.kod === 'moc_dlouhe');
+});
+
+function falesnaPosta() {
+  const maily = [];
+  return { maily, selze: false, zapnuto: () => true, adresat: () => 'l…@example.com', async posli(m) { if (this.selze) throw Object.assign(new Error('SMTP'), { kod: 'posta_selhala' }); maily.push(m); } };
+}
+
+test('upozornění: uzavření na stopu pošle e-mail s výsledkem, skokem přes stop a srovnáním s ETF', async () => {
+  const f = falesnyTrh({}), posta = falesnaPosta();
+  const s = await spust({ trh: f.trh, posta, adresa: 'https://investice.example.cz/' });
+  try {
+    const { cookie } = await prihlas(s.base);
+    const H = { Cookie: cookie, 'Content-Type': 'application/json', 'X-Inv': '1' };
+    await fetch(s.base + '/api/trh/koupit', { method: 'POST', headers: H, body: JSON.stringify({ sym: 'NVDA', size: 2000, stopPct: 5, targetPct: 10, why: 'Čekám dobré výsledky.' }) });
+    f.stav.ceny.NVDA = 140; f.stav.ceny['VWCE.DE'] = 171.7;
+    assert.equal(await s.srv.zkontrolujObchody(), 1);
+    assert.equal(posta.maily.length, 1);
+    const m = posta.maily[0];
+    assert.equal(m.predmet, 'Investiční škola: Firma NVDA skončil na stopu, −250 Kč');
+    assert.match(m.text, /Výsledek: −250 Kč \(−12,5 %\) z pozice 2\s000 Kč/);
+    assert.match(m.text, /Cena stop přeskočila: prodáno o 7,9 % níž/);
+    assert.match(m.text, /Stejné peníze v ETF za stejnou dobu: \+1,0 % \(\+20 Kč\)/);
+    assert.match(m.text, /Proč jsi kupoval: Čekám dobré výsledky\./);
+    assert.match(m.text, /https:\/\/investice\.example\.cz\/#obchod/);
+    // selhání pošty nesmí shodit hlídání ani nechat obchod otevřený
+    await fetch(s.base + '/api/trh/koupit', { method: 'POST', headers: H, body: JSON.stringify({ sym: 'AMD', size: 1000, stopPct: 5, targetPct: 10, why: 'Zkouška.' }) });
+    posta.selze = true; f.stav.ceny.AMD = 600;
+    assert.equal(await s.srv.zkontrolujObchody(), 1);
+    const obchody = (await (await fetch(s.base + '/api/trades', { headers: { Cookie: cookie } })).json()).trades;
+    assert.equal(obchody.filter((o) => o.exit != null).length, 2);
+  } finally { await s.zavri(); }
+});
+
+test('upozornění: velký denní pohyb jen nad prahem, jednou za den, ne ze starého kurzu a ne bez pošty', async () => {
+  const f = falesnyTrh({ NVDA: 91, 'CEZ.PR': 103, MSFT: 106, AMD: 100, 'VWCE.DE': 100.5 }), posta = falesnaPosta();
+  const s = await spust({ trh: f.trh, posta, prahPohybu: 5 });
+  try {
+    // předchozí závěr je ve falešném zdroji 100: NVDA −9 %, ČEZ +3 %, MSFT +6 %
+    assert.equal(await s.srv.zkontrolujPohyby(), 2);
+    assert.deepEqual(posta.maily.map((m) => m.predmet).sort(), ['Investiční škola: Firma MSFT dnes +6,0 %', 'Investiční škola: Firma NVDA dnes −9,0 %']);
+    assert.match(posta.maily.find((m) => /NVDA/.test(m.predmet)).text, /Velký denní pohyb sám o sobě neznamená/);
+    f.stav.ceny.NVDA = 85;
+    assert.equal(await s.srv.zkontrolujPohyby(), 0, 'týž den podruhé ne');
+    assert.ok(JSON.parse(fs.readFileSync(path.join(s.dataDir, 'upozorneni.json'), 'utf8')).pohyby.NVDA);
+    f.stav.ceny.AMD = 80; f.stav.cas = Math.floor(Date.now() / 1000) - 7200;
+    assert.equal(await s.srv.zkontrolujPohyby(), 0, 'kurz ze zavřené burzy upozornění nespustí');
+  } finally { await s.zavri(); }
+  const bez = await spust({ trh: falesnyTrh({ NVDA: 50 }).trh });
+  try { assert.equal(await bez.srv.zkontrolujPohyby(), 0); } finally { await bez.zavri(); }
+});
+
+test('záloha: denní snímek jednou za den, stažení souboru, týdenní e-mail jen v neděli večer a jednou', async () => {
+  const posta = falesnaPosta();
+  let cas = Date.UTC(2026, 10, 14, 17, 30); // sobota 18:30 pražského času
+  const s = await spust({ posta, ted: () => cas });
+  try {
+    const { cookie } = await prihlas(s.base);
+    const H = { Cookie: cookie, 'Content-Type': 'application/json', 'X-Inv': '1' };
+    await fetch(s.base + '/api/trades', { method: 'POST', headers: H, body: JSON.stringify(OBCHOD) });
+
+    assert.equal(s.srv.ulozSnimek(), true); assert.equal(s.srv.ulozSnimek(), false, 'druhý snímek téhož dne se nedělá');
+    const snimek = JSON.parse(fs.readFileSync(path.join(s.dataDir, 'zalohy', 'denik-2026-11-14.json'), 'utf8'));
+    assert.equal(snimek.denik.trades[0].t, 'ČEZ'); assert.deepEqual(snimek.sledovane.slice(0, 2), ['VWCE.DE', 'NVDA']); assert.equal(snimek.zdroje.length, 1);
+    for (let d = 1; d <= 70; d++) fs.writeFileSync(path.join(s.dataDir, 'zalohy', `denik-2025-${String(1 + Math.floor(d / 29)).padStart(2, '0')}-${String(1 + (d % 28)).padStart(2, '0')}.json`), '{}');
+    cas += 24 * 3600 * 1000; // neděle 18:30
+    assert.equal(s.srv.ulozSnimek(), true);
+    const soubory = fs.readdirSync(path.join(s.dataDir, 'zalohy')).sort();
+    assert.equal(soubory.length, 60, 'drží se 60 posledních'); assert.equal(soubory[soubory.length - 1], 'denik-2026-11-15.json');
+
+    const st = await fetch(s.base + '/api/zaloha', { headers: { Cookie: cookie } });
+    assert.equal(st.status, 200); assert.match(st.headers.get('content-disposition'), /attachment; filename="investicni-skola-zaloha-2026-11-15\.json"/);
+    assert.equal((await st.json()).denik.trades.length, 1);
+    assert.equal((await fetch(s.base + '/api/zaloha')).status, 401);
+
+    cas = Date.UTC(2026, 10, 15, 15, 0); // neděle 16:00 – ještě ne
+    assert.equal(await s.srv.tydenniZaloha(), false);
+    cas = Date.UTC(2026, 10, 15, 17, 30); posta.selze = true;
+    assert.equal(await s.srv.tydenniZaloha(), false, 'když pošta selže, záloha se nepovažuje za odeslanou');
+    posta.selze = false;
+    assert.equal(await s.srv.tydenniZaloha(), false, 'další pokus až za hodinu');
+    cas += 61 * 60 * 1000;
+    assert.equal(await s.srv.tydenniZaloha(), true);
+    const m = posta.maily[posta.maily.length - 1];
+    assert.equal(m.predmet, 'Investiční škola: týdenní záloha deníku');
+    assert.equal(m.prilohy[0].nazev, 'investicni-skola-zaloha-2026-11-15.json');
+    assert.equal(JSON.parse(m.prilohy[0].obsah).denik.trades[0].why, 'Zkouška deníku.');
+    assert.match(m.text, /V deníku je 1 obchodů \(0 uzavřených, 1 otevřených\)/);
+    assert.equal(await s.srv.tydenniZaloha(), false, 'týž den podruhé ne');
+
+    const u = await (await fetch(s.base + '/api/upozorneni', { headers: { Cookie: cookie } })).json();
+    assert.deepEqual([u.zapnuto, u.adresat, u.prah, u.snimku, u.posledniSnimek, u.zalohaMail], [true, 'l…@example.com', 5, 60, '2026-11-15', '2026-11-15']);
+    assert.equal((await fetch(s.base + '/api/upozorneni/test', { method: 'POST', headers: { Cookie: cookie } })).status, 403);
+    const pred = posta.maily.length;
+    assert.equal((await fetch(s.base + '/api/upozorneni/test', { method: 'POST', headers: H })).status, 200);
+    assert.equal(posta.maily.length, pred + 1);
+    posta.selze = true;
+    assert.equal((await fetch(s.base + '/api/upozorneni/test', { method: 'POST', headers: H })).status, 502);
+  } finally { await s.zavri(); }
+  const bez = await spust();
+  try {
+    const { cookie } = await prihlas(bez.base);
+    assert.equal((await (await fetch(bez.base + '/api/upozorneni', { headers: { Cookie: cookie } })).json()).zapnuto, false);
+    assert.equal((await fetch(bez.base + '/api/upozorneni/test', { method: 'POST', headers: { Cookie: cookie, 'X-Inv': '1' } })).status, 503);
+    assert.equal(await bez.srv.tydenniZaloha(), false);
+  } finally { await bez.zavri(); }
+});
+
+test('pošta: vypnutá bez přihlášení, správný tvar zprávy, rozlišení chyby přihlášení', async () => {
+  assert.equal(PO.maskuj('lada.novak@gmail.com'), 'l…@gmail.com'); assert.equal(PO.maskuj('nesmysl'), '');
+  assert.equal(PO.posta({ env: {} }).zapnuto(), false);
+  await assert.rejects(PO.posta({ env: {} }).posli({ predmet: 'x', text: 'y' }), (e) => e.kod === 'bez_posty');
+  let odeslano;
+  const transport = { sendMail: async (m) => { odeslano = m; } };
+  const p = PO.posta({ env: { MAIL_USER: 'odesilatel@gmail.com', MAIL_PASSWORD: 'x', MAIL_TO: 'ja@example.com' }, transport });
+  assert.equal(p.adresat(), 'j…@example.com');
+  await p.posli({ predmet: 'Předmět\ns řádkem', text: 'Tělo', prilohy: [{ nazev: 'z.json', obsah: '{}' }] });
+  assert.deepEqual([odeslano.to, odeslano.from.address, odeslano.subject, odeslano.text, odeslano.attachments[0].filename], ['ja@example.com', 'odesilatel@gmail.com', 'Předmět s řádkem', 'Tělo', 'z.json']);
+  assert.equal(PO.posta({ env: { MAIL_USER: 'a@b.cz', MAIL_PASSWORD: 'x' } }).adresat(), 'a…@b.cz', 'bez MAIL_TO chodí pošta odesílateli');
+  const spatne = PO.posta({ env: { MAIL_USER: 'a@b.cz', MAIL_PASSWORD: 'x' }, transport: { sendMail: async () => { throw Object.assign(new Error('535'), { code: 'EAUTH' }); } } });
+  await assert.rejects(spatne.posli({ predmet: 'x', text: 'y' }), (e) => e.kod === 'posta_prihlaseni');
 });

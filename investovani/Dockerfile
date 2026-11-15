@@ -16,7 +16,7 @@ WORKDIR /app
 # na serveru tak nepotřebuje přístup k npm.
 COPY package.json package-lock.json ./
 COPY node_modules ./node_modules
-COPY server.js trh.js zdroje.js preklad.js index.html ./
+COPY server.js trh.js zdroje.js preklad.js posta.js index.html ./
 RUN mkdir -p /data && chown -R node:node /app /data
 USER node
 VOLUME ["/data"]
