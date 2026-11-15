@@ -198,6 +198,19 @@ table.cmp th{font:500 .72rem var(--f-num);letter-spacing:.08em;text-transform:up
 .pout .tv li{border-left:3px solid var(--line);padding-left:10px;display:grid;gap:2px}
 .pout .tv .pz{color:var(--ink2);font-size:.93rem}
 .field textarea.big{min-height:150px}
+.ugroup{display:grid;gap:8px}
+.ugroup>p{color:var(--ink2);font-size:.93rem}
+.utask{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:12px 14px;display:grid;gap:6px}
+.utask>label{display:grid;grid-template-columns:auto 1fr;gap:10px;align-items:start;cursor:pointer}
+.utask input{width:1.15rem;height:1.15rem;margin-top:.22rem;accent-color:var(--accent)}
+.utask .t{font:700 1rem var(--f-display)}
+.utask .d{color:var(--ink2);font-size:.93rem;padding-left:calc(1.15rem + 10px);overflow-wrap:anywhere}
+.utask .m{display:flex;flex-wrap:wrap;gap:6px;padding-left:calc(1.15rem + 10px)}
+.utask.done{opacity:.6}
+.utask.done .t{text-decoration:line-through}
+.pill.term{border-color:var(--warn);color:var(--warn)}
+.unext{border:2px solid var(--accent);border-radius:10px;padding:14px 16px;display:grid;gap:4px;background:var(--accent-soft)}
+.unext b{font:700 1.08rem var(--f-display)}
 .news{font-size:.93rem}
 .news .num{font-size:.78rem;color:var(--muted);white-space:nowrap}
 .trade a{overflow-wrap:anywhere}
@@ -214,6 +227,7 @@ footer{border-top:1px solid var(--line);padding-block:18px 8px;font-size:.84rem;
 
 <nav class="tabs" aria-label="Části průvodce"><div class="wrap">
   <a href="#start">Základ</a>
+  <a href="#ukoly">Úkoly</a>
   <a href="#cesta">Cesta krok za krokem</a>
   <a href="#obchod">Obchodování</a>
   <a href="#trh">Trh naživo</a>
@@ -283,13 +297,27 @@ footer{border-top:1px solid var(--line);padding-block:18px 8px;font-size:.84rem;
   <div class="block">
     <h2>Jak spolu budeme pracovat</h2>
     <ol class="plain">
-      <li>Projdi <a href="#cesta">Cestu krok za krokem</a> a odškrtávej. Když se zasekneš, napiš mi, u kterého kroku.</li>
+      <li>V části <a href="#ukoly">Úkoly</a> máš seznam toho, co je na tobě, v pořadí, v jakém to dává smysl. Podrobnosti k první investici jsou v <a href="#cesta">Cestě krok za krokem</a>.</li>
       <li>Před prvním nákupem mi pošli snímek vyplněného příkazu. Projdeme ho spolu, než ho odešleš.</li>
       <li>Cokoli uslyšíš od kohokoli (video, kolega, reklama), pošli mi to. Ověřím to proti primárním zdrojům a řeknu, co z toho platí.</li>
       <li>Nové pojmy si zkoušej v části <a href="#zkus">Vyzkoušej si</a>. Trading, short a páku si můžeš osahat tam, bez peněz.</li>
     </ol>
     <p class="note"><b>Na rovinu:</b> nejsem licencovaný investiční poradce a neznám celou tvoji finanční situaci. Učím tě, jak věci fungují a kde si je ověřit. Rozhodnutí, co koupit, je tvoje.</p>
   </div>
+</section>
+
+<!-- ============ ÚKOLY ============ -->
+<section class="view" data-view="ukoly" hidden>
+  <div class="block">
+    <h2>Úkoly</h2>
+    <p class="lead">Co máš udělat ty, v pořadí, v jakém to dává smysl. Odškrtnuté úkoly si stránka pamatuje, takže seznam najdeš stejný na telefonu i na počítači.</p>
+    <div class="progress" aria-hidden="true"><i id="uProg"></i></div>
+    <p class="num" id="uProgTxt" style="font-size:.86rem;color:var(--muted)"></p>
+    <p class="note" id="uState" hidden></p>
+  </div>
+  <div class="unext" id="uNext" hidden></div>
+  <div id="uList" style="display:grid;gap:26px"></div>
+  <script type="application/json" id="ukolyData">[{"sk": "Rozjet web", "pozn": "Jednorázově, asi čtvrt hodiny. Bez toho neběží Trh naživo ani deník na telefonu.", "ukoly": [{"id": "web-heslo", "t": "Přidat do GitHubu heslo k webu", "d": "Repo Doma → Settings → Secrets and variables → Actions → New repository secret. Název INVESTOVANI_HESLO, hodnota je heslo, kterým se budeš přihlašovat. Zvol jiné, než používáš jinde.", "kde": "GitHub", "cas": "2 min"}, {"id": "web-dns", "t": "Přidat v Cloudflare adresu investice", "d": "U domény ksprehledy.cz přidej DNS záznam se jménem investice (CNAME na ksprehledy.cz) a nech zapnutou proxy, tedy oranžový mrak.", "kde": "Cloudflare", "cas": "3 min"}, {"id": "web-hotovo", "t": "Napsat mi „hotovo“", "d": "Spustím nasazení a ohlásím, jak dopadlo.", "kde": "chat", "cas": "1 min"}, {"id": "web-overit", "t": "Přihlásit se na investice.ksprehledy.cz", "d": "Otevři Trh naživo a zkontroluj, že vidíš ceny. Když něco nesedí, pošli mi snímek obrazovky.", "kde": "web", "cas": "3 min"}, {"id": "web-posta", "t": "Zapnout upozornění e-mailem", "d": "V účtu Google vytvoř heslo aplikace (Zabezpečení → Hesla aplikací). Do GitHubu přidej secrets INVESTOVANI_MAIL_USER (adresa Gmailu) a INVESTOVANI_MAIL_PASSWORD (heslo aplikace). Po nasazení zmáčkni v části Obchodování „Poslat zkušební e-mail“.", "kde": "Google a GitHub", "cas": "10 min", "vol": true}, {"id": "web-klic", "t": "Zapnout Překladač i na webu", "d": "Do GitHubu přidej secret ANTHROPIC_API_KEY. Platí se podle spotřeby. Bez něj Překladač dál funguje tady na claude.ai.", "kde": "GitHub", "cas": "5 min", "vol": true}]}, {"sk": "Koš 1: investování", "pozn": "Jediná část, kde má vznikat výnos. Podrobný postup je v části Cesta krok za krokem.", "ukoly": [{"id": "k1-rezerva", "t": "Ověřit rezervu a dluhy", "d": "Výdaje na 3 až 6 měsíců na spořicím účtu, žádné drahé úvěry. Peníze na burzu nebudeš potřebovat aspoň 5 let.", "kde": "doma", "cas": "10 min"}, {"id": "k1-profil", "t": "Zjistit nastavení účtu DEGIRO", "d": "Jaký máš profil účtu a jestli je zapnuté půjčování cenných papírů. Napiš mi, co tam vidíš.", "kde": "DEGIRO", "cas": "5 min"}, {"id": "k1-vklad", "t": "Poslat 10 000 Kč na DEGIRO", "d": "Převodem v korunách z účtu na tvoje jméno. Zapiš si, kolik eur z toho vzniklo, porovnáme to s kurzem ČNB.", "kde": "banka", "cas": "5 min, připsání do druhého dne"}, {"id": "k1-etf", "t": "Vybrat ETF a přečíst jeho list", "d": "V dokumentu KID najdi roční náklady (TER), jestli je akumulační, a stupeň rizika 1 až 7.", "kde": "DEGIRO", "cas": "15 min"}, {"id": "k1-snimek", "t": "Vyplnit příkaz a poslat mi snímek", "d": "Hledej podle ISIN, burza Tradegate, typ příkazu Limit, celé kusy. Než ho odešleš, pošli mi snímek obrazovky.", "kde": "DEGIRO a chat", "cas": "10 min"}, {"id": "k1-datum", "t": "Zapsat datum nákupu", "d": "Za tři roky od něj je prodej těchto kusů bez daně.", "kde": "poznámky", "cas": "1 min"}]}, {"sk": "Koš 2: obchodování nanečisto", "pozn": "Tři až čtyři týdny bez peněz. Cílem je deset zapsaných obchodů, ne výdělek.", "ukoly": [{"id": "k2-nvidia", "t": "Zapsat zkušební obchod na Nvidii", "d": "V části Obchodování do deníku, režim Nanečisto: proč by měla růst nebo klesnout, kde je stop a kde cíl. Výsledky firma zveřejní v úterý 17. 11. po 22. hodině.", "kde": "deník", "cas": "10 min", "termin": "do pondělí 16. 11. večer"}, {"id": "k2-rozbor", "t": "Projít se mnou, co Nvidia udělala", "d": "Napiš mi a porovnáme tvůj zápis se skutečností. Uvidíš, jak se cena po výsledcích umí pohnout přes noc.", "kde": "chat", "cas": "10 min", "termin": "středa 18. 11."}, {"id": "k2-deset", "t": "Udělat deset zkušebních obchodů", "d": "Po nasazení webu přes Trh naživo: nákup za skutečný kurz, stop a cíl hlídá server. Dodržuj pravidla koše: riziko nejvýš 100 Kč, pozice nejvýš 2 500 Kč.", "kde": "web", "cas": "3 až 4 týdny"}, {"id": "k2-vyhodnotit", "t": "Poslat mi deník k vyhodnocení", "d": "V části Obchodování zmáčkni „Zkopírovat deník pro vyhodnocení“ a vlož mi ho do chatu. Podíváme se, co se opakuje a jak jsi na tom proti ETF.", "kde": "web a chat", "cas": "5 min"}, {"id": "k2-naostro", "t": "Rozhodnout se, jestli jít naostro", "d": "Až po vyhodnocení. Teprve pak má smysl otevírat účet u brokera na malé pozice a posílat druhých 10 000 Kč.", "kde": "chat", "cas": "rozhodnutí"}]}, {"sk": "Průběžně", "pozn": "Zvyky, které se vyplatí držet.", "ukoly": [{"id": "p-kviz", "t": "Projít kvíz", "d": "Sedm otázek na základy. Co nevíš, najdeš ve slovníku.", "kde": "průvodce", "cas": "5 min"}, {"id": "p-preklad", "t": "Vyzkoušet Překladač na jednom tipu", "d": "Vlož příspěvek nebo reklamu, které nerozumíš. Dívej se hlavně na to, kdo to říká a co z toho má.", "kde": "průvodce", "cas": "3 min"}, {"id": "p-zdroje", "t": "Přidat dva zdroje, které chceš sledovat", "d": "V části Trh naživo. Ke každému napiš, kdo to je a z čeho žije.", "kde": "web", "cas": "10 min"}]}]</script>
 </section>
 
 <!-- ============ CESTA ============ -->
@@ -1311,7 +1339,38 @@ function prekladInit(){
   });
 }
 
+/* ---------- úkoly ---------- */
+const U={skupiny:[],hotovo:{},uloz:null};
+function renderUkoly(){
+  const vse=U.skupiny.flatMap(g=>g.ukoly),povinne=vse.filter(u=>!u.vol),n=povinne.filter(u=>U.hotovo[u.id]).length;
+  $('#uProg').style.width=(povinne.length?100*n/povinne.length:0)+'%';
+  $('#uProgTxt').textContent=`Hotovo ${n} z ${povinne.length} úkolů`+(vse.length>povinne.length?` (a ${vse.filter(u=>u.vol&&U.hotovo[u.id]).length} z ${vse.length-povinne.length} volitelných)`:'');
+  const dalsi=povinne.find(u=>!U.hotovo[u.id]),nx=$('#uNext');
+  nx.hidden=!dalsi;if(dalsi)nx.innerHTML=`<span class="eyebrow">Teď je na řadě</span><b>${esc(dalsi.t)}</b><span style="color:var(--ink2);font-size:.93rem">${esc(dalsi.d)}</span>`;
+  $('#uList').innerHTML=U.skupiny.map(g=>`<div class="ugroup"><h3>${esc(g.sk)}</h3><p>${esc(g.pozn||'')}</p>${g.ukoly.map(u=>`<div class="utask${U.hotovo[u.id]?' done':''}"><label><input type="checkbox" id="u_${esc(u.id)}" data-u="${esc(u.id)}"${U.hotovo[u.id]?' checked':''}><span class="t">${esc(u.t)}</span></label><div class="d">${esc(u.d)}</div><div class="m">${u.termin?`<span class="pill term">${esc(u.termin)}</span>`:''}${u.vol?'<span class="pill">volitelné</span>':''}<span class="pill">${esc(u.kde)}</span><span class="pill">${esc(u.cas)}</span></div></div>`).join('')}</div>`).join('');
+}
+function ukolyInit(){
+  try{U.skupiny=JSON.parse($('#ukolyData').textContent)}catch(e){U.skupiny=[]}
+  const stav=t=>{const n=$('#uState');n.textContent=t||'';n.hidden=!t};
+  const nacteno=h=>{U.hotovo=h&&typeof h==='object'?h:{};renderUkoly()};
+  renderUkoly();
+  if(window.__INV_SERVER){
+    api('GET','/api/ukoly').then(j=>nacteno(j.hotovo),()=>stav('Stav úkolů se nepodařilo načíst.'));
+    U.uloz=(id,ano)=>api('POST','/api/ukoly',{id,hotovo:ano}).then(j=>nacteno(j.hotovo));
+  }else if(window.claude&&window.claude.use){
+    window.claude.use('db').then(d=>{
+      if(!d){mistne();return}
+      const doc=d.doc('ukoly/stav');let fronta=Promise.resolve();
+      doc.onSnapshot(s=>nacteno(s.exists?(s.data().hotovo||{}):{}),()=>stav('Stav úkolů teď není dostupný.'));
+      U.uloz=(id,ano)=>{const h=Object.assign({},U.hotovo);if(ano)h[id]=new Date().toISOString().slice(0,10);else delete h[id];U.hotovo=h;renderUkoly();fronta=fronta.then(()=>doc.set({hotovo:h}));return fronta};
+    },mistne);
+  }else mistne();
+  function mistne(){nacteno(store.get('inv_ukoly',{}));stav('Odškrtnutí se v tomto zobrazení ukládá jen v tomto prohlížeči.');
+    U.uloz=(id,ano)=>{if(ano)U.hotovo[id]=new Date().toISOString().slice(0,10);else delete U.hotovo[id];store.set('inv_ukoly',U.hotovo);renderUkoly();return Promise.resolve()}}
+  $('#uList').addEventListener('change',e=>{const id=e.target.dataset.u;if(!id||!U.uloz)return;U.uloz(id,e.target.checked).catch(()=>{stav('Změnu se nepodařilo uložit. Zkus to znovu.');renderUkoly()})});
+}
+
 /* ---------- start ---------- */
-fillCites();renderSteps();shortSim();feeCalc();barChart();lineChart();tax();renderTerms('');renderQuiz();posCalc();expCalc();renderJournal();initJournal();trhInit();prekladInit();route();
+fillCites();renderSteps();shortSim();feeCalc();barChart();lineChart();tax();renderTerms('');renderQuiz();posCalc();expCalc();renderJournal();initJournal();trhInit();prekladInit();ukolyInit();route();
 })();
 </script>
