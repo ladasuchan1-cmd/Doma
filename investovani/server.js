@@ -8,6 +8,9 @@
 //   APP_VERSION       verze z gitu, ukazuje ji /api/health
 //   ANTHROPIC_API_KEY klíč ke Claude API pro Překladač (bez něj překladač na serveru neběží)
 //   INV_PREKLAD_LIMIT kolik překladů měsíčně smí server udělat (výchozí 300; brzda útraty)
+//   MAIL_USER, MAIL_PASSWORD, MAIL_TO, SMTP_HOST, SMTP_PORT  pošta pro upozornění a týdenní zálohu (viz posta.js)
+//   INV_POHYB_PRAH    od kolika procent denní změny sledovaného titulu poslat upozornění (výchozí 5)
+//   INV_ADRESA        adresa webu do odkazů v e-mailech (např. https://investice.ksprehledy.cz)
 //   INV_HLIDAC        "0" = nehlídat stop a cíl zkušebních obchodů (výchozí: hlídat každou minutu)
 'use strict';
 const http = require('http');
@@ -17,6 +20,7 @@ const crypto = require('crypto');
 const { yahoo, platnySym, ROZSAHY } = require('./trh.js');
 const { zdroje: ctecZdroju, platnaAdresa, typZdroje } = require('./zdroje.js');
 const { prekladac, vytahniPokyn, textZeStranky, MAX_ZNAKU } = require('./preklad.js');
+const { posta: vytvorPostu } = require('./posta.js');
 
 const SCRYPT = { N: 32768, r: 8, p: 1, maxmem: 96 * 1024 * 1024 };
 
@@ -68,7 +72,9 @@ const ZDROJE_VYCHOZI = [{
   pridano: '2026-11-15',
 }];
 const CERSTVY_KURZ = 20 * 60; // s; starší kurz = burza je zavřená, zkušební nákup ani prodej se neprovede
-const dnesPraha = () => new Intl.DateTimeFormat('sv-SE', { timeZone: 'Europe/Prague' }).format(new Date());
+const SNIMKU = 60; // kolik denních snímků deníku se drží ve složce dat
+const cz = (n, d = 0) => Number(n).toLocaleString('cs-CZ', { minimumFractionDigits: d, maximumFractionDigits: d });
+const seZnamenkem = (n, d, jednotka) => (n > 0 ? '+' : n < 0 ? '−' : '') + cz(Math.abs(n), d) + ' ' + jednotka;
 
 function vytvor(opts = {}) {
   const dataDir = opts.dataDir || process.env.INV_DATA || path.join(__dirname, 'data');
@@ -80,6 +86,11 @@ function vytvor(opts = {}) {
   const preklad = opts.preklad || prekladac();
   const limitPrekladu = opts.limitPrekladu !== undefined ? opts.limitPrekladu : (Number(process.env.INV_PREKLAD_LIMIT) || 300);
   const ted = opts.ted || (() => Date.now());
+  const dnesPraha = () => new Intl.DateTimeFormat('sv-SE', { timeZone: 'Europe/Prague' }).format(new Date(ted()));
+  const posta = opts.posta || vytvorPostu();
+  const prahPohybu = (opts.prahPohybu !== undefined ? opts.prahPohybu : Number(process.env.INV_POHYB_PRAH) || 5) / 100;
+  const adresaWebu = (opts.adresa !== undefined ? opts.adresa : process.env.INV_ADRESA || '').replace(/\/+$/, '');
+  const odkaz = (zalozka) => (adresaWebu ? adresaWebu + '/#' + zalozka : 'záložka ' + zalozka + ' na webu');
   fs.mkdirSync(dataDir, { recursive: true });
 
   const klicSoubor = path.join(dataDir, 'cookie.key');
@@ -172,11 +183,101 @@ function vytvor(opts = {}) {
     const b = obchody[i].bSym ? await kurzNeboNic(obchody[i].bSym) : null;
     obchody[i] = Object.assign({}, obchody[i], { exit: k.cena, xd: dnesPraha(), autoClose: duvod, bExit: b ? b.cena : null });
   }
+  // ---- Upozornění e-mailem a zálohy ----
+  // Stav, aby se totéž neposlalo dvakrát ani po restartu: který den už šlo upozornění na pohyb titulu a kdy týdenní záloha.
+  const upoSoubor = path.join(dataDir, 'upozorneni.json');
+  let upo = { pohyby: {}, zalohaMail: '' };
+  try { const j = JSON.parse(fs.readFileSync(upoSoubor, 'utf8')); if (j && typeof j.pohyby === 'object') upo = { pohyby: j.pohyby || {}, zalohaMail: String(j.zalohaMail || '') }; } catch (e) { /* první spuštění */ }
+  function ulozUpo() { const tmp = upoSoubor + '.tmp'; fs.writeFileSync(tmp, JSON.stringify(upo), { mode: 0o600 }); fs.renameSync(tmp, upoSoubor); }
+
+  // Pošta nesmí shodit hlídání ani požadavek: chyba se zapíše do logu a vrátí se false.
+  async function oznam(predmet, text, prilohy) {
+    if (!posta.zapnuto()) return false;
+    try { await posta.posli({ predmet: 'Investiční škola: ' + predmet, text, prilohy }); return true; }
+    catch (e) { console.error('E-mail se nepodařilo odeslat:', e.kod || '', e.message); return false; }
+  }
+
+  function textUzavreni(o) {
+    const pct = o.exit / o.entry - 1, kc = o.size * pct - (o.fees || 0);
+    const jak = { stop: 'skončil na stopu', cil: 'došel na cíl' }[o.autoClose] || 'byl uzavřen';
+    const radky = [
+      `Zkušební obchod ${o.t} (${o.sym}) ${jak}.`, '',
+      `Výsledek: ${seZnamenkem(Math.round(kc), 0, 'Kč')} (${seZnamenkem(pct * 100, 1, '%')}) z pozice ${cz(o.size)} Kč`,
+      `Nákup: ${cz(o.entry, 2)} ${o.cur || ''} dne ${o.d}`,
+      `Prodej: ${cz(o.exit, 2)} ${o.cur || ''} dne ${o.xd}`,
+      `Plán: stop ${cz(o.stop, 2)}, cíl ${cz(o.target, 2)}`,
+    ];
+    if (o.autoClose === 'stop' && o.exit < o.stop * 0.999) radky.push(`Cena stop přeskočila: prodáno o ${cz((1 - o.exit / o.stop) * 100, 1)} % níž, než byl plán. Tak to chodí i se skutečnými penězi.`);
+    if (o.bEntry > 0 && o.bExit > 0) { const e = o.bExit / o.bEntry - 1; radky.push(`Stejné peníze v ETF za stejnou dobu: ${seZnamenkem(e * 100, 1, '%')} (${seZnamenkem(Math.round(o.size * e), 0, 'Kč')})`); }
+    radky.push('', `Proč jsi kupoval: ${o.why || ''}`, '', `Zapiš si do deníku, co sis z obchodu odnesl: ${odkaz('obchod')}`);
+    return { predmet: `${o.t} ${jak}, ${seZnamenkem(Math.round(kc), 0, 'Kč')}`, text: radky.join('\n') };
+  }
+
+  // Velký denní pohyb sledovaného titulu: jedno upozornění na titul a obchodní den.
+  async function zkontrolujPohyby() {
+    if (!posta.zapnuto()) return 0;
+    let poslano = 0;
+    for (const sym of sledovane) {
+      const k = await kurzNeboNic(sym);
+      if (!cerstvy(k) || k.zmena == null || Math.abs(k.zmena) < prahPohybu) continue;
+      const den = new Intl.DateTimeFormat('sv-SE', { timeZone: 'Europe/Prague' }).format(new Date(k.cas * 1000));
+      if (upo.pohyby[sym] === den) continue;
+      const moje = obchody.filter((o) => o.auto && o.sym === sym && o.exit == null);
+      const text = [
+        `${k.nazev} (${sym}) je dnes ${seZnamenkem(k.zmena * 100, 1, '%')} proti včerejšímu závěru.`, '',
+        `Kurz: ${cz(k.cena, 2)} ${k.mena}, včera ${cz(k.predchozi, 2)} ${k.mena}`,
+        ...moje.map((o) => `Máš v ní otevřenou zkušební pozici ${cz(o.size)} Kč: nákup ${cz(o.entry, 2)}, stop ${cz(o.stop, 2)}, cíl ${cz(o.target, 2)}.`),
+        '', 'Velký denní pohyb sám o sobě neznamená, že je potřeba něco dělat. Podívej se, co se stalo, a když tomu nerozumíš, vlož zprávu do Překladače.',
+        '', `Graf: ${odkaz('trh')}`,
+      ].join('\n');
+      upo.pohyby[sym] = den; ulozUpo(); // zapsat předem: při chybě pošty se nemá každou kontrolu zkoušet znovu
+      if (await oznam(`${k.nazev} dnes ${seZnamenkem(k.zmena * 100, 1, '%')}`, text)) poslano++;
+    }
+    return poslano;
+  }
+
+  // Záloha: všechno, co uživatel zadal ručně a nejde odjinud obnovit.
+  const zalohaDat = () => ({ vytvoreno: new Date(ted()).toISOString(), verze, denik: { trades: obchody }, sledovane, zdroje: seznamZdroju });
+  const zalohyDir = path.join(dataDir, 'zalohy');
+  const snimky = () => { try { return fs.readdirSync(zalohyDir).filter((f) => /^denik-\d{4}-\d{2}-\d{2}\.json$/.test(f)).sort(); } catch (e) { return []; } };
+  // Denní snímek do složky dat (60 posledních). Chrání před omylem a chybou programu; před ztrátou serveru chrání
+  // kopie mimo kontejner (deploy/nasadit.sh) a týdenní e-mail.
+  function ulozSnimek() {
+    if (!denikOk) return false;
+    const soubor = path.join(zalohyDir, 'denik-' + dnesPraha() + '.json');
+    if (fs.existsSync(soubor)) return false;
+    fs.mkdirSync(zalohyDir, { recursive: true });
+    fs.writeFileSync(soubor, JSON.stringify(zalohaDat()), { mode: 0o600 });
+    for (const stary of snimky().slice(0, -SNIMKU)) fs.unlinkSync(path.join(zalohyDir, stary));
+    return true;
+  }
+  // Týdenní záloha e-mailem: v neděli po 18. hodině pražského času, jednou. Kopie tak existuje i mimo server.
+  let zalohaPokus = 0;
+  async function tydenniZaloha() {
+    if (!posta.zapnuto() || !denikOk) return false;
+    const casti = new Intl.DateTimeFormat('en-GB', { timeZone: 'Europe/Prague', weekday: 'short', hour: '2-digit', hour12: false }).formatToParts(new Date(ted()));
+    const den = casti.find((c) => c.type === 'weekday').value, hodina = Number(casti.find((c) => c.type === 'hour').value);
+    const dnes = dnesPraha();
+    if (den !== 'Sun' || hodina < 18 || upo.zalohaMail === dnes) return false;
+    if (ted() - zalohaPokus < 3600 * 1000) return false; // po neúspěchu další pokus až za hodinu
+    zalohaPokus = ted();
+    const uzavrene = obchody.filter((o) => o.exit != null), otevrene = obchody.length - uzavrene.length;
+    const text = [
+      'V příloze je záloha deníku obchodů, sledovaných titulů a zdrojů. Schovej si ji; kdyby se se serverem něco stalo, deník z ní jde obnovit.', '',
+      `V deníku je ${obchody.length} obchodů (${uzavrene.length} uzavřených, ${otevrene} otevřených), sleduješ ${sledovane.length} titulů a ${seznamZdroju.length} zdrojů.`,
+      '', `Deník: ${odkaz('obchod')}`,
+    ].join('\n');
+    const ok = await oznam('týdenní záloha deníku', text, [{ nazev: `investicni-skola-zaloha-${dnes}.json`, obsah: JSON.stringify(zalohaDat(), null, 1) }]);
+    if (ok) { upo.zalohaMail = dnes; ulozUpo(); }
+    return ok;
+  }
+
   let hlidaBezi = false;
   async function zkontrolujObchody() {
     if (hlidaBezi || !denikOk) return 0;
     hlidaBezi = true;
     let zmen = 0;
+    const uzavrene = [];
     try {
       const otevrene = obchody.filter((o) => o.auto && o.sym && o.exit == null);
       for (const sym of new Set(otevrene.map((o) => o.sym))) {
@@ -186,13 +287,24 @@ function vytvor(opts = {}) {
           if (k.cas * 1000 <= Date.parse(o.created)) continue; // kurz starší než nákup nic neříká
           const duvod = k.cena <= o.stop ? 'stop' : k.cena >= o.target ? 'cil' : null;
           const i = obchody.findIndex((x) => x.id === o.id);
-          if (duvod && i >= 0 && obchody[i].exit == null) { await uzavri(i, k, duvod); zmen++; }
+          if (duvod && i >= 0 && obchody[i].exit == null) { await uzavri(i, k, duvod); zmen++; uzavrene.push(obchody[i]); }
         }
       }
       if (zmen) await uloz();
+      for (const o of uzavrene) { const z = textUzavreni(o); await oznam(z.predmet, z.text); }
     } catch (e) { console.error('Hlídání stopu a cíle selhalo:', e.message); }
     hlidaBezi = false;
     return zmen;
+  }
+  // Co se děje každou minutu: stop a cíl; jednou za pět minut velké pohyby; jednou denně snímek; v neděli záloha mailem.
+  let minut = 0;
+  async function minutovaKontrola() {
+    await zkontrolujObchody();
+    try {
+      if (minut++ % 5 === 0) await zkontrolujPohyby();
+      ulozSnimek();
+      await tydenniZaloha();
+    } catch (e) { console.error('Pravidelná kontrola selhala:', e.message); }
   }
 
   const pokusy = new Map();
@@ -309,6 +421,22 @@ input:focus-visible,button:focus-visible{outline:2px solid var(--acc);outline-of
     if (cesta === '/' && m === 'GET') return posli(res, 200, 'text/html; charset=utf-8', stranka);
 
     if (cesta === '/api/trades' && m === 'GET') return json(res, 200, { trades: obchody });
+
+    if (cesta === '/api/zaloha' && m === 'GET') {
+      return posli(res, 200, 'application/json; charset=utf-8', JSON.stringify(zalohaDat(), null, 1), { 'Content-Disposition': `attachment; filename="investicni-skola-zaloha-${dnesPraha()}.json"` });
+    }
+    if (cesta === '/api/upozorneni' && m === 'GET') {
+      const s = snimky();
+      return json(res, 200, { zapnuto: posta.zapnuto(), adresat: posta.zapnuto() ? posta.adresat() : '', prah: Math.round(prahPohybu * 1000) / 10, snimku: s.length, posledniSnimek: s.length ? s[s.length - 1].slice(6, 16) : null, zalohaMail: upo.zalohaMail || null });
+    }
+    if (cesta === '/api/upozorneni/test' && m === 'POST') {
+      if (req.headers['x-inv'] !== '1') return json(res, 403, { chyba: 'chybi_hlavicka' });
+      if (!posta.zapnuto()) return json(res, 503, { chyba: 'bez_posty' });
+      try {
+        await posta.posli({ predmet: 'Investiční škola: zkušební e-mail', text: ['Upozornění z Investiční školy fungují.', '', `Přijde ti e-mail, když zkušební obchod skončí na stopu nebo cíli, když se sledovaný titul za den pohne o ${cz(prahPohybu * 100, 1)} % a víc, a každou neděli večer záloha deníku.`, '', odkaz('obchod')].join('\n') });
+      } catch (e) { console.error('Zkušební e-mail selhal:', e.kod || '', e.message); return json(res, 502, { chyba: e.kod || 'posta_selhala' }); }
+      return json(res, 200, { ok: true, adresat: posta.adresat() });
+    }
 
     // ---- Trh: kurzy, graf, hledání, sledované tituly, zkušební nákup a prodej za skutečný kurz ----
     const chybaTrhu = (e) => json(res, e.kod === 'neznamy' ? 404 : 502, { chyba: e.kod || 'nedostupne', zprava: e.message });
@@ -489,10 +617,11 @@ input:focus-visible,button:focus-visible{outline:2px solid var(--acc);outline-of
       if (!res.headersSent) json(res, 500, { chyba: 'chyba_serveru' }); else res.end();
     });
   });
-  srv.zkontrolujObchody = zkontrolujObchody;
+  Object.assign(srv, { zkontrolujObchody, zkontrolujPohyby, ulozSnimek, tydenniZaloha, minutovaKontrola });
   const hlidat = opts.hlidac !== undefined ? opts.hlidac : process.env.INV_HLIDAC !== '0';
   if (hlidat) {
-    const casovac = setInterval(zkontrolujObchody, 60 * 1000);
+    try { ulozSnimek(); } catch (e) { console.error('Snímek deníku se nepodařilo uložit:', e.message); }
+    const casovac = setInterval(minutovaKontrola, 60 * 1000);
     casovac.unref();
     srv.on('close', () => clearInterval(casovac));
   }
