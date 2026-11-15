@@ -3,6 +3,8 @@
 # Testy běží na každém pushi a PR, který se složky dotkne. Nasazení běží jen z hlavní větve repa
 # (default branch) nebo ručně (Run workflow) a potřebuje:
 #   secret   INVESTOVANI_HESLO   heslo k přihlášení (na server jde jen jeho otisk scrypt)
+#   secret   ANTHROPIC_API_KEY   volitelně klíč ke Claude API pro Překladač (uloží se na server do /opt/investovani/.env,
+#                                čitelný jen pro roota); bez něj web běží, jen Překladač na něm ne
 #   secrets  HETZNER_HOST, HETZNER_SSH_KEY, volitelně HETZNER_USER (výchozí root), HETZNER_PORT
 #            – tytéž, kterými se nasazuje Cyklo & Ski mapa
 #   variable INVESTOVANI_DOMENA  volitelně jiná doména (výchozí investice.ksprehledy.cz)
@@ -36,9 +38,11 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: "22"
-      - name: Testy serveru
+      - name: Závislosti a testy serveru
         working-directory: investovani
-        run: node --test test/server.test.js
+        run: |
+          npm ci --no-audit --no-fund
+          node --test test/server.test.js
       - name: Syntaxe skriptu stránky a nasazovacího skriptu
         working-directory: investovani
         run: |
@@ -63,6 +67,7 @@ jobs:
           PORT: ${{ secrets.HETZNER_PORT }}
           KEY: ${{ secrets.HETZNER_SSH_KEY }}
           HESLO: ${{ secrets.INVESTOVANI_HESLO }}
+          CLAUDE_KLIC: ${{ secrets.ANTHROPIC_API_KEY }}
           DOMENA: ${{ vars.INVESTOVANI_DOMENA || 'investice.ksprehledy.cz' }}
         run: |
           if [ -z "$HESLO" ]; then
@@ -89,14 +94,17 @@ jobs:
           # Na server jde jen otisk hesla (scrypt s náhodnou solí), heslo samotné runner neopustí.
           OTISK_B64="$(printf %s "$HESLO" | node investovani/server.js --hash | tr -d '\n' | base64 -w0)"
           echo "::add-mask::$OTISK_B64"
+          KLIC_B64=""; if [ -n "$CLAUDE_KLIC" ]; then KLIC_B64="$(printf %s "$CLAUDE_KLIC" | tr -d '\r\n ' | base64 -w0)"; echo "::add-mask::$KLIC_B64"; else echo "::notice::Secret ANTHROPIC_API_KEY není nastavený – Překladač na webu poběží jen s klíčem, který už na serveru je."; fi
           VERZE="v$(git log -1 --format=%cd --date=format:%Y-%m-%d)-$(git rev-parse --short HEAD)"
 
+          echo "→ Závislosti pro běh (bez vývojových), přesně podle package-lock.json"
+          (cd investovani && rm -rf node_modules && npm ci --omit=dev --no-audit --no-fund)
           echo "→ Nahrávám zdrojáky ($VERZE)"
-          tar -czf - -C investovani server.js trh.js zdroje.js index.html Dockerfile .dockerignore \
+          tar -czf - -C investovani server.js trh.js zdroje.js preklad.js index.html package.json package-lock.json node_modules Dockerfile .dockerignore \
             | ssh_cmd "$SUDO sh -c 'rm -rf /opt/investovani/src.new && mkdir -p /opt/investovani/src.new && tar -xzf - -C /opt/investovani/src.new'"
 
           # Skript jde stdinem z nasazovaného commitu; otisk hesla před ním, ne v příkazové řádce (tu na serveru vidí ps).
-          { printf 'export INV_HESLO_HASH_B64=%q\n' "$OTISK_B64"; cat investovani/deploy/nasadit.sh; } \
+          { printf 'export INV_HESLO_HASH_B64=%q INV_ANTHROPIC_KEY_B64=%q\n' "$OTISK_B64" "$KLIC_B64"; cat investovani/deploy/nasadit.sh; } \
             | ssh_cmd "$SUDO env INV_DOMENA='$DOMENA' INV_VERZE='$VERZE' bash -s"
 
           echo "→ Kontrola zvenčí"

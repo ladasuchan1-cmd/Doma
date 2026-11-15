@@ -6,6 +6,8 @@
 //   INV_DATA          složka pro deník a klíč cookie (výchozí ./data, v kontejneru /data)
 //   INV_TRUST_PROXY   "1" = adresu klienta brát z X-Forwarded-For (server stojí za Caddy)
 //   APP_VERSION       verze z gitu, ukazuje ji /api/health
+//   ANTHROPIC_API_KEY klíč ke Claude API pro Překladač (bez něj překladač na serveru neběží)
+//   INV_PREKLAD_LIMIT kolik překladů měsíčně smí server udělat (výchozí 300; brzda útraty)
 //   INV_HLIDAC        "0" = nehlídat stop a cíl zkušebních obchodů (výchozí: hlídat každou minutu)
 'use strict';
 const http = require('http');
@@ -14,6 +16,7 @@ const path = require('path');
 const crypto = require('crypto');
 const { yahoo, platnySym, ROZSAHY } = require('./trh.js');
 const { zdroje: ctecZdroju, platnaAdresa, typZdroje } = require('./zdroje.js');
+const { prekladac, vytahniPokyn, textZeStranky, MAX_ZNAKU } = require('./preklad.js');
 
 const SCRYPT = { N: 32768, r: 8, p: 1, maxmem: 96 * 1024 * 1024 };
 
@@ -74,6 +77,8 @@ function vytvor(opts = {}) {
   const verze = process.env.APP_VERSION || 'vývoj';
   const trh = opts.trh || yahoo();
   const ctec = opts.zdroje || ctecZdroju();
+  const preklad = opts.preklad || prekladac();
+  const limitPrekladu = opts.limitPrekladu !== undefined ? opts.limitPrekladu : (Number(process.env.INV_PREKLAD_LIMIT) || 300);
   const ted = opts.ted || (() => Date.now());
   fs.mkdirSync(dataDir, { recursive: true });
 
@@ -86,6 +91,7 @@ function vytvor(opts = {}) {
   const zdroj = fs.readFileSync(path.join(__dirname, 'index.html'), 'utf8')
     .replace(/^\s*<title>[^<]*<\/title>\s*/, '')
     .replace(/<meta name="claude:viewport-fit-sides"[^>]*>\s*/, '');
+  const pokynPrekladu = vytahniPokyn(zdroj);
   const stranka = HLAVA(TITUL) + '<script>window.__INV_SERVER=1</script>' + zdroj + '</body></html>';
 
   const denikSoubor = path.join(dataDir, 'denik.json');
@@ -143,6 +149,20 @@ function vytvor(opts = {}) {
     fs.writeFileSync(tmp, JSON.stringify({ zdroje: seznamZdroju }, null, 1), { mode: 0o600 });
     fs.renameSync(tmp, zdrSoubor);
   }
+
+  // Překladač: počet překladů v měsíci (brzda útraty) a posledních pár výsledků pro přehled.
+  const prekSoubor = path.join(dataDir, 'preklady.json');
+  let prek = { mesic: '', pocet: 0, posledni: [] };
+  try {
+    const j = JSON.parse(fs.readFileSync(prekSoubor, 'utf8'));
+    if (j && typeof j.pocet === 'number' && Array.isArray(j.posledni)) prek = { mesic: String(j.mesic || ''), pocet: j.pocet, posledni: j.posledni.slice(0, 20) };
+  } catch (e) { /* první spuštění nebo nečitelný soubor: počítá se od nuly, historie překladů není ruční evidence */ }
+  function ulozPreklady() {
+    const tmp = prekSoubor + '.tmp';
+    fs.writeFileSync(tmp, JSON.stringify(prek), { mode: 0o600 });
+    fs.renameSync(tmp, prekSoubor);
+  }
+  const zbyvaPrekladu = () => { const m = dnesPraha().slice(0, 7); if (prek.mesic !== m) { prek.mesic = m; prek.pocet = 0; } return Math.max(0, limitPrekladu - prek.pocet); };
 
   const cerstvy = (k) => k && !k.stare && k.cas > 0 && ted() / 1000 - k.cas <= CERSTVY_KURZ;
   const kurzNeboNic = (sym) => trh.kurz(sym).catch(() => null);
@@ -220,10 +240,10 @@ function vytvor(opts = {}) {
   const json = (res, kod, obj, extra) => posli(res, kod, 'application/json; charset=utf-8', JSON.stringify(obj), extra);
   const presmeruj = (res, kam, extra) => { res.writeHead(303, Object.assign({ Location: kam }, BEZP, extra || {})); res.end(); };
 
-  function telo(req) {
+  function telo(req, max = MAX_TELO) {
     return new Promise((ok, chyba) => {
       let n = 0; const casti = [];
-      req.on('data', (c) => { n += c.length; if (n > MAX_TELO) { chyba(Object.assign(new Error('moc velké'), { kod: 413 })); req.destroy(); } else casti.push(c); });
+      req.on('data', (c) => { n += c.length; if (n > max) { chyba(Object.assign(new Error('moc velké'), { kod: 413 })); req.destroy(); } else casti.push(c); });
       req.on('end', () => ok(Buffer.concat(casti).toString('utf8')));
       req.on('error', chyba);
     });
@@ -306,6 +326,41 @@ input:focus-visible,button:focus-visible{outline:2px solid var(--acc);outline-of
     if (cesta === '/api/trh/hledej' && m === 'GET') {
       try { return json(res, 200, { vysledky: await trh.hledej(url.searchParams.get('q') || '') }); } catch (e) { return chybaTrhu(e); }
     }
+    if (cesta === '/api/preklad' && m === 'GET') return json(res, 200, { dostupny: preklad.dostupny(), zbyva: zbyvaPrekladu(), limit: limitPrekladu, posledni: prek.posledni });
+    if (cesta === '/api/preklad' && m === 'POST') {
+      if (req.headers['x-inv'] !== '1') return json(res, 403, { chyba: 'chybi_hlavicka' });
+      if (!preklad.dostupny()) return json(res, 503, { chyba: 'bez_klice' });
+      let b; try { b = JSON.parse(await telo(req, 4 * MAX_ZNAKU + 2000)); } catch (e) { return json(res, e.kod || 400, { chyba: e.kod === 413 ? 'moc_dlouhe' : 'spatny_json' }); }
+      let material = b && typeof b.text === 'string' ? b.text.trim() : '', zdrojAdresa = null;
+      if (!material && b && b.url) {
+        const u = platnaAdresa(b.url);
+        if (!u) return json(res, 400, { chyba: 'neplatna_adresa' });
+        if (typZdroje(u.hostname) !== 'web') return json(res, 400, { chyba: 'socialni_sit' });
+        try { const s = await ctec.stahni(u.href); material = textZeStranky(s.text); zdrojAdresa = s.adresa; }
+        catch (e) { return json(res, 502, { chyba: e.kod === 'zakazana_adresa' ? 'neplatna_adresa' : 'stranka_nedostupna' }); }
+        if (material.length < 80) return json(res, 422, { chyba: 'stranka_bez_textu' });
+      }
+      if (!material) return json(res, 400, { chyba: 'prazdne' });
+      if (material.length > MAX_ZNAKU) return json(res, 413, { chyba: 'moc_dlouhe', znaku: material.length, max: MAX_ZNAKU });
+      if (zbyvaPrekladu() <= 0) return json(res, 429, { chyba: 'limit_vycerpan', limit: limitPrekladu });
+      // Kontext, aby šla tvrzení o cenách porovnat se skutečností: dnešní datum a kurzy, které server zná.
+      const kurzy = (await Promise.all([...new Set([...sledovane, 'BTC-USD'])].map(kurzNeboNic))).filter((k) => k && k.cena != null);
+      const kontext = 'Dnes je ' + dnesPraha() + '.' + (kurzy.length ? '\nKurzy, které má server k dispozici (mohou být až čtvrt hodiny zpožděné):\n' + kurzy.map((k) => `- ${k.nazev} (${k.sym}): ${k.cena} ${k.mena}, změna proti předchozímu dni ${k.zmena != null ? (k.zmena * 100).toFixed(1) + ' %' : 'neznámá'}, roční minimum ${k.rokMin ?? '?'}, roční maximum ${k.rokMax ?? '?'}`).join('\n') : '');
+      prek.pocet++; // počítá se i neúspěšný pokus, který došel až k modelu – i ten stojí peníze
+      let vystup;
+      try { vystup = await preklad.preloz({ pokyn: pokynPrekladu, material, zdroj: zdrojAdresa, kontext }); }
+      catch (e) {
+        ulozPreklady();
+        const kody = { odmitnuto: 422, necitelna_odpoved: 502, pretizeno: 503, spatny_klic: 503, nedostupne: 502, moc_dlouhe: 413, bez_klice: 503 };
+        if (!kody[e.kod]) console.error('Překlad selhal:', e.message);
+        return json(res, kody[e.kod] || 500, { chyba: e.kod || 'chyba_serveru' });
+      }
+      const zaznam = { kdy: new Date().toISOString(), zdroj: zdrojAdresa || material.replace(/\s+/g, ' ').slice(0, 90), vysledek: vystup.vysledek };
+      prek.posledni.unshift(zaznam); prek.posledni = prek.posledni.slice(0, 20);
+      ulozPreklady();
+      return json(res, 200, { vysledek: vystup.vysledek, zdroj: zdrojAdresa, zbyva: zbyvaPrekladu() });
+    }
+
     if (cesta === '/api/zdroje' && m === 'GET') {
       const vypis = await Promise.all(seznamZdroju.map(async (z) => {
         if (!z.feed) return Object.assign({}, z, { novinky: null });

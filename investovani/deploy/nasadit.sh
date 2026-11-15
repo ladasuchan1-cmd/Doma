@@ -9,7 +9,8 @@
 #      když ji Caddy nepřijme, blok vrátí a skončí chybou – ostatní weby na serveru zůstanou, jak byly.
 # Deník obchodů žije ve svazku `investovani_data` a nasazení na něj nesahá.
 #
-# Proměnné: INV_DOMENA (povinná), INV_VERZE, INV_HESLO_HASH_B64 (otisk hesla v base64; bez něj platí dosavadní).
+# Proměnné: INV_DOMENA (povinná), INV_VERZE, INV_HESLO_HASH_B64 (otisk hesla v base64; bez něj platí dosavadní),
+# INV_ANTHROPIC_KEY_B64 (klíč ke Claude API pro Překladač v base64; bez něj platí dosavadní, nebo překladač neběží).
 set -euo pipefail
 
 DIR=/opt/investovani
@@ -22,22 +23,41 @@ DOMENA="${INV_DOMENA:-}"
 VERZE="${INV_VERZE:-rucne}"
 
 chyba() { echo "✗ $*" >&2; exit 1; }
+# Přepíše nebo doplní řádek KLIC=hodnota v $ENVF, ostatní řádky nechá být; soubor čte jen root.
+env_set() {
+  local tmp; tmp="$(mktemp "$DIR/.env.XXXXXX")"
+  { grep -v "^$1=" "$ENVF" 2>/dev/null || true; printf '%s=%s\n' "$1" "$2"; } > "$tmp"
+  chmod 600 "$tmp" && mv "$tmp" "$ENVF"
+}
 
 [ "$(id -u)" = 0 ] || chyba "Spusť jako root (nebo přes sudo)."
 command -v docker >/dev/null || chyba "Na serveru chybí docker."
 [[ "$DOMENA" =~ ^([a-z0-9]([a-z0-9-]*[a-z0-9])?\.)+[a-z]{2,}$ ]] || chyba "INV_DOMENA musí být doména malými písmeny, např. investice.ksprehledy.cz (dostal jsem '$DOMENA')."
 case "$VERZE" in ""|*[!A-Za-z0-9._-]*) chyba "INV_VERZE smí obsahovat jen písmena, číslice, tečku, - a _." ;; esac
-[ -f "$NOVY/server.js" ] && [ -f "$NOVY/trh.js" ] && [ -f "$NOVY/zdroje.js" ] && [ -f "$NOVY/index.html" ] && [ -f "$NOVY/Dockerfile" ] || chyba "V $NOVY nejsou zdrojáky (server.js, trh.js, zdroje.js, index.html, Dockerfile)."
+for soubor in server.js trh.js zdroje.js preklad.js index.html package.json package-lock.json Dockerfile; do
+  [ -f "$NOVY/$soubor" ] || chyba "V $NOVY chybí $soubor."
+done
+[ -f "$NOVY/node_modules/@anthropic-ai/sdk/package.json" ] || chyba "V $NOVY chybí nainstalované závislosti (node_modules) – nasazení je má poslat hotové."
 
 echo "== 1/4 Heslo"
 mkdir -p "$DIR" && chmod 700 "$DIR"
 if [ -n "${INV_HESLO_HASH_B64:-}" ]; then
   otisk="$(printf %s "$INV_HESLO_HASH_B64" | base64 -d)" || chyba "INV_HESLO_HASH_B64 není base64."
   case "$otisk" in scrypt:*:*:*:*:*) ;; *) chyba "Otisk hesla nemá očekávaný tvar." ;; esac
-  ( umask 077; printf 'INV_HESLO_HASH=%s\n' "$otisk" > "$ENVF.tmp" ) && mv "$ENVF.tmp" "$ENVF"
+  env_set INV_HESLO_HASH "$otisk"
   echo "  ✓ otisk hesla uložen do $ENVF"
 fi
-[ -s "$ENVF" ] || chyba "Na serveru není otisk hesla a nasazení ho neposlalo (secret INVESTOVANI_HESLO)."
+grep -q '^INV_HESLO_HASH=scrypt:' "$ENVF" 2>/dev/null || chyba "Na serveru není otisk hesla a nasazení ho neposlalo (secret INVESTOVANI_HESLO)."
+if [ -n "${INV_ANTHROPIC_KEY_B64:-}" ]; then
+  klic="$(printf %s "$INV_ANTHROPIC_KEY_B64" | base64 -d)" || chyba "INV_ANTHROPIC_KEY_B64 není base64."
+  case "$klic" in *[!A-Za-z0-9_-]*|"") chyba "Klíč ke Claude API obsahuje nečekané znaky." ;; esac
+  env_set ANTHROPIC_API_KEY "$klic"
+  echo "  ✓ klíč ke Claude API uložen (Překladač poběží)"
+elif grep -q '^ANTHROPIC_API_KEY=' "$ENVF" 2>/dev/null; then
+  echo "  ✓ klíč ke Claude API zůstává dosavadní"
+else
+  echo "  ⚠ klíč ke Claude API na serveru není – Překladač na webu nepoběží (secret ANTHROPIC_API_KEY)"
+fi
 
 echo "== 2/4 Sdílená Caddy"
 CADDY="$(docker ps -q --filter label=com.docker.compose.project=deploy --filter label=com.docker.compose.service=caddy | head -1)"
