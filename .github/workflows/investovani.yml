@@ -92,7 +92,7 @@ jobs:
           VERZE="v$(git log -1 --format=%cd --date=format:%Y-%m-%d)-$(git rev-parse --short HEAD)"
 
           echo "→ Nahrávám zdrojáky ($VERZE)"
-          tar -czf - -C investovani server.js index.html Dockerfile .dockerignore \
+          tar -czf - -C investovani server.js trh.js zdroje.js index.html Dockerfile .dockerignore \
             | ssh_cmd "$SUDO sh -c 'rm -rf /opt/investovani/src.new && mkdir -p /opt/investovani/src.new && tar -xzf - -C /opt/investovani/src.new'"
 
           # Skript jde stdinem z nasazovaného commitu; otisk hesla před ním, ne v příkazové řádce (tu na serveru vidí ps).

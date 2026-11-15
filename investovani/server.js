@@ -6,11 +6,14 @@
 //   INV_DATA          složka pro deník a klíč cookie (výchozí ./data, v kontejneru /data)
 //   INV_TRUST_PROXY   "1" = adresu klienta brát z X-Forwarded-For (server stojí za Caddy)
 //   APP_VERSION       verze z gitu, ukazuje ji /api/health
+//   INV_HLIDAC        "0" = nehlídat stop a cíl zkušebních obchodů (výchozí: hlídat každou minutu)
 'use strict';
 const http = require('http');
 const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
+const { yahoo, platnySym, ROZSAHY } = require('./trh.js');
+const { zdroje: ctecZdroju, platnaAdresa, typZdroje } = require('./zdroje.js');
 
 const SCRYPT = { N: 32768, r: 8, p: 1, maxmem: 96 * 1024 * 1024 };
 
@@ -51,12 +54,27 @@ const MAX_TELO = 16 * 1024;
 const POKUSY_MAX = 10;
 const POKUSY_OKNO = 15 * 60 * 1000;
 const PLATNOST = 30 * 24 * 3600 * 1000;
+const BENCHMARK = 'VWCE.DE'; // ETF z prvního koše – proti němu se zkušební obchody měří
+const SLEDOVANE_VYCHOZI = [BENCHMARK, 'NVDA', 'CEZ.PR', 'MSFT', 'AMD'];
+const MAX_SLEDOVANYCH = 30;
+const MAX_ZDROJU = 40;
+// Výchozí zdroj je příklad, který si uživatel vyžádal; poznámka říká, kdo to je a z čeho žije (údaje z webu firmy, 11/2026).
+const ZDROJE_VYCHOZI = [{
+  id: 'vychozi-purple', nazev: 'Purple Trading', url: 'https://www.facebook.com/purpletrading.cz/', typ: 'facebook', feed: null,
+  pozn: 'Broker forexu a CFD (L.F. Investment Limited, Kypr, dohled CySEC). Vydělává na tom, že jeho klienti obchodují. Sám uvádí, že u něj na CFD přichází o kapitál 74,37 % účtů drobných investorů. Čti jako reklamu obchodníka, ne jako nezávislou radu.',
+  pridano: '2026-11-15',
+}];
+const CERSTVY_KURZ = 20 * 60; // s; starší kurz = burza je zavřená, zkušební nákup ani prodej se neprovede
+const dnesPraha = () => new Intl.DateTimeFormat('sv-SE', { timeZone: 'Europe/Prague' }).format(new Date());
 
 function vytvor(opts = {}) {
   const dataDir = opts.dataDir || process.env.INV_DATA || path.join(__dirname, 'data');
   const otisk = opts.hash !== undefined ? opts.hash : (process.env.INV_HESLO_HASH || '');
   const trustProxy = opts.trustProxy !== undefined ? opts.trustProxy : process.env.INV_TRUST_PROXY === '1';
   const verze = process.env.APP_VERSION || 'vývoj';
+  const trh = opts.trh || yahoo();
+  const ctec = opts.zdroje || ctecZdroju();
+  const ted = opts.ted || (() => Date.now());
   fs.mkdirSync(dataDir, { recursive: true });
 
   const klicSoubor = path.join(dataDir, 'cookie.key');
@@ -89,6 +107,72 @@ function vytvor(opts = {}) {
       fs.writeFile(tmp, text, { mode: 0o600 }, (e) => e ? chyba(e) : fs.rename(tmp, denikSoubor, (e2) => e2 ? chyba(e2) : ok()));
     }));
     return fronta;
+  }
+
+  // Sledované tituly: ruční seznam, stejné zacházení jako deník (nečitelný soubor se nepřepíše).
+  const sledSoubor = path.join(dataDir, 'sledovane.json');
+  let sledovane = SLEDOVANE_VYCHOZI.slice();
+  let sledOk = true;
+  try {
+    const j = JSON.parse(fs.readFileSync(sledSoubor, 'utf8'));
+    if (!Array.isArray(j.syms)) throw new Error('chybí pole syms');
+    sledovane = j.syms.filter(platnySym).slice(0, MAX_SLEDOVANYCH);
+    if (!sledovane.includes(BENCHMARK)) sledovane.unshift(BENCHMARK);
+  } catch (e) {
+    if (e.code !== 'ENOENT') { sledOk = false; console.error('Seznam sledovaných nejde přečíst, změny jsou vypnuté:', e.message); }
+  }
+  function ulozSledovane() {
+    const tmp = sledSoubor + '.tmp';
+    fs.writeFileSync(tmp, JSON.stringify({ syms: sledovane }), { mode: 0o600 });
+    fs.renameSync(tmp, sledSoubor);
+  }
+
+  // Sledované zdroje (weby, kanály, stránky na sociálních sítích): ruční evidence jako seznam titulů.
+  const zdrSoubor = path.join(dataDir, 'zdroje.json');
+  let seznamZdroju = ZDROJE_VYCHOZI.map((z) => Object.assign({}, z));
+  let zdrOk = true;
+  try {
+    const j = JSON.parse(fs.readFileSync(zdrSoubor, 'utf8'));
+    if (!Array.isArray(j.zdroje)) throw new Error('chybí pole zdroje');
+    seznamZdroju = j.zdroje.filter((z) => z && typeof z.id === 'string' && platnaAdresa(z.url)).slice(0, MAX_ZDROJU);
+  } catch (e) {
+    if (e.code !== 'ENOENT') { zdrOk = false; console.error('Seznam zdrojů nejde přečíst, změny jsou vypnuté:', e.message); }
+  }
+  function ulozZdroje() {
+    const tmp = zdrSoubor + '.tmp';
+    fs.writeFileSync(tmp, JSON.stringify({ zdroje: seznamZdroju }, null, 1), { mode: 0o600 });
+    fs.renameSync(tmp, zdrSoubor);
+  }
+
+  const cerstvy = (k) => k && !k.stare && k.cas > 0 && ted() / 1000 - k.cas <= CERSTVY_KURZ;
+  const kurzNeboNic = (sym) => trh.kurz(sym).catch(() => null);
+
+  // Zkušební obchod se uzavře za skutečný kurz v okamžiku kontroly – po skoku ceny přes noc tedy i hůř než na stopu.
+  async function uzavri(i, k, duvod) {
+    const b = obchody[i].bSym ? await kurzNeboNic(obchody[i].bSym) : null;
+    obchody[i] = Object.assign({}, obchody[i], { exit: k.cena, xd: dnesPraha(), autoClose: duvod, bExit: b ? b.cena : null });
+  }
+  let hlidaBezi = false;
+  async function zkontrolujObchody() {
+    if (hlidaBezi || !denikOk) return 0;
+    hlidaBezi = true;
+    let zmen = 0;
+    try {
+      const otevrene = obchody.filter((o) => o.auto && o.sym && o.exit == null);
+      for (const sym of new Set(otevrene.map((o) => o.sym))) {
+        const k = await kurzNeboNic(sym);
+        if (!cerstvy(k)) continue;
+        for (const o of otevrene.filter((x) => x.sym === sym)) {
+          if (k.cas * 1000 <= Date.parse(o.created)) continue; // kurz starší než nákup nic neříká
+          const duvod = k.cena <= o.stop ? 'stop' : k.cena >= o.target ? 'cil' : null;
+          const i = obchody.findIndex((x) => x.id === o.id);
+          if (duvod && i >= 0 && obchody[i].exit == null) { await uzavri(i, k, duvod); zmen++; }
+        }
+      }
+      if (zmen) await uloz();
+    } catch (e) { console.error('Hlídání stopu a cíle selhalo:', e.message); }
+    hlidaBezi = false;
+    return zmen;
   }
 
   const pokusy = new Map();
@@ -206,6 +290,114 @@ input:focus-visible,button:focus-visible{outline:2px solid var(--acc);outline-of
 
     if (cesta === '/api/trades' && m === 'GET') return json(res, 200, { trades: obchody });
 
+    // ---- Trh: kurzy, graf, hledání, sledované tituly, zkušební nákup a prodej za skutečný kurz ----
+    const chybaTrhu = (e) => json(res, e.kod === 'neznamy' ? 404 : 502, { chyba: e.kod || 'nedostupne', zprava: e.message });
+    if (cesta === '/api/trh' && m === 'GET') {
+      const otevrene = obchody.filter((o) => o.auto && o.sym && o.exit == null).map((o) => o.sym);
+      const syms = [...new Set([...sledovane, ...otevrene, BENCHMARK])];
+      const kurzy = await Promise.all(syms.map((sym) => trh.kurz(sym).then((k) => Object.assign(k, { cerstvy: cerstvy(k) }), (e) => ({ sym, chyba: e.kod || 'nedostupne' }))));
+      return json(res, 200, { kurzy, sledovane, benchmark: BENCHMARK, cas: Math.floor(ted() / 1000) });
+    }
+    if (cesta === '/api/trh/graf' && m === 'GET') {
+      const sym = url.searchParams.get('s') || '', r = url.searchParams.get('r') || '1d';
+      if (!platnySym(sym) || !ROZSAHY[r]) return json(res, 400, { chyba: 'spatny_dotaz' });
+      try { return json(res, 200, await trh.graf(sym, r)); } catch (e) { return chybaTrhu(e); }
+    }
+    if (cesta === '/api/trh/hledej' && m === 'GET') {
+      try { return json(res, 200, { vysledky: await trh.hledej(url.searchParams.get('q') || '') }); } catch (e) { return chybaTrhu(e); }
+    }
+    if (cesta === '/api/zdroje' && m === 'GET') {
+      const vypis = await Promise.all(seznamZdroju.map(async (z) => {
+        if (!z.feed) return Object.assign({}, z, { novinky: null });
+        try { return Object.assign({}, z, { novinky: await ctec.novinky(z.feed) }); }
+        catch (e) { return Object.assign({}, z, { novinky: null, chyba: 'novinky_nedostupne' }); }
+      }));
+      return json(res, 200, { zdroje: vypis });
+    }
+    if (cesta.startsWith('/api/zdroje') && (m === 'POST' || m === 'DELETE')) {
+      if (req.headers['x-inv'] !== '1') return json(res, 403, { chyba: 'chybi_hlavicka' });
+      if (!zdrOk) return json(res, 503, { chyba: 'seznam_necitelny' });
+      if (m === 'POST' && cesta === '/api/zdroje') {
+        let b; try { b = JSON.parse(await telo(req)); } catch (e) { return json(res, e.kod || 400, { chyba: 'spatny_json' }); }
+        const u = platnaAdresa(b && b.url);
+        const nazev = b && typeof b.nazev === 'string' ? b.nazev.trim().slice(0, 80) : '';
+        const pozn = b && typeof b.pozn === 'string' ? b.pozn.trim().slice(0, 600) : '';
+        if (!u) return json(res, 400, { chyba: 'neplatna_adresa' });
+        if (!nazev || !pozn) return json(res, 400, { chyba: 'chybi_popis' });
+        if (seznamZdroju.some((z) => z.url === u.href)) return json(res, 409, { chyba: 'uz_je' });
+        if (seznamZdroju.length >= MAX_ZDROJU) return json(res, 409, { chyba: 'seznam_plny' });
+        let info;
+        try { info = await ctec.prozkoumej(u.href); } catch (e) { return json(res, 400, { chyba: e.kod || 'neplatna_adresa', zprava: e.message }); }
+        const z = { id: crypto.randomBytes(8).toString('hex'), nazev, url: u.href, typ: info.typ || typZdroje(u.hostname), feed: info.feed || null, pozn, pridano: dnesPraha() };
+        seznamZdroju.push(z); ulozZdroje();
+        return json(res, 201, { zdroj: z });
+      }
+      if (m === 'DELETE') {
+        const id = cesta.slice('/api/zdroje/'.length), i = seznamZdroju.findIndex((z) => z.id === id);
+        if (i < 0) return json(res, 404, { chyba: 'nenalezeno' });
+        seznamZdroju.splice(i, 1); ulozZdroje();
+        return json(res, 200, { ok: true });
+      }
+      return json(res, 404, { chyba: 'nenalezeno' });
+    }
+
+    const zmenaTrhu = cesta.startsWith('/api/trh/') && (m === 'POST' || m === 'DELETE');
+    const prodej = m === 'POST' && /^\/api\/trades\/[0-9a-f]{16}\/prodat$/.test(cesta);
+    if (zmenaTrhu || prodej) {
+      if (req.headers['x-inv'] !== '1') return json(res, 403, { chyba: 'chybi_hlavicka' });
+      if (cesta.startsWith('/api/trh/sledovane')) {
+        if (!sledOk) return json(res, 503, { chyba: 'seznam_necitelny' });
+        if (m === 'POST' && cesta === '/api/trh/sledovane') {
+          let b; try { b = JSON.parse(await telo(req)); } catch (e) { return json(res, e.kod || 400, { chyba: 'spatny_json' }); }
+          const sym = b && typeof b.sym === 'string' ? b.sym.trim().toUpperCase() : '';
+          if (!platnySym(sym)) return json(res, 400, { chyba: 'neplatny_titul' });
+          if (sledovane.includes(sym)) return json(res, 200, { sledovane });
+          if (sledovane.length >= MAX_SLEDOVANYCH) return json(res, 409, { chyba: 'seznam_plny' });
+          try { await trh.kurz(sym); } catch (e) { return chybaTrhu(e); } // titul bez kurzu se do seznamu nedostane
+          sledovane.push(sym); ulozSledovane();
+          return json(res, 201, { sledovane });
+        }
+        if (m === 'DELETE') {
+          const sym = decodeURIComponent(cesta.slice('/api/trh/sledovane/'.length));
+          if (sym === BENCHMARK) return json(res, 409, { chyba: 'benchmark_zustava' });
+          if (!sledovane.includes(sym)) return json(res, 404, { chyba: 'nenalezeno' });
+          sledovane = sledovane.filter((x) => x !== sym); ulozSledovane();
+          return json(res, 200, { sledovane });
+        }
+      }
+      if (!denikOk) return json(res, 503, { chyba: 'denik_necitelny' });
+      if (m === 'POST' && cesta === '/api/trh/koupit') {
+        let b; try { b = JSON.parse(await telo(req)); } catch (e) { return json(res, e.kod || 400, { chyba: 'spatny_json' }); }
+        const cislo = (v) => (typeof v === 'number' && isFinite(v) ? v : NaN);
+        const sym = b && typeof b.sym === 'string' ? b.sym : '', size = cislo(b && b.size), sp = cislo(b && b.stopPct), tp = cislo(b && b.targetPct);
+        const why = b && typeof b.why === 'string' ? b.why.trim().slice(0, 1000) : '';
+        if (!platnySym(sym) || !(size > 0 && size <= 1e7) || !(sp > 0 && sp < 90) || !(tp > 0 && tp <= 1000) || !why) return json(res, 400, { chyba: 'neplatny_obchod' });
+        if (obchody.length >= MAX_OBCHODU) return json(res, 409, { chyba: 'denik_plny' });
+        let k; try { k = await trh.kurz(sym); } catch (e) { return chybaTrhu(e); }
+        if (!cerstvy(k)) return json(res, 409, { chyba: 'trh_zavreny', cas: k.cas });
+        const bk = sym === BENCHMARK ? k : await kurzNeboNic(BENCHMARK);
+        const zaokr = (x) => Math.round(x * 10000) / 10000;
+        const o = {
+          t: String(k.nazev).slice(0, 40), sym, cur: k.mena, d: dnesPraha(), mode: 'paper', size,
+          entry: k.cena, stop: zaokr(k.cena * (1 - sp / 100)), target: zaokr(k.cena * (1 + tp / 100)), fees: 0, why,
+          auto: true, bSym: BENCHMARK, bEntry: bk ? bk.cena : null,
+          id: crypto.randomBytes(8).toString('hex'), exit: null, created: new Date().toISOString(),
+        };
+        obchody.push(o); await uloz();
+        return json(res, 201, { trade: o });
+      }
+      if (prodej) {
+        const id = cesta.split('/')[3], i = obchody.findIndex((x) => x.id === id);
+        if (i < 0) return json(res, 404, { chyba: 'nenalezeno' });
+        if (!obchody[i].auto || !obchody[i].sym || obchody[i].exit != null) return json(res, 409, { chyba: 'nelze_prodat' });
+        let k; try { k = await trh.kurz(obchody[i].sym); } catch (e) { return chybaTrhu(e); }
+        if (!cerstvy(k)) return json(res, 409, { chyba: 'trh_zavreny', cas: k.cas });
+        await uzavri(i, k, 'rucne'); await uloz();
+        return json(res, 200, { trade: obchody[i] });
+      }
+      return json(res, 404, { chyba: 'nenalezeno' });
+    }
+
     const zapis = m === 'POST' || m === 'PATCH' || m === 'DELETE';
     if (cesta.startsWith('/api/trades') && zapis) {
       // Zápis jen z vlastní stránky: vlastní hlavička neprojde cizím formulářem a cookie je SameSite=Lax.
@@ -236,12 +428,20 @@ input:focus-visible,button:focus-visible{outline:2px solid var(--acc);outline-of
     return cesta.startsWith('/api/') ? json(res, 404, { chyba: 'nenalezeno' }) : posli(res, 404, 'text/plain; charset=utf-8', 'Nenalezeno');
   }
 
-  return http.createServer((req, res) => {
+  const srv = http.createServer((req, res) => {
     obsluha(req, res).catch((e) => {
       console.error(new Date().toISOString(), req.method, req.url, e && e.message);
       if (!res.headersSent) json(res, 500, { chyba: 'chyba_serveru' }); else res.end();
     });
   });
+  srv.zkontrolujObchody = zkontrolujObchody;
+  const hlidat = opts.hlidac !== undefined ? opts.hlidac : process.env.INV_HLIDAC !== '0';
+  if (hlidat) {
+    const casovac = setInterval(zkontrolujObchody, 60 * 1000);
+    casovac.unref();
+    srv.on('close', () => clearInterval(casovac));
+  }
+  return srv;
 }
 
 module.exports = { vytvor, hashHesla, overHeslo, POLE_NOVY };

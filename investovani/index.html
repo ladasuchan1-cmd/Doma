@@ -171,6 +171,28 @@ table.cmp th{font:500 .72rem var(--f-num);letter-spacing:.08em;text-transform:up
 .empty{border:1px dashed var(--line);border-radius:10px;padding:18px;color:var(--ink2);font-size:.95rem}
 .field textarea{font:400 .95rem var(--f-body);padding:8px 10px;border:1px solid var(--line);border-radius:6px;background:var(--bg);color:var(--ink);width:100%;min-height:64px;resize:vertical}
 .field.wide{grid-column:1/-1}
+/* trh naživo */
+.wl{display:grid;border-top:1px solid var(--line)}
+.wrow{display:grid;grid-template-columns:minmax(0,1fr) 72px auto;gap:10px;align-items:center;padding:10px 6px;border:0;border-bottom:1px solid var(--line);background:none;color:var(--ink);text-align:left;cursor:pointer;font:inherit;width:100%}
+.wrow:hover{background:var(--bg)}
+.wrow[aria-pressed="true"]{background:var(--accent-soft)}
+.wrow .nm{min-width:0}
+.wrow .nm b{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:600}
+.wrow .nm span{font:.76rem var(--f-num);color:var(--muted)}
+.wrow .px{text-align:right;font-family:var(--f-num);font-variant-numeric:tabular-nums;white-space:nowrap}
+.wrow .px b{display:block;font-weight:600}
+.wrow .px span{font-size:.82rem}
+.spark{width:72px;height:28px;display:block}
+.bigpx{font:600 1.9rem/1.1 var(--f-num);font-variant-numeric:tabular-nums}
+.mhead{display:flex;flex-wrap:wrap;gap:6px 16px;align-items:baseline;justify-content:space-between}
+.mfind{display:flex;gap:8px;flex-wrap:wrap}
+.mfind input{flex:1 1 180px;min-width:0;font:400 1rem var(--f-body);padding:8px 10px;border:1px solid var(--line);border-radius:6px;background:var(--bg);color:var(--ink)}
+.reslist{display:grid;gap:4px}
+.news{font-size:.93rem}
+.news .num{font-size:.78rem;color:var(--muted);white-space:nowrap}
+.trade a{overflow-wrap:anywhere}
+.reslist button{text-align:left;font:500 .92rem var(--f-body);padding:8px 10px;border-radius:6px;border:1px solid var(--line);background:var(--bg);color:var(--ink);cursor:pointer;overflow-wrap:anywhere}
+#mApp{display:grid;gap:26px}
 footer{border-top:1px solid var(--line);padding-block:18px 8px;font-size:.84rem;color:var(--muted)}
 </style>
 
@@ -184,6 +206,7 @@ footer{border-top:1px solid var(--line);padding-block:18px 8px;font-size:.84rem;
   <a href="#start">Základ</a>
   <a href="#cesta">Cesta krok za krokem</a>
   <a href="#obchod">Obchodování</a>
+  <a href="#trh">Trh naživo</a>
   <a href="#zkus">Vyzkoušej si</a>
   <a href="#slovnik">Slovník</a>
   <a href="#dukazy">Komu věřit</a>
@@ -399,6 +422,82 @@ footer{border-top:1px solid var(--line);padding-block:18px 8px;font-size:.84rem;
     <label class="field" id="jCopyBox" hidden>Schránka není dostupná. Označ text a zkopíruj ho ručně.<textarea id="jCopyTxt" readonly></textarea></label>
   </div>
   <div class="trades" id="jList"></div>
+</section>
+
+<!-- ============ TRH NAŽIVO ============ -->
+<section class="view" data-view="trh" hidden>
+  <div class="block">
+    <h2>Trh naživo</h2>
+    <p class="lead">Skutečné ceny, na kterých uvidíš, jak moc která akcie skáče. Zkušební nákup proběhne za kurz, který zrovna platí, a stop i cíl za tebe hlídá server.</p>
+    <p class="note" id="mState" hidden></p>
+  </div>
+
+  <div id="mApp" hidden>
+    <div class="panel">
+      <div class="mhead"><span class="eyebrow">Sledované tituly</span><span class="num" id="mCas" style="font-size:.8rem;color:var(--muted)"></span></div>
+      <div class="wl" id="mList"></div>
+      <form class="mfind" id="mFind" autocomplete="off">
+        <input type="search" id="mQ" placeholder="Přidat titul: název nebo zkratka (např. Apple, ČEZ)" aria-label="Hledat titul">
+        <button class="btn2" type="submit">Hledat</button>
+      </form>
+      <div class="reslist" id="mRes"></div>
+      <p class="verdict">Ceny jsou z veřejných dat Yahoo Finance a u některých burz mají zpoždění až čtvrt hodiny. U každého kurzu je čas, ke kterému platí. Mimo obchodní hodiny vidíš poslední kurz.</p>
+    </div>
+
+    <div class="panel" id="mDetail" hidden>
+      <div class="mhead">
+        <div style="min-width:0"><h3 id="mName"></h3><span class="num" id="mSub" style="font-size:.8rem;color:var(--muted)"></span></div>
+        <div style="text-align:right"><div class="bigpx" id="mPx"></div><span class="num" id="mChg"></span></div>
+      </div>
+      <div class="mhead">
+        <div class="seg" role="group" aria-label="Období grafu" id="mRanges">
+          <button type="button" data-r="1d" aria-pressed="true">Den</button>
+          <button type="button" data-r="5d" aria-pressed="false">5 dní</button>
+          <button type="button" data-r="1mo" aria-pressed="false">Měsíc</button>
+          <button type="button" data-r="6mo" aria-pressed="false">Půl roku</button>
+          <button type="button" data-r="1y" aria-pressed="false">Rok</button>
+        </div>
+        <span class="pill" id="mOpen"></span>
+      </div>
+      <div class="chart" id="mChart"></div>
+      <div class="out" id="mStats"></div>
+      <p class="verdict" id="mJump"></p>
+
+      <span class="eyebrow">Koupit nanečisto za aktuální kurz</span>
+      <div class="fields">
+        <label class="field">Velikost pozice (Kč)<input type="number" id="mSize" value="2000" min="0" step="any" inputmode="numeric"></label>
+        <label class="field">Stop (% pod nákupem)<input type="number" id="mStop" value="5" min="0" step="any" inputmode="decimal"></label>
+        <label class="field">Cíl (% nad nákupem)<input type="number" id="mTarget" value="10" min="0" step="any" inputmode="decimal"></label>
+        <label class="field wide">Proč to kupuji a co by mě přesvědčilo, že se mýlím<textarea id="mWhy" maxlength="1000"></textarea></label>
+      </div>
+      <p class="verdict" id="mCalc"></p>
+      <p class="verdict" id="mBuyMsg"></p>
+      <div class="seg"><button class="btn" type="button" id="mBuy">Koupit nanečisto</button><button class="btn2 danger" type="button" id="mUnwatch">Přestat sledovat</button></div>
+    </div>
+
+    <div class="block">
+      <h3>Otevřené zkušební pozice</h3>
+      <p class="verdict" id="mPosMsg"></p>
+      <div class="trades" id="mPos"></div>
+    </div>
+
+    <div class="block">
+      <h3>Zdroje, které sleduji</h3>
+      <p class="verdict">Weby a stránky, které chceš mít po ruce. U webu s kanálem novinek uvidíš poslední titulky. Facebook a další sociální sítě čtení bez přihlášení nedovolují, proto je u nich jen odkaz. Ke každému zdroji si napiš, kdo to je a z čeho žije; pět otázek, podle kterých to poznáš, je v části <a href="#dukazy">Komu věřit</a>.</p>
+      <p class="verdict" id="zState"></p>
+      <div class="trades" id="zList"></div>
+    </div>
+    <form class="panel" id="zForm" autocomplete="off" novalidate>
+      <span class="eyebrow">Přidat zdroj</span>
+      <div class="fields">
+        <label class="field">Adresa (začíná https://)<input type="url" id="zUrl" maxlength="300" inputmode="url" style="font-family:var(--f-body)"></label>
+        <label class="field">Název<input type="text" id="zNazev" maxlength="80" style="font-family:var(--f-body)"></label>
+        <label class="field wide">Kdo to je a z čeho žije<textarea id="zPozn" maxlength="600"></textarea></label>
+      </div>
+      <p class="verdict" id="zMsg"></p>
+      <button class="btn" type="submit" id="zAdd">Přidat zdroj</button>
+    </form>
+  </div>
 </section>
 
 <!-- ============ VYZKOUŠEJ SI ============ -->
@@ -617,6 +716,7 @@ function route(){
   const h=(location.hash||'#start').slice(1);
   const v=views.some(x=>x.dataset.view===h)?h:'start';
   views.forEach(x=>x.hidden=x.dataset.view!==v);
+  if(v==='trh')trhOtevren();
   $$('nav.tabs a').forEach(a=>{if(a.getAttribute('href')==='#'+v){a.setAttribute('aria-current','page');a.scrollIntoView&&a.scrollIntoView({block:'nearest',inline:'nearest'})}else a.removeAttribute('aria-current')});
 }
 window.addEventListener('hashchange',()=>{route();window.scrollTo(0,0)});
@@ -849,6 +949,9 @@ function renderJournal(){
    <div><span class="k">Vyhrané</span><span class="v">${closed.length?cz(100*wins.length/closed.length)+' %':'–'}</span></div>
    <div><span class="k">Výsledek celkem</span><span class="v${cls(tot)}">${closed.length?money(Math.round(tot),'Kč'):'–'}</span></div>
    <div><span class="k">Průměr na obchod v násobcích rizika</span><span class="v${cls(avgR)}">${closed.length?(avgR>0?'+':avgR<0?'−':'')+cz(Math.abs(avgR),2)+' R':'–'}</span></div>`;
+  const sEtf=closed.filter(x=>x.t.bEntry>0&&x.t.bExit>0);
+  if(sEtf.length){const etf=sEtf.reduce((a,x)=>a+x.t.size*(x.t.bExit/x.t.bEntry-1),0),moje=sEtf.reduce((a,x)=>a+x.s.kc,0);
+    $('#jStats').insertAdjacentHTML('beforeend',`<div><span class="k">Stejné peníze v ETF za stejnou dobu (${sEtf.length} obchodů)</span><span class="v${cls(etf)}">${money(Math.round(etf),'Kč')}</span><span class="k">tvoje obchody: ${money(Math.round(moje),'Kč')}</span></div>`)}
   const yr=String(new Date().getFullYear()),sold=trades.filter(t=>t.mode==='real'&&t.exit!=null&&(t.xd||'').startsWith(yr)).reduce((a,t)=>a+tStat(t).sold,0);
   $('#jTax').textContent=`Prodeje naostro v roce ${yr}: ${cz(sold)} Kč ze 100 000 Kč daňového limitu. Přičti k tomu prodeje u ostatních brokerů.`+(closed.length&&closed.length<20?` Z ${closed.length} obchodů se zatím nedá nic usoudit, čísla začnou něco říkat kolem dvaceti.`:'');
   const L=$('#jList');
@@ -856,7 +959,8 @@ function renderJournal(){
   if(!list.length){L.innerHTML=`<div class="empty">${trades.length?'V tomto režimu zatím žádný obchod není.':'Deník je prázdný. První obchod zapiš nahoře v režimu Nanečisto: vyber si akcii, kterou znáš, podívej se na dnešní cenu a napiš, proč by měla růst a kde přiznáš omyl.'}</div>`;return}
   L.innerHTML=list.map(t=>{const s=tStat(t),id=esc(t.id);
     const head=`<div class="hd"><b>${esc(t.t)}</b><span class="pill ${t.mode==='real'?'real':''}">${t.mode==='real'?'naostro':'nanečisto'}</span>${s.open?'<span class="pill">otevřený</span>':`<span class="res${cls(s.kc)}">${money(Math.round(s.kc),'Kč')} · ${(s.r>0?'+':s.r<0?'−':'')+cz(Math.abs(s.r),1)} R</span>`}</div>`;
-    const meta=`<div class="meta"><span>${esc(t.d||'')}${t.xd?' → '+esc(t.xd):''}</span><span>pozice ${cz(t.size)} Kč</span><span>nákup ${cz(t.entry,2)}</span><span>stop ${cz(t.stop,2)}</span><span>cíl ${cz(t.target,2)}</span>${s.open?`<span>riziko ${cz(t.size*s.risk)} Kč</span>`:`<span>prodej ${cz(t.exit,2)} (${(s.pct>0?'+':s.pct<0?'−':'')+cz(Math.abs(s.pct*100),1)} %)</span>`}</div>`;
+    const jak={stop:'uzavřeno automaticky na stopu',cil:'uzavřeno automaticky na cíli',rucne:'prodáno za aktuální kurz'}[t.autoClose];
+    const meta=`<div class="meta"><span>${esc(t.d||'')}${t.xd?' → '+esc(t.xd):''}</span>${t.sym?`<span>${esc(t.sym)}${t.cur?' · '+esc(t.cur):''}</span>`:''}${jak?`<span>${jak}</span>`:''}<span>pozice ${cz(t.size)} Kč</span><span>nákup ${cz(t.entry,2)}</span><span>stop ${cz(t.stop,2)}</span><span>cíl ${cz(t.target,2)}</span>${s.open?`<span>riziko ${cz(t.size*s.risk)} Kč</span>`:`<span>prodej ${cz(t.exit,2)} (${(s.pct>0?'+':s.pct<0?'−':'')+cz(Math.abs(s.pct*100),1)} %)</span>`}</div>`;
     const why=`<p class="why"><b>Proč:</b> ${esc(t.why||'')}</p>`+(t.lesson?`<p class="why"><b>Poučení:</b> ${esc(t.lesson)}</p>`:'');
     const close=s.open?`<div class="fields"><label class="field">Prodejní cena<input type="number" step="any" min="0" id="x_${id}" data-keep inputmode="decimal"></label><label class="field">Datum prodeje<input type="date" id="xd_${id}" data-keep></label><label class="field wide">Co jsem se naučil<textarea id="xl_${id}" data-keep maxlength="1000"></textarea></label></div>`:'';
     return `<div class="trade">${head}${meta}${why}${close}<div class="seg">${s.open?`<button class="btn2" type="button" data-close="${id}">Uzavřít obchod</button>`:''}<button class="btn2 danger" type="button" data-del="${id}">${jArm===t.id?'Opravdu smazat?':'Smazat'}</button></div></div>`}).join('');
@@ -885,7 +989,7 @@ $('#jList').addEventListener('click',async e=>{
 /* Na vlastním serveru (ksprehledy.cz) deník neukládá claude.ai, ale server: stejné volání, jiné úložiště. */
 function serverStore(){
   const call=(m,u,b)=>fetch(u,{method:m,credentials:'same-origin',headers:b?{'Content-Type':'application/json','X-Inv':'1'}:{'X-Inv':'1'},body:b?JSON.stringify(b):undefined}).then(r=>{if(r.status===401){location.href='/login';throw{code:'auth'}}if(!r.ok)throw{code:r.status===409?'quota_exceeded':'http'};return r.json()});
-  const load=()=>call('GET','/api/trades').then(j=>{trades=j.trades||[];jLoaded=true;jMsg('',false);renderJournal()});
+  const load=()=>call('GET','/api/trades').then(j=>{trades=j.trades||[];jLoaded=true;jMsg('',false);renderJournal();renderPozice()});
   return{load,collection:()=>({add:t=>call('POST','/api/trades',t).then(load)}),doc:p=>({update:d=>call('PATCH','/api/'+p,d).then(load),delete:()=>call('DELETE','/api/'+p).then(load)})};
 }
 function denikText(){
@@ -919,7 +1023,162 @@ function initJournal(){
   },off);
 }
 
+/* ---------- trh naživo (jen na vlastním serveru) ---------- */
+const M={kurzy:{},sled:[],bench:'',sel:null,rozsah:'1d',graf:null,kdy:0};
+const api=(m,u,b)=>fetch(u,{method:m,credentials:'same-origin',headers:b!==undefined?{'Content-Type':'application/json','X-Inv':'1'}:{'X-Inv':'1'},body:b!==undefined?JSON.stringify(b):undefined}).then(async r=>{if(r.status===401){location.href='/login';throw{chyba:'auth'}}const j=await r.json().catch(()=>({}));if(!r.ok)throw Object.assign({status:r.status},j);return j});
+const cena=(v,mena)=>cz(v,v<10?3:2)+(mena?' '+mena:'');
+const proc=(v,d=2)=>(v>0?'+':v<0?'−':'')+cz(Math.abs(v*100),d)+' %';
+const sipka=v=>v>0?'▲ ':v<0?'▼ ':'';
+const kdyKurz=c=>c?new Date(c*1000).toLocaleString('cs-CZ',{day:'numeric',month:'numeric',hour:'2-digit',minute:'2-digit'}):'';
+const mMsg=(t)=>{const n=$('#mState');n.textContent=t||'';n.hidden=!t};
+function nahled(body,zmena){
+  if(!body||body.length<2)return '<svg class="spark" aria-hidden="true"></svg>';
+  const lo=Math.min(...body),hi=Math.max(...body),r=hi-lo||1;
+  const pts=body.map((v,i)=>(2+i/(body.length-1)*68).toFixed(1)+','+(25-(v-lo)/r*22).toFixed(1)).join(' ');
+  return `<svg class="spark" viewBox="0 0 72 28" aria-hidden="true"><polyline points="${pts}" fill="none" stroke="var(--${zmena<0?'loss':'gain'})" stroke-width="1.5" stroke-linejoin="round"/></svg>`;
+}
+function renderSeznam(){
+  $('#mList').innerHTML=M.sled.map(sym=>{const k=M.kurzy[sym]||{};
+    const prava=k.cena!=null?`<b>${cena(k.cena,k.mena)}</b><span class="${k.zmena>0?'gain':k.zmena<0?'loss':''}">${k.zmena!=null?sipka(k.zmena)+proc(k.zmena):''}</span>`:'<span>kurz není k dispozici</span>';
+    return `<button type="button" class="wrow" data-sym="${esc(sym)}" aria-pressed="${M.sel===sym}"><span class="nm"><b>${esc(k.nazev||sym)}</b><span>${esc(sym)}${sym===M.bench?' · tvůj ETF pro srovnání':k.burza?' · '+esc(k.burza):''}</span></span>${nahled(k.nahled,k.zmena)}<span class="px">${prava}</span></button>`}).join('');
+  $('#mCas').textContent=M.kdy?'obnoveno '+new Date(M.kdy).toLocaleTimeString('cs-CZ',{hour:'2-digit',minute:'2-digit'}):'';
+}
+function renderPozice(){
+  if(!window.__INV_SERVER)return;
+  const ot=trades.filter(t=>t.auto&&t.sym&&t.exit==null),b=M.kurzy[M.bench];
+  $('#mPosMsg').textContent=ot.length?'':'Žádná otevřená zkušební pozice. Vyber titul ze seznamu a kup ho nanečisto. Uzavřené obchody najdeš v deníku v části Obchodování.';
+  $('#mPos').innerHTML=ot.map(t=>{const k=M.kurzy[t.sym],id=esc(t.id);
+    if(!k||k.cena==null)return `<div class="trade"><div class="hd"><b>${esc(t.t)}</b><span class="pill">kurz není k dispozici</span></div></div>`;
+    const pct=k.cena/t.entry-1,kc=t.size*pct,etf=b&&b.cena&&t.bEntry?b.cena/t.bEntry-1:null,c=kc>0?' gain':kc<0?' loss':'';
+    return `<div class="trade"><div class="hd"><b>${esc(t.t)}</b><span class="pill">${esc(t.sym)}</span><span class="res${c}">${money(Math.round(kc),'Kč')} · ${proc(pct,1)}</span></div>
+      <div class="meta"><span>od ${esc(t.d)}</span><span>pozice ${cz(t.size)} Kč</span><span>nákup ${cena(t.entry,t.cur)}</span><span>teď ${cena(k.cena,t.cur)}</span><span>stop ${cena(t.stop)} (${proc(t.stop/k.cena-1,1)})</span><span>cíl ${cena(t.target)} (${proc(t.target/k.cena-1,1)})</span>${etf!=null?`<span>ETF za stejnou dobu ${proc(etf,1)}</span>`:''}</div>
+      <p class="why"><b>Proč:</b> ${esc(t.why||'')}</p>
+      <div class="seg"><button class="btn2" type="button" data-sell="${id}">Prodat nanečisto teď</button></div></div>`}).join('');
+}
+function nactiTrh(){
+  return api('GET','/api/trh').then(j=>{M.kurzy={};j.kurzy.forEach(k=>M.kurzy[k.sym]=k);M.sled=j.sledovane;M.bench=j.benchmark;M.kdy=Date.now();mMsg('');renderSeznam();renderPozice();if(M.sel)renderHlavicka()},
+    e=>{if(e&&e.chyba==='auth')return;mMsg(M.kdy?'Ceny se teď nedaří obnovit, vidíš poslední načtené.':'Ceny se nepodařilo načíst. Zkusím to znovu za minutu.')});
+}
+function renderHlavicka(){
+  const k=M.kurzy[M.sel];if(!k||k.cena==null)return;
+  $('#mName').textContent=k.nazev||M.sel;$('#mSub').textContent=[M.sel,k.burza,k.mena].filter(Boolean).join(' · ');
+  $('#mPx').textContent=cena(k.cena,k.mena);
+  const ch=$('#mChg');ch.textContent=k.zmena!=null?sipka(k.zmena)+proc(k.zmena)+' proti včerejšku':'';ch.className='num '+(k.zmena>0?'gain':k.zmena<0?'loss':'');
+  $('#mOpen').textContent=(k.cerstvy?'burza otevřená':'burza zavřená')+' · kurz z '+kdyKurz(k.cas);
+  $('#mUnwatch').hidden=M.sel===M.bench;
+  vypocetNakupu();
+}
+function vypocetNakupu(){
+  const k=M.kurzy[M.sel];if(!k||k.cena==null)return;
+  const size=+$('#mSize').value||0,sp=+$('#mStop').value||0,tp=+$('#mTarget').value||0,risk=size*sp/100;
+  let v=`Nákup za ${cena(k.cena,k.mena)}, stop ${cena(k.cena*(1-sp/100))}, cíl ${cena(k.cena*(1+tp/100))}. Na stopu ztratíš ${cz(risk)} Kč, na cíli získáš ${cz(size*tp/100)} Kč.`;
+  if(risk>100)v+=' Riziko je nad 100 Kč, tedy nad pravidlem 1 % koše.';
+  if(size>2500)v+=' Pozice je nad limitem 2 500 Kč.';
+  if(!k.cerstvy)v+=' Burza je teď zavřená, nákup půjde až v obchodních hodinách.';
+  $('#mCalc').textContent=v;
+}
+function nactiGraf(){
+  if(!M.sel)return Promise.resolve();
+  const sym=M.sel,r=M.rozsah;
+  return api('GET','/api/trh/graf?s='+encodeURIComponent(sym)+'&r='+r).then(g=>{if(M.sel!==sym||M.rozsah!==r)return;M.graf=g;renderGraf()},
+    e=>{if(e&&e.chyba==='auth')return;$('#mChart').innerHTML='<p class="empty">Graf se nepodařilo načíst.</p>';$('#mStats').innerHTML='';$('#mJump').textContent=''});
+}
+function renderGraf(){
+  const g=M.graf,box=$('#mChart'),b=g.body;box.innerHTML='';
+  if(!b||b.length<2){box.innerHTML='<p class="empty">Pro tohle období nejsou data.</p>';$('#mStats').innerHTML='';$('#mJump').textContent='';return}
+  const denni=g.rozsah!=='1d'&&g.rozsah!=='5d',vals=b.map(x=>x[1]);
+  let lo=Math.min(...vals),hi=Math.max(...vals);
+  const ref=g.rozsah==='1d'&&g.predchozi?g.predchozi:null;if(ref){lo=Math.min(lo,ref);hi=Math.max(hi,ref)}
+  const pad=(hi-lo)*.08||hi*.01;lo-=pad;hi+=pad;
+  const W=640,H=260,m={l:58,r:12,t:12,b:26},x=i=>m.l+i/(b.length-1)*(W-m.l-m.r),y=v=>m.t+(hi-v)/(hi-lo)*(H-m.t-m.b);
+  const fmtT=t=>{const d=new Date(t*1000);return g.rozsah==='1d'?d.toLocaleTimeString('cs-CZ',{hour:'2-digit',minute:'2-digit'}):denni?d.toLocaleDateString('cs-CZ',{day:'numeric',month:'numeric',year:g.rozsah==='1y'?'2-digit':undefined}):d.toLocaleString('cs-CZ',{day:'numeric',month:'numeric',hour:'2-digit',minute:'2-digit'})};
+  const svg=el('svg',{viewBox:`0 0 ${W} ${H}`,role:'img','aria-label':'Vývoj ceny '+g.nazev});
+  for(let k=0;k<=3;k++){const v=lo+(hi-lo)*k/3;svg.appendChild(el('line',{x1:m.l,x2:W-m.r,y1:y(v),y2:y(v),class:'grid'}));svg.appendChild(el('text',{x:m.l-6,y:y(v)+4,'text-anchor':'end'},cz(v,v<10?2:v<1000?1:0)))}
+  [[0,'start'],[Math.floor((b.length-1)/2),'middle'],[b.length-1,'end']].forEach(([i,a])=>svg.appendChild(el('text',{x:x(i),y:H-7,'text-anchor':a},fmtT(b[i][0]))));
+  if(ref){svg.appendChild(el('line',{x1:m.l,x2:W-m.r,y1:y(ref),y2:y(ref),stroke:'var(--muted)','stroke-width':1,'stroke-dasharray':'4 4'}));svg.appendChild(el('text',{x:W-m.r,y:y(ref)-5,'text-anchor':'end'},'včerejší závěr'))}
+  svg.appendChild(el('path',{d:b.map((p,i)=>(i?'L':'M')+x(i).toFixed(1)+' '+y(p[1]).toFixed(1)).join(' '),fill:'none',stroke:'var(--accent)','stroke-width':2,'stroke-linejoin':'round'}));
+  svg.appendChild(el('circle',{cx:x(b.length-1),cy:y(vals[vals.length-1]),r:4,fill:'var(--accent)',stroke:'var(--surface)','stroke-width':2}));
+  const cross=el('line',{y1:m.t,y2:H-m.b,class:'zero',visibility:'hidden'}),dot=el('circle',{r:4,fill:'var(--accent)',stroke:'var(--surface)','stroke-width':2,visibility:'hidden'});svg.appendChild(cross);svg.appendChild(dot);
+  const tip=tipFor(box),hit=el('rect',{x:m.l,y:m.t,width:W-m.l-m.r,height:H-m.t-m.b,fill:'transparent'});
+  hit.addEventListener('pointermove',e=>{const r=box.getBoundingClientRect(),k=r.width/W,i=Math.min(b.length-1,Math.max(0,Math.round(((e.clientX-r.left)/k-m.l)/(W-m.l-m.r)*(b.length-1))));
+    cross.setAttribute('x1',x(i));cross.setAttribute('x2',x(i));cross.setAttribute('visibility','visible');dot.setAttribute('cx',x(i));dot.setAttribute('cy',y(b[i][1]));dot.setAttribute('visibility','visible');
+    tip.show(`<b>${cena(b[i][1],g.mena)}</b><br>${fmtT(b[i][0])}`,x(i)*k,y(b[i][1])*k)});
+  hit.addEventListener('pointerleave',()=>{cross.setAttribute('visibility','hidden');dot.setAttribute('visibility','hidden');tip.hide()});
+  svg.appendChild(hit);box.insertBefore(svg,box.firstChild);
+
+  const vMin=Math.min(...vals),vMax=Math.max(...vals),zm=vals[vals.length-1]/(ref||vals[0])-1,c=zm>0?' gain':zm<0?' loss':'';
+  $('#mStats').innerHTML=`<div><span class="k">Změna za období</span><span class="v${c}">${proc(zm,1)}</span></div><div><span class="k">Nejníž</span><span class="v">${cena(vMin)}</span></div><div><span class="k">Nejvýš</span><span class="v">${cena(vMax)}</span></div><div><span class="k">Rozpětí mezi nimi</span><span class="v">${cz((vMax/vMin-1)*100,1)} %</span></div>`;
+  let t='';
+  if(denni){const r=[];for(let i=1;i<b.length;i++)r.push([b[i][0],b[i][1]/b[i-1][1]-1]);
+    const prum=r.reduce((a,z)=>a+Math.abs(z[1]),0)/r.length,up=r.reduce((a,z)=>z[1]>a[1]?z:a),dn=r.reduce((a,z)=>z[1]<a[1]?z:a),sp=(+$('#mStop').value||5)/100,zasah=r.filter(z=>z[1]<=-sp).length;
+    const den=z=>new Date(z[0]*1000).toLocaleDateString('cs-CZ',{day:'numeric',month:'numeric'});
+    t=`Jak moc skáče: za den se cena pohne v průměru o ${cz(prum*100,1)} %. Největší denní růst ${proc(up[1],1)} (${den(up)}), největší pokles ${proc(dn[1],1)} (${den(dn)}). Pokles o ${cz(sp*100,1)} % a víc za jediný den nastal ${zasah}krát z ${r.length} dní; tolikrát by ti stop ${cz(sp*100,1)} % vzal pozici hned první den.`}
+  else t=g.rozsah==='1d'?`Dnes se cena pohybovala v rozpětí ${cz((vMax/vMin-1)*100,1)} %. Pro představu, jak moc titul skáče ze dne na den, přepni na Měsíc nebo Rok.`:'Pět dní po půlhodinách. Čas, kdy je burza zavřená, je vynechaný, takže skok na začátku dne je rozdíl proti večernímu závěru.';
+  $('#mJump').textContent=t;
+}
+function vyberTitul(sym){M.sel=sym;$('#mDetail').hidden=false;$('#mBuyMsg').textContent='';renderSeznam();renderHlavicka();nactiGraf()}
+/* ---------- sledované zdroje ---------- */
+let Zd=[],zKdy=0,zArm=null;
+const TYP={facebook:'Facebook · jen odkaz',socialni:'sociální síť · jen odkaz'};
+function renderZdroje(){
+  $('#zState').textContent=Zd.length?'':'Zatím tu žádný zdroj není.';
+  $('#zList').innerHTML=Zd.map(z=>{let host='';try{host=new URL(z.url).hostname.replace(/^www\./,'')}catch(e){}
+    const typ=TYP[z.typ]||(z.feed?'web · novinky':'web · jen odkaz');
+    const telo=z.novinky&&z.novinky.length?`<ul class="plain news">${z.novinky.map(n=>`<li><a href="${esc(n.odkaz)}" target="_blank" rel="noopener noreferrer">${esc(n.titul)}</a>${n.kdy?` <span class="num">${new Date(n.kdy*1000).toLocaleDateString('cs-CZ',{day:'numeric',month:'numeric'})}</span>`:''}</li>`).join('')}</ul>`
+      :`<p class="why">${z.typ==='facebook'||z.typ==='socialni'?'Příspěvky odsud server číst nesmí, otevři stránku odkazem.':z.feed?'Novinky se teď nepodařilo načíst.':'Tenhle web nemá kanál novinek, otevři ho odkazem.'}</p>`;
+    return `<div class="trade"><div class="hd"><b><a href="${esc(z.url)}" target="_blank" rel="noopener noreferrer">${esc(z.nazev)} ↗</a></b><span class="pill">${typ}</span></div>
+      <div class="meta"><span>${esc(host)}</span>${z.pridano?`<span>přidáno ${esc(z.pridano)}</span>`:''}</div>
+      <p class="why"><b>Kdo to je:</b> ${esc(z.pozn||'')}</p>${telo}
+      <div class="seg"><button class="btn2 danger" type="button" data-zdel="${esc(z.id)}">${zArm===z.id?'Opravdu odebrat?':'Odebrat'}</button></div></div>`}).join('');
+}
+function nactiZdroje(){return api('GET','/api/zdroje').then(j=>{Zd=j.zdroje||[];zKdy=Date.now();renderZdroje()},e=>{if(e&&e.chyba==='auth')return;$('#zState').textContent='Zdroje se nepodařilo načíst.'})}
+function zdrojeInit(){
+  $('#zList').addEventListener('click',e=>{const b=e.target.closest('[data-zdel]');if(!b)return;const id=b.dataset.zdel;
+    if(zArm!==id){zArm=id;renderZdroje();return}
+    zArm=null;api('DELETE','/api/zdroje/'+encodeURIComponent(id)).then(nactiZdroje,()=>{$('#zState').textContent='Odebrání se nepovedlo.'})});
+  $('#zForm').addEventListener('submit',e=>{e.preventDefault();
+    const msg=$('#zMsg'),btn=$('#zAdd'),z={url:$('#zUrl').value.trim(),nazev:$('#zNazev').value.trim(),pozn:$('#zPozn').value.trim()};
+    if(!/^https:\/\//i.test(z.url)){msg.textContent='Adresa musí začínat https://.';return}
+    if(!z.nazev||!z.pozn){msg.textContent='Doplň název a napiš, kdo to je a z čeho žije. Bez toho se zdroj nepřidá.';return}
+    btn.disabled=true;msg.textContent='Přidávám a hledám kanál novinek…';
+    api('POST','/api/zdroje',z).then(j=>{msg.textContent=j.zdroj.feed?'Přidáno, novinky se budou načítat.':'Přidáno jako odkaz.';['zUrl','zNazev','zPozn'].forEach(i=>$('#'+i).value='');return nactiZdroje()},
+      er=>{msg.textContent={uz_je:'Tenhle zdroj už v seznamu je.',seznam_plny:'Seznam je plný (40 zdrojů).',neplatna_adresa:'Adresa není platná. Musí začínat https:// a vést na běžnou doménu.',zakazana_adresa:'Tuhle adresu přidat nejde.',chybi_popis:'Doplň název a popis.'}[er.chyba]||'Přidání se nepovedlo. Zkus to za chvíli.'}).then(()=>{btn.disabled=false})});
+}
+function trhOtevren(){
+  if(!window.__INV_SERVER){mMsg('Živé ceny a zkušební nákup za skutečný kurz běží jen na webu investice.ksprehledy.cz. Tahle verze na claude.ai je bez nich, protože stránka odtud nesmí stahovat data z jiných serverů.');return}
+  $('#mApp').hidden=false;
+  if(Date.now()-zKdy>300000)nactiZdroje();
+  if(Date.now()-M.kdy>30000)nactiTrh().then(()=>{if(!M.sel&&M.sled.length)vyberTitul(M.sled.find(s=>s!==M.bench)||M.sled[0])});
+}
+function trhInit(){
+  if(!window.__INV_SERVER)return;
+  zdrojeInit();
+  $('#mList').addEventListener('click',e=>{const b=e.target.closest('[data-sym]');if(b)vyberTitul(b.dataset.sym)});
+  $('#mRanges').addEventListener('click',e=>{const b=e.target.closest('[data-r]');if(!b)return;M.rozsah=b.dataset.r;$$('#mRanges button').forEach(x=>x.setAttribute('aria-pressed',x===b));nactiGraf()});
+  ['mSize','mStop','mTarget'].forEach(id=>$('#'+id).addEventListener('input',()=>{vypocetNakupu();if(id==='mStop'&&M.graf)renderGraf()}));
+  $('#mFind').addEventListener('submit',e=>{e.preventDefault();const q=$('#mQ').value.trim(),R=$('#mRes');if(q.length<2){R.innerHTML='';return}
+    R.innerHTML='<p class="verdict">Hledám…</p>';
+    api('GET','/api/trh/hledej?q='+encodeURIComponent(q)).then(j=>{R.innerHTML=j.vysledky.length?j.vysledky.map(v=>`<button type="button" data-add="${esc(v.sym)}">${esc(v.nazev)} · ${esc(v.sym)}${v.burza?' · '+esc(v.burza):''}${v.typ==='ETF'?' · ETF':''}</button>`).join(''):'<p class="verdict">Nic jsem nenašel. Zkus anglický název firmy nebo její zkratku.</p>'},
+      ()=>{R.innerHTML='<p class="verdict">Hledání se nepovedlo. Zkus to za chvíli.</p>'})});
+  $('#mRes').addEventListener('click',e=>{const b=e.target.closest('[data-add]');if(!b)return;const sym=b.dataset.add;b.disabled=true;
+    api('POST','/api/trh/sledovane',{sym}).then(()=>{$('#mRes').innerHTML='';$('#mQ').value='';return nactiTrh()}).then(()=>vyberTitul(sym),
+      e=>{b.disabled=false;$('#mRes').insertAdjacentHTML('beforeend',`<p class="verdict">${e.chyba==='seznam_plny'?'Seznam je plný (30 titulů), nějaký napřed odeber.':'Tenhle titul se nepodařilo přidat, zdroj pro něj nemá kurz.'}</p>`)})});
+  $('#mUnwatch').addEventListener('click',()=>{const sym=M.sel;if(!sym)return;api('DELETE','/api/trh/sledovane/'+encodeURIComponent(sym)).then(()=>{M.sel=null;$('#mDetail').hidden=true;return nactiTrh()},()=>{$('#mBuyMsg').textContent='Odebrání se nepovedlo.'})});
+  $('#mBuy').addEventListener('click',()=>{
+    const msg=$('#mBuyMsg'),btn=$('#mBuy'),t={sym:M.sel,size:+$('#mSize').value,stopPct:+$('#mStop').value,targetPct:+$('#mTarget').value,why:$('#mWhy').value.trim()};
+    if(!(t.size>0)||!(t.stopPct>0)||!(t.targetPct>0)||!t.why){msg.textContent='Vyplň velikost pozice, stop, cíl a důvod. Bez důvodu se nekupuje ani nanečisto.';return}
+    btn.disabled=true;msg.textContent='Kupuji…';
+    api('POST','/api/trh/koupit',t).then(j=>{msg.textContent=`Koupeno nanečisto za ${cena(j.trade.entry,j.trade.cur)}. Stop a cíl hlídá server každou minutu, dokud je burza otevřená.`;$('#mWhy').value='';return Promise.all([db&&db.load?db.load():null,nactiTrh()])},
+      e=>{msg.textContent=e.chyba==='trh_zavreny'?`Burza je teď zavřená (poslední kurz z ${kdyKurz(e.cas)}). Zkušební nákup jde jen v obchodních hodinách, aby cena odpovídala tomu, za kolik bys opravdu koupil.`:e.chyba==='denik_plny'?'Deník je plný.':'Nákup se nepovedl. Zkus to za chvíli.'}).then(()=>{btn.disabled=false});
+  });
+  $('#mPos').addEventListener('click',e=>{const b=e.target.closest('[data-sell]');if(!b)return;b.disabled=true;
+    api('POST','/api/trades/'+b.dataset.sell+'/prodat').then(()=>Promise.all([db&&db.load?db.load():null,nactiTrh()]),
+      er=>{b.disabled=false;$('#mPosMsg').textContent=er.chyba==='trh_zavreny'?'Burza je teď zavřená, prodat půjde až v obchodních hodinách.':'Prodej se nepovedl. Zkus to za chvíli.'})});
+  setInterval(()=>{const vidim=!document.hidden&&!$('section.view[data-view="trh"]').hidden;if(!vidim)return;
+    Promise.all([nactiTrh(),db&&db.load?db.load().catch(()=>{}):null]).then(()=>{if(M.sel&&M.rozsah==='1d')nactiGraf()})},60000);
+}
+
 /* ---------- start ---------- */
-fillCites();renderSteps();shortSim();feeCalc();barChart();lineChart();tax();renderTerms('');renderQuiz();posCalc();expCalc();renderJournal();initJournal();route();
+fillCites();renderSteps();shortSim();feeCalc();barChart();lineChart();tax();renderTerms('');renderQuiz();posCalc();expCalc();renderJournal();initJournal();trhInit();route();
 })();
 </script>
