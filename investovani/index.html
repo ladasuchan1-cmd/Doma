@@ -366,17 +366,17 @@ footer{border-top:1px solid var(--line);padding-block:18px 8px;font-size:.84rem;
 
   <div class="block">
     <h3>Deník obchodů</h3>
-    <p>Ukládá se k této stránce, takže ho najdeš z telefonu i z počítače a vidím ho i já. Stačí mi napsat „vyhodnoť deník“.</p>
+    <p id="jKde">Ukládá se k této stránce, takže ho najdeš z telefonu i z počítače a vidím ho i já. Stačí mi napsat „vyhodnoť deník“.</p>
     <p class="note" id="jState" hidden></p>
   </div>
 
-  <form class="panel" id="jForm" autocomplete="off">
+  <form class="panel" id="jForm" autocomplete="off" novalidate>
     <span class="eyebrow">Nový obchod, zapsaný předem</span>
     <div class="fields">
       <label class="field">Titul (název nebo zkratka)<input type="text" id="jT" maxlength="40" required style="font-family:var(--f-body)"></label>
       <label class="field">Datum nákupu<input type="date" id="jD" required></label>
       <label class="field">Režim<select id="jMode"><option value="paper">Nanečisto</option><option value="real">Naostro</option></select></label>
-      <label class="field">Velikost pozice (Kč)<input type="number" id="jSize" min="1" step="50" required inputmode="numeric"></label>
+      <label class="field">Velikost pozice (Kč)<input type="number" id="jSize" min="0" step="any" required inputmode="numeric"></label>
       <label class="field">Nákupní cena<input type="number" id="jEntry" min="0" step="any" required inputmode="decimal"></label>
       <label class="field">Stop<input type="number" id="jStop" min="0" step="any" required inputmode="decimal"></label>
       <label class="field">Cíl<input type="number" id="jTarget" min="0" step="any" required inputmode="decimal"></label>
@@ -395,6 +395,8 @@ footer{border-top:1px solid var(--line);padding-block:18px 8px;font-size:.84rem;
     </div>
     <div class="out" id="jStats"></div>
     <p class="verdict" id="jTax"></p>
+    <div class="seg"><button class="btn2" type="button" id="jCopy">Zkopírovat deník pro vyhodnocení</button></div>
+    <label class="field" id="jCopyBox" hidden>Schránka není dostupná. Označ text a zkopíruj ho ručně.<textarea id="jCopyTxt" readonly></textarea></label>
   </div>
   <div class="trades" id="jList"></div>
 </section>
@@ -573,7 +575,7 @@ footer{border-top:1px solid var(--line);padding-block:18px 8px;font-size:.84rem;
   </div>
 </section>
 
-<footer>Vzdělávací materiál, ne investiční doporučení. Hodnota investic může klesat i růst a můžeš dostat zpět méně, než jsi vložil.</footer>
+<footer>Vzdělávací materiál, ne investiční doporučení. Hodnota investic může klesat i růst a můžeš dostat zpět méně, než jsi vložil.<form method="post" action="/logout" id="odhlasit" hidden style="margin-top:10px"><button class="btn2" type="submit">Odhlásit</button></form></footer>
 </div></main>
 
 <script>
@@ -880,8 +882,29 @@ $('#jList').addEventListener('click',async e=>{
   if(d){const id=d.dataset.del;if(jArm!==id){jArm=id;renderJournal();return}
     jArm=null;try{await db.doc('trades/'+id).delete()}catch(err){jMsg('Smazání se nepovedlo.')}}
 });
+/* Na vlastním serveru (ksprehledy.cz) deník neukládá claude.ai, ale server: stejné volání, jiné úložiště. */
+function serverStore(){
+  const call=(m,u,b)=>fetch(u,{method:m,credentials:'same-origin',headers:b?{'Content-Type':'application/json','X-Inv':'1'}:{'X-Inv':'1'},body:b?JSON.stringify(b):undefined}).then(r=>{if(r.status===401){location.href='/login';throw{code:'auth'}}if(!r.ok)throw{code:r.status===409?'quota_exceeded':'http'};return r.json()});
+  const load=()=>call('GET','/api/trades').then(j=>{trades=j.trades||[];jLoaded=true;jMsg('',false);renderJournal()});
+  return{load,collection:()=>({add:t=>call('POST','/api/trades',t).then(load)}),doc:p=>({update:d=>call('PATCH','/api/'+p,d).then(load),delete:()=>call('DELETE','/api/'+p).then(load)})};
+}
+function denikText(){
+  const r=trades.slice().sort((a,b)=>(a.d||'').localeCompare(b.d||'')).map(t=>{const s=tStat(t);return [t.d,t.t,t.mode==='real'?'naostro':'nanečisto','pozice '+t.size+' Kč','nákup '+t.entry,'stop '+t.stop,'cíl '+t.target,s.open?'otevřený':'prodej '+t.exit+' dne '+t.xd+', výsledek '+Math.round(s.kc)+' Kč ('+s.r.toFixed(2)+' R)','poplatky '+(t.fees||0)+' Kč','proč: '+(t.why||''),t.lesson?'poučení: '+t.lesson:''].filter(Boolean).join(' | ')});
+  return 'Deník obchodů ('+trades.length+' záznamů)\n'+r.join('\n');
+}
+$('#jCopy').addEventListener('click',()=>{
+  const txt=denikText(),b=$('#jCopy'),fallback=()=>{$('#jCopyBox').hidden=false;const a=$('#jCopyTxt');a.value=txt;a.focus();a.select()};
+  if(navigator.clipboard&&navigator.clipboard.writeText)navigator.clipboard.writeText(txt).then(()=>{b.textContent='Zkopírováno, vlož to do chatu';setTimeout(()=>b.textContent='Zkopírovat deník pro vyhodnocení',2500)},fallback);else fallback();
+});
 function initJournal(){
   $('#jD').value=new Date().toISOString().slice(0,10);
+  if(window.__INV_SERVER){
+    $('#odhlasit').hidden=false;
+    $('#jKde').textContent='Ukládá se na serveru, takže ho najdeš z telefonu i z počítače. Když chceš vyhodnocení, zkopíruj deník tlačítkem pod statistikou a vlož mi ho do chatu.';
+    db=serverStore();$('#jAdd').disabled=false;
+    db.load().catch(e=>{if(e&&e.code==='auth')return;jLoaded=true;jMsg('Deník se nepodařilo načíst. Obnov stránku.');renderJournal()});
+    return;
+  }
   const off=()=>{jLoaded=true;jMsg('Deník se ukládá jen při otevření této stránky na claude.ai pod tvým účtem. V tomto zobrazení ho nejde načíst ani zapisovat.');renderJournal()};
   if(!window.claude||!window.claude.use){off();return}
   window.claude.use('db').then(d=>{
