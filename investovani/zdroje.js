@@ -141,7 +141,7 @@ function zdroje(opts = {}) {
     }
   }
 
-  return { prozkoumej, novinky };
+  return { prozkoumej, novinky, stahni };
 }
 
 module.exports = { zdroje, platnaAdresa, typZdroje, soukroma, ctiFeed, najdiFeed, jeFeed, cistyText };

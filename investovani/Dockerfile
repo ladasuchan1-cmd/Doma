@@ -11,7 +11,12 @@ ENV PORT=8095
 ENV INV_DATA=/data
 
 WORKDIR /app
-COPY server.js trh.js zdroje.js index.html ./
+# Jediná závislost je oficiální knihovna pro Claude API (Překladač), čistý JavaScript bez nativních částí.
+# Instaluje ji nasazení předem (npm ci --omit=dev podle package-lock.json) a posílá hotovou – stavba image
+# na serveru tak nepotřebuje přístup k npm.
+COPY package.json package-lock.json ./
+COPY node_modules ./node_modules
+COPY server.js trh.js zdroje.js preklad.js index.html ./
 RUN mkdir -p /data && chown -R node:node /app /data
 USER node
 VOLUME ["/data"]

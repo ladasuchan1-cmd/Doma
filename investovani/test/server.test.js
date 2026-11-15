@@ -7,6 +7,7 @@ const path = require('path');
 const { vytvor, hashHesla, overHeslo } = require('../server.js');
 const { yahoo, platnySym } = require('../trh.js');
 const Z = require('../zdroje.js');
+const PR = require('../preklad.js');
 
 const HESLO = 'zkusebni-heslo-1';
 const OBCHOD = { t: 'ČEZ', d: '2026-11-16', mode: 'paper', size: 2000, entry: 100, stop: 95, target: 112, fees: 0, why: 'Zkouška deníku.' };
@@ -25,7 +26,7 @@ function falesnyTrh(ceny, extra = {}) {
 
 async function spust(opts = {}) {
   const dataDir = opts.dataDir || fs.mkdtempSync(path.join(os.tmpdir(), 'inv-'));
-  const srv = vytvor({ dataDir, hash: opts.hash !== undefined ? opts.hash : hashHesla(HESLO), trustProxy: !!opts.trustProxy, hlidac: false, trh: opts.trh || falesnyTrh({}).trh, ted: opts.ted, zdroje: opts.zdroje || { prozkoumej: async (u) => ({ typ: /facebook/.test(u) ? 'facebook' : 'web', feed: /patria/.test(u) ? 'https://www.patria.cz/rss.html' : null }), novinky: async () => [{ titul: 'Zpráva', odkaz: 'https://www.patria.cz/z/1', kdy: 1794600000 }] } });
+  const srv = vytvor({ dataDir, hash: opts.hash !== undefined ? opts.hash : hashHesla(HESLO), trustProxy: !!opts.trustProxy, hlidac: false, trh: opts.trh || falesnyTrh({}).trh, ted: opts.ted, preklad: opts.preklad || { dostupny: () => false, preloz: async () => { throw new Error('bez klíče'); } }, limitPrekladu: opts.limitPrekladu, zdroje: opts.zdroje || { stahni: async (u) => ({ adresa: u, text: '<html><head><style>a{}</style></head><body><h1>Kurz obchodování</h1><p>Naučíme vás vydělávat 5 % měsíčně. Zadejte e-mail a telefon a získáte analýzu zdarma.</p><script>x()</script></body></html>' }), prozkoumej: async (u) => ({ typ: /facebook/.test(u) ? 'facebook' : 'web', feed: /patria/.test(u) ? 'https://www.patria.cz/rss.html' : null }), novinky: async () => [{ titul: 'Zpráva', odkaz: 'https://www.patria.cz/z/1', kdy: 1794600000 }] } });
   await new Promise((ok) => srv.listen(0, '127.0.0.1', ok));
   const base = 'http://127.0.0.1:' + srv.address().port;
   return { base, dataDir, srv, zavri: () => new Promise((ok) => srv.close(ok)) };
@@ -381,4 +382,82 @@ test('čtení zdrojů: RSS i Atom, hledání kanálu ve stránce, zákaz vnitřn
   await assert.rejects(c.prozkoumej('https://vnitrni.cz/'), (e) => e.kod === 'zakazana_adresa');
   await assert.rejects(c.prozkoumej('https://presmeruje.cz/'), (e) => e.kod === 'zakazana_adresa', 'přesměrování do vnitřní sítě neprojde');
   assert.deepEqual(await c.prozkoumej('https://neexistuje-web.cz/'), { typ: 'web', feed: null }, 'web, který neodpovídá, jde přidat jako odkaz');
+});
+
+const VYSLEDEK = { jednou_vetou: 'Bitcoin spadl.', lidsky: 'Cena klesla a autor čeká další pokles.', pojmy: [{ pojem: 'bull trap', vyznam: 'Růst, který naláká kupce a pak se otočí.' }], kdo_to_rika: 'Neznámý autor.', tvrzeni: [{ text: 'Cena je 62 000 USD', druh: 'fakt', poznamka: 'Sedí s kurzem.' }], muj_pohled: 'Je to odhad.', co_s_tim: 'Krypto není v žádném z košů.', pozor: [] };
+
+test('překladač na serveru: bez klíče neběží, s klíčem přeloží text i stránku, hlídá limit a délku', async () => {
+  const bez = await spust();
+  try {
+    const { cookie } = await prihlas(bez.base);
+    const H = { Cookie: cookie, 'Content-Type': 'application/json', 'X-Inv': '1' };
+    assert.equal((await (await fetch(bez.base + '/api/preklad', { headers: { Cookie: cookie } })).json()).dostupny, false);
+    assert.equal((await fetch(bez.base + '/api/preklad', { method: 'POST', headers: H, body: '{"text":"cokoli"}' })).status, 503);
+  } finally { await bez.zavri(); }
+
+  const volani = [];
+  const preklad = { dostupny: () => true, preloz: async (v) => { volani.push(v); if (/ODMITNI/.test(v.material)) throw Object.assign(new Error('x'), { kod: 'odmitnuto' }); return { vysledek: VYSLEDEK, model: 'claude-opus-5-5' }; } };
+  const s = await spust({ preklad, limitPrekladu: 4 });
+  try {
+    assert.equal((await fetch(s.base + '/api/preklad')).status, 401);
+    const { cookie } = await prihlas(s.base);
+    const H = { Cookie: cookie, 'Content-Type': 'application/json', 'X-Inv': '1' };
+    const posli = (b, h = H) => fetch(s.base + '/api/preklad', { method: 'POST', headers: h, body: JSON.stringify(b) });
+    assert.equal((await posli({ text: 'x' }, { Cookie: cookie, 'Content-Type': 'application/json' })).status, 403);
+    assert.equal((await posli({})).status, 400);
+    assert.equal((await posli({ url: 'https://www.facebook.com/nekdo/' })).status, 400);
+    assert.equal((await posli({ url: 'http://web.cz/' })).status, 400);
+    assert.equal((await posli({ text: 'a'.repeat(40001) })).status, 413);
+    assert.equal(volani.length, 0, 'odmítnuté požadavky se k modelu nedostanou a nepočítají se do limitu');
+
+    const r = await posli({ text: 'Propad ceny bitcoinu se prohloubil na 62 000 USD.' });
+    assert.equal(r.status, 200);
+    const j = await r.json();
+    assert.deepEqual(j.vysledek, VYSLEDEK); assert.equal(j.zbyva, 3); assert.equal(j.zdroj, null);
+    assert.match(volani[0].pokyn, /Jsi průvodce začínajícího investora/);
+    assert.match(volani[0].pokyn, /Odpověz jen jedním objektem JSON/);
+    assert.match(volani[0].kontext, /^Dnes je \d{4}-\d{2}-\d{2}\./);
+    assert.match(volani[0].kontext, /NVDA\): 160 USD/, 'model dostane kurzy, které server zná');
+
+    const w = await posli({ url: 'https://ai.finademica.com/?utm_source=facebook' });
+    assert.equal(w.status, 200);
+    assert.equal((await w.json()).zdroj, 'https://ai.finademica.com/?utm_source=facebook');
+    assert.match(volani[1].material, /Kurz obchodování\nNaučíme vás vydělávat 5 % měsíčně/);
+    assert.doesNotMatch(volani[1].material, /x\(\)|a\{\}/, 'skripty a styly se modelu neposílají');
+
+    assert.equal((await posli({ text: 'ODMITNI' })).status, 422);
+    const stav = await (await fetch(s.base + '/api/preklad', { headers: { Cookie: cookie } })).json();
+    assert.deepEqual([stav.dostupny, stav.zbyva, stav.limit, stav.posledni.length], [true, 1, 4, 2], 'neúspěšný pokus se do limitu počítá, do historie ne');
+    assert.equal((await posli({ text: 'čtvrtý' })).status, 200);
+    assert.equal((await posli({ text: 'pátý' })).status, 429);
+    assert.equal(volani.length, 4);
+    assert.equal(JSON.parse(fs.readFileSync(path.join(s.dataDir, 'preklady.json'), 'utf8')).pocet, 4);
+  } finally { await s.zavri(); }
+});
+
+test('překladač: čtení odpovědi modelu, text ze stránky a volání Claude API', async () => {
+  const cisty = JSON.stringify(VYSLEDEK);
+  assert.deepEqual(PR.ctiOdpoved(cisty), VYSLEDEK);
+  assert.deepEqual(PR.ctiOdpoved('Tady je výsledek:\n```json\n' + cisty + '\n```'), VYSLEDEK);
+  assert.deepEqual(PR.ctiOdpoved('Výsledek: ' + cisty + ' Hotovo.'), VYSLEDEK);
+  const divny = PR.ctiOdpoved(JSON.stringify({ lidsky: 'Text.', tvrzeni: [{ text: 'A', druh: 'věštba' }, { druh: 'fakt' }], pojmy: 'nic', pozor: ['x', 5], navic: 1 }));
+  assert.deepEqual(divny, { jednou_vetou: '', lidsky: 'Text.', pojmy: [], kdo_to_rika: '', tvrzeni: [{ text: 'A', druh: 'odhad', poznamka: '' }], muj_pohled: '', co_s_tim: '', pozor: ['x'] });
+  assert.throws(() => PR.ctiOdpoved('Nevím.'), (e) => e.kod === 'necitelna_odpoved');
+  assert.throws(() => PR.ctiOdpoved('{"pojmy":[]}'), (e) => e.kod === 'necitelna_odpoved');
+  assert.equal(PR.textZeStranky('<div><h1>Nadpis</h1><p>A &amp; B&nbsp;&#268;</p><script>zlo()</script><!-- skryté --></div>'), 'Nadpis\nA & B Č');
+  assert.throws(() => PR.vytahniPokyn('<html></html>'));
+  assert.match(PR.sestavZpravu({ material: 'M', zdroj: 'https://w.cz/', kontext: 'K' }), /^<kontext>\nK\n<\/kontext>\n\n<zdroj>https:\/\/w.cz\/<\/zdroj>\n\n<material>\nM\n<\/material>$/);
+
+  assert.equal(PR.prekladac({ apiKey: '' }).dostupny(), false);
+  await assert.rejects(PR.prekladac({ apiKey: '' }).preloz({ pokyn: 'P', material: 'M' }), (e) => e.kod === 'bez_klice');
+  let pozadavek, odpoved = { stop_reason: 'end_turn', model: 'claude-opus-5-5', content: [{ type: 'thinking', thinking: '' }, { type: 'text', text: cisty }] };
+  const klient = { beta: { messages: { create: async (p) => { pozadavek = p; return odpoved; } } } };
+  const pr = PR.prekladac({ klient });
+  assert.deepEqual((await pr.preloz({ pokyn: 'POKYN', material: 'MATERIÁL', kontext: 'Dnes je 2026-11-15.' })).vysledek, VYSLEDEK);
+  assert.deepEqual([pozadavek.model, pozadavek.system, pozadavek.fallbacks, pozadavek.betas[0], pozadavek.output_config.effort, pozadavek.messages.length, pozadavek.messages[0].role], ['claude-opus-5-5', 'POKYN', 'default', 'server-side-fallback-2026-07-01', 'medium', 1, 'user']);
+  assert.match(pozadavek.messages[0].content, /<material>\nMATERIÁL\n<\/material>/);
+  assert.equal(pozadavek.thinking, undefined, 'na tomhle modelu se thinking neposílá, je vždy zapnuté');
+  odpoved = { stop_reason: 'refusal', content: [] };
+  await assert.rejects(pr.preloz({ pokyn: 'P', material: 'M' }), (e) => e.kod === 'odmitnuto');
+  await assert.rejects(pr.preloz({ pokyn: 'P', material: 'x'.repeat(PR.MAX_ZNAKU + 1) }), (e) => e.kod === 'moc_dlouhe');
 });

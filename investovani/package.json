@@ -1,0 +1,16 @@
+{
+  "name": "investicni-skola",
+  "private": true,
+  "description": "Investiční škola: průvodce, deník obchodů, trh naživo a překladač",
+  "license": "UNLICENSED",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "start": "node server.js",
+    "test": "node --test test/server.test.js"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^1.8.0"
+  }
+}
