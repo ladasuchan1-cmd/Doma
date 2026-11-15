@@ -11,7 +11,7 @@ ENV PORT=8095
 ENV INV_DATA=/data
 
 WORKDIR /app
-COPY server.js index.html ./
+COPY server.js trh.js zdroje.js index.html ./
 RUN mkdir -p /data && chown -R node:node /app /data
 USER node
 VOLUME ["/data"]

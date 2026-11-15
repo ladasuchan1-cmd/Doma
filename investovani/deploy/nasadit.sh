@@ -27,7 +27,7 @@ chyba() { echo "✗ $*" >&2; exit 1; }
 command -v docker >/dev/null || chyba "Na serveru chybí docker."
 [[ "$DOMENA" =~ ^([a-z0-9]([a-z0-9-]*[a-z0-9])?\.)+[a-z]{2,}$ ]] || chyba "INV_DOMENA musí být doména malými písmeny, např. investice.ksprehledy.cz (dostal jsem '$DOMENA')."
 case "$VERZE" in ""|*[!A-Za-z0-9._-]*) chyba "INV_VERZE smí obsahovat jen písmena, číslice, tečku, - a _." ;; esac
-[ -f "$NOVY/server.js" ] && [ -f "$NOVY/index.html" ] && [ -f "$NOVY/Dockerfile" ] || chyba "V $NOVY nejsou zdrojáky (server.js, index.html, Dockerfile)."
+[ -f "$NOVY/server.js" ] && [ -f "$NOVY/trh.js" ] && [ -f "$NOVY/zdroje.js" ] && [ -f "$NOVY/index.html" ] && [ -f "$NOVY/Dockerfile" ] || chyba "V $NOVY nejsou zdrojáky (server.js, trh.js, zdroje.js, index.html, Dockerfile)."
 
 echo "== 1/4 Heslo"
 mkdir -p "$DIR" && chmod 700 "$DIR"
