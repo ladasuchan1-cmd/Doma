@@ -144,18 +144,46 @@ details.tbl summary{cursor:pointer;font-size:.88rem;color:var(--ink2)}
 table.src{width:100%;border-collapse:collapse;font-size:.9rem;min-width:520px}
 table.src td,table.src th{padding:8px 8px 8px 0;border-bottom:1px solid var(--line);text-align:left;vertical-align:top}
 table.src th{font:500 .72rem var(--f-num);letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+/* obchodování */
+table.cmp{width:100%;border-collapse:collapse;font-size:.92rem;min-width:560px}
+table.cmp td,table.cmp th{padding:8px 10px 8px 0;border-bottom:1px solid var(--line);text-align:left;vertical-align:top}
+table.cmp th{font:500 .72rem var(--f-num);letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.rules{counter-reset:r;display:grid;gap:0;border-top:1px solid var(--line);margin:0;padding:0;list-style:none}
+.rules li{counter-increment:r;display:grid;grid-template-columns:2.2rem 1fr;gap:2px 10px;padding:11px 0;border-bottom:1px solid var(--line)}
+.rules li::before{content:counter(r);font:600 1.15rem/1.4 var(--f-num);color:var(--accent)}
+.rules li span{color:var(--ink2);grid-column:2;font-size:.95rem}
+.rules li b{grid-column:2}
+.pill{font:600 .68rem/1 var(--f-num);letter-spacing:.06em;text-transform:uppercase;padding:3px 6px;border-radius:4px;border:1px solid var(--line);color:var(--ink2);white-space:nowrap}
+.pill.real{border-color:var(--accent);color:var(--accent)}
+.seg{display:flex;gap:4px;flex-wrap:wrap}
+.seg button{font:600 .85rem var(--f-body);padding:6px 11px;border-radius:999px;border:1px solid var(--line);background:var(--surface);color:var(--ink2);cursor:pointer}
+.seg button[aria-pressed="true"]{background:var(--accent);border-color:var(--accent);color:var(--on-accent)}
+.trades{display:grid;gap:10px}
+.trade{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:14px 16px;display:grid;gap:8px;min-width:0}
+.trade .hd{display:flex;flex-wrap:wrap;gap:6px 10px;align-items:center}
+.trade .hd b{font:700 1.05rem var(--f-display)}
+.trade .hd .res{margin-left:auto;font:600 1rem var(--f-num)}
+.trade .meta{font:.85rem var(--f-num);color:var(--ink2);display:flex;flex-wrap:wrap;gap:2px 14px}
+.trade .why{font-size:.93rem;color:var(--ink2);overflow-wrap:anywhere}
+.btn2{font:600 .85rem var(--f-body);padding:7px 11px;border-radius:8px;border:1px solid var(--line);background:var(--bg);color:var(--ink);cursor:pointer}
+.btn2.danger{color:var(--loss)}
+.btn:disabled{opacity:.5;cursor:default}
+.empty{border:1px dashed var(--line);border-radius:10px;padding:18px;color:var(--ink2);font-size:.95rem}
+.field textarea{font:400 .95rem var(--f-body);padding:8px 10px;border:1px solid var(--line);border-radius:6px;background:var(--bg);color:var(--ink);width:100%;min-height:64px;resize:vertical}
+.field.wide{grid-column:1/-1}
 footer{border-top:1px solid var(--line);padding-block:18px 8px;font-size:.84rem;color:var(--muted)}
 </style>
 
 <header class="top"><div class="wrap">
   <span class="eyebrow">Investiční škola · stav ověření 15. 11. 2026</span>
   <h1>Prvních 10 000 na burze</h1>
-  <p>Průvodce pro úplného začátečníka s účtem u DEGIRO. To nejnutnější, příklady, na kterých si vše vyzkoušíš, a u každého čísla zdroj, kde si ho ověříš.</p>
+  <p>Průvodce pro úplného začátečníka s účtem u DEGIRO. Dva koše po 10 000 Kč: jeden na investování, druhý na učení obchodování. Příklady, na kterých si vše vyzkoušíš, a u každého čísla zdroj.</p>
 </div></header>
 
 <nav class="tabs" aria-label="Části průvodce"><div class="wrap">
   <a href="#start">Základ</a>
   <a href="#cesta">Cesta krok za krokem</a>
+  <a href="#obchod">Obchodování</a>
   <a href="#zkus">Vyzkoušej si</a>
   <a href="#slovnik">Slovník</a>
   <a href="#dukazy">Komu věřit</a>
@@ -199,6 +227,16 @@ footer{border-top:1px solid var(--line);padding-block:18px 8px;font-size:.84rem;
     <p class="verdict">Poplatek je 0,29 % z nakoupené částky. Vlastníš kousek zhruba 3 600 firem z celého světa a fond tě ročně stojí 0,14 % z hodnoty (TER), které se strhávají uvnitř fondu. <a class="cite" data-s="E1"></a></p>
   </div>
 
+  <div class="panel">
+    <span class="eyebrow">Tvoje rozhodnutí z 15. 11. 2026</span>
+    <h3>Dva koše, dvě různé hry</h3>
+    <div class="out">
+      <div><span class="k">Koš 1: investování</span><span class="v">10 000 Kč</span><span class="k">Široký ETF na DEGIRO, držet roky. Tady má vznikat výnos.</span></div>
+      <div><span class="k">Koš 2: obchodování</span><span class="v">10 000 Kč</span><span class="k">Učení s pravidly a deníkem. Cílem je zkušenost, ne výdělek.</span></div>
+    </div>
+    <p class="verdict">Koše se nemíchají. Z investic se obchodování nedotuje a naopak. Pravidla druhého koše jsou v části <a href="#obchod">Obchodování</a>.</p>
+  </div>
+
   <div class="block">
     <h2>Než pošleš první korunu</h2>
     <ul class="plain">
@@ -229,6 +267,136 @@ footer{border-top:1px solid var(--line);padding-block:18px 8px;font-size:.84rem;
     <p class="num" id="progtxt" style="font-size:.86rem;color:var(--muted)"></p>
   </div>
   <div class="steps" id="steps"></div>
+</section>
+
+<!-- ============ OBCHODOVÁNÍ ============ -->
+<section class="view" data-view="obchod" hidden>
+  <div class="block">
+    <h2>Obchodování: druhý koš</h2>
+    <p class="lead">10 000 Kč na to, aby ses naučil obchodovat a zjistil, jestli ti to jde. Cílem prvních měsíců není výdělek. Cílem je mít 20 zapsaných obchodů, ze kterých poznáš pravdu, a zaplatit za ni co nejmenší školné.</p>
+    <p class="note"><b>Co říkají data:</b> většina lidí, kteří aktivně obchodují, dopadne hůř, než kdyby jen drželi ETF (část <a href="#dukazy">Komu věřit</a>). Proto se tvoje výsledky budou měřit proti prvnímu koši, ne proti nule.</p>
+  </div>
+
+  <div class="block">
+    <h3>Pravidla koše</h3>
+    <ol class="rules">
+      <li><b>Strop 10 000 Kč, nedoplňuje se.</b><span>Když peníze dojdou, experiment skončil a vyhodnotíme ho. Ztrátu nedoháníš dalším vkladem.</span></li>
+      <li><b>Jen skutečné akcie a ETF.</b><span>Žádné CFD, páka, short, opce ani krypto. U těch se ztrácí rychleji, než se člověk stihne učit.</span></li>
+      <li><b>Na jednom obchodu riskuješ nejvýš 1 % koše, tedy 100 Kč.</b><span>Riziko není velikost pozice. Je to částka, o kterou přijdeš, když cena dojde na tvůj stop. Spočítá ji kalkulačka níže.</span></li>
+      <li><b>Jedna pozice nejvýš 2 500 Kč, najednou nejvýš pět pozic.</b><span>Žádný jednotlivý omyl tě nesmí vyřadit ze hry.</span></li>
+      <li><b>Obchod zapíšeš do deníku dřív, než ho zadáš.</b><span>Proč kupuješ, za kolik, kde vystoupíš se ztrátou (stop) a kde se ziskem (cíl). Co není zapsané předem, se nepočítá jako obchod, ale jako tip.</span></li>
+      <li><b>Stop se neposouvá dolů.</b><span>Když cena dojde na stop, prodáváš. Posunout ho můžeš jen směrem k zisku.</span></li>
+      <li><b>Když koš klesne na 8 000 Kč, pauza.</b><span>Přestaneš obchodovat, projdeme deník a hledáme, co se opakuje.</span></li>
+    </ol>
+  </div>
+
+  <div class="block">
+    <h3>Tři fáze</h3>
+    <ol class="plain">
+      <li><b>Nanečisto, 3 až 4 týdny.</b> Obchody zapisuješ do deníku v režimu Nanečisto, bez peněz, podle skutečných cen. Účet zatím nepotřebuješ. Stačí 10 uzavřených obchodů.</li>
+      <li><b>Naostro, malé pozice.</b> Otevřeš účet, pošleš 10 000 Kč a obchoduješ podle stejných pravidel. Zjistíš, že se skutečnými penězi se rozhoduje hůř než na papíře. To je hlavní lekce téhle fáze.</li>
+      <li><b>Vyhodnocení po 20 obchodech naostro nebo po 3 měsících.</b> Porovnáme výsledek s tím, co za stejnou dobu udělal ETF v prvním koši, po odečtení poplatků. Podle toho se rozhodneš, jestli pokračovat.</li>
+    </ol>
+  </div>
+
+  <div class="block">
+    <h3>Jaké obchodování dává s 10 000 Kč smysl</h3>
+    <div class="scroll"><table class="cmp">
+      <tr><th>Styl</th><th>Jak dlouho držíš</th><th>Kolik času stojí</th><th>S 10 000 Kč</th></tr>
+      <tr><td><b>Denní</b></td><td>minuty až hodiny</td><td>celý den u obrazovky</td><td>Ne. Malé pohyby ceny sežerou poplatky a směna měny, a právě tady jsou výsledky drobných obchodníků nejhorší.</td></tr>
+      <tr><td><b>Swingové</b></td><td>dny až týdny</td><td>půl hodiny denně večer</td><td>Ano. Pohyby jsou dost velké, aby náklady nerozhodly, a jde to dělat při práci.</td></tr>
+      <tr><td><b>Poziční</b></td><td>týdny až měsíce</td><td>hodina týdně</td><td>Ano. Méně obchodů, takže 20 jich nasbíráš pomaleji.</td></tr>
+    </table></div>
+    <p>Začni swingovým nebo pozičním stylem. Dvě školy, podle kterých se lidé rozhodují, co koupit, jsou technická analýza (čte graf ceny) a fundamentální analýza (čte hospodaření firmy). Obě projdeme v dalších lekcích na tvých obchodech z deníku.</p>
+  </div>
+
+  <div class="panel">
+    <span class="eyebrow">Kde obchodovat</span>
+    <h3>Pro malé pozice vychází nejlevněji broker bez provize a se zlomky akcií</h3>
+    <div class="scroll"><table class="cmp">
+      <tr><th></th><th>DEGIRO</th><th>XTB</th><th>Trading 212</th></tr>
+      <tr><td>Provize, americká akcie</td><td>1 € + 1 € <a class="cite" data-s="D1"></a></td><td>0 € do obratu 100 000 € měsíčně <a class="cite" data-s="X1"></a></td><td>0 € <a class="cite" data-s="X3"></a></td></tr>
+      <tr><td>Směna měny</td><td>0,25 % <a class="cite" data-s="D1"></a></td><td>0,5 % <a class="cite" data-s="X1"></a></td><td>0,15 % <a class="cite" data-s="X3"></a></td></tr>
+      <tr><td>Roční poplatek za burzu</td><td>2,50 € za každou zahraniční <a class="cite" data-s="D1"></a></td><td>není v ceníku</td><td>neověřeno</td></tr>
+      <tr><td>Nejmenší nákup</td><td>celý kus <a class="cite" data-s="E2"></a></td><td>od 10 €, i zlomek akcie <a class="cite" data-s="X1"></a> <a class="cite" data-s="X2"></a></td><td>zlomky akcií ano <a class="cite" data-s="X3"></a></td></tr>
+      <tr><td>Pozice 2 500 Kč tam i zpět</td><td>asi 4,4 %</td><td>asi 1 % (akcie v cizí měně)</td><td>asi 0,3 %</td></tr>
+    </table></div>
+    <p class="verdict">Pro tenhle koš dává smysl XTB nebo Trading 212, ne DEGIRO: u pozice 2 500 Kč by tě tam každý obchod stál přes 4 %, tedy skoro polovinu zisku, na který u jednoho obchodu obvykle míříš. XTB mám ověřené z jejich ceníku a má českou pobočku a podporu. Trading 212 znám jen z recenzí, jejich ceník se mi nepodařilo otevřít.</p>
+    <p class="note"><b>Pozor:</b> XTB i Trading 212 mají ve stejné aplikaci i CFD s pákou. XTB sám uvádí, že na nich prodělává 79 % účtů drobných klientů. <a class="cite" data-s="X1"></a> Při každém nákupu si zkontroluj, že kupuješ akcii nebo ETF, ne CFD. Zlomek akcie u XTB navíc není celá akcie, ale smluvní právo na její část. <a class="cite" data-s="X2"></a></p>
+    <p class="verdict"><b>Daně.</b> Limit 100 000 Kč se počítá ze všech prodejů u všech brokerů za rok dohromady. Při pozicích po 2 500 Kč ho překročíš čtyřicátým prodejem, a pak se daní zisk ze všeho, co jsi nedržel 3 roky, a podává se přiznání. Deník ti součet prodejů hlídá.</p>
+  </div>
+
+  <div class="panel">
+    <span class="eyebrow">Kalkulačka 1</span>
+    <h3>Jak velkou pozici si můžu koupit?</h3>
+    <p>Velikost pozice se nepočítá z toho, kolik chceš vydělat, ale z toho, kolik smíš ztratit. Zadej cenu, za kterou kupuješ, a cenu, na které přiznáš omyl a prodáš (stop).</p>
+    <div class="fields">
+      <label class="field">Velikost koše (Kč)<input type="number" id="pAcct" value="10000" min="100" step="500" inputmode="numeric"></label>
+      <label class="field">Riziko na obchod (%)<input type="number" id="pRisk" value="1" min="0.1" max="5" step="0.1" inputmode="decimal"></label>
+      <label class="field">Měna akcie<select id="pCur"><option value="1">CZK</option><option value="24.425">EUR</option><option value="22.101">USD</option></select></label>
+      <label class="field">Nákupní cena<input type="number" id="pEntry" value="100" min="0" step="0.5" inputmode="decimal"></label>
+      <label class="field">Stop (prodám se ztrátou)<input type="number" id="pStop" value="95" min="0" step="0.5" inputmode="decimal"></label>
+      <label class="field">Cíl (prodám se ziskem)<input type="number" id="pTarget" value="112" min="0" step="0.5" inputmode="decimal"></label>
+    </div>
+    <div class="out">
+      <div><span class="k">Riskuji nejvýš</span><span class="v" id="pRiskKc"></span></div>
+      <div><span class="k">Velikost pozice</span><span class="v" id="pSize"></span></div>
+      <div><span class="k">Počet kusů</span><span class="v" id="pUnits"></span></div>
+      <div><span class="k">Zisk ku riziku</span><span class="v" id="pRR"></span></div>
+    </div>
+    <p class="verdict" id="pVerdict"></p>
+  </div>
+
+  <div class="panel">
+    <span class="eyebrow">Kalkulačka 2</span>
+    <h3>Kolik obchodů musím vyhrát, abych nebyl v minusu?</h3>
+    <p>Nezáleží jen na tom, jak často máš pravdu. Záleží na tom, kolik vyděláš, když ji máš, proti tomu, kolik ztratíš, když ne. Riziko jednoho obchodu je tady 100 Kč.</p>
+    <div class="fields">
+      <label class="field">Průměrný zisk je kolikanásobek ztráty<input type="number" id="eRR" value="2" min="0.2" max="10" step="0.1" inputmode="decimal"></label>
+      <label class="field">Náklady na jeden obchod tam i zpět (Kč)<input type="number" id="eCost" value="25" min="0" step="5" inputmode="numeric"></label>
+      <label class="field">Vyhraju obchodů ze sta: <span class="num" id="eWinTxt"></span><input type="range" id="eWin" min="10" max="90" step="1" value="40"></label>
+    </div>
+    <div class="out">
+      <div><span class="k">Na nulu potřebuji vyhrát</span><span class="v" id="eBE"></span></div>
+      <div><span class="k">Průměrný výsledek jednoho obchodu</span><span class="v" id="eExp"></span></div>
+      <div><span class="k">Po 20 obchodech v průměru</span><span class="v" id="e20"></span></div>
+    </div>
+    <p class="verdict" id="eVerdict"></p>
+  </div>
+
+  <div class="block">
+    <h3>Deník obchodů</h3>
+    <p>Ukládá se k této stránce, takže ho najdeš z telefonu i z počítače a vidím ho i já. Stačí mi napsat „vyhodnoť deník“.</p>
+    <p class="note" id="jState" hidden></p>
+  </div>
+
+  <form class="panel" id="jForm" autocomplete="off">
+    <span class="eyebrow">Nový obchod, zapsaný předem</span>
+    <div class="fields">
+      <label class="field">Titul (název nebo zkratka)<input type="text" id="jT" maxlength="40" required style="font-family:var(--f-body)"></label>
+      <label class="field">Datum nákupu<input type="date" id="jD" required></label>
+      <label class="field">Režim<select id="jMode"><option value="paper">Nanečisto</option><option value="real">Naostro</option></select></label>
+      <label class="field">Velikost pozice (Kč)<input type="number" id="jSize" min="1" step="50" required inputmode="numeric"></label>
+      <label class="field">Nákupní cena<input type="number" id="jEntry" min="0" step="any" required inputmode="decimal"></label>
+      <label class="field">Stop<input type="number" id="jStop" min="0" step="any" required inputmode="decimal"></label>
+      <label class="field">Cíl<input type="number" id="jTarget" min="0" step="any" required inputmode="decimal"></label>
+      <label class="field">Poplatky tam i zpět (Kč)<input type="number" id="jFees" min="0" step="1" value="0" inputmode="numeric"></label>
+      <label class="field wide">Proč to kupuji a co by mě přesvědčilo, že se mýlím<textarea id="jWhy" maxlength="1000" required></textarea></label>
+    </div>
+    <p class="verdict" id="jMsg"></p>
+    <button class="btn" type="submit" id="jAdd" disabled>Zapsat obchod</button>
+  </form>
+
+  <div class="panel">
+    <div class="seg" role="group" aria-label="Které obchody počítat">
+      <button type="button" data-f="all" aria-pressed="true">Všechny</button>
+      <button type="button" data-f="paper" aria-pressed="false">Nanečisto</button>
+      <button type="button" data-f="real" aria-pressed="false">Naostro</button>
+    </div>
+    <div class="out" id="jStats"></div>
+    <p class="verdict" id="jTax"></p>
+  </div>
+  <div class="trades" id="jList"></div>
 </section>
 
 <!-- ============ VYZKOUŠEJ SI ============ -->
@@ -433,6 +601,9 @@ const S={
  S3:{l:'s',t:'Barber, Odean: Trading Is Hazardous to Your Wealth (Journal of Finance, 2000)',w:'Nejaktivnější domácnosti 11,4 % ročně proti 17,9 % trhu; cituji podle abstraktu',u:'https://doi.org/10.1111/0022-1082.00226'},
  S4:{l:'s',t:'ESMA: omezení CFD a zákaz binárních opcí pro drobné investory (2018)',w:'74–89 % účtů drobných investorů na CFD prodělává; cituji podle tiskové zprávy přes vyhledávač',u:'https://www.esma.europa.eu/node/84933'},
  E1:{l:'s',t:'justETF: Vanguard FTSE All-World UCITS ETF (Acc), IE00BK5BQT80',w:'TER 0,14 % od 28. 7. 2026; závazné číslo je v KID fondu',u:'https://www.justetf.com/en/etf-profile.html?isin=IE00BK5BQT80'},
+ X1:{l:'p',t:'XTB: Účet a poplatky (tabulky platné od 30. 9. a 20. 10. 2026)',w:'Akcie a ETF 0 % do obratu 100 000 € měsíčně, pak 0,2 % (min. 10 €); směna měny 0,5 %; nejmenší investice 10 €; 79 % CFD účtů ve ztrátě',u:'https://www.xtb.com/cz/ucet-a-poplatky'},
+ X2:{l:'s',t:'CzechCrunch a finhacker.cz: frakční akcie u XTB',w:'Zlomky akcií od 10 €; právně jde o fiduciární právo k části akcie',u:'https://www.finhacker.cz/frakcni-akcie-a-etf-u-xtb-seznam-tickeru/'},
+ X3:{l:'s',t:'testado.cz: recenze Trading 212 (aktualizace 6/2026)',w:'Bez provize, směna měny 0,15 %, zlomky akcií; oficiální ceník se mi nepodařilo otevřít',u:'https://www.testado.cz/recenze-trading-212/'},
  E2:{l:'s',t:'finex.cz: recenze DEGIRO (aktualizace 6/2026)',w:'DEGIRO neprodává zlomky kusů; vklad v korunách',u:'https://finex.cz/recenze/degiro/'}
 };
 function fillCites(root){(root||document).querySelectorAll('a.cite[data-s]').forEach(a=>{const s=S[a.dataset.s];if(!s)return;a.href=s.u;a.target='_blank';a.rel='noopener';a.classList.add(s.l);a.textContent=a.dataset.s;a.title=s.t})}
@@ -594,6 +765,12 @@ const G=[
  ['P/E','Cena akcie dělená ročním ziskem na akcii. Kolik let zisků platíš v ceně. Hrubé měřítko toho, jak je akcie drahá.','Akcie za 100 € a zisk 5 € na akcii: P/E 20. Index MSCI World měl na konci října 2026 P/E 22,3.'],
  ['Likvidita','Jak snadno a rychle jde cenný papír koupit nebo prodat bez toho, aby se pohnula cena.','Velký ETF se obchoduje každou vteřinu a spread má pár centů. U malé firmy můžeš na kupce čekat hodiny.'],
  ['Rebalancování','Návrat portfolia k původnímu poměru, když se složky vyvíjely různě.','Chceš mít 80 % v akciích a 20 % v dluhopisech. Akcie vyrostly na 88 %: část prodáš a dokoupíš dluhopisy.'],
+ ['Stop-loss','Cena, na které prodáš se ztrátou, protože se tvůj předpoklad nepotvrdil. Určuješ ji před nákupem. Když cena přes noc poskočí, můžeš prodat i hůř než na stopu.','Koupíš za 100, stop 95. Když cena klesne na 95, prodáváš a ztráta je 5 %. Bez stopu se z malé ztráty snadno stane velká.'],
+ ['Riziko na obchod','Částka, o kterou přijdeš, když cena dojde na stop. Není to velikost pozice.','Pozice 2 000 Kč se stopem 5 % pod nákupem: riziko je 100 Kč, tedy 1 % z koše 10 000 Kč.'],
+ ['Poměr zisku k riziku','Kolikrát víc můžeš na obchodu vydělat, než na něm riskuješ. Značí se R:R nebo v násobcích R.','Nákup 100, stop 95, cíl 110. Riskuješ 5, můžeš získat 10. Poměr je 2 : 1 a stačí ti vyhrát zhruba každý třetí obchod.'],
+ ['Swingové obchodování','Obchody držené dny až týdny, které se snaží zachytit jeden větší pohyb ceny.','Koupíš v pondělí po dobrých výsledcích firmy a za dva týdny prodáš na cíli nebo na stopu.'],
+ ['Technická a fundamentální analýza','Dva způsoby, jak se rozhodovat. Technická čte graf ceny a objemů. Fundamentální čte hospodaření firmy: tržby, zisk, dluh.','Technik koupí, protože cena prorazila loňské maximum. Fundamentalista koupí, protože firma roste o 20 % ročně a je levná proti zisku.'],
+ ['Trend','Směr, kterým se cena delší dobu pohybuje. Rostoucí trend dělá vyšší vrcholy a vyšší dna.','Akcie jde 90, 100, 95, 108, 102, 115. Každé dno je výš než to předchozí: rostoucí trend.'],
  ['Inflace','Růst cen. Snižuje, co si za peníze koupíš, a je to laťka, kterou musí investice přeskočit.','Při inflaci 3 % ročně má 10 000 Kč za 10 let kupní sílu dnešních 7 441 Kč.']
 ];
 function renderTerms(q){
@@ -623,7 +800,103 @@ function renderQuiz(){
 $('#quiz').addEventListener('click',e=>{const b=e.target.closest('button[data-q]');if(!b||b.disabled)return;ans[b.dataset.q]=+b.dataset.o;renderQuiz()});
 $('#qReset').addEventListener('click',()=>{ans={};renderQuiz();window.scrollTo(0,0)});
 
+/* ---------- velikost pozice ---------- */
+function posCalc(){
+  const acct=Math.max(0,+$('#pAcct').value||0),rp=Math.max(0,+$('#pRisk').value||0),fx=+$('#pCur').value,e=+$('#pEntry').value||0,st=+$('#pStop').value||0,tg=+$('#pTarget').value||0;
+  const risk=acct*rp/100;$('#pRiskKc').textContent=cz(risk)+' Kč';
+  if(!(e>0)||!(st>0)||st>=e){['pSize','pUnits','pRR'].forEach(i=>$('#'+i).textContent='–');$('#pVerdict').textContent='Stop musí být níž než nákupní cena. Je to cena, na které prodáš se ztrátou.';return}
+  const dist=(e-st)/e;let size=risk/dist;const cap=acct*.25,over=size>cap;
+  const shown=over?cap:size;
+  $('#pSize').textContent=cz(shown)+' Kč';
+  $('#pUnits').textContent=cz(shown/(e*fx),2)+' ks';
+  const rr=tg>e?(tg-e)/(e-st):0;$('#pRR').textContent=rr?cz(rr,1)+' : 1':'–';
+  let v=`Stop je ${cz(dist*100,1)} % pod nákupem. `;
+  v+=over?`Podle rizika by vyšla pozice ${cz(size)} Kč, to je přes limit čtvrtiny koše. Kup za ${cz(cap)} Kč; na stopu pak ztratíš jen ${cz(cap*dist)} Kč.`:`Když cena dojde na stop, ztratíš ${cz(risk)} Kč a v koši zůstane ${cz(acct-risk)} Kč.`;
+  if(fx!==1)v+=` U akcie v cizí měně počítej se směnou: u XTB asi ${cz(shown*.01)} Kč tam i zpět.`;
+  if(rr&&rr<1.5)v+=' Zisk ku riziku je pod 1,5 : 1. Takový obchod se vyplatí, jen když vyhráváš většinu obchodů.';
+  if(shown/(e*fx)<1)v+=' Vychází méně než jeden kus, potřebuješ brokera, který prodává zlomky akcií.';
+  $('#pVerdict').textContent=v;
+}
+['pAcct','pRisk','pCur','pEntry','pStop','pTarget'].forEach(id=>$('#'+id).addEventListener('input',posCalc));
+
+/* ---------- kolik musím vyhrát ---------- */
+function expCalc(){
+  const rr=Math.max(.1,+$('#eRR').value||0),c=Math.max(0,+$('#eCost').value||0)/100,p=+$('#eWin').value/100;
+  $('#eWinTxt').textContent=cz(p*100);
+  const be=Math.min(1,(1+c)/(rr+1)),ex=(p*rr-(1-p)-c)*100;
+  $('#eBE').textContent=cz(be*100)+' ze 100';
+  const E=$('#eExp'),T=$('#e20');
+  E.textContent=money(Math.round(ex),'Kč');E.className='v '+(ex>0?'gain':ex<0?'loss':'');
+  T.textContent=money(Math.round(ex*20),'Kč');T.className='v '+(ex>0?'gain':ex<0?'loss':'');
+  $('#eVerdict').textContent=ex>0?`S těmito čísly vyděláváš, i když ${cz((1-p)*100)} obchodů ze sta prohraješ. Jestli tahle čísla opravdu máš, ukáže až deník, ne pocit.`:`S těmito čísly proděláváš, i když máš pravdu ve ${cz(p*100)} případech ze sta. Buď potřebuješ větší zisky proti ztrátám, nebo nižší náklady.`;
+}
+['eRR','eCost','eWin'].forEach(id=>$('#'+id).addEventListener('input',expCalc));
+
+/* ---------- deník obchodů (db) ---------- */
+let db=null,trades=[],jFilter='all',jLoaded=false,jArm=null;
+const jMsg=(t,show=true)=>{const n=$('#jState');n.textContent=t;n.hidden=!show};
+const num=v=>{const n=parseFloat(v);return isFinite(n)?n:null};
+function tStat(t){const risk=(t.entry-t.stop)/t.entry;if(t.exit==null)return{open:true,risk};const pct=(t.exit-t.entry)/t.entry,kc=t.size*pct-(t.fees||0);return{open:false,pct,kc,risk,r:risk>0?kc/(t.size*risk):0,sold:t.size*(1+pct)}}
+function renderJournal(){
+  const keep={};$$('#jList [data-keep]').forEach(i=>keep[i.id]=i.value);
+  const list=trades.filter(t=>jFilter==='all'||t.mode===jFilter).sort((a,b)=>(b.d||'').localeCompare(a.d||'')||(b.created||'').localeCompare(a.created||''));
+  const closed=list.map(t=>({t,s:tStat(t)})).filter(x=>!x.s.open),wins=closed.filter(x=>x.s.kc>0);
+  const tot=closed.reduce((a,x)=>a+x.s.kc,0),avgR=closed.length?closed.reduce((a,x)=>a+x.s.r,0)/closed.length:0;
+  const cls=v=>v>0?' gain':v<0?' loss':'';
+  $('#jStats').innerHTML=`<div><span class="k">Uzavřené obchody</span><span class="v">${closed.length}</span><span class="k">otevřené: ${list.length-closed.length}</span></div>
+   <div><span class="k">Vyhrané</span><span class="v">${closed.length?cz(100*wins.length/closed.length)+' %':'–'}</span></div>
+   <div><span class="k">Výsledek celkem</span><span class="v${cls(tot)}">${closed.length?money(Math.round(tot),'Kč'):'–'}</span></div>
+   <div><span class="k">Průměr na obchod v násobcích rizika</span><span class="v${cls(avgR)}">${closed.length?(avgR>0?'+':avgR<0?'−':'')+cz(Math.abs(avgR),2)+' R':'–'}</span></div>`;
+  const yr=String(new Date().getFullYear()),sold=trades.filter(t=>t.mode==='real'&&t.exit!=null&&(t.xd||'').startsWith(yr)).reduce((a,t)=>a+tStat(t).sold,0);
+  $('#jTax').textContent=`Prodeje naostro v roce ${yr}: ${cz(sold)} Kč ze 100 000 Kč daňového limitu. Přičti k tomu prodeje u ostatních brokerů.`+(closed.length&&closed.length<20?` Z ${closed.length} obchodů se zatím nedá nic usoudit, čísla začnou něco říkat kolem dvaceti.`:'');
+  const L=$('#jList');
+  if(!jLoaded){L.innerHTML='';return}
+  if(!list.length){L.innerHTML=`<div class="empty">${trades.length?'V tomto režimu zatím žádný obchod není.':'Deník je prázdný. První obchod zapiš nahoře v režimu Nanečisto: vyber si akcii, kterou znáš, podívej se na dnešní cenu a napiš, proč by měla růst a kde přiznáš omyl.'}</div>`;return}
+  L.innerHTML=list.map(t=>{const s=tStat(t),id=esc(t.id);
+    const head=`<div class="hd"><b>${esc(t.t)}</b><span class="pill ${t.mode==='real'?'real':''}">${t.mode==='real'?'naostro':'nanečisto'}</span>${s.open?'<span class="pill">otevřený</span>':`<span class="res${cls(s.kc)}">${money(Math.round(s.kc),'Kč')} · ${(s.r>0?'+':s.r<0?'−':'')+cz(Math.abs(s.r),1)} R</span>`}</div>`;
+    const meta=`<div class="meta"><span>${esc(t.d||'')}${t.xd?' → '+esc(t.xd):''}</span><span>pozice ${cz(t.size)} Kč</span><span>nákup ${cz(t.entry,2)}</span><span>stop ${cz(t.stop,2)}</span><span>cíl ${cz(t.target,2)}</span>${s.open?`<span>riziko ${cz(t.size*s.risk)} Kč</span>`:`<span>prodej ${cz(t.exit,2)} (${(s.pct>0?'+':s.pct<0?'−':'')+cz(Math.abs(s.pct*100),1)} %)</span>`}</div>`;
+    const why=`<p class="why"><b>Proč:</b> ${esc(t.why||'')}</p>`+(t.lesson?`<p class="why"><b>Poučení:</b> ${esc(t.lesson)}</p>`:'');
+    const close=s.open?`<div class="fields"><label class="field">Prodejní cena<input type="number" step="any" min="0" id="x_${id}" data-keep inputmode="decimal"></label><label class="field">Datum prodeje<input type="date" id="xd_${id}" data-keep></label><label class="field wide">Co jsem se naučil<textarea id="xl_${id}" data-keep maxlength="1000"></textarea></label></div>`:'';
+    return `<div class="trade">${head}${meta}${why}${close}<div class="seg">${s.open?`<button class="btn2" type="button" data-close="${id}">Uzavřít obchod</button>`:''}<button class="btn2 danger" type="button" data-del="${id}">${jArm===t.id?'Opravdu smazat?':'Smazat'}</button></div></div>`}).join('');
+  for(const k in keep){const i=document.getElementById(k);if(i)i.value=keep[k]}
+}
+$('.view[data-view="obchod"] .seg[role="group"]').addEventListener('click',e=>{const b=e.target.closest('button[data-f]');if(!b)return;jFilter=b.dataset.f;$$('button[data-f]').forEach(x=>x.setAttribute('aria-pressed',x===b));renderJournal()});
+$('#jForm').addEventListener('submit',async e=>{
+  e.preventDefault();if(!db)return;
+  const t={t:$('#jT').value.trim(),d:$('#jD').value,mode:$('#jMode').value,size:num($('#jSize').value),entry:num($('#jEntry').value),stop:num($('#jStop').value),target:num($('#jTarget').value),fees:num($('#jFees').value)||0,why:$('#jWhy').value.trim(),exit:null,created:new Date().toISOString()};
+  const m=$('#jMsg');
+  if(!t.t||!t.d||!(t.size>0)||!(t.entry>0)||!(t.stop>0)||!(t.target>0)||!t.why){m.textContent='Vyplň všechna pole. Obchod bez důvodu, stopu a cíle se nezapisuje.';return}
+  if(t.stop>=t.entry||t.target<=t.entry){m.textContent='Stop musí být pod nákupní cenou a cíl nad ní.';return}
+  const btn=$('#jAdd');btn.disabled=true;m.textContent='Ukládám…';
+  try{await db.collection('trades').add(t);m.textContent='Zapsáno.';['jT','jSize','jEntry','jStop','jTarget','jWhy'].forEach(i=>$('#'+i).value='');$('#jFees').value=0}
+  catch(err){m.textContent=err&&err.code==='quota_exceeded'?'Deník je plný, smaž staré záznamy.':'Uložení se nepovedlo. Zkus to za chvíli znovu.'}
+  btn.disabled=false;
+});
+$('#jList').addEventListener('click',async e=>{
+  const c=e.target.closest('[data-close]'),d=e.target.closest('[data-del]');if(!db)return;
+  if(c){const id=c.dataset.close,x=num(document.getElementById('x_'+id).value),xd=document.getElementById('xd_'+id).value,l=document.getElementById('xl_'+id).value.trim();
+    if(!(x>0)||!xd){jMsg('K uzavření obchodu doplň prodejní cenu a datum.');return}
+    c.disabled=true;try{await db.doc('trades/'+id).update({exit:x,xd,lesson:l});jMsg('',false)}catch(err){jMsg('Uzavření se nepovedlo uložit. Zkus to znovu.');c.disabled=false}}
+  if(d){const id=d.dataset.del;if(jArm!==id){jArm=id;renderJournal();return}
+    jArm=null;try{await db.doc('trades/'+id).delete()}catch(err){jMsg('Smazání se nepovedlo.')}}
+});
+function initJournal(){
+  $('#jD').value=new Date().toISOString().slice(0,10);
+  const off=()=>{jLoaded=true;jMsg('Deník se ukládá jen při otevření této stránky na claude.ai pod tvým účtem. V tomto zobrazení ho nejde načíst ani zapisovat.');renderJournal()};
+  if(!window.claude||!window.claude.use){off();return}
+  window.claude.use('db').then(d=>{
+    if(!d){off();return}
+    db=d;$('#jAdd').disabled=false;
+    const slow=setTimeout(()=>jMsg(jLoaded?'Deník se nedaří obnovit, zobrazené obchody nemusí být aktuální.':'Deník se zatím nedaří načíst. Zkouším dál.'),10000);
+    d.collection('trades').onSnapshot(snap=>{
+      trades=snap.docs.map(x=>Object.assign({id:x.id},x.data()));jLoaded=true;
+      if(!snap.metadata.fromCache){clearTimeout(slow);jMsg('',false)}
+      renderJournal();
+    },()=>{clearTimeout(slow);jLoaded=true;$('#jAdd').disabled=true;db=null;jMsg('Deník teď není dostupný. Obnov stránku později.');renderJournal()});
+  },off);
+}
+
 /* ---------- start ---------- */
-fillCites();renderSteps();shortSim();feeCalc();barChart();lineChart();tax();renderTerms('');renderQuiz();route();
+fillCites();renderSteps();shortSim();feeCalc();barChart();lineChart();tax();renderTerms('');renderQuiz();posCalc();expCalc();renderJournal();initJournal();route();
 })();
 </script>
