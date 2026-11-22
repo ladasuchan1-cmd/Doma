@@ -46,6 +46,14 @@ Pracnost je odhad v člověkodnech práce Clauda, ne slib. Stav „dnes“ je ov
 - **Klíče:** každý TOP/admin si vydává svůj, zrušit smí kterýkoli TOP/admin. Klíč platí, dokud se majitel aspoň jednou za 30 dní přihlásí do Feed Hubu účtem Salesu a má roli TOP/admin; v sekci je vidět, kdo se kdy na co ptal (bez obsahu dat). 60 dotazů za minutu na klíč.
 - **Nezkoušeno naostro:** instalace rozšíření v Claude Desktop na firemním počítači (lokálně ověřeno skutečným mostem rozšíření proti kopii dat KCK: Force 1 717 nemáme → 1 370 do souboru).
 
+**Stav 22. 11. 2026 ve 23:10 (verze `v2026-11-22-425d883`, feedhub #25), z logu nasazení:**
+
+- **Láďa má MCP napojené a první dotaz („co od KCK značky Force nemáme“) nevrátil nic.** Příčina: značku u českých feedů čte Feed Hub až od odpoledního nasazení 22. 11., KCK ale naposledy běžel ve 12:00 — log ukázal u KCK 6 210 nabídek, se značkou 0. Filtr „Force“ proto nenašel nic a nástroj neřekl proč (stejně filtr značky a import v Sortimentu na dashboardu).
+- **Opraveno a ověřeno z logu:** zdroje, které značku umí číst a ještě ji neměly, se po nasazení pustily jednou hned. Po doplnění má značku KCK u všech 6 210 nabídek, Helios 16 931, Zookee 11 918, Sport Import 10 535, Sport und Freizeit 9 394 a 8 747, Catherine 5 411, Origos 5 042, Cyklomax 4 871, ABUS 2 185, Vertone 1 912, Pedalsport 1 857, Crussis 1 286, Penco 145.
+- **Bez značky zůstávají** (feed ji nenese, nebo ji mapování nečte): Bike Park, Biketime (Bulls), Crussis dostupnost, Ride Hard, Sidas, Viva. U nich filtr značky nepůjde, dokud se značka nedoplní do mapování zdroje.
+- Když filtr značky nic nenajde, Claude teď dostane důvod (pole `pozor`) a má ho říct jako první; stejná věta je v Sortimentu. Výpis stavu ukazuje u zdroje počet nabídek se značkou.
+- Ruční běh zdroje z GitHubu dál nejde — workflow „Spustit zdroj na serveru“ není registrovaný, dokud výchozí větev repozitáře není `main` (úkol Ládi).
+
 **Zbývá z kontroly zalistování:** omezit objednací název na karty daného dodavatele (karta dodavatele nese, chybí přiřazení dodavatel Pohody → zdroj feedu), skupiny variant (chybějící velikosti a barvy), uložené parametry po dodavatelích (sledované značky), tabulka pro import nových položek do Pohody (potřebuje vzor od Ládi), týdenní souhrn mailem (čeká na SMTP).
 
 ## Kde jsme dnes
