@@ -29,6 +29,14 @@ Pracnost je odhad v člověkodnech práce Clauda, ne slib. Stav „dnes“ je ov
 
 **Adresa pro tým: `https://sales.report/feeds/`** (rozhodnutí Ládi 22. 11.). Aplikace je připravená a nasazená; chybí jediný krok na serveru, který nasazení záměrně nedělá samo (konfigurace Caddy je vstupní brána Salesu, zásah s právy správce): `bash /home/suchan/actions-runner-feedhub/_work/feedhub/feedhub/deploy.sh --vratnice`. Příkaz upraví jen blok `sales.report`, uloží zálohu, nechá konfiguraci zkontrolovat a vrátí ji, kdyby Sales po změně odpovídal jinak.
 
+**Stav 22. 11. 2026 v 19:01 (verze `v2026-11-22-42219c1`, feedhub #23), z logu nasazení:**
+
+- **Adresa `https://sales.report/feeds/` funguje** (cesta na vrátnici je doplněná, log: „Vrátnice: … odpovídá“).
+- **Přihlášení účtem Salesu, jen role TOP a admin** (rozhodnutí Ládi; nezaměňovat se `sales.report/znalosti`). Feed Hub se na platnost přihlášení ptá Salesu po vnitřní síti — log hlásí `"sales":"ok"`. Společné heslo platí už jen přímo na portu aplikace (SSH tunel).
+- **Import do Pohody**: v Sortimentu v pohledu „Dodavatel nabízí, my nemáme“ tlačítko „Import do Pohody (XLSX)“ — soubor přesně podle vzoru od Ládi (Kód, Čár. kód, Název, Nákupní bez DPH, Prodejní bez DPH vzorcem z MOC, Dodavatel, Obj. název, Dop. MOC CZK/EUR, Sezona, Výrobce), se stejnými filtry jako seznam (dodavatel, značka, jen skladem, nové). Čísla dodavatelů z adresáře Pohody jsou u 64 zdrojů (z fotek adresáře; KCK 103639, Biketime 240482); chybí německý ABUS a Oberalp.
+- **K rozhodnutí u importu:** nákupní cena je cena z feedu tak, jak je (u KCK velkoobchodní bez DPH, bez případné slevy); MOC v EUR se na Kč nepřepočítává; Sezona se zadává ručně; položky bez EANu se do souboru nedávají (u KCK jsou to řádky modelů).
+- **MCP pro Claude Desktop** (přání Ládi: zadávat přes Clauda třeba „vytáhni import KCK / Force“) zatím není: je v rozporu s direktivou č. 1 (žádná AI API), dokud Láďa neřekne, co smí ke Claudovi odejít. Návrh: jen příkazy, počty a odkaz na soubor na firemním serveru — žádné položky ani ceny.
+
 **Zbývá z kontroly zalistování:** omezit objednací název na karty daného dodavatele (karta dodavatele nese, chybí přiřazení dodavatel Pohody → zdroj feedu), skupiny variant (chybějící velikosti a barvy), uložené parametry po dodavatelích (sledované značky), tabulka pro import nových položek do Pohody (potřebuje vzor od Ládi), týdenní souhrn mailem (čeká na SMTP).
 
 ## Kde jsme dnes
@@ -110,7 +118,7 @@ Bloky A až D dávají dohromady zhruba dva týdny práce, blok E další týden
 
 ## Co musí rozhodnout nebo dodat lidé
 
-- **Láďa:** prahy pro podezřelé změny, po kolika dnech výpadku dodavatele vyřadit z feedu, kdo má mít přístup do dashboardu. Od 22. 11.: spustit na serveru `deploy.sh --vratnice` (adresa `sales.report/feeds`), dodat vzor tabulky pro zakládání položek do Pohody, říct, které značky u kterého dodavatele sledovat.
+- **Láďa:** prahy pro podezřelé změny, po kolika dnech výpadku dodavatele vyřadit z feedu, kdo má mít přístup do dashboardu. Od 22. 11.: rozhodnout rozsah MCP (co smí ke Claudovi), potvrdit pravidla importu do Pohody (nákupní cena, MOC v EUR, sezona), doplnit číslo dodavatele pro německý ABUS a Oberalp, říct, které značky u kterého dodavatele sledovat. (Hotovo 22. 11.: vrátnice `sales.report/feeds`, vzor importní tabulky, adresář dodavatelů.)
 - **František:** SMTP pro poštu, zpřístupnění feedu zvenku, interní adresa, místo pro zálohy.
 - **BHIT:** potvrzení struktury XML a zdrojová IP.
 - **Pavel:** přístupy k VeloConnectu pro MBPS a ABUS, kontrolní položky s ověřenou nákupní cenou.
