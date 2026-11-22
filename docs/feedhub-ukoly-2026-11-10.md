@@ -19,6 +19,18 @@ Pracnost je odhad v člověkodnech práce Clauda, ne slib. Stav „dnes“ je ov
 
 **Rozhodnutí Ládi 10. 11. 2026:** celý katalog vždy, kde to jde, u všech dodavatelů. Je to výchozí chování všech zdrojů přes VeloConnect; zadané kódy jsou jen záloha.
 
+**Stav 22. 11. 2026 večer (verze `v2026-11-22-7bb3738`), čtený z logu nasazení — nový cíl: kontrola zalistování.** Zadání Ládi: hlídat, jestli máme zalistované všechno, co dodavatel nabízí, nové položky, chybějící varianty, co máme a dodavatel už nevede; přehledně pro tým a s tabulkou pro import do Pohody. Hotové a nasazené jsou tři kroky (feedhub #19–#22):
+
+1. **Náš sortiment z e-shopového feedu** (51 311 položek, denně 5:30) a párování nabídek podle EANu.
+2. **Sekce „Sortiment“ na dashboardu** — po dodavatelích kolik nabídek máme, pohledy „nabízí a nemáme“, „máme a nenabízí“, „máme“, exporty pro Excel; značka a doporučená MOC z českých feedů.
+3. **Katalog karet Pohody** (souhlas Ládi: číst export ze serverové složky, jen čtení; denně 6:40 a 12:40). První běh na serveru: **149 050 karet**, objednací název má 142 369, EAN 136 525, běh 47 s; sloupec Stav zásoby katalog nenese. Všech 51 311 položek e-shopu má kartu (kódy e-shopu a Pohody sedí). Tím začalo platit párování podle objednacího názvu a přibyly pohledy „jen karta, není na e-shopu“ a „ke kontrole“.
+
+Čísla po kroku 3: z 117 709 aktuálních nabídek dodavatelů **máme 29 445** (EAN 27 370, objednací název 2 075; před katalogem 18 621), u 9 394 z nich máme jen kartu v Pohodě a na e-shopu nejsou, **nemáme 87 525**, **ke kontrole 739** (objednací název sedí na kód dodavatele, EAN je jiný — nejvíc Helios 213, Cyklomax 207, ABUS 93, Zookee 64, KCK 51). KCK: nabízí 6 210, máme 3 904 (jen karta 770), nemáme 2 255.
+
+**Adresa pro tým: `https://sales.report/feeds/`** (rozhodnutí Ládi 22. 11.). Aplikace je připravená a nasazená; chybí jediný krok na serveru, který nasazení záměrně nedělá samo (konfigurace Caddy je vstupní brána Salesu, zásah s právy správce): `bash /home/suchan/actions-runner-feedhub/_work/feedhub/feedhub/deploy.sh --vratnice`. Příkaz upraví jen blok `sales.report`, uloží zálohu, nechá konfiguraci zkontrolovat a vrátí ji, kdyby Sales po změně odpovídal jinak.
+
+**Zbývá z kontroly zalistování:** omezit objednací název na karty daného dodavatele (karta dodavatele nese, chybí přiřazení dodavatel Pohody → zdroj feedu), skupiny variant (chybějící velikosti a barvy), uložené parametry po dodavatelích (sledované značky), tabulka pro import nových položek do Pohody (potřebuje vzor od Ládi), týdenní souhrn mailem (čeká na SMTP).
+
 ## Kde jsme dnes
 
 | Cíl | Co už je | Co chybí |
@@ -98,7 +110,7 @@ Bloky A až D dávají dohromady zhruba dva týdny práce, blok E další týden
 
 ## Co musí rozhodnout nebo dodat lidé
 
-- **Láďa:** prahy pro podezřelé změny, po kolika dnech výpadku dodavatele vyřadit z feedu, kdo má mít přístup do dashboardu.
+- **Láďa:** prahy pro podezřelé změny, po kolika dnech výpadku dodavatele vyřadit z feedu, kdo má mít přístup do dashboardu. Od 22. 11.: spustit na serveru `deploy.sh --vratnice` (adresa `sales.report/feeds`), dodat vzor tabulky pro zakládání položek do Pohody, říct, které značky u kterého dodavatele sledovat.
 - **František:** SMTP pro poštu, zpřístupnění feedu zvenku, interní adresa, místo pro zálohy.
 - **BHIT:** potvrzení struktury XML a zdrojová IP.
 - **Pavel:** přístupy k VeloConnectu pro MBPS a ABUS, kontrolní položky s ověřenou nákupní cenou.
