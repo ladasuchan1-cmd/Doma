@@ -35,7 +35,16 @@ Pracnost je odhad v člověkodnech práce Clauda, ne slib. Stav „dnes“ je ov
 - **Přihlášení účtem Salesu, jen role TOP a admin** (rozhodnutí Ládi; nezaměňovat se `sales.report/znalosti`). Feed Hub se na platnost přihlášení ptá Salesu po vnitřní síti — log hlásí `"sales":"ok"`. Společné heslo platí už jen přímo na portu aplikace (SSH tunel).
 - **Import do Pohody**: v Sortimentu v pohledu „Dodavatel nabízí, my nemáme“ tlačítko „Import do Pohody (XLSX)“ — soubor přesně podle vzoru od Ládi (Kód, Čár. kód, Název, Nákupní bez DPH, Prodejní bez DPH vzorcem z MOC, Dodavatel, Obj. název, Dop. MOC CZK/EUR, Sezona, Výrobce), se stejnými filtry jako seznam (dodavatel, značka, jen skladem, nové). Čísla dodavatelů z adresáře Pohody jsou u 64 zdrojů (z fotek adresáře; KCK 103639, Biketime 240482); chybí německý ABUS a Oberalp.
 - **K rozhodnutí u importu:** nákupní cena je cena z feedu tak, jak je (u KCK velkoobchodní bez DPH, bez případné slevy); MOC v EUR se na Kč nepřepočítává; Sezona se zadává ručně; položky bez EANu se do souboru nedávají (u KCK jsou to řádky modelů).
-- **MCP pro Claude Desktop** (přání Ládi: zadávat přes Clauda třeba „vytáhni import KCK / Force“) zatím není: je v rozporu s direktivou č. 1 (žádná AI API), dokud Láďa neřekne, co smí ke Claudovi odejít. Návrh: jen příkazy, počty a odkaz na soubor na firemním serveru — žádné položky ani ceny.
+- **MCP pro Claude Desktop**: v 19:01 ještě nebylo (čekalo na rozhodnutí, co smí ke Claudovi) — Láďa pak řekl „postav to jako v sales“, viz stav v 19:36 níže.
+
+**Stav 22. 11. 2026 v 19:36 (verze `v2026-11-22-80c1109`, feedhub #24), z logu nasazení:**
+
+- **Claude Desktop přes MCP je nasazený** (rozhodnutí Ládi: „postav to jako v sales“). Stejné řešení jako u Salesu: rozšíření `.mcpb` na počítači uživatele, jen po firemní síti nebo VPN, osobní klíč `sk-feedhub-…`, adresa `https://sales.report/feeds/mcp`. Log: zdraví `ok`, `"sales":"ok"`, vrátnice odpovídá, **kořenový certifikát Caddy uložen** (rozšíření ho ponese).
+- **Jak se připojit:** `sales.report/feeds` → sekce *Claude Desktop* → *Vydat můj klíč* (ukáže se jednou) → *Stáhnout rozšíření* → v Claude Desktop Nastavení → Rozšíření → Instalovat rozšíření → vložit klíč. Pak třeba: „Vytáhni do import souboru všechny položky od KCK, výrobce Force, které nemáme založené.“
+- **Co Claude umí (šest nástrojů, jen čtou):** přehled dodavatelů a pokrytí, značky dodavatele, položky dodavatele (nemáme / máme / jen karta / ke kontrole; značka, jen skladem, nové, hledání), naše položky, které dodavatel nenabízí, stav zdrojů a **import do Pohody — vrátí souhrn a odkaz**, soubor se stáhne z Feed Hubu v prohlížeči (položky ani ceny přes Clauda nejdou).
+- **Nákupní ceny přes připojení jsou vypnuté**, dokud je TOP/admin v sekci Claude Desktop nezapne (zaškrtávátko, změna je v Deníku). To jsem zvolil já jako opatrnější výchozí stav — k potvrzení Láďou.
+- **Klíče:** každý TOP/admin si vydává svůj, zrušit smí kterýkoli TOP/admin. Klíč platí, dokud se majitel aspoň jednou za 30 dní přihlásí do Feed Hubu účtem Salesu a má roli TOP/admin; v sekci je vidět, kdo se kdy na co ptal (bez obsahu dat). 60 dotazů za minutu na klíč.
+- **Nezkoušeno naostro:** instalace rozšíření v Claude Desktop na firemním počítači (lokálně ověřeno skutečným mostem rozšíření proti kopii dat KCK: Force 1 717 nemáme → 1 370 do souboru).
 
 **Zbývá z kontroly zalistování:** omezit objednací název na karty daného dodavatele (karta dodavatele nese, chybí přiřazení dodavatel Pohody → zdroj feedu), skupiny variant (chybějící velikosti a barvy), uložené parametry po dodavatelích (sledované značky), tabulka pro import nových položek do Pohody (potřebuje vzor od Ládi), týdenní souhrn mailem (čeká na SMTP).
 
@@ -118,7 +127,7 @@ Bloky A až D dávají dohromady zhruba dva týdny práce, blok E další týden
 
 ## Co musí rozhodnout nebo dodat lidé
 
-- **Láďa:** prahy pro podezřelé změny, po kolika dnech výpadku dodavatele vyřadit z feedu, kdo má mít přístup do dashboardu. Od 22. 11.: rozhodnout rozsah MCP (co smí ke Claudovi), potvrdit pravidla importu do Pohody (nákupní cena, MOC v EUR, sezona), doplnit číslo dodavatele pro německý ABUS a Oberalp, říct, které značky u kterého dodavatele sledovat. (Hotovo 22. 11.: vrátnice `sales.report/feeds`, vzor importní tabulky, adresář dodavatelů.)
+- **Láďa:** prahy pro podezřelé změny, po kolika dnech výpadku dodavatele vyřadit z feedu, kdo má mít přístup do dashboardu. Od 22. 11.: potvrdit, že nákupní ceny přes Claude Desktop mají zůstat vypnuté (přepínač na dashboardu), vyzkoušet rozšíření v Claude Desktop, potvrdit pravidla importu do Pohody (nákupní cena, MOC v EUR, sezona), doplnit číslo dodavatele pro německý ABUS a Oberalp, říct, které značky u kterého dodavatele sledovat. (Hotovo 22. 11.: vrátnice `sales.report/feeds`, vzor importní tabulky, adresář dodavatelů, rozhodnutí o MCP — „jako v Sales“.)
 - **František:** SMTP pro poštu, zpřístupnění feedu zvenku, interní adresa, místo pro zálohy.
 - **BHIT:** potvrzení struktury XML a zdrojová IP.
 - **Pavel:** přístupy k VeloConnectu pro MBPS a ABUS, kontrolní položky s ověřenou nákupní cenou.
