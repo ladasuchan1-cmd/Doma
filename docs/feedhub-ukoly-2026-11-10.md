@@ -129,7 +129,11 @@ Dnešní zkušenost ukazuje, proč je to potřeba: Lindlau deset dní padal po m
 
 ## F. Feedy podle obratu dodavatele (23. 11. 2026)
 
-**Stav 23. 11. 2026 ve 23:45 (feedhub #36–#38):**
+**Stav 23. 11. 2026 ve 23:37 (verze `v2026-11-23-f509ba5`, feedhub #36–#38), z logu nasazení — vše nasazeno:**
+
+- Přiřazení značek, záložka Nápověda i ruční párování běží na serveru; kontrola po nasazení v pořádku (databáze, start, spojení na Sales). Čísla Sortimentu se ručním párováním nezměnila (zatím žádný ruční pár): máme 53 950, nemáme 117 924, ke kontrole 941.
+
+**Průběh 23. 11. 2026 večer (feedhub #36–#38):**
 
 - **Přiřazení značky dodavatele k naší značce** je nasazené (verze `v2026-11-23-eb0c2ff`): Sortiment → dodavatel → ve filtru Značka vyber značku s poznámkou „nevedeme“ → pod filtry „Je to naše značka pod jiným názvem?“ → vyber naši značku → Přiřadit.
 - **Záložka Nápověda** (nasazuje se): návod pro kolegy přímo ve Feed Hubu — `https://sales.report/feeds/#napoveda`.
