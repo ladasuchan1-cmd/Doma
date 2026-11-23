@@ -129,6 +129,14 @@ Dnešní zkušenost ukazuje, proč je to potřeba: Lindlau deset dní padal po m
 
 ## F. Feedy podle obratu dodavatele (23. 11. 2026)
 
+**Stav 24. 11. 2026 po půlnoci (feedhub #39) — nezávislá kontrola večerních změn:**
+
+- Večerní změny (feedhub #30–#38, asi 2 100 řádků) prošly nezávislou kontrolou — druhý agent je jen četl, pouštěl sondy a měřil. Našel dvanáct věcí, všechny jsou opravené a mají vlastní test (305 testů).
+- Tři mohly dát špatná data: neúplné stažení hned po změně adresy feedu by položky tiše vyřadilo; ruční páry by přestaly platit po přejmenování dodavatele; značku se zápisem jen na staré kartě Pohody nešlo přiřadit.
+- Jedna zpomalila pohled „Máme, dodavatel nenabízí“ ze zlomku sekundy na sekundy (opraveno, nad skutečnými feedy 0,05 s).
+- Dvě se tvářily jako „nic nechybí“: Claude u filtru „jen naše značky“ a u přehledu dodavatelů tam, kde feed značku nebo varianty nenese.
+- Kontrola zároveň potvrdila, že rozdělení nabídek (ručně / EAN / objednací název / ke kontrole / nemáme) dává vždy součet všech nabídek, zápisy jsou chráněné a migrace bezpečné.
+
 **Stav 23. 11. 2026 ve 23:37 (verze `v2026-11-23-f509ba5`, feedhub #36–#38), z logu nasazení — vše nasazeno:**
 
 - Přiřazení značek, záložka Nápověda i ruční párování běží na serveru; kontrola po nasazení v pořádku (databáze, start, spojení na Sales). Čísla Sortimentu se ručním párováním nezměnila (zatím žádný ruční pár): máme 53 950, nemáme 117 924, ke kontrole 941.
