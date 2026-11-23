@@ -129,6 +129,8 @@ Dnešní zkušenost ukazuje, proč je to potřeba: Lindlau deset dní padal po m
 
 ## F. Feedy podle obratu dodavatele (23. 11. 2026)
 
+**Stav 23. 11. 2026 v 18:30 (verze `v2026-11-23-7af9527`, feedhub #27):** LAID zapnutý a stažený — 2 071 nabídek, všechny s EANem, nákupní cenou, MOC a značkou (Smith, Barts); máme 219 (z toho 51 jen kartu v Pohodě), nemáme 1 852. Import do Pohody nově počítá prodejní cenu v EUR jako MOC v Kč / 24,5 u všech zdrojů s MOC v korunách. Zdrojů běží 29 ze 48 zapnutých.
+
 Zadání Ládi: úkoly podle priorit, prioritou je obrat dodavatele, od největšího. Řazeno podle **nákupu od dodavatele (příjemky) za 8/2025–7/2026** z dat Salesu v repozitáři (novější měsíce tam nejsou; obrat z prodejů po dodavatelích v repu není). Celkem 125,2 mil. Kč. **Fungující feedy pokrývají dodavatele s nákupem 27,8 mil. (22 %)**, úkoly níže 92,4 mil. (74 %); jen Aspire je 17,7 % nákupu. Sloupec „Kdo“ je návrh.
 
 | # | Dodavatel | Nákup 12 měs. (mil. Kč) | Stav feedu | Úkol | Kdo |
@@ -169,7 +171,7 @@ Zadání Ládi: úkoly podle priorit, prioritou je obrat dodavatele, od největ�
 | 34 | Activent 365 s.r.o. | 0,4 | chybí jen adresa | Vložit adresu feedu (zdroj pinguin) | Láďa |
 | 35 | Engelbert Wiener Bike Parts GmbH | 0,3 | žádný feed nemáme | Zjistit, jestli Wiener Bike Parts nabízí VeloConnect | Pavel |
 | 36 | Biketime s.r.o. | 0,3 | běží, bez nákupní ceny a značky | Zjistit, jestli jde dostat feed s nákupní cenou (ve feedu je jen MOC) | Pavel |
-| 37 | LAID a.s. | 0,3 | zapíná se dnes | Hotovo po nasazení — zkontrolovat první import | Claude |
+| 37 | LAID a.s. | 0,3 | **běží od 23. 11. 18:30** (2 071 nabídek, máme 219, nemáme 1 852) | Zkontrolovat první import (kód karty bez závorek, EUR = MOC / 24,5) | Láďa |
 | 38 | LEVIT s.r.o. | 0,3 | žádný feed nemáme | Zjistit, jestli Levit dává feed | Pavel |
 | 39 | SPRINT spol.s r.o. | 0,2 | adresa neexistuje (404) | Vyžádat u Sprintu novou adresu feedu a vložit ji | Pavel |
 | 40 | CYKLO BARTONÍČEK, s.r.o. | 0,2 | žádný feed nemáme | Zjistit, jestli Cyklo Bartoníček dává feed | Pavel |
