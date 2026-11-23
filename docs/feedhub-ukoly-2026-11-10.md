@@ -129,13 +129,15 @@ Dnešní zkušenost ukazuje, proč je to potřeba: Lindlau deset dní padal po m
 
 ## F. Feedy podle obratu dodavatele (23. 11. 2026)
 
+**Stav 23. 11. 2026 ve 21:20 (feedhub #28):** Aspire — Láďa dodal adresu s klíčem, odpovídají oba feedy. Mapování plného katalogu je nasazené (cyklo 19 669 variant, sport 8 526; kód = `Id`, tedy náš objednací název). Klíč není v repozitáři — adresu vloží Láďa ve formuláři Upravit a zdroje zapne. Dostupnostní feed se nezakládá (plný katalog kusy nese).
+
 **Stav 23. 11. 2026 v 18:30 (verze `v2026-11-23-7af9527`, feedhub #27):** LAID zapnutý a stažený — 2 071 nabídek, všechny s EANem, nákupní cenou, MOC a značkou (Smith, Barts); máme 219 (z toho 51 jen kartu v Pohodě), nemáme 1 852. Import do Pohody nově počítá prodejní cenu v EUR jako MOC v Kč / 24,5 u všech zdrojů s MOC v korunách. Zdrojů běží 29 ze 48 zapnutých.
 
 Zadání Ládi: úkoly podle priorit, prioritou je obrat dodavatele, od největšího. Řazeno podle **nákupu od dodavatele (příjemky) za 8/2025–7/2026** z dat Salesu v repozitáři (novější měsíce tam nejsou; obrat z prodejů po dodavatelích v repu není). Celkem 125,2 mil. Kč. **Fungující feedy pokrývají dodavatele s nákupem 27,8 mil. (22 %)**, úkoly níže 92,4 mil. (74 %); jen Aspire je 17,7 % nákupu. Sloupec „Kdo“ je návrh.
 
 | # | Dodavatel | Nákup 12 měs. (mil. Kč) | Stav feedu | Úkol | Kdo |
 | --- | --- | --- | --- | --- | --- |
-| 1 | ASPIRE SPORTS, s.r.o. | 22,1 | oba feedy odpovídají „Access denied“ | Vyžádat u Aspire klíč k feedu nebo povolení naší IP (cyklo i sport) | Láďa / Pavel |
+| 1 | ASPIRE SPORTS, s.r.o. | 22,1 | **klíč máme (23. 11.), mapování nasazené**; zdroje vypnuté, dokud v nich není adresa s klíčem | U zdrojů `aspire` a `aspire-sport-aspire-saucony-merrel`: Upravit → vložit adresu s klíčem → Uložit → Zapnout → Spustit; potvrdit cenu (`Cena` po slevě × `CenaPuvodni`) | Láďa |
 | 2 | BIKE FUN International s.r.o. | 10,7 | zvenku blokováno (403) | Zkusit ze serveru (Upravit → rozbor); když neprojde, požádat Bike Fun o povolení IP | Láďa |
 | 3 | LEVELSPORTKONCEPT s.r.o. | 5,8 | feed vrací chybu na jejich straně | Požádat Level Sport o funkční adresu feedu (stará hlásí chybu funkce) a vložit ji | Láďa / Pavel |
 | 4 | PAUL LANGE - OSTRAVA, s.r.o. | 5,7 | zvenku blokováno (Cloudflare) | Zkusit ze serveru (oba feedy); když neprojde, požádat Paul Lange o povolení IP | Láďa |
