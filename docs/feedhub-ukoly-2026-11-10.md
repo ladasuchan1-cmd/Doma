@@ -129,6 +129,14 @@ Dnešní zkušenost ukazuje, proč je to potřeba: Lindlau deset dní padal po m
 
 ## F. Feedy podle obratu dodavatele (23. 11. 2026)
 
+**Stav 23. 11. 2026 ve 22:52 (verze `v2026-11-23-341bd69`, feedhub #32 a #33), z logu nasazení:**
+
+- **Paul Lange běží.** Láďa poslal obsah feedu uložený z prohlížeče; mapování je nasazené a server přes Cloudflare projde: 6 774 nabídek za 7 s (EAN 6 438, cena 6 568, značka 6 771). **Máme 3 234 (jen karta 1 061), nemáme 3 521 (bez EAN 273), ke kontrole 19.** Značka je první slovo názvu (Shimano 4 518, Schwalbe 598, PRO 589, Lazer 481, Elite 253). Cena `PRICE` = nákupní bez DPH — k potvrzení Láďou. Druhý feed Paul Lange (`img.paul-lange.cz`) je dál vypnutý, obsah neznáme.
+- **Stablecam běží** (úkol 44): feed chodí v ZIPu, Feed Hub ho teď rozbalí sám. 5 031 nabídek s nákupní cenou, MOC a skladem; **názvy ani značky feed nenese**. Máme 81 (jen karta 43), nemáme 4 950. Do importu nových položek nejde (bez názvu).
+- **K řešení Láďou:** adresa Stablecamu je v repozitáři od 19. 10. i s parametrem `access=`. Jestli je to přístupový klíč, je vhodné nechat si u Stablecamu vystavit nový a vložit ho jen ve formuláři Upravit.
+- Server celkem: 72 zdrojů (19 vypnutých), 34 funkčních, 1 s varováním, 37 nefunkčních nebo bez běhu; 176 982 nabídek. Za 23. 11. přibyly LAID, Aspire cyklo, Level Sport 100 %, Paul Lange a Stablecam.
+- **Chybějící varianty** (původní zadání: model máme, ale ne všechny velikosti a barvy) jsou hotové a jdou do nasazení (feedhub #34): filtr v Sortimentu, počty v přehledu, CSV, import a Claude Desktop. Jdou u 13 zdrojů, jejichž feed varianty spojuje (ABUS, Aspire, Crussis, KCK, LAID, Level Sport, Origos, Penco, Sport und Freizeit, Zookee).
+
 **Stav 23. 11. 2026 ve 22:34 (verze `v2026-11-23-96a5ee2`, feedhub #31), z logu nasazení:**
 
 - **Level Sport Koncept — katalog značky 100 % běží.** Láďa poslal soubor z jejich B2B a jeho adresu (veřejná, bez klíče). Nový zdroj `level-sport-koncept-100percent`, 6:00 a 12:00; první stažení ve 22:34: 1 927 nabídek, EAN má 1 919, značka u všech, běh 2 s — server na jejich B2B dosáhne. Sortiment: **máme 464 (z toho jen karta v Pohodě 376, na e-shopu tedy 88), nemáme 1 461 (z toho bez EAN 8), ke kontrole 2**.
@@ -160,7 +168,7 @@ Zadání Ládi: úkoly podle priorit, prioritou je obrat dodavatele, od největ�
 | 1 | ASPIRE SPORTS, s.r.o. | 22,1 | **cyklo běží od 23. 11. 21:51** (19 669 nabídek, máme 10 254, nemáme 9 325); **sport má omylem adresu cyklo feedu** | U zdroje `aspire-sport-aspire-saucony-merrel`: Upravit → adresa se serverem `sport.aspire.cz` a stejným klíčem → Uložit → Spustit (čeká se asi 8 500 nabídek) | Láďa |
 | 2 | BIKE FUN International s.r.o. | 10,7 | feed `feed.bikefunint.com` je za Cloudflare Access (povolení jen pro vybrané IP) | Zkusit ze serveru (Upravit → rozbor); když vrátí „Forbidden“, požádat Bike Fun o povolení veřejné IP serveru. XML na koloshop.cz (`bikefun-rock-machine-2`, `bikefun-superior-1`) a export od BFI jsou **náš** sklad hlášený BFI, ne jejich nabídka — do Feed Hubu nepatří | Láďa / František |
 | 3 | LEVELSPORTKONCEPT s.r.o. | 5,8 | **katalog značky 100 % běží od 23. 11. 22:34** (1 927 nabídek, máme 464, nemáme 1 461; bez cen a skladu); starý feed hlásí chybu | Vyžádat u Level Sportu soubor s cenami a skladem a stejné soubory pro další značky | Láďa / Pavel |
-| 4 | PAUL LANGE - OSTRAVA, s.r.o. | 5,7 | zvenku blokováno (Cloudflare) | Zkusit ze serveru (oba feedy); když neprojde, požádat Paul Lange o povolení IP | Láďa |
+| 4 | Paul Lange Ostrava s.r.o. | 5,7 | **běží od 23. 11. 22:47** (6 774 nabídek, máme 3 234, nemáme 3 521) | Potvrdit, že `PRICE` je nákupní bez DPH; zjistit, co nese druhý feed (`img.paul-lange.cz`) | Láďa |
 | 5 | PROGRESS CYCLE, a.s. | 4,8 | žádný feed nemáme | Zjistit, jestli Progress Cycle nabízí feed (XML / B2B export), a založit ho | Pavel |
 | 6 | Ober Alp S.p.A. | 4,1 | čeká na sdílenou složku | Připojit složku ImportZasob na server (Order Sheety Salewa, Dynafit) | František / Pavel |
 | 7 | CYKLOMAX, spol.s.r.o. | 4,0 | běží, hlavní feed bez nákupní ceny | Ověřit, jestli nový feed s cenou (203 položek) má nahradit starý, nebo chtít cenu do hlavního | Pavel |
@@ -200,7 +208,7 @@ Zadání Ládi: úkoly podle priorit, prioritou je obrat dodavatele, od největ�
 | 41 | Summit Trade s.r.o. | 0,2 | chybí jen adresy | Vložit adresy tří feedů (produkt, dostupnost, outlet) | Láďa |
 | 42 | Krab cycles s.r.o. | 0,2 | žádný feed nemáme | Zjistit, jestli Krab cycles dává feed | Pavel |
 | 43 | MTBiker s.r.o. | 0,2 | chybí adresa; zvenku blokováno | Vložit adresu s tokenem a zkusit ze serveru | Láďa |
-| 44 | STABLECAM s.r.o. | 0,2 | feed je ZIP s XML (jen dostupnost) | Claude doprogramuje čtení ZIPu a zdroj zapne | Claude |
+| 44 | Stablecam | 0,2 | **běží od 23. 11. 22:52** (5 031 nabídek s cenou a skladem; bez názvů a značek) | Zeptat se Stablecamu na katalogový feed s názvy; vyměnit přístupový klíč v adrese | Láďa |
 
 Feed běží a úkol nemá (podle nákupu): Crussis 6,7 · Zookee 5,1 · KCK 3,8 · Raymon 2,6 · Sport Import 2,2 · Lindlau 1,4 · Viva 1,2 · Helios 1,0 · Focus 1,0 · Bottico 0,7 · Pedalsport 0,7 · Origos 0,6 · Catherine 0,4 · Sidas 0,2 · Bike Park 0,2 · Ride Hard, Penco, Vertone 0,1.
 
