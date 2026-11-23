@@ -59,7 +59,7 @@ Pracnost je odhad v člověkodnech práce Clauda, ne slib. Stav „dnes“ je ov
 - Láďa potvrdil, že dotaz na KCK / Force přes Claude Desktop funguje.
 - **Nákupní ceny přes Claude Desktop jsou zapnuté** (pokyn Ládi „zapni nákupní ceny“). Zapnula je jednou migrace 018, deník to zapsal v 10:45; přepínač v sekci Claude Desktop platí dál a jde jím ceny zase vypnout. Claude u položek dodavatele vidí nákupní cenu, měnu a přepočet na Kč.
 
-**Zbývá z kontroly zalistování:** omezit objednací název na karty daného dodavatele (karta dodavatele nese, chybí přiřazení dodavatel Pohody → zdroj feedu), skupiny variant (chybějící velikosti a barvy), uložené parametry po dodavatelích (sledované značky), tabulka pro import nových položek do Pohody (potřebuje vzor od Ládi), týdenní souhrn mailem (čeká na SMTP).
+**Zbývá z kontroly zalistování (stav 23. 11. 2026 večer):** omezit objednací název na karty daného dodavatele (karta dodavatele nese, chybí přiřazení dodavatel Pohody → zdroj feedu) a týdenní souhrn mailem (čeká na SMTP). **Hotovo:** skupiny variant a chybějící varianty, sledované značky (značky, které vedeme, a ruční přiřazení značek), tabulka pro import do Pohody.
 
 ## Kde jsme dnes
 
@@ -128,6 +128,14 @@ Dnešní zkušenost ukazuje, proč je to potřeba: Lindlau deset dní padal po m
 | E7 | Lindlau: číst celý katalog. | **Hotovo 10. 11.** Lindlau na stránku hledání bez parametru `ResultFormat` vrací jen počet, položky až na `ITEM_DETAIL`; klient to teď zkusí sám. Katalog má 8 898 položek místo dosavadních 937. Velikost balení je 1 u 936 z 937 dosud stahovaných položek (jedna má balení po 50), minimální odběr má 59 položek; ani jedno Feed Hub zatím nečte, viz E8. | hotovo |
 
 ## F. Feedy podle obratu dodavatele (23. 11. 2026)
+
+**Stav 23. 11. 2026 ve 23:18 (verze `v2026-11-23-0ee3a14`, feedhub #34 a #35), z logu nasazení — dvě nové věci v Sortimentu:**
+
+- **Chybějící varianty** (model máme, ale ne všechny velikosti a barvy): Sortiment → dodavatel → *Dodavatel nabízí, my nemáme* → filtr **Varianty: jen chybějící (model už máme)**. Čísla ze serveru: Aspire 1 396, Zookee 670, Sport und Freizeit 187 a 172, ABUS 157, Origos 72, Level Sport 100 % 57, LAID 40, KCK 22, Penco 20, Crussis 12. U dodavatelů, jejichž feed varianty nespojuje (Paul Lange, Stablecam, Helios, Sport Import…), stránka říká, že to z feedu poznat nejde.
+- **Co nám chybí u značek, které už prodáváme:** filtr **Naše značky: jen které vedeme** a počet v přehledu. Ze serveru: Aspire nemáme 9 325, z toho u našich značek 6 531; Helios 12 460 → 5 779; Zookee 6 353 → 5 689; Sport und Freizeit 8 338 → 3 943; Lindlau 6 802 → 3 758; Paul Lange 3 521 → 3 339; KCK 2 254 → 2 045; Cyklomax 3 306 → 1 789; Origos 4 645 → 710. Značka se pozná jen podle stejného názvu.
+- **Ruční přiřazení značky dodavatele k naší značce** (feedhub #36, nasazuje se): kde dodavatel píše značku jinak („SRAM ROCK SHOX“ × naše „RockShox“), jde ji v Sortimentu po výběru značky přiřadit. Pak se počítá mezi naše značky a v importu do Pohody je ve sloupci Výrobce náš zápis. Import nově upozorní na řádky se značkou, kterou nevedeme.
+- Oba filtry i počty jsou také v CSV, v importu do Pohody a u Clauda (`jen_chybejici_varianty`, `jen_nase_znacky`).
+- Server: 72 zdrojů (19 vypnutých), 34 funkčních; 176 988 nabídek; máme 53 950, nemáme 117 924 (včetně zdvojeného Aspire sport).
 
 **Stav 23. 11. 2026 ve 22:52 (verze `v2026-11-23-341bd69`, feedhub #32 a #33), z logu nasazení:**
 
