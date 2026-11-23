@@ -129,6 +129,14 @@ Dnešní zkušenost ukazuje, proč je to potřeba: Lindlau deset dní padal po m
 
 ## F. Feedy podle obratu dodavatele (23. 11. 2026)
 
+**Stav 23. 11. 2026 ve 22:34 (verze `v2026-11-23-96a5ee2`, feedhub #31), z logu nasazení:**
+
+- **Level Sport Koncept — katalog značky 100 % běží.** Láďa poslal soubor z jejich B2B a jeho adresu (veřejná, bez klíče). Nový zdroj `level-sport-koncept-100percent`, 6:00 a 12:00; první stažení ve 22:34: 1 927 nabídek, EAN má 1 919, značka u všech, běh 2 s — server na jejich B2B dosáhne. Sortiment: **máme 464 (z toho jen karta v Pohodě 376, na e-shopu tedy 88), nemáme 1 461 (z toho bez EAN 8), ke kontrole 2**.
+- **Soubor je katalog bez cen a skladu** (kód, EAN, název, barva, velikost, kategorie). Stačí na kontrolu zalistování; import do Pohody z něj vyjde bez nákupní ceny a doporučené MOC. Řádky modelů (381, bez EANu) se nečtou. Kód dodavatele je stejný jako náš kód (115 ze 117 položek spárovaných EANem na e-shopu). Názvy jsou anglické.
+- **Chybí od Level Sportu:** soubor s cenami a skladem a stejné soubory pro další značky. Starý zdroj `level-sport-koncept` (feed mywac) zůstává vypnutý.
+- **Paul Lange:** adresa, kterou Láďa poslal, je ve Feed Hubu od 19. 10. jako zdroj `paul-lange-2` (vypnutý, bez mapování). Odsud ji stáhnout nejde (Cloudflare pustí jen běžný prohlížeč), takže mapování nejde připravit bez souboru — **Láďa nahraje XML do chatu**, nebo zkusí u zdroje Upravit → rozbor ze serveru.
+- Aspire sport má dál adresu cyklo feedu (čeká na opravu Láďou, viz níže).
+
 **Stav 23. 11. 2026 ve 22:12 (verze `v2026-11-23-e916bde`, feedhub #29 a #30), z logu nasazení:**
 
 - **Záložka Úkoly je nasazená** (přání Ládi: „záložku úkoly, kde si budu moci odškrtávat či psát poznámky“): `https://sales.report/feeds/#ukoly`. Je v ní 44 úkolů z tabulky níže ve stejném pořadí (podle nákupu od dodavatele); úkol jde odškrtnout a vrátit, napsat k němu poznámku, změnit „kdo“ a přidat vlastní. Ukládá se hned, s účtem Salesu a časem. U úkolu je živý stav jeho feedů z posledního běhu (běží / neběží / vypnutý). Odškrtnutí je na člověku, samo se nic neodškrtává. **Tahle tabulka v dokumentu se tím přestává udržovat — platí záložka.**
@@ -151,7 +159,7 @@ Zadání Ládi: úkoly podle priorit, prioritou je obrat dodavatele, od největ�
 | --- | --- | --- | --- | --- | --- |
 | 1 | ASPIRE SPORTS, s.r.o. | 22,1 | **cyklo běží od 23. 11. 21:51** (19 669 nabídek, máme 10 254, nemáme 9 325); **sport má omylem adresu cyklo feedu** | U zdroje `aspire-sport-aspire-saucony-merrel`: Upravit → adresa se serverem `sport.aspire.cz` a stejným klíčem → Uložit → Spustit (čeká se asi 8 500 nabídek) | Láďa |
 | 2 | BIKE FUN International s.r.o. | 10,7 | feed `feed.bikefunint.com` je za Cloudflare Access (povolení jen pro vybrané IP) | Zkusit ze serveru (Upravit → rozbor); když vrátí „Forbidden“, požádat Bike Fun o povolení veřejné IP serveru. XML na koloshop.cz (`bikefun-rock-machine-2`, `bikefun-superior-1`) a export od BFI jsou **náš** sklad hlášený BFI, ne jejich nabídka — do Feed Hubu nepatří | Láďa / František |
-| 3 | LEVELSPORTKONCEPT s.r.o. | 5,8 | feed vrací chybu na jejich straně | Požádat Level Sport o funkční adresu feedu (stará hlásí chybu funkce) a vložit ji | Láďa / Pavel |
+| 3 | LEVELSPORTKONCEPT s.r.o. | 5,8 | **katalog značky 100 % běží od 23. 11. 22:34** (1 927 nabídek, máme 464, nemáme 1 461; bez cen a skladu); starý feed hlásí chybu | Vyžádat u Level Sportu soubor s cenami a skladem a stejné soubory pro další značky | Láďa / Pavel |
 | 4 | PAUL LANGE - OSTRAVA, s.r.o. | 5,7 | zvenku blokováno (Cloudflare) | Zkusit ze serveru (oba feedy); když neprojde, požádat Paul Lange o povolení IP | Láďa |
 | 5 | PROGRESS CYCLE, a.s. | 4,8 | žádný feed nemáme | Zjistit, jestli Progress Cycle nabízí feed (XML / B2B export), a založit ho | Pavel |
 | 6 | Ober Alp S.p.A. | 4,1 | čeká na sdílenou složku | Připojit složku ImportZasob na server (Order Sheety Salewa, Dynafit) | František / Pavel |
