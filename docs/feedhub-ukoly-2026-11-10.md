@@ -129,6 +129,12 @@ Dnešní zkušenost ukazuje, proč je to potřeba: Lindlau deset dní padal po m
 
 ## F. Feedy podle obratu dodavatele (23. 11. 2026)
 
+**Stav 23. 11. 2026 ve 23:45 (feedhub #36–#38):**
+
+- **Přiřazení značky dodavatele k naší značce** je nasazené (verze `v2026-11-23-eb0c2ff`): Sortiment → dodavatel → ve filtru Značka vyber značku s poznámkou „nevedeme“ → pod filtry „Je to naše značka pod jiným názvem?“ → vyber naši značku → Přiřadit.
+- **Záložka Nápověda** (nasazuje se): návod pro kolegy přímo ve Feed Hubu — `https://sales.report/feeds/#napoveda`.
+- **Ruční párování** (feedhub #38, čeká na testy a nasazení): položku, kterou máme pod jiným kódem nebo EANem, jde spárovat s naší kartou — odkaz „spárovat ručně“ pod položkou v pohledech *Dodavatel nabízí, my nemáme* a *Ke kontrole*. Tím je hotový třetí krok párování ze zadání (EAN → objednací název → člověk) a 941 položek „ke kontrole“ má jak vyřešit.
+
 **Stav 23. 11. 2026 ve 23:18 (verze `v2026-11-23-0ee3a14`, feedhub #34 a #35), z logu nasazení — dvě nové věci v Sortimentu:**
 
 - **Chybějící varianty** (model máme, ale ne všechny velikosti a barvy): Sortiment → dodavatel → *Dodavatel nabízí, my nemáme* → filtr **Varianty: jen chybějící (model už máme)**. Čísla ze serveru: Aspire 1 396, Zookee 670, Sport und Freizeit 187 a 172, ABUS 157, Origos 72, Level Sport 100 % 57, LAID 40, KCK 22, Penco 20, Crussis 12. U dodavatelů, jejichž feed varianty nespojuje (Paul Lange, Stablecam, Helios, Sport Import…), stránka říká, že to z feedu poznat nejde.
