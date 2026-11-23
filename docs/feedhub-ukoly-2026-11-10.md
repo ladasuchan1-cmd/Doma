@@ -127,6 +127,59 @@ Dnešní zkušenost ukazuje, proč je to potřeba: Lindlau deset dní padal po m
 | E8 | Číst i údaje, které dnes zahazujeme. Raymon posílá u každé položky kód výrobce, zařazení do skupiny, odkaz na informace o zboží a sazbu DPH (ověřeno 10. 11. na staženém katalogu). Lindlau navíc velikost balení a minimální odběr. | Kód výrobce pomůže s párováním na karty, skupina s orientací v sortimentu. | 1 |
 | E7 | Lindlau: číst celý katalog. | **Hotovo 10. 11.** Lindlau na stránku hledání bez parametru `ResultFormat` vrací jen počet, položky až na `ITEM_DETAIL`; klient to teď zkusí sám. Katalog má 8 898 položek místo dosavadních 937. Velikost balení je 1 u 936 z 937 dosud stahovaných položek (jedna má balení po 50), minimální odběr má 59 položek; ani jedno Feed Hub zatím nečte, viz E8. | hotovo |
 
+## F. Feedy podle obratu dodavatele (23. 11. 2026)
+
+Zadání Ládi: úkoly podle priorit, prioritou je obrat dodavatele, od největšího. Řazeno podle **nákupu od dodavatele (příjemky) za 8/2025–7/2026** z dat Salesu v repozitáři (novější měsíce tam nejsou; obrat z prodejů po dodavatelích v repu není). Celkem 125,2 mil. Kč. **Fungující feedy pokrývají dodavatele s nákupem 27,8 mil. (22 %)**, úkoly níže 92,4 mil. (74 %); jen Aspire je 17,7 % nákupu. Sloupec „Kdo“ je návrh.
+
+| # | Dodavatel | Nákup 12 měs. (mil. Kč) | Stav feedu | Úkol | Kdo |
+| --- | --- | --- | --- | --- | --- |
+| 1 | ASPIRE SPORTS, s.r.o. | 22,1 | oba feedy odpovídají „Access denied“ | Vyžádat u Aspire klíč k feedu nebo povolení naší IP (cyklo i sport) | Láďa / Pavel |
+| 2 | BIKE FUN International s.r.o. | 10,7 | zvenku blokováno (403) | Zkusit ze serveru (Upravit → rozbor); když neprojde, požádat Bike Fun o povolení IP | Láďa |
+| 3 | LEVELSPORTKONCEPT s.r.o. | 5,8 | feed vrací chybu na jejich straně | Požádat Level Sport o funkční adresu feedu (stará hlásí chybu funkce) a vložit ji | Láďa / Pavel |
+| 4 | PAUL LANGE - OSTRAVA, s.r.o. | 5,7 | zvenku blokováno (Cloudflare) | Zkusit ze serveru (oba feedy); když neprojde, požádat Paul Lange o povolení IP | Láďa |
+| 5 | PROGRESS CYCLE, a.s. | 4,8 | žádný feed nemáme | Zjistit, jestli Progress Cycle nabízí feed (XML / B2B export), a založit ho | Pavel |
+| 6 | Ober Alp S.p.A. | 4,1 | čeká na sdílenou složku | Připojit složku ImportZasob na server (Order Sheety Salewa, Dynafit) | František / Pavel |
+| 7 | CYKLOMAX, spol.s.r.o. | 4,0 | běží, hlavní feed bez nákupní ceny | Ověřit, jestli nový feed s cenou (203 položek) má nahradit starý, nebo chtít cenu do hlavního | Pavel |
+| 8 | N Distribution s.r.o. | 3,8 | chybí jen adresa | Vložit adresu feedu s tokenem (Upravit u zdroje n-distribution) | Láďa |
+| 9 | CYKLOSPECIALITY s.r.o. | 2,7 | chybí jen adresa | Vložit adresu feedu (zdroj cyklospeciality) | Láďa |
+| 10 | Early Rider Dealer Store | 2,3 | žádný feed nemáme | Zjistit, jestli Early Rider dává feed nebo ceník ke stažení | Pavel |
+| 11 | Creative play s.r.o. | 1,9 | chybí jen adresa | Vložit adresu feedu (zdroj beany) | Láďa |
+| 12 | SPORT und FREIZEIT, spol. s r.o. | 1,8 | běží, bez nákupní ceny | Zjistit, jestli jde dostat feed s nákupní cenou (oba zdroje) | Pavel |
+| 13 | CYKLO PROFI, s.r.o. | 1,6 | chybí jen adresa | Vložit adresu feedu (zdroj cyklo-profi) | Láďa |
+| 14 | Kalkhoff Werke GmbH | 1,5 | žádný feed nemáme | Zjistit, jestli Kalkhoff nabízí VeloConnect, a vyžádat přístup | Pavel |
+| 15 | Garmin Czech s.r.o. | 1,4 | žádný feed nemáme | Zjistit, jestli Garmin dává feed pro prodejce | Pavel |
+| 16 | BIKE BROTHERS IMPORT, spol. s r.o. | 1,4 | jen přihlášení do B2B | Požádat o přímou adresu feedu (bez přihlášení přes web) | Pavel |
+| 17 | ENDURA LIMITED | 1,3 | B2B přihlášení; katalog v jiném formátu | Vložit adresu katalogu s tokenem; Claude doprogramuje čtení (text/JSON) | Láďa + Claude |
+| 18 | RASCAL BIKES s.r.o. | 1,3 | chybí jen adresa | Vložit adresu feedu (zdroj rascal) | Láďa |
+| 19 | SILVINI s.r.o. | 1,2 | pouští jen firemní IP | Zkusit ze serveru (4 feedy: Upravit → rozbor) a zapnout | Láďa |
+| 20 | CYKLO ŽITNÝ, s.r.o. | 1,2 | chybí jen adresa | Vložit adresu feedu (zdroj cyklo-zitny) | Láďa |
+| 21 | 4EVER, s.r.o. | 1,0 | chybí jen adresa | Vložit adresu feedu (zdroj 4ever); rozhodnout cenu: BHIT a IT Future ji berou z jiného prvku | Láďa |
+| 22 | SNOW-HOW ČR s.r.o. | 0,9 | chybí jen adresa | Vložit adresu feedu (zdroj snow-how-pouze-amulet) | Láďa |
+| 23 | SLOGER, j.s.a. | 0,9 | chybí jen adresa | Vložit adresu feedu (zdroj sloger) | Láďa |
+| 24 | Wahoo Fitness | 0,9 | žádný feed nemáme | Zjistit, jestli Wahoo dává feed pro prodejce | Pavel |
+| 25 | OneUp Components | 0,9 | feed je Excel | Vložit adresu s tokenem; Claude doprogramuje čtení Excelu z adresy | Láďa + Claude |
+| 26 | VAVRYS CZ s.r.o. | 0,8 | jen přihlášení do B2B | Požádat o přímou adresu feedu | Pavel |
+| 27 | Protocycles s.r.o. | 0,6 | chybí jen adresa | Vložit adresu feedu (zdroj protocycles) | Láďa |
+| 28 | Halbich s.r.o. | 0,5 | žádný feed nemáme | Zjistit, jestli Halbich dává feed | Pavel |
+| 29 | Forever Faster s.r.o. | 0,5 | jen přihlášení do B2B | Požádat o přímou adresu feedu | Pavel |
+| 30 | UNIS Pro Team s.r.o. | 0,5 | žádný feed nemáme | Zjistit, jestli Unis dává feed | Pavel |
+| 31 | MAGURA Bosch Parts & Services GmbH & Co. KG | 0,5 | chybí přístup k VeloConnectu | Vyžádat u MBPS přihlášení k VeloConnectu a dát ho do .env na serveru | Pavel / Láďa |
+| 32 | AMER SPORTS Czech Republic s.r.o. | 0,5 | žádný feed nemáme | Zjistit, jestli Amer Sports dává feed | Pavel |
+| 33 | ABUS CZECH s.r.o. | 0,4 | běží jen dostupnost, bez ceny | Vyžádat přístup k VeloConnectu ABUS (ceny), až skončí údržba jejich portálu | Pavel |
+| 34 | Activent 365 s.r.o. | 0,4 | chybí jen adresa | Vložit adresu feedu (zdroj pinguin) | Láďa |
+| 35 | Engelbert Wiener Bike Parts GmbH | 0,3 | žádný feed nemáme | Zjistit, jestli Wiener Bike Parts nabízí VeloConnect | Pavel |
+| 36 | Biketime s.r.o. | 0,3 | běží, bez nákupní ceny a značky | Zjistit, jestli jde dostat feed s nákupní cenou (ve feedu je jen MOC) | Pavel |
+| 37 | LAID a.s. | 0,3 | zapíná se dnes | Hotovo po nasazení — zkontrolovat první import | Claude |
+| 38 | LEVIT s.r.o. | 0,3 | žádný feed nemáme | Zjistit, jestli Levit dává feed | Pavel |
+| 39 | SPRINT spol.s r.o. | 0,2 | adresa neexistuje (404) | Vyžádat u Sprintu novou adresu feedu a vložit ji | Pavel |
+| 40 | CYKLO BARTONÍČEK, s.r.o. | 0,2 | žádný feed nemáme | Zjistit, jestli Cyklo Bartoníček dává feed | Pavel |
+| 41 | Summit Trade s.r.o. | 0,2 | chybí jen adresy | Vložit adresy tří feedů (produkt, dostupnost, outlet) | Láďa |
+| 42 | Krab cycles s.r.o. | 0,2 | žádný feed nemáme | Zjistit, jestli Krab cycles dává feed | Pavel |
+| 43 | MTBiker s.r.o. | 0,2 | chybí adresa; zvenku blokováno | Vložit adresu s tokenem a zkusit ze serveru | Láďa |
+| 44 | STABLECAM s.r.o. | 0,2 | feed je ZIP s XML (jen dostupnost) | Claude doprogramuje čtení ZIPu a zdroj zapne | Claude |
+
+Feed běží a úkol nemá (podle nákupu): Crussis 6,7 · Zookee 5,1 · KCK 3,8 · Raymon 2,6 · Sport Import 2,2 · Lindlau 1,4 · Viva 1,2 · Helios 1,0 · Focus 1,0 · Bottico 0,7 · Pedalsport 0,7 · Origos 0,6 · Catherine 0,4 · Sidas 0,2 · Bike Park 0,2 · Ride Hard, Penco, Vertone 0,1.
+
 ## Navržené pořadí
 
 1. **A1 a A2.** Bezpečnost a dva dodavatelé, kteří čekají jen na řádky v `.env`. A1 hotovo, A2 čeká na Láďu.
