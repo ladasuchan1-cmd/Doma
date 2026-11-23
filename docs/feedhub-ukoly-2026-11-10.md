@@ -54,6 +54,11 @@ Pracnost je odhad v člověkodnech práce Clauda, ne slib. Stav „dnes“ je ov
 - Když filtr značky nic nenajde, Claude teď dostane důvod (pole `pozor`) a má ho říct jako první; stejná věta je v Sortimentu. Výpis stavu ukazuje u zdroje počet nabídek se značkou.
 - Ruční běh zdroje z GitHubu dál nejde — workflow „Spustit zdroj na serveru“ není registrovaný, dokud výchozí větev repozitáře není `main` (úkol Ládi).
 
+**Stav 23. 11. 2026 v 10:45 (verze `v2026-11-23-de3e435`, feedhub #26), z logu nasazení:**
+
+- Láďa potvrdil, že dotaz na KCK / Force přes Claude Desktop funguje.
+- **Nákupní ceny přes Claude Desktop jsou zapnuté** (pokyn Ládi „zapni nákupní ceny“). Zapnula je jednou migrace 018, deník to zapsal v 10:45; přepínač v sekci Claude Desktop platí dál a jde jím ceny zase vypnout. Claude u položek dodavatele vidí nákupní cenu, měnu a přepočet na Kč.
+
 **Zbývá z kontroly zalistování:** omezit objednací název na karty daného dodavatele (karta dodavatele nese, chybí přiřazení dodavatel Pohody → zdroj feedu), skupiny variant (chybějící velikosti a barvy), uložené parametry po dodavatelích (sledované značky), tabulka pro import nových položek do Pohody (potřebuje vzor od Ládi), týdenní souhrn mailem (čeká na SMTP).
 
 ## Kde jsme dnes
@@ -135,7 +140,7 @@ Bloky A až D dávají dohromady zhruba dva týdny práce, blok E další týden
 
 ## Co musí rozhodnout nebo dodat lidé
 
-- **Láďa:** prahy pro podezřelé změny, po kolika dnech výpadku dodavatele vyřadit z feedu, kdo má mít přístup do dashboardu. Od 22. 11.: potvrdit, že nákupní ceny přes Claude Desktop mají zůstat vypnuté (přepínač na dashboardu), vyzkoušet rozšíření v Claude Desktop, potvrdit pravidla importu do Pohody (nákupní cena, MOC v EUR, sezona), doplnit číslo dodavatele pro německý ABUS a Oberalp, říct, které značky u kterého dodavatele sledovat. (Hotovo 22. 11.: vrátnice `sales.report/feeds`, vzor importní tabulky, adresář dodavatelů, rozhodnutí o MCP — „jako v Sales“.)
+- **Láďa:** prahy pro podezřelé změny, po kolika dnech výpadku dodavatele vyřadit z feedu, kdo má mít přístup do dashboardu. Od 22. 11.: potvrdit pravidla importu do Pohody (nákupní cena, MOC v EUR, sezona), doplnit číslo dodavatele pro německý ABUS a Oberalp, říct, které značky u kterého dodavatele sledovat. (Hotovo 22. 11.: vrátnice `sales.report/feeds`, vzor importní tabulky, adresář dodavatelů, rozhodnutí o MCP — „jako v Sales“, rozšíření v Claude Desktop vyzkoušeno; 23. 11.: nákupní ceny přes Claude Desktop zapnuty.)
 - **František:** SMTP pro poštu, zpřístupnění feedu zvenku, interní adresa, místo pro zálohy.
 - **BHIT:** potvrzení struktury XML a zdrojová IP.
 - **Pavel:** přístupy k VeloConnectu pro MBPS a ABUS, kontrolní položky s ověřenou nákupní cenou.
