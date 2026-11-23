@@ -129,6 +129,16 @@ Dnešní zkušenost ukazuje, proč je to potřeba: Lindlau deset dní padal po m
 
 ## F. Feedy podle obratu dodavatele (23. 11. 2026)
 
+**Stav 23. 11. 2026 ve 22:12 (verze `v2026-11-23-e916bde`, feedhub #29 a #30), z logu nasazení:**
+
+- **Záložka Úkoly je nasazená** (přání Ládi: „záložku úkoly, kde si budu moci odškrtávat či psát poznámky“): `https://sales.report/feeds/#ukoly`. Je v ní 44 úkolů z tabulky níže ve stejném pořadí (podle nákupu od dodavatele); úkol jde odškrtnout a vrátit, napsat k němu poznámku, změnit „kdo“ a přidat vlastní. Ukládá se hned, s účtem Salesu a časem. U úkolu je živý stav jeho feedů z posledního běhu (běží / neběží / vypnutý). Odškrtnutí je na člověku, samo se nic neodškrtává. **Tahle tabulka v dokumentu se tím přestává udržovat — platí záložka.**
+- **Aspire cyklo běží:** první stažení ve 21:51, 19 669 nabídek (s EAN 19 132, s cenou 19 625, značka u všech), běh 94 s. Máme 10 254 (z toho jen karta 3 079), nemáme 9 325 (z toho bez EAN 526), ke kontrole 90.
+- **Aspire sport má vloženou adresu cyklo feedu** (deník 21:27: adresa `sport.aspire.cz` → `cyklo.aspire.cz`), takže načetl tytéž položky jako cyklo — 19 669 nabídek je v přehledu dvakrát. **Náprava (Láďa):** u zdroje `aspire-sport-aspire-saucony-merrel` Upravit → adresa se serverem `sport.aspire.cz` a stejným klíčem → Uložit → Spustit. Čeká se asi 8 500 nabídek (Merrell, Saucony) a u posledního běhu „po změně nastavení vyřazeno 19 669 a nově načteno 8 526 položek“.
+- **Aby se omylem načtené položky po opravě samy vyřadily** (pojistka „víc než polovina chybí = neúplné stažení“ by je nechala navždy), přibylo pravidlo: když se z dashboardu změní adresa zdroje, prvek položky nebo čtení kódu a víc než polovinu dosud nabízených položek od té změny žádný běh neposlal, bere se běh jako nové načtení — staré položky se vyřadí bez události, nově načtené se nezapisují jako „nové“. Výměna klíče v adrese téhož feedu nic nemění.
+- **Formulář už stejnou adresu ve dvou zdrojích neuloží** — řekne, který zdroj ji má.
+- **Zůstává k rozhodnutí:** 19 669 omylem načtených řádků zůstane ve zdroji „sport“ vedeno jako „už neposílá“ (Feed Hub nabídky nemaže) — o tolik bude na dashboardu vyšší počet zmizelých nabídek. Smazat je jde jen migrací; rozhoduje Láďa.
+- Souhrn serveru: 71 zdrojů (21 vypnutých), 31 funkčních, 1 s varováním, 39 nefunkčních nebo bez běhu; 163 250 nabídek (včetně zdvojeného Aspire), z toho 4 163 už dodavatel neposílá. E-shop měl 23. 11. 48 774 položek (22. 11. 51 311).
+
 **Stav 23. 11. 2026 ve 22:00:** Aspire — Láďa adresu vložil a zdroje spustil (výsledek běhu odsud nevidím). Cena: doporučeno nechat `Cena` — platí `Cena = CenaPuvodni × (1 − SlevaProcento/100)` u všech položek, sleva je u 94 % variant cyklo feedu a je hlavně stálá po značkách (SRAM 6–8 %, Mavic 13 %, Fizik 15 %, Troy Lee 28 %, Merrell 30 %), tedy naše čistá nákupní cena; `CenaPuvodni` je ceník před slevou. Bike Fun — dvě XML na koloshop.cz (852 EANů, 848 z nich na našem e-shopu) a export od BFI (202 řádků, vše Shop = Koloshop.cz, bez cen) popisují náš sklad, ne nabídku BFI.
 
 **Stav 23. 11. 2026 ve 21:20 (feedhub #28):** Aspire — Láďa dodal adresu s klíčem, odpovídají oba feedy. Mapování plného katalogu je nasazené (cyklo 19 669 variant, sport 8 526; kód = `Id`, tedy náš objednací název). Klíč není v repozitáři — adresu vloží Láďa ve formuláři Upravit a zdroje zapne. Dostupnostní feed se nezakládá (plný katalog kusy nese).
@@ -139,7 +149,7 @@ Zadání Ládi: úkoly podle priorit, prioritou je obrat dodavatele, od největ�
 
 | # | Dodavatel | Nákup 12 měs. (mil. Kč) | Stav feedu | Úkol | Kdo |
 | --- | --- | --- | --- | --- | --- |
-| 1 | ASPIRE SPORTS, s.r.o. | 22,1 | **klíč máme (23. 11.), mapování nasazené**; zdroje vypnuté, dokud v nich není adresa s klíčem | U zdrojů `aspire` a `aspire-sport-aspire-saucony-merrel`: Upravit → vložit adresu s klíčem → Uložit → Zapnout → Spustit; potvrdit cenu (`Cena` po slevě × `CenaPuvodni`) | Láďa |
+| 1 | ASPIRE SPORTS, s.r.o. | 22,1 | **cyklo běží od 23. 11. 21:51** (19 669 nabídek, máme 10 254, nemáme 9 325); **sport má omylem adresu cyklo feedu** | U zdroje `aspire-sport-aspire-saucony-merrel`: Upravit → adresa se serverem `sport.aspire.cz` a stejným klíčem → Uložit → Spustit (čeká se asi 8 500 nabídek) | Láďa |
 | 2 | BIKE FUN International s.r.o. | 10,7 | feed `feed.bikefunint.com` je za Cloudflare Access (povolení jen pro vybrané IP) | Zkusit ze serveru (Upravit → rozbor); když vrátí „Forbidden“, požádat Bike Fun o povolení veřejné IP serveru. XML na koloshop.cz (`bikefun-rock-machine-2`, `bikefun-superior-1`) a export od BFI jsou **náš** sklad hlášený BFI, ne jejich nabídka — do Feed Hubu nepatří | Láďa / František |
 | 3 | LEVELSPORTKONCEPT s.r.o. | 5,8 | feed vrací chybu na jejich straně | Požádat Level Sport o funkční adresu feedu (stará hlásí chybu funkce) a vložit ji | Láďa / Pavel |
 | 4 | PAUL LANGE - OSTRAVA, s.r.o. | 5,7 | zvenku blokováno (Cloudflare) | Zkusit ze serveru (oba feedy); když neprojde, požádat Paul Lange o povolení IP | Láďa |
