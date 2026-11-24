@@ -129,6 +129,16 @@ Dnešní zkušenost ukazuje, proč je to potřeba: Lindlau deset dní padal po m
 
 ## F. Feedy podle obratu dodavatele (23. 11. 2026)
 
+**Stav 24. 11. 2026 v 15:05 (verze `v2026-11-24-b2ebfff`, feedhub #40), z logu nasazení — Bike Fun:**
+
+- Stránka „Forbidden“ u feedu Bike Funu **není blokovaná IP adresa**. Podle podkladů Bike Funu z 26. 2. 2026 (Pavel je přeposlal 24. 11.) feed chrání Cloudflare Access a přístup se posílá ve **dvou hlavičkách** (`CF-Access-Client-Id`, `CF-Access-Client-Secret`) — proto ho neotevře ani prohlížeč.
+- Feed Hub to od této verze umí: v nastavení zdroje jsou jen názvy hlaviček, hodnoty klíče jsou v `.env` na serveru (jedna proměnná, hodnoty oddělené dvojtečkou). Hlavičky dostane jen server z adresy feedu. Zdroj `bike-fun-international-s-r-o` má název proměnné a hlaviček přednastavený, **zůstává vypnutý a bez mapování**.
+- **Chybí na serveru:** řádek `BIKE_FUN_FEED_AUTH=<Client-Id>:<Client-Secret>` v `.env` a nasazení. Pak u zdroje Upravit → Stáhnout a rozebrat.
+- **Mapování není připravené:** strukturu feedu jsem neviděl (stažení odsud klíčem z mailu neproběhlo — čeká na souhlas Ládi). Podklady říkají jen: volný sklad má vždy `Year` 1900 a `week` 01, `Qty` = počet kol. Položka tedy nejspíš chodí ve víc řádcích (sklad a týdny dodání) a mapování to musí rozlišit.
+- Podklady zmiňují i druhý, produktový feed (specifikace a obrázky) s tokenem v adrese — jde vložit formulářem Přidat feed.
+- Vedlejší opravy formuláře: rozbor už nedrží v paměti odmítnutí (po doplnění přístupu se feed zkusí hned znovu) a zdroj založený bez mapování si při rozboru vezme navržená pole (dřív zůstala prázdná — týká se i Silvini, MTBiker a dalších vypnutých zdrojů).
+- Stav serveru: 72 zdrojů (19 vypnutých), 33 funkčních, 2 s varováním (oba zdroje konkurence), 37 nefunkčních nebo bez běhu; 177 098 nabídek, máme 53 960, nemáme 117 973.
+
 **Stav 24. 11. 2026 v 00:07 (verze `v2026-11-24-3d5ec23`, feedhub #39), z logu nasazení — nezávislá kontrola večerních změn, opravy nasazené:**
 
 - Večerní změny (feedhub #30–#38, asi 2 100 řádků) prošly nezávislou kontrolou — druhý agent je jen četl, pouštěl sondy a měřil. Našel dvanáct věcí, všechny jsou opravené a mají vlastní test (305 testů).
@@ -194,7 +204,7 @@ Zadání Ládi: úkoly podle priorit, prioritou je obrat dodavatele, od největ�
 | # | Dodavatel | Nákup 12 měs. (mil. Kč) | Stav feedu | Úkol | Kdo |
 | --- | --- | --- | --- | --- | --- |
 | 1 | ASPIRE SPORTS, s.r.o. | 22,1 | **cyklo běží od 23. 11. 21:51** (19 669 nabídek, máme 10 254, nemáme 9 325); **sport má omylem adresu cyklo feedu** | U zdroje `aspire-sport-aspire-saucony-merrel`: Upravit → adresa se serverem `sport.aspire.cz` a stejným klíčem → Uložit → Spustit (čeká se asi 8 500 nabídek) | Láďa |
-| 2 | BIKE FUN International s.r.o. | 10,7 | feed `feed.bikefunint.com` je za Cloudflare Access (povolení jen pro vybrané IP) | Zkusit ze serveru (Upravit → rozbor); když vrátí „Forbidden“, požádat Bike Fun o povolení veřejné IP serveru. XML na koloshop.cz (`bikefun-rock-machine-2`, `bikefun-superior-1`) a export od BFI jsou **náš** sklad hlášený BFI, ne jejich nabídka — do Feed Hubu nepatří | Láďa / František |
+| 2 | BIKE FUN International s.r.o. | 10,7 | **feed chce klíč ve dvou hlavičkách** (Cloudflare Access), ne povolenou IP; Feed Hub to umí od 24. 11. (feedhub #40), zdroj je přednastavený a vypnutý | Na server do `.env` řádek `BIKE_FUN_FEED_AUTH=<Client-Id>:<Client-Secret>` (hodnoty z podkladů Bike Funu) a nasadit; pak Upravit → Stáhnout a rozebrat. Mapování doladit podle struktury (volný sklad = `Year` 1900, `week` 01). XML na koloshop.cz (`bikefun-rock-machine-2`, `bikefun-superior-1`) a export od BFI jsou **náš** sklad hlášený BFI, ne jejich nabídka — do Feed Hubu nepatří | Láďa / František |
 | 3 | LEVELSPORTKONCEPT s.r.o. | 5,8 | **katalog značky 100 % běží od 23. 11. 22:34** (1 927 nabídek, máme 464, nemáme 1 461; bez cen a skladu); starý feed hlásí chybu | Vyžádat u Level Sportu soubor s cenami a skladem a stejné soubory pro další značky | Láďa / Pavel |
 | 4 | Paul Lange Ostrava s.r.o. | 5,7 | **běží od 23. 11. 22:47** (6 774 nabídek, máme 3 234, nemáme 3 521) | Potvrdit, že `PRICE` je nákupní bez DPH; zjistit, co nese druhý feed (`img.paul-lange.cz`) | Láďa |
 | 5 | PROGRESS CYCLE, a.s. | 4,8 | žádný feed nemáme | Zjistit, jestli Progress Cycle nabízí feed (XML / B2B export), a založit ho | Pavel |
