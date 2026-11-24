@@ -129,6 +129,13 @@ Dnešní zkušenost ukazuje, proč je to potřeba: Lindlau deset dní padal po m
 
 ## F. Feedy podle obratu dodavatele (23. 11. 2026)
 
+**Stav 24. 11. 2026 v 16:20 (verze `v2026-11-24-57c128c`, feedhub #42), z logu nasazení — Bike Fun běží:**
+
+- Láďa doplnil klíč do `.env` a nasadil; zdroj se v 16:11 stáhl sám hned po startu. **1 499 nabídek** (EAN má 1 498, značku 1 247, bez cen — feed je nenese).
+- Zalistování: **máme 841** (z toho 101 jen kartu v Pohodě, na e-shopu není), **nemáme 653** — z toho 486 od značek, které vedeme (Superior, Rock Machine); ke kontrole 5 (objednací název sedí, EAN ne).
+- Zbývá: ceník Bike Funu (nákupní ceny a doporučené MOC — bez něj vyjde import do Pohody bez cen) a potvrdit značku doplňků (kódy SF = Superior, NF = One Bikeparts?). Úkol v záložce Úkoly je přepsaný, odškrtnutí je na Láďovi.
+- Stav serveru: 72 zdrojů (18 vypnutých), 34 funkčních, 2 s varováním, 36 nefunkčních nebo bez běhu; 178 597 nabídek, máme 54 801, nemáme 118 626.
+
 **Stav 24. 11. 2026 v 15:35 (verze `v2026-11-24-133d132`, feedhub #41), z logu nasazení — Bike Fun má mapování, čeká jen na klíč:**
 
 - Se souhlasem Ládi jsem feed volného skladu stáhl klíčem z podkladů Bike Funu. **Je to JSON, ne XML** — Feed Hub ho nově čte převedený na XML (stejný parser a mapování, i ve formuláři Přidat feed). Totéž odemyká katalog Endury, až bude adresa.
@@ -212,7 +219,7 @@ Zadání Ládi: úkoly podle priorit, prioritou je obrat dodavatele, od největ�
 | # | Dodavatel | Nákup 12 měs. (mil. Kč) | Stav feedu | Úkol | Kdo |
 | --- | --- | --- | --- | --- | --- |
 | 1 | ASPIRE SPORTS, s.r.o. | 22,1 | **cyklo běží od 23. 11. 21:51** (19 669 nabídek, máme 10 254, nemáme 9 325); **sport má omylem adresu cyklo feedu** | U zdroje `aspire-sport-aspire-saucony-merrel`: Upravit → adresa se serverem `sport.aspire.cz` a stejným klíčem → Uložit → Spustit (čeká se asi 8 500 nabídek) | Láďa |
-| 2 | BIKE FUN International s.r.o. | 10,7 | **mapování hotové, zdroj zapnutý** (feed v JSON, klíč ve dvou hlavičkách; feedhub #40 a #41); na serveru chybí jen klíč v `.env` | Na server do `.env` řádek `BIKE_FUN_FEED_AUTH=<Client-Id>:<Client-Secret>` (hodnoty z podkladů Bike Funu) a nasadit — zdroj se stáhne sám (čeká se asi 1 500 položek). Potvrdit značku doplňků (SF = Superior, NF = One Bikeparts). XML na koloshop.cz (`bikefun-rock-machine-2`, `bikefun-superior-1`) a export od BFI jsou **náš** sklad hlášený BFI — do Feed Hubu nepatří | Láďa |
+| 2 | BIKE FUN International s.r.o. | 10,7 | **běží od 24. 11. 16:11** (1 499 nabídek, máme 841, nemáme 653; volný sklad a týdny dodání, **bez cen**) | Vyžádat u Bike Funu ceník (nákupní ceny a doporučené MOC). Potvrdit značku doplňků (SF = Superior, NF = One Bikeparts). XML na koloshop.cz (`bikefun-rock-machine-2`, `bikefun-superior-1`) a export od BFI jsou **náš** sklad hlášený BFI — do Feed Hubu nepatří | Láďa / Pavel |
 | 3 | LEVELSPORTKONCEPT s.r.o. | 5,8 | **katalog značky 100 % běží od 23. 11. 22:34** (1 927 nabídek, máme 464, nemáme 1 461; bez cen a skladu); starý feed hlásí chybu | Vyžádat u Level Sportu soubor s cenami a skladem a stejné soubory pro další značky | Láďa / Pavel |
 | 4 | Paul Lange Ostrava s.r.o. | 5,7 | **běží od 23. 11. 22:47** (6 774 nabídek, máme 3 234, nemáme 3 521) | Potvrdit, že `PRICE` je nákupní bez DPH; zjistit, co nese druhý feed (`img.paul-lange.cz`) | Láďa |
 | 5 | PROGRESS CYCLE, a.s. | 4,8 | žádný feed nemáme | Zjistit, jestli Progress Cycle nabízí feed (XML / B2B export), a založit ho | Pavel |
