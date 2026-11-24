@@ -129,6 +129,17 @@ Dnešní zkušenost ukazuje, proč je to potřeba: Lindlau deset dní padal po m
 
 ## F. Feedy podle obratu dodavatele (23. 11. 2026)
 
+**Stav 24. 11. 2026 ve 21:50 (feedhub #46 až #49; verze `v2026-11-24-6806f00`), z logů nasazení — adresy z tabulek běží, opravená mapování:**
+
+- **Všech 14 feedů s adresami z tabulek BHIT a IT Future běží** (Láďa doplnil `.env` ve 20:29): 4ever 799, Beany 348, Cyklo Profi 4 426, Cyklo Žitný 2 687, Cyklospeciality 5 752, N Distribution 9 122, Pinguin 1 569, Protocycles 61, Rascal 287, Sloger, Snow-How, Summit Trade ×2, Zookee. Funkčních zdrojů 49 (ráno 36).
+- **Tři mapování z října ztrácela varianty** (feedhub #47, migrace 035) — zjištěno kontrolou produkčním parserem nad staženými feedy. Po opravě: **Sloger 11 627 nabídek** (dřív 7 396; máme 3 590, nemáme 8 021, chybějící varianty 224), **Snow-How 614** (dřív 368), **outlet Summit Trade 3 925** (dřív 1 435). Hlavní feed Summit Trade se nově čte z produktového feedu (168 MB, proudem — 20 MB paměti místo 1 GB): 9 384 variant s názvem, značkou, cenou a skladem; čeká na vložení adresy.
+- **Endura** (feedhub #46): mapování katalogu v JSON hotové (8 581 variant, všechny s EANem, 958 máme na e-shopu, bez cen); čeká na vložení adresy.
+- **Zdvojené zdroje vypnuty:** starý Sport und Freizeit (všech 9 396 položek „skladem: ne“), starý Zookee (bez ceny), dostupnostní feed Summit Trade. Vypnutý zdroj se v Sortimentu ani v součtech nepočítá. Sortiment ve 21:47: z 211 710 nabídek zapnutých zdrojů máme 67 225, nemáme 143 391, ke kontrole 1 094.
+- **Názvy, značky a skupiny variant u šesti feedů** (feedhub #49, migrace 036) — u feedů se stavbou produkt → varianty se jako název četl název parametru („velikost“). Po opravě: **Ride Hard 3 787 nabídek** (dřív 3 236; přibylo 551 produktů bez variant; značky O´Neal, SIXS, Kini Red Bull; máme 245, nemáme 3 541, chybějící varianty 159), **Sidas 950** (dřív 884; máme 640, nemáme 310), **Viva 2 569** s kódem dodavatele `CODE-velikost` (máme 1 273, nemáme 1 291, chybějící varianty 185), **Sport Import** se značkou z prvku `<brand>` (dřív 1 212 „značek“ = názvy variant) a rozpoznaným skladem, **Crussis** se skutečným názvem místo kódu, **Bike Time** s názvem a značkou. **Sidas: nákupní cena se přestala číst** — feed nese jen ceník MOC a jeho cena bez DPH byla v mediánu 111 % naší prodejní ceny; kontrola stejného poměru u ostatních feedů nic nenašla (0,64–0,90).
+- **Pojistka** (feedhub #48): běh říká, kolik položek feedu se neuložilo (bez kódu i EANu, opakovaný kód); nad 5 % opakovaných kódů je varování „kód dodavatele není jedinečný“ — chyba typu Summit Trade se příště ukáže sama.
+- **Méně klikání:** po vložení adresy ve formuláři Upravit se zdroj stáhne sám; výpis stavu po nasazení čeká i na zdroje odblokované doplněním `.env`.
+- **Čeká na Láďu:** vložit dvě adresy ve formuláři Upravit (`endura-2`, `summit-trade-produkt` — soubor s adresami dostal), rozhodnout nákupní cenu 4ever (`CATALOGUE_PRICE` podle BHIT, nebo `CUSTOMER_PRICE / 1,21` podle IT Future — o 9 % méně), nahrát ceník Bike Funu a soubory Ober Alpu a OneUpu, opravit adresu Aspire sport.
+
 **Stav 24. 11. 2026 v 17:10 (feedhub #43, #44, #45) — ceník Bike Funu, Progress Cycle, soubory Ober Alp a OneUp, adresy z tabulek:**
 
 - **Ceník ke zdroji** (feedhub #43): feed bez cen dostane ceny ze souboru nahraného na dashboardu („Nahrát ceník“ u řádku zdroje). U Bike Funu je to export z jejich B2B: po nahrání má cenu 1 316 z 1 497 nabídek a MOC 1 120 (ověřeno nad skutečným feedem a souborem). Když se ve feedu objeví nový produkt mimo ceník, zdroj zoranžoví, v Úkolech vznikne žádost a deník ji zapíše; nahráním nového souboru se uzavře. Značka doplňků: SF = Superior, NF = One Bikeparts. **Čeká na Láďu:** nahrát soubor na dashboardu.
@@ -233,40 +244,40 @@ Zadání Ládi: úkoly podle priorit, prioritou je obrat dodavatele, od největ�
 | 5 | PROGRESS CYCLE, a.s. | 4,8 | žádný feed nemáme | Zjistit, jestli Progress Cycle nabízí feed (XML / B2B export), a založit ho | Pavel |
 | 6 | Ober Alp S.p.A. | 4,1 | čeká na sdílenou složku | Připojit složku ImportZasob na server (Order Sheety Salewa, Dynafit) | František / Pavel |
 | 7 | CYKLOMAX, spol.s.r.o. | 4,0 | běží, hlavní feed bez nákupní ceny | Ověřit, jestli nový feed s cenou (203 položek) má nahradit starý, nebo chtít cenu do hlavního | Pavel |
-| 8 | N Distribution s.r.o. | 3,8 | chybí jen adresa | Vložit adresu feedu s tokenem (Upravit u zdroje n-distribution) | Láďa |
-| 9 | CYKLOSPECIALITY s.r.o. | 2,7 | chybí jen adresa | Vložit adresu feedu (zdroj cyklospeciality) | Láďa |
+| 8 | N Distribution s.r.o. | 3,8 | **běží od 24. 11. 20:29** (9 122 nabídek, máme 814, nemáme 8 299) | Projít, co od N Distribution nemáme u značek, které vedeme (1 708) | Pavel |
+| 9 | CYKLOSPECIALITY s.r.o. | 2,7 | **běží od 24. 11. 20:29** (5 752 nabídek, máme 1 887, nemáme 3 807) | Projít, co nemáme u značek, které vedeme (1 055) | Pavel |
 | 10 | Early Rider Dealer Store | 2,3 | žádný feed nemáme | Zjistit, jestli Early Rider dává feed nebo ceník ke stažení | Pavel |
-| 11 | Creative play s.r.o. | 1,9 | chybí jen adresa | Vložit adresu feedu (zdroj beany) | Láďa |
+| 11 | Creative play s.r.o. | 1,9 | **běží od 24. 11. 20:29** (348 nabídek, máme 101, nemáme 247) | — | — |
 | 12 | SPORT und FREIZEIT, spol. s r.o. | 1,8 | běží, bez nákupní ceny | Zjistit, jestli jde dostat feed s nákupní cenou (oba zdroje) | Pavel |
-| 13 | CYKLO PROFI, s.r.o. | 1,6 | chybí jen adresa | Vložit adresu feedu (zdroj cyklo-profi) | Láďa |
+| 13 | CYKLO PROFI, s.r.o. | 1,6 | **běží od 24. 11. 20:29** (4 426 nabídek, máme 2 154, nemáme 2 215) | Projít, co nemáme u značek, které vedeme (1 724) | Pavel |
 | 14 | Kalkhoff Werke GmbH | 1,5 | žádný feed nemáme | Zjistit, jestli Kalkhoff nabízí VeloConnect, a vyžádat přístup | Pavel |
 | 15 | Garmin Czech s.r.o. | 1,4 | žádný feed nemáme | Zjistit, jestli Garmin dává feed pro prodejce | Pavel |
 | 16 | BIKE BROTHERS IMPORT, spol. s r.o. | 1,4 | jen přihlášení do B2B | Požádat o přímou adresu feedu (bez přihlášení přes web) | Pavel |
-| 17 | ENDURA LIMITED | 1,3 | B2B přihlášení; katalog v jiném formátu | Vložit adresu katalogu s tokenem; Claude doprogramuje čtení (text/JSON) | Láďa + Claude |
-| 18 | RASCAL BIKES s.r.o. | 1,3 | chybí jen adresa | Vložit adresu feedu (zdroj rascal) | Láďa |
+| 17 | ENDURA LIMITED | 1,3 | mapování katalogu hotové 24. 11. (8 581 variant, EAN u všech, bez cen); **chybí jen adresa** | Vložit adresu katalogu u zdroje `endura-2` (Upravit) — zdroj se pak stáhne sám | Láďa |
+| 18 | RASCAL BIKES s.r.o. | 1,3 | **běží od 24. 11. 20:29** (287 nabídek, máme 126, nemáme 161; feed nenese značku) | — | — |
 | 19 | SILVINI s.r.o. | 1,2 | pouští jen firemní IP | Zkusit ze serveru (4 feedy: Upravit → rozbor) a zapnout | Láďa |
-| 20 | CYKLO ŽITNÝ, s.r.o. | 1,2 | chybí jen adresa | Vložit adresu feedu (zdroj cyklo-zitny) | Láďa |
-| 21 | 4EVER, s.r.o. | 1,0 | chybí jen adresa | Vložit adresu feedu (zdroj 4ever); rozhodnout cenu: BHIT a IT Future ji berou z jiného prvku | Láďa |
-| 22 | SNOW-HOW ČR s.r.o. | 0,9 | chybí jen adresa | Vložit adresu feedu (zdroj snow-how-pouze-amulet) | Láďa |
-| 23 | SLOGER, j.s.a. | 0,9 | chybí jen adresa | Vložit adresu feedu (zdroj sloger) | Láďa |
+| 20 | CYKLO ŽITNÝ, s.r.o. | 1,2 | **běží od 24. 11. 20:29** (2 687 nabídek, máme 1 594, nemáme 1 090) | — | — |
+| 21 | 4EVER, s.r.o. | 1,0 | **běží od 24. 11. 20:29** (799 nabídek, máme 446, nemáme 347) | Rozhodnout nákupní cenu: `CATALOGUE_PRICE` (BHIT, teď) nebo `CUSTOMER_PRICE / 1,21` (IT Future, o 9 % méně) | Láďa |
+| 22 | SNOW-HOW ČR s.r.o. | 0,9 | **běží od 24. 11.** (614 variant po opravě čtení, máme 200, nemáme 413) | — | — |
+| 23 | SLOGER, j.s.a. | 0,9 | **běží od 24. 11.** (11 627 nabídek po opravě čtení variant, máme 3 590, nemáme 8 021) | Projít, co nemáme u značek, které vedeme (3 923) | Pavel |
 | 24 | Wahoo Fitness | 0,9 | žádný feed nemáme | Zjistit, jestli Wahoo dává feed pro prodejce | Pavel |
 | 25 | OneUp Components | 0,9 | feed je Excel | Vložit adresu s tokenem; Claude doprogramuje čtení Excelu z adresy | Láďa + Claude |
 | 26 | VAVRYS CZ s.r.o. | 0,8 | jen přihlášení do B2B | Požádat o přímou adresu feedu | Pavel |
-| 27 | Protocycles s.r.o. | 0,6 | chybí jen adresa | Vložit adresu feedu (zdroj protocycles) | Láďa |
+| 27 | Protocycles s.r.o. | 0,6 | **běží od 24. 11. 20:29** (61 nabídek, máme 41, nemáme 18) | — | — |
 | 28 | Halbich s.r.o. | 0,5 | žádný feed nemáme | Zjistit, jestli Halbich dává feed | Pavel |
 | 29 | Forever Faster s.r.o. | 0,5 | jen přihlášení do B2B | Požádat o přímou adresu feedu | Pavel |
 | 30 | UNIS Pro Team s.r.o. | 0,5 | žádný feed nemáme | Zjistit, jestli Unis dává feed | Pavel |
 | 31 | MAGURA Bosch Parts & Services GmbH & Co. KG | 0,5 | chybí přístup k VeloConnectu | Vyžádat u MBPS přihlášení k VeloConnectu a dát ho do .env na serveru | Pavel / Láďa |
 | 32 | AMER SPORTS Czech Republic s.r.o. | 0,5 | žádný feed nemáme | Zjistit, jestli Amer Sports dává feed | Pavel |
 | 33 | ABUS CZECH s.r.o. | 0,4 | běží jen dostupnost, bez ceny | Vyžádat přístup k VeloConnectu ABUS (ceny), až skončí údržba jejich portálu | Pavel |
-| 34 | Activent 365 s.r.o. | 0,4 | chybí jen adresa | Vložit adresu feedu (zdroj pinguin) | Láďa |
+| 34 | Activent 365 s.r.o. | 0,4 | **běží od 24. 11. 20:29** (1 569 nabídek, máme 263, nemáme 1 304; 192 položek feedu nemá EAN a neukládají se) | — | — |
 | 35 | Engelbert Wiener Bike Parts GmbH | 0,3 | žádný feed nemáme | Zjistit, jestli Wiener Bike Parts nabízí VeloConnect | Pavel |
 | 36 | Biketime s.r.o. | 0,3 | běží, bez nákupní ceny a značky | Zjistit, jestli jde dostat feed s nákupní cenou (ve feedu je jen MOC) | Pavel |
 | 37 | LAID a.s. | 0,3 | **běží od 23. 11. 18:30** (2 071 nabídek, máme 219, nemáme 1 852) | Zkontrolovat první import (kód karty bez závorek, EUR = MOC / 24,5) | Láďa |
 | 38 | LEVIT s.r.o. | 0,3 | žádný feed nemáme | Zjistit, jestli Levit dává feed | Pavel |
 | 39 | SPRINT spol.s r.o. | 0,2 | adresa neexistuje (404) | Vyžádat u Sprintu novou adresu feedu a vložit ji | Pavel |
 | 40 | CYKLO BARTONÍČEK, s.r.o. | 0,2 | žádný feed nemáme | Zjistit, jestli Cyklo Bartoníček dává feed | Pavel |
-| 41 | Summit Trade s.r.o. | 0,2 | chybí jen adresy | Vložit adresy tří feedů (produkt, dostupnost, outlet) | Láďa |
+| 41 | Summit Trade s.r.o. | 0,2 | **outlet běží od 24. 11.** (3 925 nabídek); hlavní feed čeká na adresu produktového feedu | Vložit adresu produktového feedu u zdroje `summit-trade-produkt` (Upravit) | Láďa |
 | 42 | Krab cycles s.r.o. | 0,2 | žádný feed nemáme | Zjistit, jestli Krab cycles dává feed | Pavel |
 | 43 | MTBiker s.r.o. | 0,2 | chybí adresa; zvenku blokováno | Vložit adresu s tokenem a zkusit ze serveru | Láďa |
 | 44 | Stablecam | 0,2 | **běží od 23. 11. 22:52** (5 031 nabídek s cenou a skladem; bez názvů a značek) | Zeptat se Stablecamu na katalogový feed s názvy; vyměnit přístupový klíč v adrese | Láďa |
