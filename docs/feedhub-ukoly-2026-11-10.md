@@ -129,6 +129,14 @@ Dnešní zkušenost ukazuje, proč je to potřeba: Lindlau deset dní padal po m
 
 ## F. Feedy podle obratu dodavatele (23. 11. 2026)
 
+**Stav 24. 11. 2026 v 17:10 (feedhub #43, #44, #45) — ceník Bike Funu, Progress Cycle, soubory Ober Alp a OneUp, adresy z tabulek:**
+
+- **Ceník ke zdroji** (feedhub #43): feed bez cen dostane ceny ze souboru nahraného na dashboardu („Nahrát ceník“ u řádku zdroje). U Bike Funu je to export z jejich B2B: po nahrání má cenu 1 316 z 1 497 nabídek a MOC 1 120 (ověřeno nad skutečným feedem a souborem). Když se ve feedu objeví nový produkt mimo ceník, zdroj zoranžoví, v Úkolech vznikne žádost a deník ji zapíše; nahráním nového souboru se uzavře. Značka doplňků: SF = Superior, NF = One Bikeparts. **Čeká na Láďu:** nahrát soubor na dashboardu.
+- **Progress Cycle** (feedhub #44) běží: 4 910 nabídek, máme 2 143 (jen karta 617), nemáme 2 755, u značek, které vedeme, 1 829, chybějící varianty 390. Nákupní cenu feed nenese (jen doporučenou MOC) — zbývá ceník.
+- **Ober Alp a OneUp** (feedhub #45): soubor se nahrává na dashboardu („Nahrát soubor“). Dynafit: 8 956 položek s nákupní cenou, MOC, EANem a skladem; OneUp: 283 položek se skladem (bez EANu a cen; hlavička má SKU a Brand prohozené, mapování s tím počítá). **Čeká na Láďu:** nahrát soubory Dynafit, Salewa a OneUp.
+- **Adresy z tabulek BHIT a IT Future:** pro 14 zapnutých zdrojů, které čekaly na adresu, je připravený soubor řádků pro `.env` (není v repozitáři). Ověřeno stažením a produkčním parserem: 4ever 799, Cyklo Profi 4 426, Cyklo Žitný 2 687, N Distribution 9 164, Pinguin 1 761, Protocycles 61, Sloger 7 415, Snow-How 368, Summit Trade dostupnost 12 926 a outlet 3 907. Odsud neověřeno (server pouští jen některé adresy): Beany, Rascal, Zookee, Cyklospeciality. **Summit Trade produkt** vynechán: feed má 168 MB a jeho čtení bere 1,1 GB paměti (kontejner má 2 GB), nese jen názvy a zdvojil by nabídky — chce to spojit názvy s dostupnostním feedem jinak.
+- Nové možnosti z tabulek: Endura má katalog v JSON (teď už čitelný), Vertone vrací XML `<stock>` — oba čekají na mapování. MTBiker a Viva vracejí 404, Level Sport chybu na své straně.
+
 **Stav 24. 11. 2026 v 16:20 (verze `v2026-11-24-57c128c`, feedhub #42), z logu nasazení — Bike Fun běží:**
 
 - Láďa doplnil klíč do `.env` a nasadil; zdroj se v 16:11 stáhl sám hned po startu. **1 499 nabídek** (EAN má 1 498, značku 1 247, bez cen — feed je nenese).
