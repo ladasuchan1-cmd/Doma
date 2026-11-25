@@ -75,7 +75,7 @@ Stav k 25. 11. 2026 po ranním běhu. Přehled pro tým je v dokumentu [Feed Hub
 
 Čísla z 25. 11. 2026 v 7:14 (verze `v2026-11-25-16808aa`): 73 zdrojů, 52 zapnutých, z nich 47 v pořádku, 3 s varováním (Aspire sport přechodně, obě konkurence) a 2 červené (Salewa čeká na svůj Order Sheet, MBPS na přístup). 226 338 nabídek od 44 dodavatelů, máme 62 586, nemáme 162 750, ke kontrole 1 002.
 
-Večer 25. 11. 2026 ve 22:31 (verze `v2026-11-25-2f5985d`): 74 zdrojů, 54 zapnutých. Přibyl zdroj `raymon-api` (nové B2B API Raymonu, vypnutý, čeká na přístup v `.env`), Silvini se poprvé stáhlo ze serveru (dostupnostní feed Viking, 17 093 nabídek) a nová pojistka hlídá, jestli dva zapnuté zdroje téhož dodavatele nenesou tytéž položky. Hned našla znovu zapnutý starý zdroj Sport und Freizeit: **večerní součty (252 863 nabídek, nemáme 182 840) jsou o zhruba 8 000 nabídek nadsazené**, dokud se starý zdroj zase nevypne.
+Večer 25. 11. 2026 ve 22:41 (verze `v2026-11-25-83dd701`): 74 zdrojů, 53 zapnutých. Přibyl zdroj `raymon-api` (nové B2B API Raymonu, vypnutý, čeká na přístup v `.env`), Silvini se poprvé stáhlo ze serveru (dostupnostní feed Viking, 17 093 nabídek) a nová pojistka hlídá, jestli dva zapnuté zdroje téhož dodavatele nenesou tytéž položky. Hned našla znovu zapnutý starý zdroj Sport und Freizeit (8 015 společných nabídek); po rozhodnutí Ládi je zase vypnutý. Sortiment po tom: z 243 467 nabídek zapnutých zdrojů máme 67 961, nemáme 174 502, ke kontrole 1 004 — proti ránu přibylo Silvini.
 
 Zkušenost z 10. 11., proč je to potřeba: Lindlau deset dní padal po mém nasazení z 31. 10. a nikdo se to nedozvěděl. Feed Hub to věděl (červený semafor), ale neřekl to nikomu a nedal to do souvislosti s nasazením.
 
@@ -136,12 +136,12 @@ Zkušenost z 10. 11., proč je to potřeba: Lindlau deset dní padal po mém nas
 
 ## F. Feedy podle obratu dodavatele (23. 11. 2026)
 
-**Stav 25. 11. 2026 ve 22:31 (feedhub #54 a #55; verze `v2026-11-25-2f5985d`), z logu nasazení — Raymon API, Silvini a pojistka na překryv zdrojů:**
+**Stav 25. 11. 2026 ve 22:41 (feedhub #54 až #56; verze `v2026-11-25-83dd701`), z logu nasazení — Raymon API, Silvini a pojistka na překryv zdrojů:**
 
 - **Raymon má nové B2B API** (Postman kolekci poslal Láďa). Proti VeloConnectu nese skutečné kusy skladem a naše ceny s množstevními stupni; termín dodání nenese. Zdroj `raymon-api` je založený a **vypnutý**: mapování je podle veřejného popisu rozhraní, skutečná data jsme neviděli. **Čeká na Láďu:** řádek `RAYMON_API_AUTH=e-mail:heslo` (přihlášení do B2B Raymonu) do `.env` na serveru a nasazení. Po prvním běhu se rozhodne, jestli Raymon přepnout na API (a VeloConnect vypnout), nebo nechat VeloConnect kvůli termínům.
 - **Silvini se poprvé stáhlo** (Láďa odpoledne nastavil na dashboardu dva feedy Viking): `silvini-viking-dostupnostni` běží — 17 093 nabídek, všechny s EANem, máme 5 382 (jen karta 3 218), nemáme 11 710. Feed nese jen kód, EAN a dispozici, takže nabídky jsou **bez názvu, značky a ceny**. `silvini-viking-zalistovaci` (názvy, nákupní ceny, sklad) je nastavený, ale vypnutý. Další krok: zapnout zalistovací feed; Feed Hub hned řekne, jestli nese tytéž položky jako dostupnostní, a pak nechat zapnutý jen jeden (nebo je spojit jako druhý feed).
 - **Pojistka na překryv zdrojů** (feedhub #55): když dva zapnuté zdroje téhož dodavatele nesou tytéž položky (stejný kód nebo EAN u aspoň poloviny nabídek menšího z nich), napíše to Feed Hub nad tabulku Sortimentu, k oběma zdrojům, do výpisu stavu, Claudovi a hned po zapnutí takového zdroje. Nic sám nevypíná. Zapnutí a vypnutí zdroje se nově v Sortimentu projeví hned.
-- **Co pojistka našla na serveru:** starý zdroj `sport-und-freizeit` (fischer-shop.cz), který Láďa v 17:23 znovu zapnul, nese 8 015 z 9 396 nabídek shodných s novým zdrojem (8 016 z 8 712). Starý feed má navíc všechny položky „skladem: ne“. **K rozhodnutí Ládi: vypnout ho.** Summit Trade (produkt × outlet) se nehlásí — společná je menšina.
+- **Co pojistka našla na serveru:** starý zdroj `sport-und-freizeit` (fischer-shop.cz), který Láďa v 17:23 znovu zapnul, nese 8 015 z 9 396 nabídek shodných s novým zdrojem (8 016 z 8 712). Starý feed má navíc všechny položky „skladem: ne“. **Láďa rozhodl vypnout — hotovo ve 22:41 (feedhub #56, migrace 041)**, varování zmizelo a součty sedí. Summit Trade (produkt × outlet) se nehlásí — společná je menšina.
 - Beze změny: Salewa čeká na svůj Order Sheet, MBPS na přístup, Aspire sport je přechodně ve varování.
 
 **Stav 25. 11. 2026 v 7:14 (feedhub #53; verze `v2026-11-25-16808aa`), z logu nasazení — Crussis a Cyklomax jsou každý jeden zdroj:**
