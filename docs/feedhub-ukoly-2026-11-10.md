@@ -75,6 +75,8 @@ Stav k 25. 11. 2026 po ranním běhu. Přehled pro tým je v dokumentu [Feed Hub
 
 Čísla z 25. 11. 2026 v 7:14 (verze `v2026-11-25-16808aa`): 73 zdrojů, 52 zapnutých, z nich 47 v pořádku, 3 s varováním (Aspire sport přechodně, obě konkurence) a 2 červené (Salewa čeká na svůj Order Sheet, MBPS na přístup). 226 338 nabídek od 44 dodavatelů, máme 62 586, nemáme 162 750, ke kontrole 1 002.
 
+Večer 25. 11. 2026 ve 22:31 (verze `v2026-11-25-2f5985d`): 74 zdrojů, 54 zapnutých. Přibyl zdroj `raymon-api` (nové B2B API Raymonu, vypnutý, čeká na přístup v `.env`), Silvini se poprvé stáhlo ze serveru (dostupnostní feed Viking, 17 093 nabídek) a nová pojistka hlídá, jestli dva zapnuté zdroje téhož dodavatele nenesou tytéž položky. Hned našla znovu zapnutý starý zdroj Sport und Freizeit: **večerní součty (252 863 nabídek, nemáme 182 840) jsou o zhruba 8 000 nabídek nadsazené**, dokud se starý zdroj zase nevypne.
+
 Zkušenost z 10. 11., proč je to potřeba: Lindlau deset dní padal po mém nasazení z 31. 10. a nikdo se to nedozvěděl. Feed Hub to věděl (červený semafor), ale neřekl to nikomu a nedal to do souvislosti s nasazením.
 
 ## A. Napřed: bezpečnost a provoz
@@ -133,6 +135,14 @@ Zkušenost z 10. 11., proč je to potřeba: Lindlau deset dní padal po mém nas
 | E7 | Lindlau: číst celý katalog. | **Hotovo 10. 11.** Lindlau na stránku hledání bez parametru `ResultFormat` vrací jen počet, položky až na `ITEM_DETAIL`; klient to teď zkusí sám. Katalog má 8 898 položek místo dosavadních 937. Velikost balení je 1 u 936 z 937 dosud stahovaných položek (jedna má balení po 50), minimální odběr má 59 položek; ani jedno Feed Hub zatím nečte, viz E8. | hotovo |
 
 ## F. Feedy podle obratu dodavatele (23. 11. 2026)
+
+**Stav 25. 11. 2026 ve 22:31 (feedhub #54 a #55; verze `v2026-11-25-2f5985d`), z logu nasazení — Raymon API, Silvini a pojistka na překryv zdrojů:**
+
+- **Raymon má nové B2B API** (Postman kolekci poslal Láďa). Proti VeloConnectu nese skutečné kusy skladem a naše ceny s množstevními stupni; termín dodání nenese. Zdroj `raymon-api` je založený a **vypnutý**: mapování je podle veřejného popisu rozhraní, skutečná data jsme neviděli. **Čeká na Láďu:** řádek `RAYMON_API_AUTH=e-mail:heslo` (přihlášení do B2B Raymonu) do `.env` na serveru a nasazení. Po prvním běhu se rozhodne, jestli Raymon přepnout na API (a VeloConnect vypnout), nebo nechat VeloConnect kvůli termínům.
+- **Silvini se poprvé stáhlo** (Láďa odpoledne nastavil na dashboardu dva feedy Viking): `silvini-viking-dostupnostni` běží — 17 093 nabídek, všechny s EANem, máme 5 382 (jen karta 3 218), nemáme 11 710. Feed nese jen kód, EAN a dispozici, takže nabídky jsou **bez názvu, značky a ceny**. `silvini-viking-zalistovaci` (názvy, nákupní ceny, sklad) je nastavený, ale vypnutý. Další krok: zapnout zalistovací feed; Feed Hub hned řekne, jestli nese tytéž položky jako dostupnostní, a pak nechat zapnutý jen jeden (nebo je spojit jako druhý feed).
+- **Pojistka na překryv zdrojů** (feedhub #55): když dva zapnuté zdroje téhož dodavatele nesou tytéž položky (stejný kód nebo EAN u aspoň poloviny nabídek menšího z nich), napíše to Feed Hub nad tabulku Sortimentu, k oběma zdrojům, do výpisu stavu, Claudovi a hned po zapnutí takového zdroje. Nic sám nevypíná. Zapnutí a vypnutí zdroje se nově v Sortimentu projeví hned.
+- **Co pojistka našla na serveru:** starý zdroj `sport-und-freizeit` (fischer-shop.cz), který Láďa v 17:23 znovu zapnul, nese 8 015 z 9 396 nabídek shodných s novým zdrojem (8 016 z 8 712). Starý feed má navíc všechny položky „skladem: ne“. **K rozhodnutí Ládi: vypnout ho.** Summit Trade (produkt × outlet) se nehlásí — společná je menšina.
+- Beze změny: Salewa čeká na svůj Order Sheet, MBPS na přístup, Aspire sport je přechodně ve varování.
 
 **Stav 25. 11. 2026 v 7:14 (feedhub #53; verze `v2026-11-25-16808aa`), z logu nasazení — Crussis a Cyklomax jsou každý jeden zdroj:**
 
@@ -287,7 +297,7 @@ Zadání Ládi: úkoly podle priorit, prioritou je obrat dodavatele, od největ�
 | 16 | BIKE BROTHERS IMPORT, spol. s r.o. | 1,4 | jen přihlášení do B2B | Požádat o přímou adresu feedu (bez přihlášení přes web) | Pavel |
 | 17 | ENDURA LIMITED | 1,3 | **běží od 24. 11. 22:11** (8 581 variant, máme 3 783, nemáme 4 798, chybějící varianty 1 660; bez cen) | Zjistit, jestli jde dostat ceník (feed ceny nenese) | Pavel |
 | 18 | RASCAL BIKES s.r.o. | 1,3 | **běží od 24. 11. 20:29** (287 nabídek, máme 126, nemáme 161; feed nenese značku) | — | — |
-| 19 | SILVINI s.r.o. | 1,2 | pouští jen firemní IP | Zkusit ze serveru (4 feedy: Upravit → rozbor) a zapnout | Láďa |
+| 19 | SILVINI s.r.o. | 1,2 | **dostupnostní feed Viking běží od 25. 11. 22:16** (17 093 nabídek, máme 5 382, nemáme 11 710; bez názvů a cen); zalistovací feed Viking je nastavený a vypnutý; dva feedy značky Silvini zatím nerozebrané | Zapnout `silvini-viking-zalistovaci` (názvy a ceny) a nechat zapnutý jen jeden ze dvou; stejně rozebrat zbylé dva feedy | Láďa |
 | 20 | CYKLO ŽITNÝ, s.r.o. | 1,2 | **běží od 24. 11. 20:29** (2 687 nabídek, máme 1 594, nemáme 1 090) | — | — |
 | 21 | 4EVER, s.r.o. | 1,0 | **běží od 24. 11.** (799 nabídek, máme 446, nemáme 347); nákupní cena = `CUSTOMER_PRICE / 1,21`, ověřeno proti našim nákupním cenám | Zkontrolovat první import do Pohody | Láďa |
 | 22 | SNOW-HOW ČR s.r.o. | 0,9 | **běží od 24. 11.** (614 variant po opravě čtení, máme 200, nemáme 413) | — | — |
