@@ -63,14 +63,19 @@ Pracnost je odhad v člověkodnech práce Clauda, ne slib. Stav „dnes“ je ov
 
 ## Kde jsme dnes
 
+Stav k 25. 11. 2026 po ranním běhu (verze `v2026-11-25-64adc6e`). Přehled pro tým je v dokumentu [Feed Hub: co děláme a co umíme](https://claude.ai/artifact/CF5dfPP7jNhBn8787jYsqy), na jeho druhé záložce jsou čísla po dodavatelích.
+
 | Cíl | Co už je | Co chybí |
 | --- | --- | --- |
-| 1. Zavedení feedu | Formulář „Přidat feed“ pro XML: stáhne, navrhne mapování, ukáže vzorek z produkčního parseru, uloží. | Formulář pro VeloConnect, CSV a XLSX. Kontrola, že cena je nákupní a ne MOC. Přepočet z uloženého stažení po úpravě mapování. Jednotný stav dostupnosti. |
-| 2. Změny mezi běhy | **Od 10. 11. večer:** každý úspěšný běh zapíše, co se změnilo (nová, zmizelá a vrácená položka, nákupní cena, MOC, naskladněno, vyprodáno, dostupnost, množství, termín, EAN, název). Na dashboardu sekce „Co se změnilo“ s filtry a exportem do Excelu, souhrn u posledního běhu. | Prahy na podezřelé změny (B3) a strop na stáří dat (B4). Starší historie zná jen cenu a dostupnost. |
-| 3. Kdo změnu udělal | Semafor a text chyby u zdroje. | Rozlišení příčin (přihlášení, síť, struktura). Otisk struktury feedu. Deník událostí. Pošta, protože chybí SMTP. |
-| 4. Naše změny | Nic. Úpravy z dashboardu se nezapisují, přihlášení je jedno společné. | Deník změn nastavení, kdo je udělal, změny přístupů v `.env`, deník nasazení. |
+| 1. Zavedení feedu | Formulář „Přidat feed“ pro XML i VeloConnect s ověřením připojení. Feed v JSON, v ZIPu, velký feed proudem, klíč v adrese i v hlavičkách. Excel nahraný na dashboardu, ceník ke zdroji. Náhled varuje, když kód dodavatele není jedinečný. | Formulář pro CSV. Spojení dvou feedů jednoho dodavatele do jednoho zdroje (Crussis, Level Sport). Přepočet z uloženého stažení po úpravě mapování. |
+| 2. Změny mezi běhy | Každý úspěšný běh zapíše, co se změnilo. Sekce „Co se změnilo“ s filtry a CSV. Oprava čtení z migrace ani změna adresy se do změn nezapisují. | Prahy na podezřelé změny (B3) a strop na stáří dat (B4). Ride Hard přepočítává ceny kurzem: jedna změna kurzu = tři tisíce událostí „nákupní cena“. |
+| 3. Kdo změnu udělal | Semafor, historie běhů, deník výpadků a obnov s příčinou a s tím, jestli mezitím proběhlo naše nasazení. Stav po nasazení v logu na GitHubu. | Denní e-mail, chybí SMTP. Otisk struktury feedu. |
+| 4. Naše změny | Deník: nasazení, založení a úpravy zdrojů (před → po), změny přístupů v `.env`, nahrané soubory a ceníky, přiřazení značek, ruční páry. | U změn z přímého přístupu na port není, kdo je udělal. |
+| 5. Kontrola zalistování (od 22. 11.) | Náš sortiment z e-shopu a z karet Pohody, párování EAN → objednací název → ručně. Co nemáme, chybějící varianty, značky, které vedeme, import do Pohody, Claude Desktop. | Omezit objednací název na karty daného dodavatele. Nákupní ceny u 10 feedů, které je nenesou. Týdenní souhrn mailem. |
 
-Dnešní zkušenost ukazuje, proč je to potřeba: Lindlau deset dní padal po mém nasazení z 31. 10. a nikdo se to nedozvěděl. Feed Hub to věděl (červený semafor), ale neřekl to nikomu a nedal to do souvislosti s nasazením.
+Čísla z 25. 11. 2026 v 6:52: 73 zdrojů, 54 zapnutých, z nich 49 v pořádku, 3 s varováním (Aspire sport přechodně, obě konkurence) a 2 červené (Salewa čeká na svůj Order Sheet, MBPS na přístup). 227 703 nabídek od 44 dodavatelů, máme 63 331, nemáme 163 368, ke kontrole 1 004.
+
+Zkušenost z 10. 11., proč je to potřeba: Lindlau deset dní padal po mém nasazení z 31. 10. a nikdo se to nedozvěděl. Feed Hub to věděl (červený semafor), ale neřekl to nikomu a nedal to do souvislosti s nasazením.
 
 ## A. Napřed: bezpečnost a provoz
 
@@ -128,6 +133,17 @@ Dnešní zkušenost ukazuje, proč je to potřeba: Lindlau deset dní padal po m
 | E7 | Lindlau: číst celý katalog. | **Hotovo 10. 11.** Lindlau na stránku hledání bez parametru `ResultFormat` vrací jen počet, položky až na `ITEM_DETAIL`; klient to teď zkusí sám. Katalog má 8 898 položek místo dosavadních 937. Velikost balení je 1 u 936 z 937 dosud stahovaných položek (jedna má balení po 50), minimální odběr má 59 položek; ani jedno Feed Hub zatím nečte, viz E8. | hotovo |
 
 ## F. Feedy podle obratu dodavatele (23. 11. 2026)
+
+**Stav 25. 11. 2026 v 6:52 (feedhub #52; verze `v2026-11-25-64adc6e`), z logu nasazení — první ranní běhy po včerejších opravách:**
+
+- **Všechny zdroje v 6:00 proběhly.** Ze 54 zapnutých je 49 v pořádku, 3 s varováním, 2 červené. Červená je podle očekávání **Salewa** (má nahraný sešit Dynafitu, čeká na svůj Order Sheet) a MBPS (přístup).
+- **Varování na opakované kódy nedostal žádný zdroj** — všude je to pod 5 %, jen poznámka běhu: N Distribution 76, ABUS 19, Sloger 18, Origos 15, Sport Import 6, Snow-How 3, OneUp 2. Pinguin neuložil 191 položek bez kódu i EANu.
+- **Endura** drží 8 581 nabídek s kódem varianty (oprava z migrace 038 vydržela ranní běh). **Bike Fun** má cenu z ceníku u 1 314 z 1 497 nabídek, žádost o nový ceník nevznikla.
+- **Ride Hard zapsal 2 990 změn nákupní ceny.** Není to chyba čtení: 2 883 položek se změnilo stejným poměrem (−0,16 %), dodavatel přepočítává ceny kurzem (O´Neal, Kini Red Bull, ONE; SIXS beze změny). Ověřeno produkčním parserem nad feedem z 23. a z 25. 11. Každá změna kurzu tak udělá v „Co se změnilo“ tři tisíce událostí — k rozhodnutí Ládi, jestli drobné změny ceny schovat.
+- **Bike-Discount** v noci odmítl všech 1 500 stránek (403). Podle rozhodnutí z 11. 11. se konkurence neřeší.
+- **Značka Raymonu** se nepočítá mezi značky, které vedeme, i když ji na e-shopu máme (412 položek) — v katalogu Raymonu je zapsaná jinak. Přiřadit ji musí člověk v Sortimentu, stejně jako Merrell a Saucony (Aspire sport) a OneUp.
+- Sortiment: z 227 703 nabídek zapnutých zdrojů máme 63 331 (EAN 60 526, objednací název 2 805), nemáme 163 368, ke kontrole 1 004. E-shop 49 006 položek, karet Pohody 149 221.
+- Přehled „Feed Hub: co děláme a co umíme“ je přepsaný na dnešní stav (odkaz v části Kde jsme dnes).
 
 **Stav 24. 11. 2026 ve 22:40 (feedhub #50 a #51; verze `v2026-11-24-34a78ac`), z logu nasazení — Láďa doplnil adresy a soubory:**
 
