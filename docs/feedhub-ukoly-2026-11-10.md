@@ -63,17 +63,17 @@ Pracnost je odhad v člověkodnech práce Clauda, ne slib. Stav „dnes“ je ov
 
 ## Kde jsme dnes
 
-Stav k 25. 11. 2026 po ranním běhu (verze `v2026-11-25-64adc6e`). Přehled pro tým je v dokumentu [Feed Hub: co děláme a co umíme](https://claude.ai/artifact/CF5dfPP7jNhBn8787jYsqy), na jeho druhé záložce jsou čísla po dodavatelích.
+Stav k 25. 11. 2026 po ranním běhu. Přehled pro tým je v dokumentu [Feed Hub: co děláme a co umíme](https://claude.ai/artifact/CF5dfPP7jNhBn8787jYsqy), na jeho druhé záložce jsou čísla po dodavatelích.
 
 | Cíl | Co už je | Co chybí |
 | --- | --- | --- |
-| 1. Zavedení feedu | Formulář „Přidat feed“ pro XML i VeloConnect s ověřením připojení. Feed v JSON, v ZIPu, velký feed proudem, klíč v adrese i v hlavičkách. Excel nahraný na dashboardu, ceník ke zdroji. Náhled varuje, když kód dodavatele není jedinečný. | Formulář pro CSV. Spojení dvou feedů jednoho dodavatele do jednoho zdroje (Crussis, Level Sport). Přepočet z uloženého stažení po úpravě mapování. |
+| 1. Zavedení feedu | Formulář „Přidat feed“ pro XML i VeloConnect s ověřením připojení. Feed v JSON, v ZIPu, velký feed proudem, klíč v adrese i v hlavičkách. Excel nahraný na dashboardu, ceník ke zdroji, druhý feed téhož dodavatele (Crussis, Cyklomax). Náhled varuje, když kód dodavatele není jedinečný. | Formulář pro CSV. Přepočet z uloženého stažení po úpravě mapování. Druhý feed se nastavuje migrací, ne formulářem. |
 | 2. Změny mezi běhy | Každý úspěšný běh zapíše, co se změnilo. Sekce „Co se změnilo“ s filtry a CSV. Oprava čtení z migrace ani změna adresy se do změn nezapisují. | Prahy na podezřelé změny (B3) a strop na stáří dat (B4). Ride Hard přepočítává ceny kurzem: jedna změna kurzu = tři tisíce událostí „nákupní cena“. |
 | 3. Kdo změnu udělal | Semafor, historie běhů, deník výpadků a obnov s příčinou a s tím, jestli mezitím proběhlo naše nasazení. Stav po nasazení v logu na GitHubu. | Denní e-mail, chybí SMTP. Otisk struktury feedu. |
 | 4. Naše změny | Deník: nasazení, založení a úpravy zdrojů (před → po), změny přístupů v `.env`, nahrané soubory a ceníky, přiřazení značek, ruční páry. | U změn z přímého přístupu na port není, kdo je udělal. |
 | 5. Kontrola zalistování (od 22. 11.) | Náš sortiment z e-shopu a z karet Pohody, párování EAN → objednací název → ručně. Co nemáme, chybějící varianty, značky, které vedeme, import do Pohody, Claude Desktop. | Omezit objednací název na karty daného dodavatele. Nákupní ceny u 10 feedů, které je nenesou. Týdenní souhrn mailem. |
 
-Čísla z 25. 11. 2026 v 6:52: 73 zdrojů, 54 zapnutých, z nich 49 v pořádku, 3 s varováním (Aspire sport přechodně, obě konkurence) a 2 červené (Salewa čeká na svůj Order Sheet, MBPS na přístup). 227 703 nabídek od 44 dodavatelů, máme 63 331, nemáme 163 368, ke kontrole 1 004.
+Čísla z 25. 11. 2026 v 7:14 (verze `v2026-11-25-16808aa`): 73 zdrojů, 52 zapnutých, z nich 47 v pořádku, 3 s varováním (Aspire sport přechodně, obě konkurence) a 2 červené (Salewa čeká na svůj Order Sheet, MBPS na přístup). 226 338 nabídek od 44 dodavatelů, máme 62 586, nemáme 162 750, ke kontrole 1 002.
 
 Zkušenost z 10. 11., proč je to potřeba: Lindlau deset dní padal po mém nasazení z 31. 10. a nikdo se to nedozvěděl. Feed Hub to věděl (červený semafor), ale neřekl to nikomu a nedal to do souvislosti s nasazením.
 
@@ -133,6 +133,15 @@ Zkušenost z 10. 11., proč je to potřeba: Lindlau deset dní padal po mém nas
 | E7 | Lindlau: číst celý katalog. | **Hotovo 10. 11.** Lindlau na stránku hledání bez parametru `ResultFormat` vrací jen počet, položky až na `ITEM_DETAIL`; klient to teď zkusí sám. Katalog má 8 898 položek místo dosavadních 937. Velikost balení je 1 u 936 z 937 dosud stahovaných položek (jedna má balení po 50), minimální odběr má 59 položek; ani jedno Feed Hub zatím nečte, viz E8. | hotovo |
 
 ## F. Feedy podle obratu dodavatele (23. 11. 2026)
+
+**Stav 25. 11. 2026 v 7:14 (feedhub #53; verze `v2026-11-25-16808aa`), z logu nasazení — Crussis a Cyklomax jsou každý jeden zdroj:**
+
+- **Druhý feed téhož dodavatele** (`app/second_feed.py`, migrace 039): hlavní zdroj při běhu stáhne i druhý feed a spojí ho přesnou shodou kódu dodavatele. Doplňuje jen to, co hlavní feed nemá. Když druhý feed nejde přečíst, běh končí chybou a nabídky zůstanou, jak byly.
+- **Crussis** na serveru: 2 649 nabídek, sklad doplněn u 1 163 produktů, 1 363 položek je jen ve feedu dostupnosti (kód a sklad, bez názvu). Máme 1 046, nemáme 1 603.
+- **Cyklomax** na serveru: 4 866 nabídek, nákupní cena u 202. U Cyklomaxu tím odpadá rozhodnutí, který feed nechat — nic se neztrácí; zbývá chtít cenu pro celý sortiment.
+- Zdroje `crussis-dostupnost` a `cyklomax-novy` jsou vypnuté a zapnout nejdou (čte je hlavní zdroj); adresa se u nich dál mění přes Upravit. První běh byl nové načtení bez událostí.
+- **Zlom:** součet nabídek zapnutých zdrojů klesl z 227 703 na 226 338, „máme“ z 63 331 na 62 586 (nabídky se už nepočítají dvakrát). Vypnutých zdrojů je 21.
+- Sloupec „Skladem“ v přehledu feedů počítá u XML feedů jen textové stavy, ne kusy — u Crussis proto ukazuje nulu, i když Sortiment sklad zná. Čeká na rozhodnutí z 10. 11. (jednotný stav dostupnosti).
 
 **Stav 25. 11. 2026 v 6:52 (feedhub #52; verze `v2026-11-25-64adc6e`), z logu nasazení — první ranní běhy po včerejších opravách:**
 
