@@ -136,6 +136,13 @@ Zkušenost z 10. 11., proč je to potřeba: Lindlau deset dní padal po mém nas
 
 ## F. Feedy podle obratu dodavatele (23. 11. 2026)
 
+**Stav 26. 11. 2026 v 17:39 (feedhub #60; verze `v2026-11-26-99ee183`), z logu nasazení — náš e-shop × feedy:**
+
+- **Nový přehled „Náš e-shop × feedy“** (zadání Ládi: u jakých výrobců a dodavatelů nemáme feed aktivní a funkční — ze všech, které máme aktivní položky na e-shopu). Bere položky, které jsou teď na e-shopu, a říká po výrobcích nebo po dodavatelích z karet Pohody, kolik jich nese některý běžící feed, kolik jen feed, který je vypnutý nebo naposledy selhal, a kolik žádný. Je na dashboardu (sekce pod Sortimentem, s CSV) a v Claude Desktop (nástroj `eshop_bez_feedu`).
+- **Čísla ze serveru:** z 49 356 položek na e-shopu má nabídku z běžícího feedu 33 515 (68 %), jen z feedu, který neběží, 855, žádnou 14 986. Z 541 výrobců je bez jediné nabídky z běžícího feedu 207 (8 110 položek), z 181 dodavatelů na kartách 97 (4 627 položek). Zbylých zhruba 7 700 nepokrytých položek patří výrobcům, které feed nese jen zčásti.
+- Názvy výrobců a dodavatelů do logu nasazení nejdou (jen počty) — seznam je na dashboardu.
+- Stav zdrojů: 46 funkčních, 5 s varováním, 4 červené — MBPS (přístup), Salewa (Order Sheet), Raymon API (chyba u Raymonu, stejná jako 25. 11.) a **Sport Import**, který ve 12:00 neodpověděl do 120 s; zkusí to znovu v 6:00.
+
 **Stav 25. 11. 2026 ve 23:15 (feedhub #57 až #59; verze `v2026-11-25-1619f0d`), z logu nasazení — první běhy Raymon API a zalistovacího feedu Silvini:**
 
 - **Raymon API nejde — chyba je na straně Raymonu.** Láďa doplnil přístup do `.env` a zdroj zapnul. Přihlášení projde, ale každý další dotaz (účet, ceny, katalog) vrací `400 NOT_FOUND` s textem „User not found with id: …“: API vydá token uživateli, kterého pak samo nenajde. Na naší straně není co opravit. **Další krok (Láďa nebo Pavel):** napsat Raymonu, že přihlášení do API projde a všechny dotazy pak končí touhle chybou, a přiložit `traceId` z poznámky běhu (dashboard → zdroj `raymon-api` → historie běhů). Zdroj zůstává zapnutý a zkouší to v 6:00, ve 12:00 a po každém nasazení; nabídky Raymonu dál bere VeloConnect.
