@@ -136,6 +136,15 @@ Zkušenost z 10. 11., proč je to potřeba: Lindlau deset dní padal po mém nas
 
 ## F. Feedy podle obratu dodavatele (23. 11. 2026)
 
+**Stav 26. 11. 2026 ve 21:32 (feedhub #63 a #64; verze `v2026-11-26-a9b50c2`), z logu nasazení — Silvini (Viking) je jeden zdroj:**
+
+- **Pokyn Ládi: „spoj silvini do jednoho zdroje jako druhý feed“.** Hlavní je skladový feed `silvini-viking-dostupnostni` (číslo materiálu, EAN, dispozice), ze zalistovacího `silvini-viking-zalistovaci` se doplňuje název, nákupní cena, doporučená MOC a značka. Spojuje se **podle EANu** — stejný kód oba feedy nenesou (nová volba druhého feedu; spojení podle kódu u Crussis a Cyklomaxu se nemění). Zalistovací zdroj je vypnutý a zapnout nejde, čte ho hlavní zdroj.
+- **První spojený běh (21:31):** 17 058 nabídek, všechna čtyři pole dostalo 7 451 z nich; 9 607 položek skladového feedu v zalistovacím není (jen kód, EAN, dispozice), žádná položka zalistovacího nechybí ve skladovém. Z nabídek máme 5 383 (jen karta 3 108), nemáme 11 674, z toho 6 928 u značek, které vedeme.
+- **Zdvojení zmizelo:** pojistka na překryv nehlásí nic. Nabídek zapnutých zdrojů 243 493 (před spojením 250 944), máme 68 022, nemáme 174 469.
+- **Zjištění z běhu:** zalistovací feed nese jen 7 451 různých EANů — 8 230 jeho položek se opakuje (proto z něj dřív zbylo 7 451 nabídek z 15 681). Poznámka běhu od #64 říká, u kolika opakovaných řádků se liší doplňovaná pole; číslo bude vidět po dalším běhu zdroje (ráno v 6:00, nebo tlačítkem Spustit).
+- **K ověření Láďou na dashboardu:** kód nabídek je číslo materiálu ze skladového feedu — jestli je to i náš objednací název; název je název produktu bez velikosti; chybějící varianty u Silvini zatím nejdou (skupina variant se nečte). Feedy značky Silvini (`silvini`, `silvini-dostupnostni`) nejsou nastavené.
+- Dodavatel hlavního zdroje se jmenuje jako u zalistovacího (dřív „Silvini - Viking - dostupnostní“). V přehledu e-shop × feedy se zdroj čtený jako druhý feed už neukazuje jako „feed, který neběží“.
+
 **Stav 26. 11. 2026 ve 20:34 (feedhub #62; verze `v2026-11-26-a71cfb3`), z logu nasazení — staré zdroje vypnuté a u vypnutých zdrojů je napsáno proč:**
 
 - **Pokyn Ládi: „vypni je oba a napiš proč jsou vypnuté“.** Migrace 044 znovu vypnula staré zdroje `zookee` a `sport-und-freizeit` (deník: oba „Zdroj vypnut (migrace 044)“ ve 20:34). Pojistka na překryv už je nehlásí; zbývá jen Silvini (dostupnostní × zalistovací, 7 451 společných nabídek).
