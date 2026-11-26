@@ -136,6 +136,15 @@ Zkušenost z 10. 11., proč je to potřeba: Lindlau deset dní padal po mém nas
 
 ## F. Feedy podle obratu dodavatele (23. 11. 2026)
 
+**Stav 26. 11. 2026 ve 20:10 (feedhub #61; verze `v2026-11-26-59b67d9`), z logu nasazení — nové členění a vzhled dashboardu:**
+
+- **Dashboard má osm záložek** (zadání Ládi: uživatelsky příjemné prostředí pro rychlou orientaci a líbivý design Koloshopu): Přehled, Feedy, Sortiment, Změny, Ceny, Úkoly, Claude Desktop, Nápověda. Dřív jedna stránka vysoká přes 22 tisíc pixelů. Na Přehledu jsou dlaždice (kolik feedů běží, má varování, nefunguje, je vypnutých), panel **Vyžaduje pozornost** (chyby a varování zapnutých zdrojů, žádosti o ceník, zdvojené zdroje — každý řádek s tlačítkem, které vede rovnou k feedu) a rozcestník. Ve Feedech filtr Zapnuté / S problémem / Vypnuté / Všechny a hledání; vypnutý zdroj má šedý stav „Vypnutý“, ne červený.
+- **Vzhled Koloshopu:** logo, písmo Poppins a barvy značky; písmo i logo leží u aplikace, stránka nic nestahuje z cizích serverů. Světlý i tmavý režim, telefon.
+- **Opravená starší chyba:** marže v části Nákup vs. konkurence se ukazovala jako pomlčka (dvě funkce stejného jména ve stránce).
+- Ověřeno jen na zkušebních datech v prohlížeči (server je vidět jen z firemní sítě) — **skutečná data zkontroluje Láďa** na `https://sales.report/feeds/`.
+- **Z deníku v logu:** 26. 11. v 19:46 někdo na dashboardu znovu zapnul staré zdroje `zookee` a `sport-und-freizeit` (vypnuté 24. a 25. 11., nahradily je `zookee-s-cenou` a `sport-und-freizeit-fischer-zmena-url`). Pojistka na překryv to hlásí: Zookee společných 7 132 z 7 243, Sport und Freizeit 8 013 z 9 396 — o tolik jsou součty v Sortimentu vyšší (nabídek zapnutých zdrojů 267 583, nemáme 193 110). **Čeká na odpověď Ládi**, jestli to byl záměr.
+- Stav: zdrojů 74 (vypnutých 17), funkčních 46, s varováním 5; červené: MBPS (přístup), Salewa (Order Sheet), `raymon-api` (chyba „User not found“ na straně Raymonu trvá), Sport Import (timeout ve 12:00), a oba znovu zapnuté staré zdroje, dokud v 6:00 neproběhnou.
+
 **Stav 26. 11. 2026 v 17:39 (feedhub #60; verze `v2026-11-26-99ee183`), z logu nasazení — náš e-shop × feedy:**
 
 - **Nový přehled „Náš e-shop × feedy“** (zadání Ládi: u jakých výrobců a dodavatelů nemáme feed aktivní a funkční — ze všech, které máme aktivní položky na e-shopu). Bere položky, které jsou teď na e-shopu, a říká po výrobcích nebo po dodavatelích z karet Pohody, kolik jich nese některý běžící feed, kolik jen feed, který je vypnutý nebo naposledy selhal, a kolik žádný. Je na dashboardu (sekce pod Sortimentem, s CSV) a v Claude Desktop (nástroj `eshop_bez_feedu`).
