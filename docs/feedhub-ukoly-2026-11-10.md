@@ -136,6 +136,13 @@ Zkušenost z 10. 11., proč je to potřeba: Lindlau deset dní padal po mém nas
 
 ## F. Feedy podle obratu dodavatele (23. 11. 2026)
 
+**Stav 26. 11. 2026 v noci (feedhub #65) — pojistka na nákupní ceny a filtr drobných změn ceny:**
+
+- **Pokyn Ládi: „udělej 2 a 3“** (ze čtyř nabídnutých vylepšení; záloha ručně zadaných dat a sjednocení „skladem“ ve Feedech čekají na rozhodnutí).
+- **Pojistka na nákupní ceny:** každý běh spočítá, u kolika položek je nákupní cena stejná nebo vyšší než doporučená MOC bez DPH. Aspoň 20 položek a víc než pětina srovnatelných = varování běhu (mapování nejspíš čte jako nákup cenu prodejní — tak Sidas ukládal ceník MOC); pod prahem poznámka s počtem. Zkalibrováno nad 16 staženými feedy: 0–0,5 % podezřelých položek, žádný planý poplach; Progress Cycle se špatně načtenou cenou by dal 4 910 z 4 910. Na serveru se poprvé projeví ranními běhy 27. 11.
+- **Filtr drobných změn ceny:** ve Změnách volba „Změny ceny“ (výchozí aspoň o 1 %) schová změny nákupní ceny a MOC pod zvolené procento — z výpisu, z počtů i z CSV. Stránka píše, kolik jich schovala, a tlačítkem je ukáže. Data se nemění. Důvod: Ride Hard při změně kurzu zapsal asi 3 000 změn o 0,16 %.
+- **Mail pro Raymon** s chybou API a traceId je připravený jako koncept v Gmailu (neodesláno).
+
 **Stav 26. 11. 2026 ve 21:32 (feedhub #63 a #64; verze `v2026-11-26-a9b50c2`), z logu nasazení — Silvini (Viking) je jeden zdroj:**
 
 - **Pokyn Ládi: „spoj silvini do jednoho zdroje jako druhý feed“.** Hlavní je skladový feed `silvini-viking-dostupnostni` (číslo materiálu, EAN, dispozice), ze zalistovacího `silvini-viking-zalistovaci` se doplňuje název, nákupní cena, doporučená MOC a značka. Spojuje se **podle EANu** — stejný kód oba feedy nenesou (nová volba druhého feedu; spojení podle kódu u Crussis a Cyklomaxu se nemění). Zalistovací zdroj je vypnutý a zapnout nejde, čte ho hlavní zdroj.
