@@ -136,6 +136,13 @@ Zkušenost z 10. 11., proč je to potřeba: Lindlau deset dní padal po mém nas
 
 ## F. Feedy podle obratu dodavatele (23. 11. 2026)
 
+**Stav 26. 11. 2026 ve 23:49 (feedhub #66; verze `v2026-11-26-deef5d2`), z logu nasazení — „Skladem“ podle jednoho pravidla:**
+
+- **Pokyn Ládi: „udělej 4“.** „Skladem“ ve Feedech a na dlaždici se počítá stejně jako v Sortimentu: jen nabídky, které dodavatel teď posílá, a jedno pravidlo pro celou aplikaci. Dřív měl přehled vlastní pravidlo — nepočítal počet kusů zapsaný textem („32“, „5+“) ani slova „ano“, „in stock“, „OK“ (Crussis měl nulu) a naopak počítal zboží na cestě a nabídky, které dodavatel už neposílá.
+- **Nové číslo ze serveru:** skladem u dodavatelů 132 068 z 243 493 aktuálních nabídek zapnutých zdrojů (54 %). **Zlom:** se starším číslem „Skladem“ není srovnatelné.
+- Totéž pravidlo má příznak skladu ve Srovnání dodavatelů a v Nákupu vs. konkurence.
+- **Zbývá k rozhodnutí:** „Nabídky“ (282 104) a „S cenou“ v přehledu dál zahrnují 38 611 nabídek, které dodavatelé už neposílají.
+
 **Stav 26. 11. 2026 v noci (feedhub #65) — pojistka na nákupní ceny a filtr drobných změn ceny:**
 
 - **Pokyn Ládi: „udělej 2 a 3“** (ze čtyř nabídnutých vylepšení; záloha ručně zadaných dat a sjednocení „skladem“ ve Feedech čekají na rozhodnutí).
