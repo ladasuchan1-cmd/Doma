@@ -136,6 +136,14 @@ Zkušenost z 10. 11., proč je to potřeba: Lindlau deset dní padal po mém nas
 
 ## F. Feedy podle obratu dodavatele (23. 11. 2026)
 
+**Stav 26. 11. 2026 ve 20:34 (feedhub #62; verze `v2026-11-26-a71cfb3`), z logu nasazení — staré zdroje vypnuté a u vypnutých zdrojů je napsáno proč:**
+
+- **Pokyn Ládi: „vypni je oba a napiš proč jsou vypnuté“.** Migrace 044 znovu vypnula staré zdroje `zookee` a `sport-und-freizeit` (deník: oba „Zdroj vypnut (migrace 044)“ ve 20:34). Pojistka na překryv už je nehlásí; zbývá jen Silvini (dostupnostní × zalistovací, 7 451 společných nabídek).
+- **Součty v Sortimentu jsou zpět:** nabídek zapnutých zdrojů 250 944 (se zdvojením 267 583), máme 68 545, nemáme 181 397 (se zdvojením 193 110), ke kontrole 1 002.
+- **U každého vypnutého zdroje je napsáno proč:** vypnutých 19, důvod má všech 19 (17 zapsaných migrací, dva čte jiný zdroj jako druhý feed). Ve Feedech je u vypnutého zdroje řádek „Proč je vypnutý: …“, před zapnutím takového zdroje se stránka zeptá a důvod ukáže, při vypnutí se na důvod zeptá; důvod jde přepsat ve formuláři Upravit. Claude Desktop ho čte ve `stav_zdroju`.
+- Text důvodu nejde do deníku ani do logu nasazení (jen „zapsán / změněn“ a počet).
+- Stav: zdrojů 74 (vypnutých 19), funkčních 46, s varováním 5; červené zapnuté zdroje: MBPS (přístup), Salewa (Order Sheet), `raymon-api` (chyba na straně Raymonu), Sport Import (timeout ve 12:00, zkusí to v 6:00).
+
 **Stav 26. 11. 2026 ve 20:10 (feedhub #61; verze `v2026-11-26-59b67d9`), z logu nasazení — nové členění a vzhled dashboardu:**
 
 - **Dashboard má osm záložek** (zadání Ládi: uživatelsky příjemné prostředí pro rychlou orientaci a líbivý design Koloshopu): Přehled, Feedy, Sortiment, Změny, Ceny, Úkoly, Claude Desktop, Nápověda. Dřív jedna stránka vysoká přes 22 tisíc pixelů. Na Přehledu jsou dlaždice (kolik feedů běží, má varování, nefunguje, je vypnutých), panel **Vyžaduje pozornost** (chyby a varování zapnutých zdrojů, žádosti o ceník, zdvojené zdroje — každý řádek s tlačítkem, které vede rovnou k feedu) a rozcestník. Ve Feedech filtr Zapnuté / S problémem / Vypnuté / Všechny a hledání; vypnutý zdroj má šedý stav „Vypnutý“, ne červený.
