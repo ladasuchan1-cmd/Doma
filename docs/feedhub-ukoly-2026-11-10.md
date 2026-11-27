@@ -397,3 +397,12 @@ Bloky A až D dávají dohromady zhruba dva týdny práce, blok E další týden
 - **František:** SMTP pro poštu, zpřístupnění feedu zvenku, interní adresa, místo pro zálohy.
 - **BHIT:** potvrzení struktury XML a zdrojová IP.
 - **Pavel:** přístupy k VeloConnectu pro MBPS a ABUS, kontrolní položky s ověřenou nákupní cenou.
+
+### Stav 27. 11. 2026 dopoledne — pojistka na stojící feed
+
+- Podnět: brand manažer hlásil Y0MV98040 (u nás na dotaz, u Paul Lange skladem). Feed Paul Lange ji nenese
+  (díly Shimano na „Y“ skoro vůbec) a od prvního stažení 23. 11. se nezměnil ani jednou — semafor zelený.
+- Nově (feedhub PR „Pojistka na stojící feed“): feed se skladem u aspoň 200 položek, který se 4 dny nezměnil
+  (aspoň 4 úspěšné běhy beze změny), je varování. Nahrané sešity se nehlídají. Paul Lange se ukáže nejpozději
+  28. 11. ve 12:00.
+- Na Láďovi / Pavlovi: zeptat se Paul Lange, jak často feed generují a jestli mají feed s celým katalogem včetně dílů.
