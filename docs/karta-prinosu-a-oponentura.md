@@ -58,3 +58,28 @@ Součet marže 0,3 / 1,1 / 3,7 mil. Kč; pravděpodobnost 80 / 50 / 15 % je úsu
 Oponentura téhož dne: od 22. do 26. 11. šlo na server 48 změn; ruční párování z 23. 11. nemělo k 26. 11. jediné
 použití; fáze 1–4 ze zadání nejsou uzavřené a BHIT s IT Future běží dál; nevíme, kdo kromě Ládi nástroj používá.
 Doporučení: napřed změřit používání a výsledek toho, co už je, než se staví další.
+
+## První měření: Disivo feed (27. 11. 2026)
+
+Láďa poslal adresu našeho feedu pro Disivo (`xml-new/CZE/disivo.xml`). Nese u každé z 49 395 položek e-shopu
+naši prodejní a nákupní cenu (s DPH), třídu ABC, sklad Teplice / Praha a dny skladem — tedy vstupy, které
+kartě chyběly. Jednorázový rozbor mimo server (nic se nestavělo), dodavatelé jen ze 17 z asi 50 feedů
+(KCK z 27. 11., ostatní z 23.–25. 11.; chybí Aspire, Helios, Zookee, Sport Import):
+
+| Třída | Položek | U nás vyprodáno | Z vyprodaných má dodavatel skladem (aspoň) |
+|---|---:|---:|---:|
+| A | 823 | 319 (39 %) | 114 |
+| B | 1 793 | 660 (37 %) | 248 |
+| C | 3 707 | 1 203 (32 %) | 511 |
+
+- Hodnota skladu v nákupních cenách bez DPH podle feedu: 82,6 mil. Kč (Sales: 92 mil., jiný den a rozsah).
+- Nákupní cena: u položek A a B, které jdou srovnat (809), je nejlevnější stažená nabídka o víc než 3 % pod
+  naší nákupní cenou u 168 a o víc než 3 % nad ní u 397. Feedové ceny bývají před našimi slevami, takže
+  je to seznam k prověření, ne úspora.
+- Vyprodáno u nás neznamená, že se neprodává (e-shop umí nabízet dodání ze skladu dodavatele), a třída ABC
+  nejsou koruny — obrat po položkách feed nenese.
+- Všechny čtyři sloupce ABC (30 / 90 / 180 / 360 dní) mají u všech položek stejnou hodnotu.
+- **Feed je stažitelný bez přihlášení z veřejné adresy** — i s nákupními cenami celého sortimentu.
+
+Další krok podle karty: seznam 362 položek tříd A a B dostane nákup s jednou otázkou — je to nová informace,
+nebo ji už dává OBR? Podle odpovědi se rozhodne, jestli se Disivo feed stane zdrojem Feed Hubu.
