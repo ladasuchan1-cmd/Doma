@@ -406,3 +406,15 @@ Bloky A až D dávají dohromady zhruba dva týdny práce, blok E další týden
   (aspoň 4 úspěšné běhy beze změny), je varování. Nahrané sešity se nehlídají. Paul Lange se ukáže nejpozději
   28. 11. ve 12:00.
 - Na Láďovi / Pavlovi: zeptat se Paul Lange, jak často feed generují a jestli mají feed s celým katalogem včetně dílů.
+
+### Stav 27. 11. 2026 odpoledne — Kontrola feedů nasazená (verze v2026-11-27-34602ad)
+
+- Nová záložka **Kontrola** (sales.report/feeds/#kontrola): řádek na dodavatele, poslední sloupec „Co udělat“.
+- První čísla ze serveru: dodavatelů s feedem 47, v pořádku 21, k řešení 26. Z 26 468 našich položek od dodavatelů
+  s feedem feed nese 20 563 (78 %); chybí a nemáme skladem 2 688.
+- Nejvíc chybí (nese / naše položky, chybí a nemáme skladem): N Distribution 640 / 1 467 (547), Bottico 360 / 917 (392),
+  Protocycles 34 / 455 (252 — feed má jen 61 položek), Level Sport 100% 85 / 1 527 (240 — feed je jen jedné značky),
+  Bike Park 110 / 351 (236), Zookee 3 554 / 3 959 (190), Sport Import 847 / 1 080 (112), Crussis 767 / 870 (90),
+  Cyklomax 600 / 785 (86).
+- Na Láďovi: přiřadit dodavatele z karet u 8 dodavatelů, kde se jméno ve feedu liší od karet (Paul Lange, KCK, Aspire,
+  Focus, Dynafit, Raymon, MBPS, Salewa) — v Kontrole u řádku je návrh, stačí kliknout Přiřadit.
